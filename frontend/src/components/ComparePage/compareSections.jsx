@@ -595,8 +595,8 @@ export function buildCompareSections({
                     <div key={price.id} className="space-y-1">
                       <div className="text-sm font-medium text-neutral-900">
                         {t(`pricing.${price.category}`)}
-                        {[priceAgeGroupLabel(price, t)].filter(Boolean).map(label => ` • ${label}`)}
-                        {[planNameBeside(price, t, priceAgeGroupLabel(price, t))].filter(Boolean).map(name => (
+                        {[priceAgeGroupLabel(price, t, language)].filter(Boolean).map(label => ` • ${label}`)}
+                        {[planNameBeside(price, t, priceAgeGroupLabel(price, t, language), language)].filter(Boolean).map(name => (
                           <span key="plan" lang={textLang(name, language)}>{` • ${name}`}</span>
                         ))}
                         {!group.academicYear && price.academic_year ? ` • ${price.academic_year}` : ''}

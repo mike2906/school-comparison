@@ -528,6 +528,8 @@ def _build_rows(
     built = []
     for result, page in checked:
         fee = result.fee
+        # The name of a way of paying says nothing once the fee carries its payment options.
+        plan_name_dropped = bool(fee.payment_options and _PAYMENT_PLAN_NAME_RE.match(fee.plan_name or ""))
         fields = price_step._normalized_price_fields(
             ExtractedPrice(
                 category=fee.category.value,
@@ -536,9 +538,7 @@ def _build_rows(
                 period=fee.period.value if fee.period else None,
                 amount_min=fee.amount_min,
                 amount_max=fee.amount_max,
-                plan_name=None
-                if fee.payment_options and _PAYMENT_PLAN_NAME_RE.match(fee.plan_name or "")
-                else fee.plan_name,
+                plan_name=None if plan_name_dropped else fee.plan_name,
                 academic_year=fee.academic_year,
                 age_group=fee.age_group,
                 confidence=result.confidence,
@@ -547,24 +547,28 @@ def _build_rows(
         if fields is not None:
             # Single payments of one plan price are the same fee whatever they are called.
             label = "" if _single_payment(fee) else " ".join(fee.label.split()).casefold()
-            built.append((result, page, fields, label))
+            english = {
+                "plan_name_en": None if plan_name_dropped or not fields.get("plan_name") else fee.plan_name_en,
+                "age_group_en": fee.age_group_en if fields.get("age_group") else None,
+            }
+            built.append((result, page, fields, label, english))
 
     # A plan paid "1 x 8950" restates the plan's 8950 a second time (596): drop such a single
     # payment when the same fee also comes without it, with or without its period.
     def unperiodic(fields: dict) -> tuple:
         return tuple(value for name, value in fields.items() if name != "period")
 
-    restated = {unperiodic(f) for r, _, f, _ in built if not _single_payment(r.fee)}
+    restated = {unperiodic(f) for r, _, f, _, _ in built if not _single_payment(r.fee)}
     built = [b for b in built if not (_single_payment(b[0].fee) and unperiodic(b[2]) in restated)]
     # The same fee on two pages is one row (564 lists its fees on three). On one page a
     # second fee with the same fields but its own label is a fee of its own: two grade
     # tiers at one price when the reader left their groups empty. So each set of fields
     # comes from the one page that lists it most often, once per label.
     labels: dict[tuple, dict[Any, set[str]]] = {}
-    for _, page, fields, label in built:
+    for _, page, fields, label, _ in built:
         labels.setdefault(tuple(fields.values()), {}).setdefault(page.id, set()).add(label)
     taken: set[tuple] = set()
-    for result, page, fields, label in built:
+    for result, page, fields, label, english in built:
         key = tuple(fields.values())
         by_page = labels[key]
         if page.id != max(by_page, key=lambda page_id: len(by_page[page_id])) or (key, label) in taken:
@@ -588,6 +592,8 @@ def _build_rows(
                     "installments": fee.installments,
                     "payment_options": [option.model_dump(exclude_none=True) for option in fee.payment_options],
                     "notes": fee.notes,
+                    # The site's words in English for the English page; the columns keep the site's own.
+                    **{key: value for key, value in english.items() if value},
                 },
             )
         )

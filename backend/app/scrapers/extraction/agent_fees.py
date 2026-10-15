@@ -54,10 +54,19 @@ class AgentFee(BaseModel):
     currency: str = Field(description="EUR or BGN, as printed; the EUR figure when both are printed")
     period: Optional[PricePeriod] = Field(description="null unless the evidence line states it")
     plan_name: Optional[str] = Field(
-        description="What the fee buys (full day, half day), as the site names it; never a payment plan"
+        description="What the fee buys (full day, half day) and on what terms, as the site names it; "
+        "never a way of paying in parts"
+    )
+    plan_name_en: Optional[str] = Field(
+        default=None,
+        description="plan_name in plain English for a parent (Half day); null when plan_name is null"
     )
     academic_year: Optional[str] = Field(description="As the site states it, e.g. 2026/2027")
     age_group: Optional[str] = Field(description="Grade or age group, as the site states it")
+    age_group_en: Optional[str] = Field(
+        default=None,
+        description="age_group in plain English for a parent (Ages 3 to 6); null when age_group is null"
+    )
     label: str = Field(description="The site's own words for this fee, short")
     notes: Optional[str] = None
     installments: list[str] = Field(default_factory=list)
@@ -118,7 +127,8 @@ READER_PROMPT = """You read a school's own web pages and list the fees it states
 Rules:
 - Only fees of the named institution. A shared site may also list a sibling school or kindergarten; skip their fees.
 - Only the current or upcoming school year. If several appear, list the most recent.
-- One entry per fee and group (grade, age group, full or half day). A discounted or early-payment price is its own entry, with a note.
+- One entry per fee and group (grade, age group, full or half day). A discounted, prepaid or promotional price the site prints as an amount is its own entry, and its plan_name says on what terms, in the site's words ("Еднократно плащане за 6 месеца", "Промоционална такса за първите 3 месеца").
+- Two entries of the same category, group and period never share a plan_name: the site's words that tell them apart (half day, full day, paid for 6 months at once) are their plan_name.
 - Paying one fee in parts is not a fee of its own. When the site offers the same fee paid in one go and also in parts (2 instalments, quarterly or monthly instalments, "Plan 1 / Plan 2 / Plan 3", "1 x A + 9 x B"), list one entry: amount is the price paid in one go, and each way of paying in parts goes in payment_options with the numbers the site prints (total, payments, instalment, first_payment). Paying in one go is the entry itself, never an option.
 - If the site prints no price for paying in one go, the entry's amount is the total it prints for one plan; with no total printed, list each instalment amount as its own entry with the plan name.
 - A monthly fee that is the school's ordinary price (a kindergarten's monthly fee) is the entry itself, not an option.
@@ -137,7 +147,8 @@ Rules:
 - Never build a range from two different fees (a full-day and a half-day price are two entries). A range only when the site prints one.
 - source_url: the URL of the page the fee is on.
 - evidence: the line of the page the amount is on, copied character for character, and the lines of its payment options. For a table row, also copy the heading line that gives its period, plan or group, as a separate line. If the period is stated in a sentence above the table, copy that sentence too. A PDF's tables are repeated after its text, one row per line with cells split by " | " and a cell's lines by " / ": when the text above splits a table row over several lines, copy the row and its heading row from there instead of joining lines yourself.
-- label: the site's own wording, short. academic_year, age_group and plan_name as the site states them, or null. plan_name names what the fee buys (full day, half day), not a way of paying: a payment plan's name is its option's label."""
+- label: the site's own wording, short. academic_year, age_group and plan_name as the site states them, or null. plan_name names what the fee buys (full day, half day) and any price terms, not a way of paying in parts: a payment plan's name is its option's label.
+- plan_name_en and age_group_en: the same words in plain English, as a parent would read them on the English page ("Half day", "Paid for 6 months at once", "Ages 3 to 6"), adding nothing the Bulgarian does not say; null when the Bulgarian field is null."""
 
 
 # ---------------------------------------------------------------------------

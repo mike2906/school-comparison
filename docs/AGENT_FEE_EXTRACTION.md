@@ -74,6 +74,12 @@ For one school, with its `website_url`:
      (9,150 EUR in total)"); a "Plan 1"-style name is dropped from a fee that has them. Their
      amounts count as read, so the old rows of a school that stored each instalment as a fee
      give way to the one fee (596 had 42 rows: 3 fees and 6 grade bands × 3 plans).
+   - **Fee names in English.** `plan_name` and `age_group` stay the site's own words; the
+     reader also gives each in plain English (`plan_name_en`, `age_group_en`), stored in
+     `pricing_context` and shown on the English page where we have no label of our own
+     (625's "половин ден" showed as is). Two fees of one category, group and period always
+     get the plan name that tells them apart, so a prepaid or promotional price no longer
+     shows as a second bare "Tuition" (2026-10-15).
    - **Discounts.** A percentage or amount off (siblings, paying early, paying the whole year
      at once) is no fee: the reader lists it in `discounts` with a bg and an en sentence. Code
      keeps one only when its evidence line is on the page, holds its one number (percent or

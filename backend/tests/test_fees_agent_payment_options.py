@@ -107,6 +107,23 @@ def test_a_name_that_is_not_a_payment_plan_stays():
     assert rows[0].plan_name == "Full day"
 
 
+def test_rows_keep_the_english_for_the_site_words_they_keep():
+    """625 (dgsofia.com): "половин ден" showed in Bulgarian on the English page."""
+    page = SourcePage(id=-1, school_id=1, scrape_type=ScrapeType.WEBSITE, source_url=URL)
+    half_day = tuition(
+        plan_name="половин ден", plan_name_en="Half day", age_group_en="Preparatory year", payment_options=[]
+    )
+    plan = tuition(plan_name_en="Plan 1", age_group=None, age_group_en="Grade 0")
+    rows, _ = fees_agent._build_rows(
+        _school(), [(check_fee(half_day, PAGE_596), page), (check_fee(plan, PAGE_596), page)]
+    )
+    by_name = {row.plan_name: row.pricing_context for row in rows}
+    assert by_name["половин ден"]["plan_name_en"] == "Half day"
+    assert by_name["половин ден"]["age_group_en"] == "Preparatory year"
+    # The payment plan's name is dropped, and the English for it and for no age group with it.
+    assert "plan_name_en" not in by_name[None] and "age_group_en" not in by_name[None]
+
+
 async def _run_596(db_session, read_fee, extra=(), page_text=PAGE_596):
     school = School(
         name_i18n={"bg": "Частно училище"},

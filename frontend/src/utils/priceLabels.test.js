@@ -77,3 +77,15 @@ test('planNameBeside drops the plan name only when it repeats the age group show
   assert.equal(planNameBeside(row, t, null), 'Grade 5')
   assert.equal(planNameBeside(row, t, 'Grade 6'), 'Grade 5')
 })
+
+test('the English page shows the fees agent English for website words (625: "половин ден")', () => {
+  const halfDay = { category: 'tuition', plan_name: 'половин ден', pricing_context: { plan_name_en: 'Half day' } }
+  assert.equal(planNameLabel(halfDay, t, 'en'), 'Half day')
+  assert.equal(planNameLabel(halfDay, t, 'en-GB'), 'Half day')
+  assert.equal(planNameLabel(halfDay, t, 'bg'), 'половин ден')
+  // No English given: the site's words, as before.
+  assert.equal(planNameLabel({ category: 'tuition', plan_name: 'половин ден' }, t, 'en'), 'половин ден')
+  // English that only repeats the category is dropped like the Bulgarian.
+  const transport = { category: 'transport', plan_name: 'Превоз', pricing_context: { plan_name_en: 'Transport' } }
+  assert.equal(planNameLabel(transport, t, 'en'), null)
+})

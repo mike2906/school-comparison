@@ -1,7 +1,7 @@
 // A price row's plan name and age group are the school website's own words, usually in
 // Bulgarian. Words we have our own label for (a fee category, a grade, a kindergarten
-// stage) are shown in the page language; other text is shown as written and marked with
-// its language, so a Bulgarian fee name on the English page is read as Bulgarian.
+// stage) are shown in the page language; on the English page other text is shown in the
+// fees agent's English when it gave one, else as written and marked with its language.
 import { gradeBandLabel, gradesInText, gradesNamedIn, parseGradeBand } from './gradeBand.js'
 
 const LANGUAGES = ['bg', 'en']
@@ -39,16 +39,28 @@ function gradesOnlyLabel(text, t) {
 }
 
 /**
+ * A row's website words (`plan_name`, `age_group`) for the page: on the English page the
+ * fees agent's English (`pricing_context.<field>_en`) when it gave one, else as written.
+ */
+export function websiteWords(price, field, language) {
+  const raw = price?.[field]?.trim()
+  if (!raw) return null
+  const english = price?.pricing_context?.[`${field}_en`]?.trim()
+  return String(language || '').startsWith('en') && english ? english : raw
+}
+
+/**
  * The plan name to show for a price row, or null when it only repeats the row's category
  * ("Транспорт" under Transport). A bare grade or kindergarten stage is shown as our own
- * label; anything else as the website wrote it.
+ * label; anything else as `websiteWords`.
  */
-export function planNameLabel(price, t) {
+export function planNameLabel(price, t, language) {
   const raw = price?.plan_name?.trim()
   if (!raw) return null
-  const name = normalize(raw)
-  if (price.category && LANGUAGES.some(lng => normalize(t(`pricing.${price.category}`, { lng })) === name)) return null
-  return stageLabel(raw, t) || gradesOnlyLabel(raw, t) || raw
+  const shown = websiteWords(price, 'plan_name', language)
+  const names = [normalize(raw), normalize(shown)]
+  if (price.category && LANGUAGES.some(lng => names.includes(normalize(t(`pricing.${price.category}`, { lng }))))) return null
+  return stageLabel(raw, t) || gradesOnlyLabel(raw, t) || shown
 }
 
 /**
@@ -67,7 +79,7 @@ export function textLang(text, pageLanguage) {
  * `planNameLabel`, or null when it reads the same as the age-group label shown beside it
  * ("ПК" under "ПК" would read "Preschool • Preschool").
  */
-export function planNameBeside(price, t, shownAgeGroup) {
-  const name = planNameLabel(price, t)
+export function planNameBeside(price, t, shownAgeGroup, language) {
+  const name = planNameLabel(price, t, language)
   return name && name === shownAgeGroup ? null : name
 }

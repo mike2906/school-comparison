@@ -288,6 +288,11 @@ test('priceAgeGroupLabel: known key translated, grades and stages as our label, 
   assert.equal(priceAgeGroupLabel({ age_group: 'Grade 1', plan_name: 'Grade 10 tuition' }, tEn), 'Grade 1')
   assert.equal(priceAgeGroupLabel({ age_group: 'Детска градина' }, tEn), 'Kindergarten')
   assert.equal(priceAgeGroupLabel({ age_group: 'Подготвителен курс' }, tEn), 'Подготвителен курс')
+  // On the English page, the fees agent's English for words we have no label for.
+  const ages = { age_group: 'от 3 до 6 години', pricing_context: { age_group_en: 'Ages 3 to 6' } }
+  assert.equal(priceAgeGroupLabel(ages, tEn, 'en'), 'Ages 3 to 6')
+  assert.equal(priceAgeGroupLabel(ages, tEn, 'bg'), 'от 3 до 6 години')
+  assert.deepEqual(groupRowsByAgeGroup([ages, { age_group: 'ПК' }], tEn, 'en').map(band => band.label), ['Ages 3 to 6', 'Preschool'])
   assert.equal(priceAgeGroupLabel({ age_group: 'Grade 0', plan_name: 'Grade 0 / Plan 1' }, tEn), 'Preschool')
   assert.equal(priceAgeGroupLabel({ age_group: 'preschool', plan_name: 'Preschool fees' }, tEn), 'Pre-school')
   assert.equal(priceAgeGroupLabel({ age_group: 'grade 2 - 4', plan_name: 'Grade 2 - 4 / Plan 1' }, tEn), null)
