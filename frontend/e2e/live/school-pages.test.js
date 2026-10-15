@@ -36,6 +36,20 @@ describe('finding a school', () => {
     await page.waitForURL(url => url.pathname === `/en/schools/${school.id}`)
     await page.getByRole('heading', { level: 1, name: schoolName(school, 'en'), exact: true }).waitFor()
   })
+
+  test("a private kindergarten's name keeps its type, as the school writes it", async () => {
+    // '"Частна детска градина СОФИЯ" ЕООД' once showed as a bare "Sofia", which reads as
+    // the city. A name the school's own website gives (a brand) may still drop the type.
+    const typed = /частна детска градина/i
+    const registered = (await allSchools()).filter(s => isPrivate(s) && typed.test(s.name_i18n?.bg || ''))
+    assert.ok(registered.length > 0, 'private kindergartens named in the register')
+    const keeping = registered.filter(s => typed.test(schoolName(s, 'bg')))
+    assert.ok(keeping.length >= registered.length * 0.8, `${keeping.length} of ${registered.length} keep the type`)
+    const school = keeping.find(s => /kindergarten/i.test(schoolName(s, 'en')))
+    assert.ok(school, 'one says "Kindergarten" in English')
+    await open('en', `/schools/${school.id}`)
+    await page.getByRole('heading', { level: 1, name: schoolName(school, 'en'), exact: true }).waitFor()
+  })
 })
 
 describe('a school page', () => {

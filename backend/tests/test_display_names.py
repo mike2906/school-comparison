@@ -6,8 +6,9 @@ only the derived ``resolved_*`` display values.
 
 import pytest
 
+from app.scrapers.price_evidence import shared_names
 from app.utils.display_names import tidy_bg_address, tidy_bg_name, translate_bg_school_name
-from app.utils.i18n_resolver import resolve_address_i18n, resolve_name_i18n
+from app.utils.i18n_resolver import register_core_names, resolve_address_i18n, resolve_name_i18n
 
 
 @pytest.mark.parametrize(
@@ -93,13 +94,13 @@ from app.utils.i18n_resolver import resolve_address_i18n, resolve_name_i18n
         # Legal-form suffixes and prefixes, wrapping and unbalanced quotes.
         (
             '"ЧАСТНА ДЕТСКА ГРАДИНА ГЕРМАНИ БГ" ЕАД',
-            "Германи БГ",
-            "Germani BG",
+            "Частна детска градина „Германи БГ“",
+            'Private Kindergarten "Germani BG"',
         ),
         (
             '"ЧАСТНА ДЕТСКА ГРАДИНА "ПРОЛЕТ" ООД',
-            "Пролет",
-            "Prolet",
+            "Частна детска градина „Пролет“",
+            'Private Kindergarten "Prolet"',
         ),
         (
             'ФОНДАЦИЯ "ЧАСТНО СРЕДНО УЧИЛИЩЕ "РОНАЛД ЛАУДЕР"',
@@ -122,8 +123,28 @@ from app.utils.i18n_resolver import resolve_address_i18n, resolve_name_i18n
             "First Private High School of Mathematics",
         ),
         # A lone caps brand in a mixed-case name is kept; a caps run is recased.
-        ('"Частна детска градина "НЕМО" ООД', "НЕМО", "NEMO"),
-        ('Частна детска градина "ПОД 1 ПОКРИВ" ЕООД', "Под 1 Покрив", "Pod 1 Pokriv"),
+        ('"Частна детска градина "НЕМО" ООД', "Частна детска градина „НЕМО“", 'Private Kindergarten "NEMO"'),
+        (
+            'Частна детска градина "ПОД 1 ПОКРИВ" ЕООД',
+            "Частна детска градина „Под 1 Покрив“",
+            'Private Kindergarten "Pod 1 Pokriv"',
+        ),
+        # The type stays: a bare "София" would read as the city (issue from Mike, 2026-10-15).
+        ('"Частна детска градина СОФИЯ" ЕООД', "Частна детска градина „София“", 'Private Kindergarten "Sofia"'),
+        ("\"Частна детска градина ''Ягодина'' ООД", "Частна детска градина „Ягодина“", 'Private Kindergarten "Yagodina"'),
+        (
+            '"ЧАСТНА АНГЛИЙСКА ГИМНАЗИЯ "ШЕКСПИР" ООД',
+            "Частна английска гимназия „Шекспир“",
+            'Private English High School "Shekspir"',
+        ),
+        ('"ЧАСТНО УЧИЛИЩЕ "БЕТА" ООД', "Частно училище „Бета“", 'Private School "Beta"'),
+        ('ЧДГ "СЛЪНЦЕ" ЕООД', "ЧДГ „Слънце“", 'Private Kindergarten "Slantse"'),
+        ("ЧДГ ''Ягодина'' ООД", "ЧДГ „Ягодина“", 'Private Kindergarten "Yagodina"'),
+        (
+            '"ЧАСТНА ГИМНАЗИЯ ПО ПРИРОДНИ НАУКИ И ПРЕДПРИЕМАЧЕСТВО "АСЕН ЙОРДАНОВ" ЕООД',
+            "Частна гимназия „Асен Йорданов“",
+            'Private High School "Asen Yordanov"',
+        ),
     ],
 )
 def test_resolve_name_cleans_register_formatting(stored_bg, expected_bg, expected_en):
@@ -234,3 +255,12 @@ def test_plain_sports_school_and_leading_modifier_get_type_and_ordinal():
     assert translate_bg_school_name('20.ИНОВАТИВНО ОСНОВНО УЧИЛИЩЕ "ТОДОР МИНКОВ"') == (
         '20th Innovative Primary School "Todor Minkov"'
     )
+
+
+def test_a_sibling_school_still_matches_a_kindergarten_brand_by_its_bare_name():
+    """validator._check_display_name: the school's published name now keeps its type, so
+    its bare register name is what a kindergarten's brand candidate is matched against."""
+    school = {"bg": '"ЧАСТНО ОСНОВНО УЧИЛИЩЕ "ПРОЛЕТ" ООД'}
+    assert resolve_name_i18n(school)["bg"] == "Частно основно училище „Пролет“"
+    assert shared_names(["Пролет"], [*resolve_name_i18n(school).values(), *register_core_names(school)])
+    assert register_core_names({"bg": "ДГ №19 Света София"}) == set()
