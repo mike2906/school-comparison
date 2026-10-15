@@ -300,9 +300,9 @@ def _title_names_period(period: PricePeriod, page_text: str, evidence: str, fee:
     """The page's title names the period of its tuition, and the fee's own lines say nothing else.
 
     Only tuition, only monthly or yearly, and only a title line (one of the page's first five
-    lines, above its first price) that names tuition and that one period. The amount's own lines must name
-    no other period and must not print it as an instalment ("2 x € 4.575"): the title names the
-    fee's period, not the period of a way of paying it.
+    lines, above its first price) that names tuition and that one period. No evidence line may name
+    another period, and the amount's own lines must not print it only as an instalment ("2 x € 4.575"):
+    the title names the fee's period, not the period of a way of paying it.
     """
     if fee.category is not PriceCategory.TUITION or period not in (PricePeriod.MONTHLY, PricePeriod.YEARLY):
         return False
@@ -322,12 +322,11 @@ def _title_names_period(period: PricePeriod, page_text: str, evidence: str, fee:
     amounts = fee_amounts(fee)
     for line in evidence.splitlines():
         line = _AGE_RE.sub(" ", line)
-        starts = [start for start, _, values in number_spans(line) if set(amounts) & values]
-        if not starts:
-            continue
+        # Any evidence line, a heading too ("Monthly tuition plan"), that names another period wins.
         if any(re.search(_PERIOD_WORDS[other], line) for other in others) or _ONE_TIME_EN_RE.search(line):
             return False
-        if all(_INSTALMENT_BEFORE_RE.search(line[:start]) for start in starts):
+        starts = [start for start, _, values in number_spans(line) if set(amounts) & values]
+        if starts and all(_INSTALMENT_BEFORE_RE.search(line[:start]) for start in starts):
             return False
     return True
 

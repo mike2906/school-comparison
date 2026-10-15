@@ -1851,3 +1851,9 @@ def test_the_title_names_no_period_for_other_fees_or_below_a_price():
     below = "Registration: € 800\n" + PAGE_TITLED
     tuition = check_fee(fee(PriceCategory.TUITION, "Plan 3 - € 9.400", amount=9400, period=PricePeriod.YEARLY), below)
     assert tuition.fee.period is None
+
+
+def test_an_evidence_heading_naming_another_period_beats_the_title():
+    page = PAGE_TITLED + "\nMonthly tuition plan\nGrade 1: € 900"
+    read = fee(PriceCategory.TUITION, "Monthly tuition plan\nGrade 1: € 900", amount=900, period=PricePeriod.YEARLY)
+    assert check_fee(read, page).fee.period is None
