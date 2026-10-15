@@ -60,6 +60,7 @@ class RegisterPoint:
     entrance: str
     lat: float
     lng: float
+    label: str = ""  # the address as the register writes it, for display
 
 
 @dataclass(frozen=True)
@@ -176,6 +177,22 @@ def parse(address: str, district: Optional[str] = None) -> Parsed:
     )
 
 
+def _label(row: dict) -> str:
+    """"гр. Банкя, ул. Тенев баир 2", "гр. София, ж.к. Младост 4, бл. 460А, вх. 2"."""
+    get = lambda key: (row.get(key) or "").strip()  # noqa: E731
+    parts = [get("settlement"), get("lareaunit")]
+    parts.append(" ".join(p for p in (get("street"), get("streetnum")) if p))
+    if get("block"):
+        parts.append(f"бл. {get('block')}")
+    if get("entrance"):
+        parts.append(f"вх. {get('entrance')}")
+    return ", ".join(p for p in parts if p)
+
+
+def _cell(lat: float, lng: float) -> tuple[int, int]:
+    return round(lat * 1000), round(lng * 1000)  # about 110 m by 80 m
+
+
 class Register:
     """The register's points, looked up by house number and by block."""
 
@@ -183,7 +200,9 @@ class Register:
         self.points = points
         self.by_number: dict[str, list[RegisterPoint]] = {}
         self.by_block: dict[str, list[RegisterPoint]] = {}
+        self.by_cell: dict[tuple[int, int], list[RegisterPoint]] = {}
         for point in points:
+            self.by_cell.setdefault(_cell(point.lat, point.lng), []).append(point)
             if point.number:
                 self.by_number.setdefault(point.number, []).append(point)
             if point.block:
@@ -203,6 +222,18 @@ class Register:
 
     def __len__(self) -> int:
         return len(self.points)
+
+    def near(self, point: tuple[float, float], metres: float) -> list[RegisterPoint]:
+        """Register points within ``metres`` (up to about 80) of ``point``, nearest first."""
+        lat, lng = _cell(*point)
+        found = [
+            p
+            for dlat in (-1, 0, 1)
+            for dlng in (-1, 0, 1)
+            for p in self.by_cell.get((lat + dlat, lng + dlng), [])
+            if distance_m(point, (p.lat, p.lng)) <= metres
+        ]
+        return sorted(found, key=lambda p: distance_m(point, (p.lat, p.lng)))
 
 
 def read_register(text: str) -> Register:
@@ -224,6 +255,7 @@ def read_register(text: str) -> Register:
                 entrance=_number(row.get("entrance") or ""),
                 lat=lat,
                 lng=lng,
+                label=_label(row),
             )
         )
     return Register(points)

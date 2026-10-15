@@ -637,6 +637,41 @@ def register_pins_command(school_ids, limit, register_file, apply_changes, repor
         console.print(f"Report: {report_path}")
 
 
+@cli.command("site-address")
+@click.option("--school-id", "school_ids", type=int, multiple=True, help="Run these schools (repeatable)")
+@click.option("--limit", type=int, default=None, help="Maximum schools")
+@click.option("--register-file", type=click.Path(exists=True, dir_okay=False, path_type=Path), help="A downloaded register CSV or its zip (default: download it)")
+@click.option("--apply", "apply_changes", is_flag=True, help="Write addresses and pins (default is a dry run that writes nothing)")
+@click.option("--out", "report_path", type=click.Path(dir_okay=False, path_type=Path), help="Write the JSON report")
+def site_address_command(school_ids, limit, register_file, apply_changes, report_path):
+    """Give hidden Sofia locations the address their school's own website maps and names."""
+    import json
+
+    from app.database import async_session_maker
+    from app.scrapers.stages import site_address as site_address_stage
+    from app.services.geocoding.bg.sofia_address_register import read_register, read_register_zip
+
+    register = None
+    if register_file is not None and register_file.suffix.lower() == ".csv":
+        register = read_register(register_file.read_text(encoding="utf-8-sig"))
+    elif register_file is not None:
+        register = read_register_zip(register_file.read_bytes())
+
+    async def _run():
+        async with async_session_maker() as db:
+            return await site_address_stage.run_site_address(
+                db, school_ids=school_ids, limit=limit, apply=apply_changes, register=register
+            )
+
+    report = asyncio.run(_run())
+    mode = "Applied" if apply_changes else "Dry run"
+    console.print(f"{mode}: {report['locations']} locations, outcomes {report['outcomes']}")
+    if report_path is not None:
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        report_path.write_text(json.dumps(report, ensure_ascii=False, indent=1, default=str), encoding="utf-8")
+        console.print(f"Report: {report_path}")
+
+
 @cli.command("website-pins")
 @click.option("--school-id", "school_ids", type=int, multiple=True, help="Run these schools (repeatable)")
 @click.option("--city", default="sofia", show_default=True, help="City (only Sofia has the bounds and town name yet)")
