@@ -612,16 +612,19 @@ function SearchPage() {
     return schoolsWithDistance.map(school => ({ ...school, driveSeconds: driveTimes.seconds.get(school.id) ?? null }))
   }, [schoolsWithDistance, driveTimes.seconds])
 
-  const hiddenBelow = useHiddenBelow(schoolsWithDrive, filters.ageGroup)
+  const hiddenBelow = useHiddenBelow(schools, filters.ageGroup)
   const distanceLimit = userLocation && distanceFilter !== 'any' ? parseFloat(distanceFilter) : null
 
-  const filteredSchools = useMemo(() => {
+  const matchingSchools = useMemo(() => {
     return schoolsWithDrive.filter(school => (
       (!distanceLimit || (typeof school.distance === 'number' && school.distance <= distanceLimit)) &&
-      schoolMatchesQuery(school, nameQuery) &&
-      !hiddenBelow.has(school.id)
+      schoolMatchesQuery(school, nameQuery)
     ))
-  }, [schoolsWithDrive, distanceLimit, nameQuery, hiddenBelow])
+  }, [schoolsWithDrive, distanceLimit, nameQuery])
+  const filteredSchools = useMemo(
+    () => (hiddenBelow.size ? matchingSchools.filter(school => !hiddenBelow.has(school.id)) : matchingSchools),
+    [matchingSchools, hiddenBelow]
+  )
 
   const boundedSchools = useMemo(() => {
     if (!searchInBounds || !mapBounds) return filteredSchools
@@ -1321,7 +1324,7 @@ function SearchPage() {
                   </div>
                 )}
 
-                <SavedAdmissionBanner ageGroup={filters.ageGroup} hiddenCount={hiddenBelow.size} />
+                <SavedAdmissionBanner ageGroup={filters.ageGroup} hiddenCount={matchingSchools.length - filteredSchools.length} />
 
                 {isFirstLoad && (
                   <div className="p-4 space-y-4">

@@ -150,4 +150,6 @@ test('only schools clearly below the last admitted child are hidden', () => {
   ]
   const hidden = clearlyBelowIds(schools, saved, null, data)
   assert.deepEqual([...hidden], [1])
+  const withSen = { kindergarten: { startYear: 2026, answers: { ...kgAnswers, additional: 'sen' } } }
+  assert.equal(clearlyBelowIds(schools, withSen, null, data).size, 0, 'SEN places are another way in')
 })

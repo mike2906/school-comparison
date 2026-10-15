@@ -1173,8 +1173,7 @@
     "saveNote": "Saved only in this browser, never sent to us. You can forget them here or on any page that uses them.",
     "needsAddressToSave": "Type your address above to save and compare every school: only a checked address says which catchment it is in.",
     "hideBelow": "Hide schools where you're below the last admitted child",
-    "hiddenCount_one": "{{count}} hidden",
-    "hiddenCount_other": "{{count}} hidden",
-    "hideBelowNote": "Cut-offs change every year, so this is a guide only."
+    "hiddenCount_one": "{{count}} hidden. Cut-offs change every year, so this is a guide only.",
+    "hiddenCount_other": "{{count}} hidden. Cut-offs change every year, so this is a guide only."
   }
 }

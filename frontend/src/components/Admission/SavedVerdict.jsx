@@ -153,8 +153,8 @@ export function SavedAdmissionBanner({ ageGroup, hiddenCount = 0 }) {
         <span>
           <span className="font-medium">{t('savedAdmission.hideBelow')}</span>
           {hideBelow && (
-            <span className="block text-primary-900/80">
-              {t('savedAdmission.hiddenCount', { count: hiddenCount })} · {t('savedAdmission.hideBelowNote')}
+            <span className="block text-primary-900/80" data-testid="hidden-count">
+              {t('savedAdmission.hiddenCount', { count: hiddenCount })}
             </span>
           )}
         </span>

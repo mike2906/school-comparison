@@ -72,7 +72,13 @@ function readHideBelow() {
 
 function subscribeHideBelow(listener) {
   hideBelowListeners.add(listener)
-  return () => hideBelowListeners.delete(listener)
+  // The switch set in another tab.
+  const onStorage = event => (event.key === HIDE_BELOW_KEY || event.key === null) && listener()
+  window.addEventListener('storage', onStorage)
+  return () => {
+    hideBelowListeners.delete(listener)
+    window.removeEventListener('storage', onStorage)
+  }
 }
 
 export function setHideBelow(value) {

@@ -114,7 +114,7 @@ function AddressQuestions({ index, value, onChange, school, catchments, measured
           onChange={v => onChange(prev => ({ ...prev, since: v }))}
         />
       )}
-      {value.inCatchment !== false && <NextTierHint kind="g1" tiers={tiers} since={value.since} measuredOn={measuredOn} />}
+      {value.inCatchment === true && <NextTierHint kind="g1" tiers={tiers} since={value.since} measuredOn={measuredOn} />}
     </div>
   )
 }
@@ -171,7 +171,8 @@ function Grade1Calculator({ selected, startYear, school, cutoffRows = [], isCurr
               school={school}
               catchments={catchments}
               measuredOn={measuredOn}
-              tiers={params.groups.tiers}
+              // A young sibling at the school is group 1 however long the address.
+              tiers={context.siblingUnderAgeAtSchool === true ? null : params.groups.tiers}
             />
           ))}
           {addresses.length === 1 ? (

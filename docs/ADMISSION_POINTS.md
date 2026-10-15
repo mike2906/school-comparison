@@ -243,8 +243,8 @@ on the latest round unless that round had no places (then the first). Eighth gra
 left out: without each class's formula most rows would read "depends".
 
 The list banner has an opt-in switch to hide schools where every saved result is clearly
-below (`clearlyBelowIds`); a tie, "depends", mixed rows, no cut-off or a cut-off ranked
-under other rules keeps the school listed. The switch is a per-browser preference
+below (`clearlyBelowIds`); a tie, "depends", mixed rows, no cut-off, a cut-off ranked
+under other rules or a possible social-priority or SEN path keeps the school listed. The switch is a per-browser preference
 (localStorage `admissionHideBelow`).
 
 Under each "address since" date the calculator says when the address reaches the next
