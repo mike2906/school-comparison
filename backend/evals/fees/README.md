@@ -1,7 +1,9 @@
 # Fees eval
 
 A regression check for the fees agent's reader: it reads saved pages and is scored against
-the blind answer keys of R6 step 3 and step 4 (`docs/accuracy/step3`, `docs/accuracy/step4`).
+the blind answer keys of R6 step 3 and step 4 (`docs/accuracy/step3`, `docs/accuracy/step4`)
+and the targeted keys in `docs/accuracy/cases` (one school's known problem each; 596: the extras
+the reader dropped run to run).
 Saved pages keep the score still while the sites change, so a moved score means the prompt,
 schema, checks or model moved it. `scripts/fees_eval.py` says what is scored and how.
 

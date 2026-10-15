@@ -97,11 +97,12 @@ def test_check_against_baseline():
     assert len(fees_eval.check({"wrong_rate": 0.20, "found_rate": 0.50}, baseline)) == 2
 
 
-def test_key_loads_both_sets():
+def test_key_loads_every_set():
     key = fees_eval.load_key()
     assert 541 not in key  # blocked
     assert len(key[520]) >= 10  # judged key, with the fees the judges added
     assert key[272] == []  # a site that states no fees stays in, so a row there counts as wrong
+    assert {fee["category"] for fee in key[596]} >= {"materials", "uniforms", "food", "transport"}  # cases
 
 
 @pytest.mark.asyncio

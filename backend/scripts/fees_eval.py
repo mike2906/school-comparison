@@ -2,7 +2,7 @@
 
 The pages are what the agent's finder found (``fees-agent --save-pages evals/fees/pages``);
 the key is the R6 step 3 and step 4 answer keys in ``docs/accuracy`` (judged site fees where
-the judges ran, the blind key otherwise). Saved pages keep the score from drifting as sites
+the judges ran, the blind key otherwise), plus the targeted keys in ``docs/accuracy/cases``. Saved pages keep the score from drifting as sites
 change, so a change in the score is a change in the prompt, schema, checks or model.
 
 What it covers: the reader, ``check_fee`` and ``_build_rows``, and the publish gate on the
@@ -61,7 +61,8 @@ EVAL_DIR = BACKEND / "evals" / "fees"
 PAGES_DIR = EVAL_DIR / "pages"
 BASELINE = EVAL_DIR / "baseline.json"
 ACCURACY = BACKEND.parent / "docs" / "accuracy"
-KEY_SETS = ("step3", "step4")
+# step3 and step4 are blind keys; cases holds keys written for one school's known problem (596's extras).
+KEY_SETS = ("step3", "step4", "cases")
 BGN_PER_EUR = Decimal("1.95583")
 TOLERANCE = Decimal("0.01")
 READ_TIMEOUT_SECONDS = 240  # as the stage's read
