@@ -1,4 +1,5 @@
 import L from 'leaflet'
+import '../../utils/leafletGuard'
 import {
   pointsForFit,
   fitKeepRatio,

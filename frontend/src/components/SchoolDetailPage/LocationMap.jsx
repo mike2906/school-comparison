@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { MapContainer, TileLayer, CircleMarker, Tooltip } from 'react-leaflet'
 import { useTranslation } from 'react-i18next'
 import 'leaflet/dist/leaflet.css'
+import '../../utils/leafletGuard'
 import { getAddress } from '../../utils/i18n'
 import { parseCoordinate } from '../../utils/coordinates'
 

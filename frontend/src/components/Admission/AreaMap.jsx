@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef } from 'react'
 import { CircleMarker, GeoJSON, MapContainer, TileLayer, useMap } from 'react-leaflet'
 import { useTranslation } from 'react-i18next'
 import 'leaflet/dist/leaflet.css'
+import '../../utils/leafletGuard'
 
 // Same CARTO tiles and key handling as the other maps (see Map/SchoolMap.jsx).
 const CARTO_API_KEY = import.meta.env.VITE_CARTO_API_KEY
