@@ -8,6 +8,7 @@ is taken). The API shows a stored link only through ``shown_social_links``.
 
 from __future__ import annotations
 
+import re
 from collections import Counter
 from collections.abc import Iterable, Mapping
 from typing import Any, Optional
@@ -63,6 +64,12 @@ _FACEBOOK_NOT_A_PAGE = {
     "video.php",
     "watch",
 }
+# A council's page is not the school's: some municipal schools link their district's page
+# ("район-средец-столична-община-1431967290452641"), the municipality's or the regional
+# education office's.
+_COUNCIL_RE = re.compile(
+    r"община|obshtina|obstina|municipality|столична|stolichna|кметство|kmetstvo|^(район|rayon|raion|rajon)|^(руо|ruo)\b",
+)
 _INSTAGRAM_NOT_A_PROFILE = {
     "about",
     "accounts",
@@ -104,8 +111,9 @@ def _facebook_page(url: str) -> Optional[str]:
         page_id = (parse_qs(parsed.query).get("id") or [""])[0]
         return f"https://www.facebook.com/profile.php?id={page_id}" if page_id.isdigit() else None
     if first in ("pages", "people") and len(parts) >= 3 and parts[2].isdigit():
-        return f"https://www.facebook.com/{first}/{quote(parts[1])}/{parts[2]}"
-    if first in _FACEBOOK_NOT_A_PAGE or first in ("pages", "people") or not _plain(first):
+        council = _COUNCIL_RE.search(parts[1].lower())
+        return None if council else f"https://www.facebook.com/{first}/{quote(parts[1])}/{parts[2]}"
+    if first in _FACEBOOK_NOT_A_PAGE or first in ("pages", "people") or not _plain(first) or _COUNCIL_RE.search(first):
         return None
     return f"https://www.facebook.com/{first}"  # page names are not case-sensitive
 
@@ -115,7 +123,7 @@ def _instagram_profile(url: str) -> Optional[str]:
     if not parts:
         return None
     name = parts[0].lower()
-    if name in _INSTAGRAM_NOT_A_PROFILE or len(name) > 30 or not all(c.isalnum() or c in "._" for c in name):
+    if name in _INSTAGRAM_NOT_A_PROFILE or _COUNCIL_RE.search(name) or len(name) > 30 or not all(c.isalnum() or c in "._" for c in name):
         return None
     return f"https://www.instagram.com/{name}/"
 

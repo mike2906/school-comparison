@@ -41,6 +41,14 @@ IG = "https://www.instagram.com/school_example/"
         ("https://www.instagram.com/p/Cx123/", None),
         ("https://www.instagram.com/explore/tags/school/", None),
         ("https://twitter.com/school", None),
+        # A council's page, not the school's: the district, the municipality, the regional office.
+        ("https://www.facebook.com/%D1%80%D0%B0%D0%B9%D0%BE%D0%BD-%D1%81%D1%80%D0%B5%D0%B4%D0%B5%D1%86-%D1%81%D1%82%D0%BE%D0%BB%D0%B8%D1%87%D0%BD%D0%B0-%D0%BE%D0%B1%D1%89%D0%B8%D0%BD%D0%B0-1431967290452641", None),
+        ("https://www.facebook.com/rayonsredec", None),
+        ("https://www.facebook.com/Stolichna.obshtina", None),
+        ("https://www.facebook.com/pages/Район-Младост/12345", None),
+        ("https://www.instagram.com/sofia_municipality/", None),
+        ("https://www.facebook.com/ruo.sofia.grad", None),
+        ("https://www.facebook.com/125sou.sofia", ("facebook", "https://www.facebook.com/125sou.sofia")),
         ("mailto:a@school.example", None),
     ],
 )
@@ -163,6 +171,9 @@ def test_links_show_only_for_an_accepted_current_website_without_a_withholding_m
     assert shown_social_links(attrs, "validated", "https://moved.example/") is None
     assert shown_social_links(attrs | {"website_data_withheld": True}, "validated", HOME) is None
     assert shown_social_links({"social_links": _block(facebook="https://www.facebook.com/groups/x")}, "validated", HOME) is None
+    # A council page stored before the reader knew to reject it is not shown.
+    council = _block(facebook="https://www.facebook.com/район-средец-столична-община-1431967290452641")
+    assert shown_social_links({"social_links": council}, "validated", HOME) is None
 
 
 @pytest.mark.asyncio

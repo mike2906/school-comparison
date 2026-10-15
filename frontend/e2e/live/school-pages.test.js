@@ -15,6 +15,8 @@ const hasCoordinates = location => location.lat != null && location.lng != null
 const isPrivate = school => ['private', 'international'].includes(school.school_type)
 // The white card a section heading opens.
 const card = heading => page.getByRole('heading', { name: heading, exact: true }).locator('xpath=ancestor::div[contains(@class, "rounded-2xl")][1]')
+// One spelling of an address: a link may carry a Cyrillic page name as is or percent-encoded.
+const sameUrl = url => new URL(url).href
 const planRow = school => (school.pricing || []).find(row => (row.pricing_context?.payment_options || []).length > 0)
 
 describe('finding a school', () => {
@@ -61,7 +63,7 @@ describe('a school page', () => {
     const days = school.school_facts.at_a_glance.open_days
     const expected = days.find(day => day.register_url)?.register_url || days[0].source_url
     const href = await line.locator('xpath=following-sibling::dd[1]//a').getAttribute('href')
-    assert.equal(href, expected, 'the open day links its sign-up or announcement page')
+    assert.equal(sameUrl(href), sameUrl(expected), 'the open day links its sign-up or announcement page')
   })
 
   test("the school's own Facebook or Instagram is linked", async () => {
@@ -71,7 +73,7 @@ describe('a school page', () => {
       const url = school.social_links[network]
       if (!url) continue
       const link = page.getByRole('link', { name: t('bg', `schools.${network}`), exact: true }).first()
-      assert.equal(await link.getAttribute('href'), url)
+      assert.equal(sameUrl(await link.getAttribute('href')), sameUrl(url))
       assert.equal(await link.getAttribute('target'), '_blank')
     }
   })

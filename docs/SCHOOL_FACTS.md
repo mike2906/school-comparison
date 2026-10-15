@@ -205,7 +205,8 @@ the stored value unless the new one passes the same format checks.
 **Social links** (2026-10-14): the `social-links` stage (`app/scrapers/stages/social_links.py`,
 no model calls) reads the home page, and the contact page when the home page links neither
 network, and stores the school's Facebook page and Instagram profile in
-`attributes["social_links"]`. Share buttons, groups, events and posts are not a page; a page
+`attributes["social_links"]`. Share buttons, groups, events and posts are not a page, nor is a council's (a district,
+the municipality or the regional education office, named in the page address); a page
 linked from two different schools' websites (a web designer's) is dropped. The detail page
 links them; `app/utils/social_links.py` `shown_social_links` gates them like the facts. A
 school with no website gets no link: website discovery keeps the pages search finds in
