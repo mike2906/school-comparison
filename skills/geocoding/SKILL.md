@@ -48,7 +48,8 @@ Sofia state schools and kindergartens take the municipality's points
 address is only its complex matches its one numbered point by name (`match_by_name`).
 Kindergarten buildings the main layer lacks (сграда 2, 3) come from kg.sofia.bg's own map
 layer (`Schools/SchoolsZones` layer 0), joined on our `source_esri_id=` tag (`match_by_id`;
-the number or address must still agree). arcgis.sofia.bg refuses non-browser User-Agents.
+only for hidden locations; the layer's name must carry our number and building, as its ids
+are not always kg.sofia.bg's for the same kindergarten). arcgis.sofia.bg refuses non-browser User-Agents.
 
 `cli confirm-pins [--apply]` publishes a hidden point that already stands on our building:
 Nominatim's nearest building there is our town, street and exact house number. Not when

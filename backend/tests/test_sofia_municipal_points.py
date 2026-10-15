@@ -242,13 +242,14 @@ async def test_fill_districts_uses_exact_pins_only(db_session, monkeypatch):
     script.district_at.assert_awaited_once()
 
 
-def _id_row(name, address, tags, status="name_only"):
-    location = SimpleNamespace(address_i18n={"bg": address}, location_tags=tags)
+def _id_row(name, address, tags, status="name_only", **point):
+    defaults = {"lat": 42.65272, "lng": 23.32018, "geocode_meta": {"precision": "approximate"}}
+    location = SimpleNamespace(address_i18n={"bg": address}, location_tags=tags, **(defaults | point))
     school = SimpleNamespace(name_i18n={"bg": name})
     return Row(location, school, status)
 
 
-def test_a_kindergarten_building_is_placed_by_its_kg_sofia_id():
+def test_a_hidden_kindergarten_building_is_placed_by_its_kg_sofia_id():
     from scripts.import_sofia_municipal_points import match_by_id
 
     building = Point(
@@ -259,10 +260,27 @@ def test_a_kindergarten_building_is_placed_by_its_kg_sofia_id():
     tags = ["source=kg_sofia_bg", "source_esri_id=688"]
     row = match_by_id(_id_row("ДГ №175 Слънчеви лъчи", 'м. "Кръстова вада", ул. "Борис Руменов" №18', tags), buildings)
     assert (row.status, row.point) == ("match_by_id", building)
-    # An id whose point names another kindergarten at another address is not taken.
-    other = match_by_id(_id_row("ДГ №44 Звездица", "ул. Казбек 3", tags), buildings)
-    assert other.status == "id_disagrees" and other.point is None
     # No id tag, or a row already matched: unchanged.
     assert match_by_id(_id_row("ДГ №175", "ул. Борис Руменов 18", []), buildings).status == "name_only"
     matched = _id_row("ДГ №175", "ул. Борис Руменов 18", tags, status="match")
     assert match_by_id(matched, buildings) is matched
+
+
+def test_the_id_join_needs_our_number_and_building_and_never_moves_a_pinned_location():
+    from scripts.import_sofia_municipal_points import match_by_id
+
+    def layer(name, address="ул. Казбек 3"):
+        return {"193": Point(kind="kindergarten", name=name, address=address, district=None, lat=42.7, lng=23.3, integration_id="193")}
+
+    tags = ["source_esri_id=193"]
+    # The layer's id 193 is another kindergarten (even at an address that agrees).
+    assert match_by_id(_id_row("ДГ №85 Родина - сграда 2", "ул. Казбек 3", tags), layer("ДГ №107 Бон-бон")).status == (
+        "id_name_mismatch"
+    )
+    # Our number, another building.
+    assert match_by_id(_id_row("ДГ №85 Родина - сграда 2", "ул. Казбек 3", tags), layer("ДГ №85 Родина - сграда 3")).status == (
+        "id_name_mismatch"
+    )
+    # A location already pinned exactly (or by hand) is left alone.
+    exact = _id_row("ДГ №85 Родина", "ул. Казбек 3", tags, geocode_meta={"precision": "exact", "method": "nominatim_fallback"})
+    assert match_by_id(exact, layer("ДГ №85 Родина")).status == "name_only"
