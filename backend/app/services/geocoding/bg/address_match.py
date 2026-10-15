@@ -142,6 +142,16 @@ def same_house_number(result_house_number: object, address: str) -> bool:
     return bool(found) and found.group(1).lstrip("0") + (found.group(2) or "") == wanted
 
 
+def has_street(address: str) -> bool:
+    """Whether the address names a street (not only a neighbourhood or a block)."""
+    return bool(_parse(address or "").street)
+
+
+def has_area(address: str) -> bool:
+    """Whether the address names a neighbourhood (ж.к., кв.)."""
+    return bool(_parse(address or "").areas)
+
+
 def same_street(first: str, second: str) -> bool:
     """Whether two addresses name the same street, whatever their numbers (one's street
     words all in the other's)."""
