@@ -223,7 +223,10 @@ async def run_trial(cases: list[dict[str, Any]], key: dict[int, list], workers: 
         school_id = saved["school_id"]
         async with gate:
             try:
-                rows = await read_school(saved, spend)
+                try:
+                    rows = await read_school(saved, spend)
+                except TimeoutError:  # a slow provider: one more try, as the stage's retry
+                    rows = await read_school(saved, spend)
             except Exception as exc:  # one failed read is that school's, not the run's
                 errors[school_id] = f"{type(exc).__name__}: {str(exc)[:200]}"
                 return
