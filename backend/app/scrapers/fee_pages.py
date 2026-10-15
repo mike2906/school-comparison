@@ -217,16 +217,31 @@ def table_lines(table: list[list[str | None]]) -> list[str]:
 
     A PDF's text layer reads a table line by line across its cells, so a row whose cells
     hold several lines comes out interleaved with the next row (596: "Plan 1 – € 9,500"
-    two lines above its grade). Only a whole grid is kept, so a row never pairs amounts
-    from different rows: a table with a merged or missing cell (None) or a single column
-    is a fragment, and one whose first column holds several lines in a cell has rows
-    the PDF draws no line between ("Grade 1 / Grade 2 | € 450 / € 500")."""
-    if not table or any(cell is None for row in table for cell in row) or max(len(row) for row in table) < 2:
+    two lines above its grade, "€ 2,550 annual fee (two-" beside "TRANSPORTATION"). Here a
+    row never pairs amounts from different rows:
+
+    - A row whose first cell is merged into the row above (None) continues that row: its
+      cells are added to the same columns, so the whole row is one line, as when the PDF
+      draws it as one cell (596's primary fees and its "billed separately" table).
+    - A row whose first column holds several lines is left out, because the PDF may draw
+      no line between rows there ("Grade 1 / Grade 2 | € 450 / € 500"); the rest of the
+      table is kept. A wrapped label ("OPTIONAL / EXTRACURRICULAR / ACTIVITIES") goes too.
+    - A single-column table, or one that starts with a merged cell, is a fragment."""
+    if not table or max(len(row) for row in table) < 2 or table[0][0] is None:
         return []
-    cells = [[[part.strip() for part in cell.splitlines() if part.strip()] for cell in row] for row in table]
-    if any(len(row[0]) > 1 for row in cells[1:]):
-        return []
-    return [" | ".join(" / ".join(lines) for lines in row) for row in cells]
+    rows: list[list[list[str]]] = []
+    for row in table:
+        cells = [[part.strip() for part in (cell or "").splitlines() if part.strip()] for cell in row]
+        if row[0] is None:
+            for column, lines in enumerate(cells[: len(rows[-1])]):
+                rows[-1][column].extend(lines)
+        else:
+            rows.append(cells)
+    return [
+        " | ".join(" / ".join(lines) for lines in row)
+        for index, row in enumerate(rows)
+        if index == 0 or len(row[0]) <= 1
+    ]
 
 
 async def fetch_fee_documents(
