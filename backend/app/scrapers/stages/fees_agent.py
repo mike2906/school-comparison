@@ -965,6 +965,11 @@ def _with_stored_proof(
         if _prints_once(line, fee) and sum(_holds(text, line) for text in page_lines) == 1
     }
     same_line = [row for row in same_fee if unique & set(_amount_lines(row.pricing_context["evidence"], fee))]
+    if not same_line and (fee.age_group or "").strip():
+        # The read copied the table in another layout than the stored proof: 596's PDF prints
+        # its tuition as text under "ANNUAL TUITION FEES" and again as cells fifty lines down,
+        # and a re-read quoted the cells alone. A proof of the same named group still stands.
+        same_line = [row for row in same_fee if _same_group(row, fee)]
     periods = {row.period for row in same_line}
     if len(periods) != 1 or None in periods:  # none, or stored rows of this fee that disagree
         return result

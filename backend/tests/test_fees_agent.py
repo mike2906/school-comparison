@@ -1665,3 +1665,63 @@ def test_a_cleaned_header_matches_the_table_its_pdf_prints_twice():
     result = check_fee(tuition, page)
     assert result.kept
     assert result.fee.period is PricePeriod.YEARLY
+
+
+# 596's primary PDF: the tuition table as text under its heading, and again as cells far below.
+PAGE_TWO_LAYOUTS = "\n".join(
+    [
+        "ANNUAL TUITION FEES 2026-2027",
+        "Grade Payment Plan Plan 1 Plan 2 Plan 3",
+        "Grade 0 Plan 1 - € 8.950 1 x € 8.950 2 x € 4.575",
+        "Grade 2 - 4 Plan 1 - € 8.950 1 x € 8.950 2 x € 4.575",
+        "Еднократна такса за записване: 200 евро.",
+        *(f"Activity {n} - by semester" for n in range(20)),
+        "Grade | Payment Plan | Plan 1 | Plan 2",
+        "Grade 0 | Plan 1 - € 8.950 | 1 x € 8.950 | 2 x € 4.575",
+        "Grade 2 - 4 | Plan 1 - € 8.950 | 1 x € 8.950 | 2 x € 4.575",
+    ]
+)
+TEXT_PROOF = "ANNUAL TUITION FEES 2026-2027\nGrade Payment Plan Plan 1 Plan 2 Plan 3\nGrade 0 Plan 1 - € 8.950 1 x € 8.950 2 x € 4.575"
+
+
+def _cells_read(group):
+    row = (
+        "Grade 0 | Plan 1 - € 8.950 | 1 x € 8.950 | 2 x € 4.575"
+        if group == "Grade 0"
+        else ("Grade 2 - 4 | Plan 1 - € 8.950 | 1 x € 8.950 | 2 x € 4.575")
+    )
+    return fee(
+        PriceCategory.TUITION,
+        f"Grade | Payment Plan | Plan 1 | Plan 2\n{row}",
+        amount=8950,
+        period=PricePeriod.YEARLY,
+        academic_year="2026/2027",
+        age_group=group,
+    )
+
+
+async def _two_layouts(db, school, group):
+    await _proved_row(db, school, evidence=TEXT_PROOF)
+    row = (await _rows(db, school))[0]
+    row.amount, row.age_group = 8950, "Grade 0"
+    await db.commit()
+    pages = [PageRead(URL, PAGE_TWO_LAYOUTS, True)]
+    return await fees_agent.run_school(
+        db, school, find=_find(pages), read=_read([_cells_read(group), FEES_STAGE[1]]), apply=False
+    )
+
+
+async def test_a_stored_proof_of_the_same_group_stands_for_another_layout_of_its_table(db_session, frozen_today):
+    school = await _school(db_session)
+    report = await _two_layouts(db_session, school, "Grade 0")
+    tuition = next(f for f in report["fees"] if f["amount"] == 8950)
+    assert tuition["period"] == "yearly", tuition
+    assert _stored_notes(report)
+
+
+async def test_another_layouts_proof_does_not_pass_to_another_group(db_session, frozen_today):
+    school = await _school(db_session)
+    report = await _two_layouts(db_session, school, "Grade 2 - 4")
+    tuition = next(f for f in report["fees"] if f["amount"] == 8950)
+    assert tuition["period"] is None, tuition
+    assert not _stored_notes(report)
