@@ -35,7 +35,7 @@ from app.database import async_session_maker
 from app.models import Pricing, School
 from app.models.field_source import FieldSource, SourceConfidence, SourceType
 from app.models.pipeline_run import PipelineRun
-from app.models.pricing import PriceCategory, PriceSource
+from app.models.pricing import PriceCategory, PricePeriod, PriceSource
 from app.models.scrape_log import ScrapeType
 from app.models.source_page import SourcePage
 from app.schemas.extraction import ExtractedPrice
@@ -49,6 +49,7 @@ from app.scrapers.extraction.agent_fees import (
     check_discount,
     check_fee,
     fee_amounts,
+    number_spans,
     page_numbers,
     read_amounts,
 )
@@ -367,7 +368,9 @@ async def find_pages(
             queue = []
         # Places the picker leaves free go to the keyword links, this year's first: 594's
         # picker chose the application forms over /school-fees-2026-2027/ in one run of two.
-        keyword = [url for url, label in unopened if url not in queue and fallback_links.search(f"{unquote(url)} {label}")]
+        keyword = [
+            url for url, label in unopened if url not in queue and fallback_links.search(f"{unquote(url)} {label}")
+        ]
         this_year = _this_years_pages()
         keyword.sort(key=lambda url: not this_year.search(f"{unquote(url)} {links.get(url, '')}"))
         queue = (queue + keyword)[:MAX_PICKS]
@@ -844,6 +847,138 @@ async def _missed_amounts(
     return sorted((published & shown) - read)
 
 
+async def _stored_proofs(db: AsyncSession, school: School) -> list[Pricing]:
+    """The school's published agent rows, with the evidence that proved them."""
+    stored = await db.execute(
+        select(Pricing)
+        .where(Pricing.school_id == school.id, Pricing.source == PriceSource.SCRAPED_WEBSITE)
+        .options(selectinload(Pricing.source_page).load_only(SourcePage.id, SourcePage.is_valid))
+    )
+    blocked = blocked_pricing_row_ids(school.attributes if isinstance(school.attributes, dict) else None)
+    return [
+        row
+        for row in stored.scalars().all()
+        if isinstance(row.pricing_context, dict)
+        and row.pricing_context.get("extractor") == "agent"
+        and isinstance(row.pricing_context.get("evidence"), str)
+        and row.pricing_context["evidence"].strip()
+        and row.id not in blocked
+        and pricing_row_is_publishable(row)
+    ]
+
+
+def _checked(fee: AgentFee, page: PageRead, proofs: list[Pricing]) -> CheckedFee:
+    result = check_fee(fee, page.text)
+    if not result.kept or result.fee.period is None:
+        result = _with_stored_proof(result, page.text, proofs, fee.period)
+    return result
+
+
+# What a stored row's evidence can stand in for: the read's own copy of the line is not the page's.
+_NOT_COPIED = ("dropped: evidence line is not on the page", "dropped: evidence line does not hold the amount")
+# How far from the amount's line a stored heading or sentence may be found today and still be
+# read as the one over it: a heading that moved to another table no longer heads this amount.
+_PROOF_LINES_AWAY = 12
+
+
+def _lines(text: str) -> list[str]:
+    return [" ".join(line.split()).casefold() for line in text.splitlines() if line.strip()]
+
+
+def _amount_lines(evidence: str, fee: AgentFee) -> list[str]:
+    amounts = set(fee_amounts(fee))
+    return [line for line in _lines(evidence) if amounts & page_numbers(line)]
+
+
+def _holds(text: str, line: str) -> bool:
+    """The page line holds the evidence line as whole words: "€ 300" is not in "€ 3000"."""
+    return re.search(rf"(?<!\w){re.escape(line)}(?!\w)", text) is not None
+
+
+def _prints_once(line: str, fee: AgentFee) -> bool:
+    """The line prints the fee's amount once: "Начален | € 3000 | Гимназия | € 3000" is two groups."""
+    return all(sum(amount in values for _, _, values in number_spans(line)) == 1 for amount in fee_amounts(fee))
+
+
+def _proof_still_reads(evidence: str, fee: AgentFee, page_lines: list[str]) -> bool:
+    """Every line of a stored proof is on today's page within a few lines of the amount's own."""
+    places = [[index for index, text in enumerate(page_lines) if _holds(text, line)] for line in _lines(evidence)]
+    starts = {
+        index for line in _amount_lines(evidence, fee) for index, text in enumerate(page_lines) if _holds(text, line)
+    }
+    return all(places) and any(
+        all(any(abs(index - start) <= _PROOF_LINES_AWAY for index in found) for found in places) for start in starts
+    )
+
+
+def _same_group(row: Pricing, fee: AgentFee) -> bool:
+    def norm(value: Optional[str]) -> str:
+        return " ".join(str(value or "").split()).casefold()
+
+    return norm(row.age_group) == norm(fee.age_group) and norm(row.plan_name) == norm(fee.plan_name)
+
+
+def _with_stored_proof(
+    result: CheckedFee, page_text: str, proofs: list[Pricing], read_period: Optional[PricePeriod]
+) -> CheckedFee:
+    """The fee checked with the evidence a stored row of the same fee was proved by, when the
+    read's own evidence falls short and that proof still holds on today's page.
+
+    The reader does not copy the same lines every run. In the 2026-10-15 Sofia dry run it
+    left a table's heading or the sentence above it out of the evidence (610's "Таксата за
+    обучение е на годишна база."), so the period was cleared, and it rebuilt table rows in
+    a layout the page does not have (596's secondary tuition), so the fee was dropped; on
+    unchanged pages. A stored proof is used only when it is this fee's: for a period, it
+    holds the same line of the page for the amount as the new read, a line the page prints
+    once (two groups at one price are two lines); for a dropped fee, it is the same group
+    and plan. Its lines must still sit near the amount, and it goes through the same checks
+    on today's page, so nothing comes back that the page no longer shows.
+    """
+    fee = result.fee
+    key = _amount_key(PriceRow(fee.category.value, fee.amount, fee.amount_min, fee.amount_max, None, None, None))
+    year = normalize_academic_year(fee.academic_year)
+    page_lines = _lines(page_text)
+    same_fee = [
+        row
+        for row in proofs
+        if row.category == fee.category
+        and (row.currency or "").upper() == fee.currency.upper()
+        and _amount_group(row) == key
+        and normalize_academic_year(row.academic_year) in (year, None)
+        and _proof_still_reads(row.pricing_context["evidence"], fee, page_lines)
+    ]
+    if not result.kept and result.checks and result.checks[0] in _NOT_COPIED:
+        evidence = {row.pricing_context["evidence"] for row in same_fee if _same_group(row, fee)}
+        if len(evidence) != 1:  # none, or stored rows of this group that read differently
+            return result
+        trial = check_fee(fee.model_copy(update={"evidence": evidence.pop()}), page_text)
+        if not trial.kept:
+            return result
+        note = "evidence from the stored row: the read's copy is not on the page"
+        result = CheckedFee(trial.fee, trial.confidence, True, [*trial.checks, note])
+    if result.fee.period is not None:
+        return result
+    fee = result.fee
+    unique = {
+        line
+        for line in _amount_lines(fee.evidence, fee)
+        if _prints_once(line, fee) and sum(_holds(text, line) for text in page_lines) == 1
+    }
+    same_line = [row for row in same_fee if unique & set(_amount_lines(row.pricing_context["evidence"], fee))]
+    periods = {row.period for row in same_line}
+    if len(periods) != 1 or None in periods:  # none, or stored rows of this fee that disagree
+        return result
+    period = periods.pop()
+    if read_period not in (None, period):  # the read says another period: no proof settles which
+        return result
+    evidence = "\n".join([fee.evidence, *(row.pricing_context["evidence"] for row in same_line)])
+    trial = check_fee(fee.model_copy(update={"period": period, "evidence": evidence}), page_text)
+    if not trial.kept or trial.fee.period != period or trial.confidence < result.confidence:
+        return result
+    note = f"period {period.value} from the stored row's evidence, still on the page"
+    return CheckedFee(trial.fee, trial.confidence, True, [*result.checks, note])
+
+
 def _euro_amounts(fees: list[AgentFee]) -> dict[str, set[Decimal]]:
     """The euro amounts read, by category: 200 лв. of meals is not a 102 € bus fee."""
     euro: dict[str, set[Decimal]] = {}
@@ -958,7 +1093,8 @@ async def run_school(
     # out, read once more, naming them, and add the fees at amounts the first read did not give.
     # A fee the first read gave but the checks drop counts as missed too: 596's first read
     # stitched its secondary tuition from lines not on the page in one run of two.
-    passing = [fee for fee in fees if (page := _page_for(fee, priced)) and check_fee(fee, page.text).kept]
+    proofs = await _stored_proofs(db, school)
+    passing = [fee for fee in fees if (page := _page_for(fee, priced)) and _checked(fee, page, proofs).kept]
     missed = await _missed_amounts(db, school, priced, passing)
     if missed:
         report["reread"] = {"missed": [format(amount, "f") for amount in missed], "added": 0}
@@ -983,7 +1119,7 @@ async def run_school(
     checked: list[tuple[CheckedFee, SourcePage]] = []
     for fee in fees:
         page = _page_for(fee, priced)
-        result = check_fee(fee, page.text) if page else CheckedFee(fee, 0.0, False, ["dropped: not on a page read"])
+        result = _checked(fee, page, proofs) if page else CheckedFee(fee, 0.0, False, ["dropped: not on a page read"])
         report["fees"].append(_fee_report(result, page))
         if result.kept and page:
             checked.append((result, source_pages[page.url]))
@@ -1163,7 +1299,9 @@ async def run_fees_agent(
     if after_id is not None:
         query = query.where(School.id > after_id)
     # Ids, not objects: a rollback after one school's failure expires every loaded object.
-    rows = (await db.execute(query.with_only_columns(School.id, School.website_url).order_by(School.id).limit(limit))).all()
+    rows = (
+        await db.execute(query.with_only_columns(School.id, School.website_url).order_by(School.id).limit(limit))
+    ).all()
     run_ids = [row.id for row in rows]
     sites = {row.id: row.website_url for row in rows}
 
