@@ -541,6 +541,19 @@ def test_a_pdf_row_whose_label_holds_several_lines_is_left_out():
     assert table_lines(table) == ["Grade | Monthly | Yearly", "EXTENDED DAY | € 700 annual fee | "]
 
 
+def test_a_pdf_row_whose_wrapped_label_sits_over_one_price_is_kept():
+    from app.scrapers.fee_pages import table_lines
+
+    # 596's last row: the label wraps over three lines, the price is on one.
+    table = [
+        ["Fees", "Details", "Price 2025-2026"],
+        ["OPTIONAL\nEXTRACURRICULAR\nACTIVITIES", "Sports, arts,\nmusic, STEM.", "€ 200 - € 550 per term,\ndepending on activity"],
+    ]
+    assert table_lines(table)[1] == (
+        "OPTIONAL / EXTRACURRICULAR / ACTIVITIES | Sports, arts, / music, STEM. | € 200 - € 550 per term, / depending on activity"
+    )
+
+
 def test_fee_pictures_are_the_ones_named_for_fees():
     from app.scrapers.stages.fee_images import fee_images
 
