@@ -406,10 +406,14 @@ def _count_is_printed(payments: int, text: str) -> bool:
 # a word's hyphen break closed. Words and numbers must still match in order; a join between two
 # numbers stays a break, so "2 | 550" cannot pass as a quoted "2 550".
 _CELL_JOIN_RE = re.compile(r"\s*(?:\||\s/\s)\s*")
+# Markdown emphasis the reader may leave out: 564's "такса ... 20 €**." quoted as "20 €.".
+_MARKDOWN_RE = re.compile(r"\*+")
 _HYPHEN_BREAK_RE = re.compile(r"(?<=[^\W\d_])- (?=[^\W\d_])")
 
 
 def _loose(text: str) -> str:
+    text = _MARKDOWN_RE.sub("", text)
+
     def join(match: re.Match[str]) -> str:
         between_numbers = re.search(r"\d[.,]?$", text[: match.start()]) and re.match(r"[.,]?\d", text[match.end() :])
         return " ¦ " if between_numbers else " "

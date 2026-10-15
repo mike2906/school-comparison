@@ -416,6 +416,39 @@ def test_rule_6_counts_fees_that_share_an_amount():
     ]
 
 
+def test_rule_6_counts_a_shared_amount_on_each_rows_own_page():
+    """564: a €20 assessment on the preschool page and a €20 fee on the first-grade page."""
+    preschool = "Необходимо е заплащане на такса за обследване в размер на 20 €."
+    first_grade = "Прием в 1 клас, като таксата за участие е 20 евро."
+    published = [
+        (row(Decimal("20"), category="REGISTRATION", period="ONE_TIME"), preschool),
+        (row(Decimal("20"), category="REGISTRATION", period="ONE_TIME"), first_grade),
+    ]
+    proposed = [(row(Decimal("20"), category="REGISTRATION", period="ONE_TIME"), first_grade)]
+    assert replacement_regressions(published, proposed, "school") == [
+        "drops 1 of 2 rows at 20.00 (REGISTRATION 20.00, REGISTRATION 20.00), which the page still shows"
+    ]
+
+
+def test_a_fee_for_the_school_or_the_kindergarten_is_not_the_other_levels():
+    """271's entry fee is for children new to "the school or the kindergarten"."""
+    notes = "За новопостъпващи семейства, чиито деца не са учили преди това в училището или детската градина."
+    price_row = row(Decimal("500"), category="REGISTRATION", period="ONE_TIME", notes=notes)
+    page = f"Такса за постъпване\n500 € еднократно\n{notes}"
+    assert "2_level_fits_school" not in rules(price_row, page, "school")
+    kindergarten_only = row(Decimal("500"), category="REGISTRATION", notes="Такса за детската градина")
+    assert "2_level_fits_school" in rules(kindergarten_only, "Такса за детската градина\n500 €", "school")
+
+
+@pytest.mark.parametrize(
+    "label", ["Preschool and Kindergarten monthly fee", "Pre-school and kindergarten", "Предучилищна и детска градина"]
+)
+def test_preschool_and_kindergarten_still_names_the_kindergarten(label):
+    from app.scrapers.price_evidence import names_other_level
+
+    assert names_other_level(label, "school")
+
+
 def test_rule_6_allows_a_fee_refiled_under_another_category():
     """525's €265 deposit moved from tuition to registration: same fee, not a loss."""
     published = [(row(Decimal("265"), period="ONE_TIME"), SLAVEICHE)]

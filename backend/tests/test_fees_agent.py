@@ -1638,3 +1638,12 @@ def test_a_cleaned_quote_takes_no_period_from_a_cell_line_it_did_not_quote():
     result = check_fee(meals, "EXTRAS\nMeals | € 6 / € 110 monthly\n")
     assert result.kept
     assert result.fee.period is None
+
+
+def test_a_quote_without_the_pages_bold_markers_is_on_the_page():
+    """564's "... 20 €**." quoted as "... 20 €."."""
+    page = "Прием\n**Необходимо е заплащане на такса за обследване в размер на 20 €**.\n"
+    assessment = fee(
+        PriceCategory.REGISTRATION, "Необходимо е заплащане на такса за обследване в размер на 20 €.", amount=20
+    )
+    assert check_fee(assessment, page).kept
