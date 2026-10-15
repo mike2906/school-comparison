@@ -5,8 +5,9 @@ unless it is plainly out of date. Some schools register a legal seat (ЧСУ Д�
 Майор Коста Паница", no number) but say on their site where they are (Тенев баир 2, Банкя).
 A site gives an address when its map (a linked map, or the coordinates its own scripts draw
 a map with) sits within ``NEAR_M`` of a point in Sofia's address register and its pages
-name that register address. Then the school's one hidden location takes that address and
-point. Held back when the site gives several addresses, when the address is one of the
+name that register address. A site also gives an address it names that the EU education
+map's feature for the school gives too (two sources agreeing; ``map_feature_address``). Then
+the school's one hidden location takes that address and point. Held back when the site gives several addresses, when the address is one of the
 school's shown locations already (the hidden one is then an old address), when an unrelated
 school is pinned there (or another school's site gives the same address), or when the
 school has more than one hidden location (which one moved is unclear). No model calls.
@@ -17,6 +18,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Sequence
+from dataclasses import replace
 from typing import Any, Optional
 
 from sqlalchemy import func, select
@@ -25,10 +27,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models import School, SchoolLocation
 from app.scrapers.campus_sync import WEBSITE_CONTACT_ADDRESS_TAG
 from app.scrapers.fee_pages import fee_http_client
+from app.scrapers.stages.confirm_pins import ELSEWHERE_M
 from app.scrapers.stages.register_pins import SAME_BUILDING_M, _name_words, download_register
 from app.scrapers.stages.social_links import Fetch, _http_fetch
 from app.scrapers.stages.website_pins import _address, _distance_m, needs_pin, read_site, write_pin
 from app.services.geocoding.bg import sofia_address_register as register_lib
+from app.services.geocoding.bg.geojson import GEOJSON_NAME_MATCH
 from app.services.geocoding.bounds import get_city_bounds
 from app.utils.school_facts import SITE_ACCEPTED_STATUSES
 
@@ -45,17 +49,63 @@ def _address_key(point: register_lib.RegisterPoint) -> tuple[str, ...]:
 
 
 def site_addresses(
-    points: list[tuple[float, float]], page: register_lib.PageText, register: register_lib.Register
-) -> dict[tuple[str, ...], register_lib.RegisterPoint]:
-    """Register addresses the site both maps and names, one point each."""
-    found: dict[tuple[str, ...], register_lib.RegisterPoint] = {}
+    points: list[tuple[float, float]],
+    page: register_lib.PageText,
+    register: register_lib.Register,
+    listed: Sequence[tuple[str, tuple[float, float]]] = (),
+) -> dict[tuple[str, ...], tuple[register_lib.RegisterPoint, Optional[str]]]:
+    """Register addresses the site names and either maps or that a ``listed`` map feature
+    (its address and point) gives too, with that feature's address; one point each."""
+    found: dict[tuple[str, ...], tuple[register_lib.RegisterPoint, Optional[str]]] = {}
     for point in points:
         for candidate in register.near(point, NEAR_M):
             if _address_key(candidate) not in found and register_lib.names_address(
                 page, register_lib.parse(candidate.label)
             ):
-                found[_address_key(candidate)] = candidate
+                found[_address_key(candidate)] = (candidate, None)
+    for address, feature in listed:
+        parsed = register_lib.parse(address)
+        result = register_lib.match(parsed, register)
+        if (
+            result.outcome == "matched"
+            # The feature stands at its address: a feature matched to us by a namesake's name
+            # is that namesake's, and its address one our site has no reason to name.
+            and _distance_m(feature, result.point) <= ELSEWHERE_M
+            and register_lib.names_address(page, parsed)
+        ):
+            row = replace(result.rows[0], lat=result.point[0], lng=result.point[1])
+            found.setdefault(_address_key(row), (row, address))
     return found
+
+
+def _same_address(a: register_lib.Parsed, b: register_lib.Parsed) -> bool:
+    if a.street and b.street and a.number:
+        return a.number == b.number and register_lib.same_name(a.street, b.street)
+    if a.complex and b.complex and a.block:
+        return a.block == b.block and register_lib.same_name(a.complex, b.complex)
+    return False
+
+
+def map_feature_address(location: SchoolLocation) -> Optional[tuple[str, tuple[float, float]]]:
+    """The address and point of the EU education map's feature our hidden point was matched
+    to by name, when its address is not ours. It is often the school's current address where
+    ours is an old one (Мечо Пух: ours "ул. Стара планина 16", the feature's and the site's
+    "ул. Лидице 14")."""
+    meta = location.geocode_meta or {}
+    address = meta.get("formatted_address")
+    if (
+        meta.get("method") != GEOJSON_NAME_MATCH
+        or meta.get("status", "accepted") != "accepted"  # a rejected feature's address is kept too
+        or not address
+        or location.lat is None
+        or location.lng is None
+        # The point must be the feature's, not one another source wrote after it.
+        or (meta.get("candidate") and (meta["candidate"].get("lat"), meta["candidate"].get("lng")) != (location.lat, location.lng))
+    ):
+        return None
+    if _same_address(register_lib.parse(address), register_lib.parse(_address(location))):
+        return None  # ours already: register-pins places it
+    return address, (location.lat, location.lng)
 
 
 async def run_site_address(
@@ -137,17 +187,20 @@ async def run_site_address(
                 results += [{**row, "outcome": "site_not_read"} for row in rows]
                 continue
             points, text = site
-            found = site_addresses(points, register_lib.page_text(text), register)
+            listed = [a for loc in hidden if (a := map_feature_address(loc))]
+            found = site_addresses(points, register_lib.page_text(text), register, listed)
             shown = [(loc.lat, loc.lng) for loc in locations if not needs_pin(loc) and loc.lat is not None]
             outcome, extra = "placed", {}
             if not found:
                 outcome = "no_site_address"
             elif len(found) > 1:
-                outcome, extra = "several_site_addresses", {"site_addresses": [p.label for p in found.values()]}
+                outcome, extra = "several_site_addresses", {"site_addresses": [p.label for p, _ in found.values()]}
             else:
-                (address,) = found.values()
+                ((address, feature_address),) = found.values()
                 point = (address.lat, address.lng)
                 extra = {"site_address": address.label, "point": point, "site_points": points}
+                if feature_address:
+                    extra["map_feature_address"] = feature_address
                 if any(_distance_m(point, other) <= NEAR_M for other in shown):
                     outcome = "already_shown"  # the hidden location is an old address
                 elif any(
@@ -195,7 +248,11 @@ async def run_site_address(
                     provider="school_site",
                     method="site_address",
                     tag=PIN_TAG,
-                    evidence={"site_address": result["site_address"], "site_points": result["site_points"]},
+                    evidence={
+                        "site_address": result["site_address"],
+                        "site_points": result["site_points"],
+                        **({"map_feature_address": a} if (a := result.get("map_feature_address")) else {}),
+                    },
                     unchanged_from=result["old_point"],
                     address=result["site_address"],
                     # The address is the site's: shared-site checks must not count it as

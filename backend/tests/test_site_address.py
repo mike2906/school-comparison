@@ -222,3 +222,64 @@ async def test_a_wrong_website_puts_the_registered_address_back_and_hides_the_pi
     assert row.address_i18n == {"bg": 'ул. "Майор Коста Паница"'}
     assert row.lat is None and "coords_source=school_site_address" not in row.location_tags
     assert "address_source=website_contact" not in row.location_tags
+
+
+LIDICE = reg.read_register(
+    """rn;region;settlement;lareaunit;block;street;streetnum;entrance;n;e
+87568;Слатина;гр. София;"";"";ул. Лидице;14;"";42.678350;23.362693
+"""
+)
+
+
+def _old_address(method="geojson_name_match", point=(42.67838, 23.36281)):
+    # Мечо Пух: our address is an old one; the EU map feature's and the site's are current.
+    return SchoolLocation(
+        address_i18n={"bg": 'ул. "Стара планина" № 16'},
+        lat=point[0],
+        lng=point[1],
+        geocode_meta={"precision": "approximate", "method": method, "formatted_address": "УЛ. ЛИДИЦЕ 14, 1000 СТОЛИЧНА"},
+        location_tags=["coords_source=geojson"],
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "method, point, page, outcome",
+    [
+        ("geojson_name_match", (42.67838, 23.36281), "<p>кв. Гео Милев, ул. Лидице 14</p>", "placed"),
+        # The site must name it too.
+        ("geojson_name_match", (42.67838, 23.36281), "<p>кв. Гео Милев</p>", "no_site_address"),
+        # Not a map feature's address.
+        ("nominatim_fallback", (42.67838, 23.36281), "<p>кв. Гео Милев, ул. Лидице 14</p>", "no_site_address"),
+        # A feature 2 km from its own address: not one to trust.
+        ("geojson_name_match", (42.69638, 23.36281), "<p>кв. Гео Милев, ул. Лидице 14</p>", "no_site_address"),
+    ],
+)
+async def test_a_map_feature_address_the_site_names_moves_the_location_there(db_session, method, point, page, outcome):
+    await _school(db_session, _old_address(method, point), name_i18n={"bg": "ЧДГ Мечо Пух"})
+    report = await stage.run_site_address(db_session, register=LIDICE, fetch=_fetcher({HOME: page}), apply=True)
+    assert report["outcomes"] == {outcome: 1}
+    row = (await db_session.execute(select(SchoolLocation))).scalar_one()
+    if outcome == "placed":
+        assert (row.lat, row.lng) == (42.67835, 23.362693)
+        assert row.address_i18n == {"bg": "гр. София, ул. Лидице 14"}
+        assert row.geocode_meta["precision"] == "exact"
+        assert row.geocode_meta["evidence"]["map_feature_address"] == "УЛ. ЛИДИЦЕ 14, 1000 СТОЛИЧНА"
+    else:
+        assert row.geocode_meta["precision"] == "approximate"
+
+
+def test_a_map_feature_with_our_own_address_is_left_to_register_pins():
+    location = _old_address()
+    location.address_i18n = {"bg": 'ул. "Лидице" № 14'}
+    assert stage.map_feature_address(location) is None
+
+
+def test_a_rejected_or_overwritten_map_feature_is_not_a_source():
+    rejected = _old_address()
+    rejected.geocode_meta = {**rejected.geocode_meta, "status": "rejected"}
+    assert stage.map_feature_address(rejected) is None
+    moved = _old_address()
+    moved.geocode_meta = {**moved.geocode_meta, "status": "accepted", "candidate": {"lat": 42.0, "lng": 23.0}}
+    assert stage.map_feature_address(moved) is None
+    assert stage.map_feature_address(_old_address()) == ("УЛ. ЛИДИЦЕ 14, 1000 СТОЛИЧНА", (42.67838, 23.36281))

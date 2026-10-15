@@ -19,6 +19,8 @@ from app.utils.transliteration import transliterate_bulgarian
 
 logger = logging.getLogger(__name__)
 
+GEOJSON_NAME_MATCH = "geojson_name_match"
+
 SOFIA_MAP_BOUNDS = SOFIA_MUNICIPALITY_BOUNDS
 
 # A "street" that is only a city/town name (e.g. "ГРАД СОФИЯ") means the dataset
@@ -404,7 +406,7 @@ class GeoJSONProvider(BaseGeocodingProvider):
             success=True,
             provider=self.provider_name,
             formatted_address=formatted_address,
-            method="geojson_name_match",
+            method=GEOJSON_NAME_MATCH,
             precision="approximate",
         )
 
