@@ -62,7 +62,8 @@ function SchoolDetailPage({ schoolId = null, embedded = false, onClose = null })
   const params = useParams()
   const [searchParams] = useSearchParams()
   // The age group the parent searched for: the search URL's own (side panel) or the
-  // ?group= the card's link passes to the full page. It picks which NVO exam leads.
+  // ?group= the card's link passes to the full page. It picks which NVO exam leads, the
+  // headline fee, and which fees the fee list shows before the other ages.
   const preferredAgeGroup = searchParams.get('age_group') || searchParams.get('group')
   const id = schoolId ?? params.id
   const navigate = useNavigate()
@@ -426,7 +427,7 @@ function SchoolDetailPage({ schoolId = null, embedded = false, onClose = null })
         <KeyFacts school={school} examAverages={examAverages} nvoExamType={keyFactsExamType} ageGroup={preferredAgeGroup} />
 
         {/* Price is what a private-school parent decides on first. */}
-        {hasPricing && <PricingSection pricing={pricing} discounts={school.fee_discounts} />}
+        {hasPricing && <PricingSection pricing={pricing} discounts={school.fee_discounts} ageGroup={preferredAgeGroup} />}
 
         <WebsiteFacts school={school} />
 

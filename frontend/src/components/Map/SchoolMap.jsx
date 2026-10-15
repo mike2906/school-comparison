@@ -26,6 +26,7 @@ import { getAgeGroupKeys } from '../../utils/countryConfig'
 import { AGE_GROUP_KEYS } from '../../utils/education'
 import { useStableCallback } from '../../hooks/useStableCallback'
 import { isDesktopViewport } from '../../utils/searchViewState'
+import { schoolPath } from '../../utils/schoolPath'
 import {
   pickSelectedMarker,
   stackedMarkersByKey,
@@ -328,8 +329,8 @@ function SchoolMap({
       onOpenDetails(school)
       return
     }
-    navigate(`/schools/${school.id}`)
-  }, [navigate, onOpenDetails])
+    navigate(schoolPath(school.id, activeAgeGroup))
+  }, [navigate, onOpenDetails, activeAgeGroup])
 
   return (
     <div

@@ -151,12 +151,27 @@ export function rowAgeGroupKeys(row) {
 }
 
 /**
+ * A school's fee rows split by one age group: `forGroup` holds the rows naming it plus
+ * those naming no group we can read (they may well apply, so they are never set aside),
+ * `otherAges` the rows that name only other groups. With no group, or one we do not know,
+ * every row is `forGroup`.
+ */
+export function splitRowsForAgeGroup(rows = [], ageGroup) {
+  if (!AGE_GROUP_KEYS.has(ageGroup)) return { forGroup: rows, otherAges: [] }
+  const forGroup = []
+  const otherAges = []
+  rows.forEach(row => {
+    const keys = rowAgeGroupKeys(row)
+    if (keys.size === 0 || keys.has(ageGroup)) forGroup.push(row)
+    else otherAges.push(row)
+  })
+  return { forGroup, otherAges }
+}
+
+/**
  * The rows for one age group: those naming it, plus those naming no group we can read.
  * When no row names a group, every row is returned: there is nothing to choose by.
  */
 export function rowsForAgeGroup(rows = [], ageGroup) {
-  if (!ageGroup) return rows
-  const keyed = rows.map(row => ({ row, keys: rowAgeGroupKeys(row) }))
-  if (keyed.every(({ keys }) => keys.size === 0)) return rows
-  return keyed.filter(({ keys }) => keys.size === 0 || keys.has(ageGroup)).map(({ row }) => row)
+  return splitRowsForAgeGroup(rows, ageGroup).forGroup
 }

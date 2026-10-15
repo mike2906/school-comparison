@@ -4,7 +4,7 @@ import { sharedPriceSource, sourceSiteName } from '../../utils/priceSources'
 import { groupPricingByCategory } from './helpers'
 import { formatAmount } from '../../utils/format'
 import PriceSource from './PriceSource'
-import { pricePeriod, periodUnknown } from '../../utils/priceRows'
+import { pricePeriod, periodUnknown, splitRowsForAgeGroup } from '../../utils/priceRows'
 import { planNameBeside, textLang } from '../../utils/priceLabels'
 import { paymentOptionTexts } from '../../utils/paymentOptions'
 import { feeDiscountLines } from '../../utils/feeDiscounts'
@@ -13,9 +13,16 @@ import { feeDiscountLines } from '../../utils/feeDiscounts'
  * Every published price, grouped by academic year, then by category, then by the age
  * group it is for. Each year says where its prices came from: once when they share one
  * page, otherwise on each row.
+ * With the parent's `ageGroup` (from the search they came from), fees that name only other
+ * ages fold under "Fees for other ages"; fees naming no age stay in view, since they may
+ * apply.
  */
-function PricingSection({ pricing, discounts }) {
+function PricingSection({ pricing, discounts, ageGroup = null }) {
   const { t, i18n } = useTranslation()
+  const { forGroup, otherAges } = splitRowsForAgeGroup(pricing, ageGroup)
+  // Mid-sentence: "fees for grades 1-4", "таксите за първа група".
+  const groupLabel = otherAges.length > 0 ? t(`ageGroups.${ageGroup}`) : null
+  const groupName = groupLabel && groupLabel.charAt(0).toLocaleLowerCase(i18n.language) + groupLabel.slice(1)
 
   const discountLines = feeDiscountLines(discounts, i18n.language)
 
@@ -68,70 +75,87 @@ function PricingSection({ pricing, discounts }) {
     )
   }
 
+  // Grouped by academic year: one shared label across mixed years would mis-date every
+  // group but one.
+  const renderYears = (rows) => (
+    <div className="space-y-8">
+      {groupPricingByAcademicYear(rows).map(group => {
+        const shared = sharedPriceSource(group.rows)
+        return (
+          <div key={group.key}>
+            <div className="mb-4 space-y-2">
+              <div className="flex items-center gap-2">
+                <span
+                  className={`text-sm px-3 py-1 rounded-lg border ${
+                    group.yearStatus === YEAR_STATUS.CURRENT || group.yearStatus === YEAR_STATUS.NEXT
+                      ? 'bg-teal-50 text-teal-700 border-teal-200'
+                      : 'bg-neutral-100 text-neutral-600 border-neutral-300'
+                  }`}
+                >
+                  {group.academicYear || t('pricing.yearNotStated')}
+                </span>
+                {(group.yearStatus === YEAR_STATUS.DATED_OTHER || group.yearStatus === YEAR_STATUS.NEXT) && (
+                  <span className="text-xs text-neutral-500">
+                    {t(group.yearStatus === YEAR_STATUS.NEXT ? 'pricing.nextYear' : 'pricing.notCurrentYear')}
+                  </span>
+                )}
+              </div>
+              {shared && (
+                <PriceSource source={shared.source} url={shared.url} checkedAt={shared.checkedAt} />
+              )}
+            </div>
+
+            <div className="space-y-6">
+              {Object.entries(groupPricingByCategory(group.rows))
+                .filter(([, items]) => items.length > 0)
+                .map(([category, items]) => (
+                  <div key={category}>
+                    <h3 className="text-sm font-semibold text-neutral-500 uppercase tracking-wide mb-3">
+                      {t(`pricing.${category}`)}
+                    </h3>
+                    <div className="space-y-4">
+                      {groupRowsByAgeGroup(items, t, i18n.language).map(band => (
+                        <div key={band.label || ''} className="space-y-3">
+                          {band.label && (
+                            <h4 className="text-sm font-medium text-neutral-700 break-words" lang={textLang(band.label, i18n.language)}>{band.label}</h4>
+                          )}
+                          {band.rows.map(price => renderRow(price, {
+                            showAgeGroup: !band.label,
+                            bandLabel: band.label,
+                            showSource: !shared,
+                          }))}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+
   return (
     <div className="bg-white rounded-2xl shadow-card border border-neutral-200 p-6 md:p-8 mb-6">
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-2xl font-bold text-neutral-900">{t('pricing.title')}</h2>
       </div>
 
-      {/* Grouped by academic year: one shared label across mixed years would
-          mis-date every group but one. */}
-      <div className="space-y-8">
-        {groupPricingByAcademicYear(pricing).map(group => {
-          const shared = sharedPriceSource(group.rows)
-          return (
-            <div key={group.key}>
-              <div className="mb-4 space-y-2">
-                <div className="flex items-center gap-2">
-                  <span
-                    className={`text-sm px-3 py-1 rounded-lg border ${
-                      group.yearStatus === YEAR_STATUS.CURRENT || group.yearStatus === YEAR_STATUS.NEXT
-                        ? 'bg-teal-50 text-teal-700 border-teal-200'
-                        : 'bg-neutral-100 text-neutral-600 border-neutral-300'
-                    }`}
-                  >
-                    {group.academicYear || t('pricing.yearNotStated')}
-                  </span>
-                  {(group.yearStatus === YEAR_STATUS.DATED_OTHER || group.yearStatus === YEAR_STATUS.NEXT) && (
-                    <span className="text-xs text-neutral-500">
-                      {t(group.yearStatus === YEAR_STATUS.NEXT ? 'pricing.nextYear' : 'pricing.notCurrentYear')}
-                    </span>
-                  )}
-                </div>
-                {shared && (
-                  <PriceSource source={shared.source} url={shared.url} checkedAt={shared.checkedAt} />
-                )}
-              </div>
-
-              <div className="space-y-6">
-                {Object.entries(groupPricingByCategory(group.rows))
-                  .filter(([, items]) => items.length > 0)
-                  .map(([category, items]) => (
-                    <div key={category}>
-                      <h3 className="text-sm font-semibold text-neutral-500 uppercase tracking-wide mb-3">
-                        {t(`pricing.${category}`)}
-                      </h3>
-                      <div className="space-y-4">
-                        {groupRowsByAgeGroup(items, t, i18n.language).map(band => (
-                          <div key={band.label || ''} className="space-y-3">
-                            {band.label && (
-                              <h4 className="text-sm font-medium text-neutral-700 break-words" lang={textLang(band.label, i18n.language)}>{band.label}</h4>
-                            )}
-                            {band.rows.map(price => renderRow(price, {
-                              showAgeGroup: !band.label,
-                              bandLabel: band.label,
-                              showSource: !shared,
-                            }))}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-              </div>
-            </div>
-          )
-        })}
-      </div>
+      {groupName && (
+        <p className="mb-6 text-sm text-neutral-600">
+          {t(forGroup.length > 0 ? 'pricing.forAgeGroup' : 'pricing.noneForAgeGroup', { group: groupName })}
+        </p>
+      )}
+      {forGroup.length > 0 && renderYears(forGroup)}
+      {groupName && (
+        <details className="mt-8" open={forGroup.length === 0}>
+          <summary className="cursor-pointer select-none text-sm font-semibold text-primary-700 hover:text-primary-800">
+            {t('pricing.otherAges', { count: otherAges.length })}
+          </summary>
+          <div className="mt-6">{renderYears(otherAges)}</div>
+        </details>
+      )}
 
       {discountLines.length > 0 && (
         <div className="mt-8">
