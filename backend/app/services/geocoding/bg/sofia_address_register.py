@@ -306,3 +306,64 @@ def match(parsed: Parsed, register: Register) -> Match:
         if street.outcome == "matched" or result.outcome == "no_address":
             return street
     return result
+
+
+def _latin(text: str) -> str:
+    from app.utils.transliteration import transliterate_bulgarian
+
+    return transliterate_bulgarian(text).casefold()
+
+
+@dataclass(frozen=True)
+class PageText:
+    """A page's text in our spelling and in Latin letters, prepared once per site."""
+
+    cyrillic: str
+    latin: str
+
+
+def page_text(text: str) -> PageText:
+    # Latin text keeps its own letters (``_clean`` turns look-alikes into Cyrillic).
+    latin = re.sub(r"\s+", " ", _QUOTES_RE.sub(" ", text))
+    return PageText(_clean(text), _latin(latin))
+
+
+_KIND_BEFORE_RE = re.compile(r"(?:^|\W)(ул|улица|бул|булевард|ul|ulitsa|bul|blvd|boulevard)\W{0,3}$")
+_KIND_OF = {"улица": "ул", "ul": "ул", "ulitsa": "ул", "bul": "бул", "булевард": "бул", "blvd": "бул", "boulevard": "бул"}
+
+
+def names_address(page: PageText, parsed: Parsed) -> bool:
+    """Whether a page states our address: the end of our street's name (its last two words,
+    initials left out) right next to our exact house number, either way round, in Bulgarian
+    or in Latin letters ("ул. Ралевица № 80А", "80A Ralevitsa Street"); for a block, the
+    complex with its number next to the block number ("Младост 4, бл. 460А"). A street of
+    another kind named just before ("бул. Витоша" for our "ул. Витоша") does not count."""
+    kind = None
+    if parsed.street and parsed.number:
+        kind, *name = parsed.street.split()
+        name = [w for w in name if len(w) > 1][-2:]
+        number, marker = parsed.number, r"(?:(?:№|no\.?|#)\s*)?"
+    elif parsed.block and parsed.complex:
+        name, number, marker = parsed.complex.split(), parsed.block, r"(?:(?:бл|bl)\.?\s*)?"
+    else:
+        return False
+    if not name or not any(len(w) >= 3 and not w.isascii() for w in name):
+        return False  # a name of initials, digits or a Roman numeral alone says too little
+    for text, convert in ((page.cyrillic, lambda w: w), (page.latin, _latin)):
+        words = r"\W+".join(re.escape(convert(w)) for w in name)
+        split = re.fullmatch(r"(\d+)(\D*)", number.casefold())
+        if split is None:
+            return False
+        digits, letter = split.groups()
+        num = re.escape(digits) + (r"\s?" + re.escape(convert(letter)) if letter else "")
+        patterns = (
+            rf"(?<!\w){words}(?!\w)\W{{1,6}}{marker}{num}(?![\w/-])",
+            rf"(?<![\w/-]){num}\s*,?\s*(?:(?:ул|бул|ul|str)\.?\s*)?{words}(?!\w)",
+        )
+        for pattern in patterns:
+            for found in re.finditer(pattern, text):
+                said = _KIND_BEFORE_RE.search(text[max(0, found.start() - 12): found.start()])
+                if kind and said and _KIND_OF.get(said.group(1), said.group(1)) != kind:
+                    continue
+                return True
+    return False

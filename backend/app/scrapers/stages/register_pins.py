@@ -3,15 +3,18 @@
 Sofia Municipality's address register (``geocoding/bg/sofia_address_register``) has a point
 for every approved street and house number and every block entrance, which OpenStreetMap
 mostly lacks. A hidden location whose address matches one register point (or one block's
-entrances, close together) is pinned there. As in ``confirm-pins``, a school whose own
-website maps it only elsewhere (none of its map points within ``ELSEWHERE_M`` of the
-register point or of its other locations), or whose website cannot be read, is left
-hidden: the site may say it moved. No model calls. Default is a dry run. Sofia only.
+entrances, close together) is pinned there. The school's own site wins: one whose website
+maps it only elsewhere (none of its map points within ``ELSEWHERE_M`` of the register point
+or of its other locations) is left hidden, as the site may say it moved, unless the site's
+text states our address (stray and old maps are common); one whose website cannot be read
+is left hidden. A pin moving over ``FAR_M`` needs our district or the site to agree. No
+model calls. Default is a dry run. Sofia only.
 """
 
 from __future__ import annotations
 
 import logging
+import re
 from collections.abc import Sequence
 from typing import Any, Optional
 
@@ -22,7 +25,7 @@ from app.models import School, SchoolLocation
 from app.scrapers.fee_pages import fee_http_client
 from app.scrapers.stages.confirm_pins import ELSEWHERE_M
 from app.scrapers.stages.social_links import Fetch, _http_fetch
-from app.scrapers.stages.website_pins import _address, _distance_m, _read_points, needs_pin, write_pin
+from app.scrapers.stages.website_pins import _address, _distance_m, needs_pin, read_site, write_pin
 from app.services.geocoding.bg import sofia_address_register as register_lib
 from app.utils.school_facts import SITE_ACCEPTED_STATUSES
 
@@ -30,8 +33,26 @@ logger = logging.getLogger(__name__)
 
 PIN_TAG = "coords_source=sofia_address_register"
 PROVIDER = "sofia_address_register"
-# A pin moving further than this needs our address's district to agree with the register's.
+# A pin moving further than this needs our address's district, or the school's site, to agree.
 FAR_M = 3000
+# Another school pinned this close to the register point is in the same building.
+SAME_BUILDING_M = 15
+
+
+# Words of a school's name that say what kind of school it is, not which.
+_TYPE_WORDS = {
+    "частна", "частно", "частен", "детска", "градина", "училище", "средно", "основно", "езикова",
+    "профилирана", "професионална", "гимназия", "начално", "обединено", "международно",
+    "английска", "американско", "немско", "френско", "ясла", "яслени", "група", "групи",
+    "kindergarten", "school", "private", "international", "high", "primary", "academy",
+}
+
+
+def _name_words(name_i18n: Optional[dict]) -> set[str]:
+    words = set()
+    for name in (name_i18n or {}).values():
+        words |= {w for w in re.findall(r"[а-яa-z]+", str(name).casefold()) if len(w) >= 4}
+    return words - _TYPE_WORDS
 
 
 async def download_register() -> register_lib.Register:
@@ -76,6 +97,15 @@ async def run_register_pins(
     if school_ids:
         query = query.where(School.id.in_(list(school_ids)))
     ids = list((await db.execute(query)).scalars().all())
+    # Other schools' published pins: a register point on one is that school's building (the
+    # address is likely an old one of ours), so it is not taken.
+    # Schools of one family (Езиков свят's primary and high school) share a building.
+    names = {sid: _name_words(name) for sid, name in (await db.execute(select(School.id, School.name_i18n))).all()}
+    pinned = [
+        (loc.school_id, (loc.lat, loc.lng))
+        for loc in (await db.execute(select(SchoolLocation).where(SchoolLocation.lat.is_not(None)))).scalars()
+        if not needs_pin(loc)
+    ]
 
     async def _run(fetch: Fetch) -> list[dict[str, Any]]:
         nonlocal register
@@ -94,19 +124,21 @@ async def run_register_pins(
                 continue
             if register is None:  # only once a location needs it
                 register = await download_register()
-            found = {}
+            found, parsed = {}, {}
             for location in hidden:
-                parsed = register_lib.parse(_address(location), location.district)
-                found[location.id] = register_lib.match(parsed, register)
-            site_points: Optional[list[tuple[float, float]]] = []
+                parsed[location.id] = register_lib.parse(_address(location), location.district)
+                found[location.id] = register_lib.match(parsed[location.id], register)
+            site: Optional[tuple[list[tuple[float, float]], str]] = ([], "")
             if any(m.outcome == "matched" for m in found.values()) and school.website_url and (
                 school.scrape_status in SITE_ACCEPTED_STATUSES
             ):
                 try:
-                    site_points = await _read_points(school, fetch)
+                    site = await read_site(school, fetch)
                 except Exception:
                     logger.exception("register-pins could not read school %s's site", school_id)
-                    site_points = None
+                    site = None
+            site_points, text = site if site is not None else ([], "")
+            prepared = register_lib.page_text(text)
             others = [
                 (loc.lat, loc.lng) for loc in locations if not needs_pin(loc) and loc.lat is not None and loc.lng is not None
             ]
@@ -130,13 +162,35 @@ async def run_register_pins(
                 row["register"] = [
                     {k: v for k, v in vars(r).items() if v} for r in result.rows[:5]
                 ]
-                if row["moved_m"] is not None and row["moved_m"] > FAR_M and not result.region_checked:
-                    # As far as another district: our address must name the district to go there.
+                # The school's own site wins: its text giving our address outweighs its map (a
+                # stray or old map is common); a map with every point at the register point backs it.
+                site_names_it = register_lib.names_address(prepared, parsed[location.id])
+                site_map_here = bool(site_points) and all(
+                    _distance_m(result.point, p) <= ELSEWHERE_M for p in site_points
+                )
+                if site_names_it:
+                    row["site_names_address"] = True
+                if (
+                    row["moved_m"] is not None
+                    and row["moved_m"] > FAR_M
+                    and not result.region_checked
+                    and not (site_names_it or site_map_here)
+                ):
+                    # As far as another district: our district or the school's site must agree.
                     row["outcome"] = "moved_far"
-                elif site_points is None:
+                elif any(
+                    other != school_id
+                    and not (names.get(other, set()) & names.get(school_id, set()))
+                    and _distance_m(result.point, point) <= SAME_BUILDING_M
+                    for other, point in pinned
+                ):
+                    row["outcome"] = "other_school_here"
+                elif site is None:
                     row["outcome"] = "site_not_read"
-                elif site_points and not any(
-                    _distance_m(point, p) <= ELSEWHERE_M for point in [result.point, *others] for p in site_points
+                elif (
+                    site_points
+                    and not site_names_it
+                    and not any(_distance_m(point, p) <= ELSEWHERE_M for point in [result.point, *others] for p in site_points)
                 ):
                     row["outcome"] = "website_map_elsewhere"
                     row["site_points"] = site_points
