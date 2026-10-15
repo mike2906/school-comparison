@@ -178,7 +178,7 @@ def _stubs(pick, osm=(), pages=None, reverse=None):
     async def rev(lat, lng):
         return (reverse or {}).get((lat, lng))
 
-    async def lookup(lat, lng):
+    async def lookup(lat, lng, radius=stage.SEARCH_RADIUS_M):
         return list(osm)
 
     messages = []
@@ -420,3 +420,79 @@ def test_type_family():
     assert stage._type_family("ЧДГ Слънце") == "kindergarten"
     assert stage._type_family("Частно средно училище с детска градина Х") == "school"
     assert stage._type_family("Слънце") is None
+
+
+@pytest.mark.asyncio
+async def test_a_wrong_point_still_finds_the_school_named_elsewhere_in_the_city():
+    # ЧОУ Образователни технологии: our point is a wrong geocode 2.4 km off; OSM names the
+    # school on its campus, at our street and number (Nominatim's nearest building there).
+    named = {"type": "node", "lat": 42.6780127, "lon": 23.3807993, "tags": {"amenity": "school", "name": "ЧОУ „Образователни технологии“"}}
+    other = {"type": "node", "lat": 42.6859, "lon": 23.3537, "tags": {"amenity": "school", "name": "125 СУ"}}
+    radii = []
+
+    async def lookup(lat, lng, radius=stage.SEARCH_RADIUS_M):
+        radii.append(radius)
+        return [named, other] if radius is None else [other]
+
+    async def reverse(lat, lng):
+        return {"road": "Гео Милев", "house_number": "158", "city": "София"}
+
+    async def call(message, school_id):
+        assert "Образователни технологии" in message
+        return stage.Pick(candidate=1, sure=True, reason="named")
+
+    school = _school(name_i18n={"bg": "ЧОУ „Образователни технологии“"}, school_type="private", education_level="primary")
+    school.id = 381
+    location = SchoolLocation(
+        address_i18n={"bg": 'район Слатина, СПЗ Слатина-юг, ул. "Гео Милев" № 158, корпус 4, ет. 3 и ет. 4'},
+        lat=42.68592,
+        lng=23.35372,
+        geocode_meta={"precision": "approximate"},
+    )
+    row = await stage.place_location(
+        school, location, [], reverse=reverse, lookup=lookup, call=call, bounds=SOFIA, town="софия", other_pins=()
+    )
+    assert radii == [stage.SEARCH_RADIUS_M, None]
+    assert row.get("refused") is None and row["outcome"] == "placed", row.get("refused")
+    assert row["point"] == (42.6780127, 23.3807993)
+
+
+@pytest.mark.asyncio
+async def test_a_school_named_near_its_point_is_not_looked_for_elsewhere():
+    near = {"type": "node", "lat": 42.68, "lon": 23.33, "tags": {"amenity": "school", "name": "НПМГ Акад. Чакалов"}}
+    radii = []
+
+    async def lookup(lat, lng, radius=stage.SEARCH_RADIUS_M):
+        radii.append(radius)
+        return [near]
+
+    async def reverse(lat, lng):
+        return None
+
+    async def call(message, school_id):
+        return stage.Pick(candidate=0, sure=False, reason="none")
+
+    location = SchoolLocation(address_i18n={"bg": "ул. Бигла 56"}, lat=42.68, lng=23.33, geocode_meta={"precision": "approximate"})
+    await stage.place_location(
+        _school(), location, [], reverse=reverse, lookup=lookup, call=call, bounds=SOFIA, town="софия", other_pins=()
+    )
+    assert radii == [stage.SEARCH_RADIUS_M]
+
+
+@pytest.mark.asyncio
+async def test_a_common_name_across_the_city_or_another_town_gives_no_far_candidates():
+    def kindergarten(lat, lng):
+        return {"type": "node", "lat": lat, "lon": lng, "tags": {"amenity": "kindergarten", "name": "ЧДГ Слънце Луна"}}
+
+    async def reverse(lat, lng):
+        return {"road": "Христо Ботев", "house_number": "12", "town": "Банкя"}
+
+    async def few(lat, lng, radius=stage.SEARCH_RADIUS_M):
+        return [kindergarten(42.70, 23.14)] if radius is None else []
+
+    async def many(lat, lng, radius=stage.SEARCH_RADIUS_M):
+        return [kindergarten(42.6 + i / 100, 23.3) for i in range(4)] if radius is None else []
+
+    found = await stage._named_in_city("ЧДГ Слънце Луна", "ул. Христо Ботев 10", (42.68, 23.32), few, reverse, "софия")
+    assert len(found) == 1 and not found[0].town_ok  # Банкя, not Sofia: check_pick refuses it
+    assert await stage._named_in_city("ЧДГ Слънце Луна", "ул. Христо Ботев 10", (42.68, 23.32), many, reverse, "софия") == []

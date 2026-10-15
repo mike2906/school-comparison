@@ -2,7 +2,8 @@
 
 For a location the API publishes without a pin (approximate or none), gathers candidate
 points: the school's own website map points (with OpenStreetMap's address there) and
-OpenStreetMap schools and kindergartens near the location's street. One model call picks
+OpenStreetMap schools and kindergartens near the location's point (anywhere in the city
+when none near it is named as the school: the point may be a wrong geocode). One model call picks
 the candidate that is this school's building, or none. The model never gives coordinates:
 it picks a candidate by number, and code checks the pick before anything is written
 (``check_pick``). The pick must always be on our street, its house number within
@@ -22,7 +23,7 @@ import logging
 import re
 from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import asdict, dataclass
-from typing import Any, Optional
+from typing import Any, Optional, Protocol
 
 import httpx
 from pydantic import BaseModel, Field
@@ -125,7 +126,10 @@ def private_status_differs(school_name: str, ours_private: bool, osm_name: Optio
 def is_private_name(name: Optional[str]) -> bool:
     return bool(_PRIVATE_ABBREVIATION_RE.search(name or "") or _PRIVATE_WORD_RE.search(name or ""))
 
-Lookup = Callable[[float, float], Awaitable[list[dict]]]
+class Lookup(Protocol):
+    """OSM elements within ``radius`` metres of a point (None: the whole city)."""
+
+    def __call__(self, lat: float, lng: float, radius: Optional[float] = ...) -> Awaitable[list[dict]]: ...
 Caller = Callable[[str, int], Awaitable["Pick"]]
 
 
@@ -149,7 +153,8 @@ class Pick(BaseModel):
 PROMPT = """You place a school or kindergarten on a map. You get the institution's name and
 address and a numbered list of candidate points from sources: map points on the
 institution's own website (with OpenStreetMap's street address at that point) and
-schools/kindergartens mapped in OpenStreetMap near the address (with their names).
+schools/kindergartens mapped in OpenStreetMap near the address, or named as the
+institution elsewhere in the city when our point may be wrong (with their names).
 
 Pick the candidate that is this institution's own building. Good evidence: an OSM name
 that is this institution (same name, or same number and type); a website map point on the
@@ -356,7 +361,7 @@ class CityOsm:
                 error = exc
         raise RuntimeError(f"no Overpass server answered: {error}")
 
-    async def __call__(self, lat: float, lng: float) -> list[dict]:
+    async def __call__(self, lat: float, lng: float, radius: Optional[float] = SEARCH_RADIUS_M) -> list[dict]:
         async with self._lock:
             if self.elements is None and self.failed is None:
                 try:
@@ -370,7 +375,7 @@ class CityOsm:
             for element in self.elements
             if (centre := element.get("center") or element).get("lat") is not None
             and centre.get("lon") is not None
-            and _distance_m((lat, lng), (float(centre["lat"]), float(centre["lon"]))) <= SEARCH_RADIUS_M
+            and (radius is None or _distance_m((lat, lng), (float(centre["lat"]), float(centre["lon"]))) <= radius)
         ]
 
 
@@ -415,6 +420,28 @@ def model_caller(spend: Spend) -> Caller:
     return call
 
 
+# More features than this named as the school across the city: a common name, not a clue.
+MAX_NAMED_IN_CITY = 3
+
+
+async def _named_in_city(
+    name: str, address: str, point: tuple[float, float], lookup: Lookup, reverse: Reverse, town: str
+) -> list[Candidate]:
+    """OSM features named as the school anywhere in the city, for a location whose point may
+    be a wrong geocode (none near it is named so). Each in our town by Nominatim, which also
+    gives its street when OSM does not. check_pick still wants our street and house number."""
+    elements = [e for e in await lookup(*point, radius=None) if name_matches(name, (e.get("tags") or {}).get("name"))]
+    if len(elements) > MAX_NAMED_IN_CITY:
+        return []
+    found = []
+    for candidate in osm_candidates(elements):
+        parts = await reverse(*candidate.point)
+        candidate.town_ok = same_town(address, parts, town)
+        candidate.address = candidate.address or nominatim_address(parts)
+        found.append(candidate)
+    return found
+
+
 async def place_location(
     school: School,
     location: SchoolLocation,
@@ -440,7 +467,11 @@ async def place_location(
             Candidate(point=point, source="website_map", address=nominatim_address(parts), town_ok=same_town(address, parts, town))
         )
     if location.lat is not None and location.lng is not None:
-        for candidate in osm_candidates(await lookup(float(location.lat), float(location.lng))):
+        point = (float(location.lat), float(location.lng))
+        found = osm_candidates(await lookup(*point))
+        if not any(name_matches(name, c.name, at_our_number=True) for c in found):
+            found += await _named_in_city(name, address, point, lookup, reverse, town)
+        for candidate in found:
             if all(_distance_m(candidate.point, seen.point) >= 20 for seen in candidates):
                 candidates.append(candidate)
     # Most relevant first: our street, then a matching name, then the rest.
