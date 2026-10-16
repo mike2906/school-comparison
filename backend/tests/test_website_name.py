@@ -16,7 +16,8 @@ REGISTER = '"ЧАСТНО СРЕДНО УЧИЛИЩЕ УВЕКИНД" ООД'
 
 
 def _html(title="Uwekind International School", body="Welcome to UWEKIND"):
-    return f"<html><head><title>{title}</title></head><body><h1>{body}</h1><p>Lozen park 1</p></body></html>"
+    filler = "Училище с история и детска градина в Лозен парк, с целодневно обучение и езици. " * 3
+    return f"<html><head><title>{title}</title></head><body><h1>{body}</h1><p>{filler}</p></body></html>"
 
 
 def _fetcher(pages):
@@ -74,7 +75,7 @@ def test_a_name_must_share_a_distinctive_word_with_the_address_or_the_register()
     ],
 )
 def test_check_name(answer, expected):
-    _, text = stage.page_summary(_html())
+    _, text, _ = stage.page_summary(_html())
     assert stage.check_name(answer, text, HOME, [REGISTER]) == expected
 
 
@@ -84,7 +85,7 @@ def test_page_summary_has_title_site_name_logo_and_headings():
         '</head><body><img class="site-logo" alt="BUSY School logo" src="/l.png"><script>var x="Spam"</script>'
         "<h1>ЧАСТНО НАЧАЛНО УЧИЛИЩЕ БИЗИ</h1></body></html>"
     )
-    summary, text = stage.page_summary(html)
+    summary, text, _ = stage.page_summary(html)
     assert "Title: Начало - Busy School" in summary and "og:site_name: Busy School" in summary
     assert "Logo text: BUSY School logo" in summary and "Headings: ЧАСТНО НАЧАЛНО УЧИЛИЩЕ БИЗИ" in summary
     assert "Spam" not in text
@@ -198,7 +199,7 @@ async def test_search_finds_a_brand_in_the_web_address_below_name_matches(seeded
 
 
 def test_on_a_shared_site_a_name_naming_only_the_other_level_is_the_siblings():
-    _, text = stage.page_summary(_html(body="UWEKIND Kindergarten and Uwekind International School"))
+    _, text, _ = stage.page_summary(_html(body="UWEKIND Kindergarten and Uwekind International School"))
     kindergarten = dict(family="kindergarten", shared_with_other_level=True)
     assert stage.check_name("Uwekind International School", text, HOME, [REGISTER], **kindergarten) == (
         "names the other level on a shared site"
@@ -232,7 +233,7 @@ async def test_the_run_knows_a_site_is_shared_with_the_other_level(db_session):
 
 
 @pytest.mark.asyncio
-async def test_a_home_page_that_redirects_to_another_site_clears_the_name(db_session):
+async def test_a_home_page_that_redirects_to_another_host_is_not_read_and_keeps_the_name(db_session):
     school = _school(attributes={"website_name": _block()})
     db_session.add(school)
     await db_session.commit()
@@ -241,11 +242,29 @@ async def test_a_home_page_that_redirects_to_another_site_clears_the_name(db_ses
         return "https://operator.example/", _html()
 
     async def call(message, school_id):
-        raise AssertionError("no model call for another site")
+        raise AssertionError("no model call for another host")
 
     report = await stage.run_website_name(db_session, school_ids=[school.id], fetch=fetch, call=call, apply=True)
-    assert report["results"][0]["dropped"] == "redirects to another site"
-    assert school.attributes["website_name"]["name"] is None
+    assert report["outcomes"] == {"not_read": 1} and school.attributes["website_name"]["name"] == "UWEKIND"
+
+
+@pytest.mark.asyncio
+async def test_a_script_built_home_page_is_not_read_and_keeps_the_name(db_session):
+    school = _school(attributes={"website_name": _block()})
+    db_session.add(school)
+    await db_session.commit()
+    shell = "<html><head><title>Loading…</title></head><body><div id=app></div></body></html>"
+    report = await stage.run_website_name(
+        db_session, school_ids=[school.id], fetch=_fetcher({HOME: shell}), call=_caller(None), apply=True
+    )
+    assert report["outcomes"] == {"not_read": 1} and school.attributes["website_name"]["name"] == "UWEKIND"
+
+
+def test_a_fragment_of_a_word_or_a_short_word_inside_the_address_is_not_enough():
+    _, text, _ = stage.page_summary(_html())
+    assert stage.check_name("Kind", text, HOME, [REGISTER]) == "not on the page"
+    assert not matches_site_or_register("Kids Art Studio", "https://smartkids.bg/", ["ЧДГ Усмивка"])
+    assert address_name("https://www.facebook.com/uwekind", "validated") is None
 
 
 def test_a_register_english_name_stays_before_the_website_name():

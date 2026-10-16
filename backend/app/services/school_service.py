@@ -14,6 +14,8 @@ from app.utils import school_search
 from app.utils.i18n_resolver import resolve_address_i18n, resolve_name_i18n
 from app.utils.school_attributes import build_filterable_attributes
 from app.utils.school_facts import publication_attributes
+from app.utils.website_data import attributes_for_publication
+from app.utils.website_name import PUBLISHED_KEY as WEBSITE_NAME_KEY
 from app.utils.website_name import address_name, shown_website_name
 
 SOFIA_MAP_BOUNDS = SOFIA_MUNICIPALITY_BOUNDS
@@ -375,15 +377,14 @@ class SchoolService:
             if entry is None:
                 name_i18n = name_i18n or {}
                 names = list(name_i18n.values())
-                names.extend(
-                    resolve_name_i18n(
-                        name_i18n,
-                        publication_attributes(attributes, scrape_status, website_url),
-                    ).values()
-                )
+                # Only the website name of ``publication_attributes`` matters for a name;
+                # building the shown facts for every school on each search is not needed.
+                public = attributes_for_publication(attributes, scrape_status)
                 # The website's own Latin name, also when a corroborated display name wins.
                 if website_name := shown_website_name(attributes, scrape_status, website_url):
+                    public[WEBSITE_NAME_KEY] = website_name
                     names.append(website_name)
+                names.extend(resolve_name_i18n(name_i18n, public).values())
                 entry = schools[school_id] = {
                     "registry_name": name_i18n.get("bg", ""),
                     "names": names,

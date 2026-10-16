@@ -94,22 +94,31 @@ def distinctive_words(name: str) -> list[str]:
     return [word for word in _WORD_RE.findall(name.casefold()) if len(word) >= 3 and word not in _GENERIC_WORDS]
 
 
+def host(url: Optional[str]) -> str:
+    """The URL's host without "www.", lowercase."""
+    return (urlparse(url or "").hostname or "").casefold().removeprefix("www.")
+
+
 def matches_site_or_register(name: str, website_url: Optional[str], register_names: list[str]) -> bool:
     """Whether a distinctive word of ``name`` is in the website's address (busy-school.com
     for Busy School) or matches the register name the way search would (Drujba for Дружба).
 
     The reader could otherwise take an operator's, a template's or a network's name ("My
-    Blog", "Kidscool Site") from the page."""
+    Blog", "Kidscool Site") from the page. A three-letter word must start a part of the
+    address ("abc" in abckinder.org, not "art" in smartkids.bg)."""
     from app.utils import school_search
 
-    host = (urlparse(website_url or "").hostname or "").casefold().removeprefix("www.")
-    host_letters = re.sub(r"[^a-z0-9]", "", host.rsplit(".", 1)[0])
+    labels = re.split(r"[^a-z0-9]+", host(website_url).rsplit(".", 1)[0])
+    host_letters = "".join(labels)
     words = distinctive_words(name)
-    if any(word in host_letters for word in words):
+    if any(
+        word in host_letters if len(word) >= 4 else any(label.startswith(word) for label in labels) for word in words
+    ):
         return True
     return any(
         school_search.rank_school([word], registry_name=register, names=[register]) is not None
         for word in words
+        if len(word) >= 4
         for register in register_names
         if register
     )
@@ -128,6 +137,12 @@ def names_other_level(name: str, family: str) -> bool:
     return school and not kindergarten if family == "kindergarten" else kindergarten and not school
 
 
+# Hosts of other people's sites: their address names the platform, not the school.
+_PLATFORM_DOMAINS = frozenset(
+    {"facebook.com", "instagram.com", "google.com", "wixsite.com", "blogspot.com", "wordpress.com", "weebly.com"}
+)
+
+
 def address_name(website_url: Optional[str], scrape_status: Any) -> Optional[str]:
     """The website's address as words for search ("busy school" for busy-school.com,
     "questjunior" for questjunior.bg), for an accepted website only.
@@ -137,8 +152,10 @@ def address_name(website_url: Optional[str], scrape_status: Any) -> Optional[str
     "questjunior"). Not shown anywhere."""
     if str(scrape_status or "").strip().lower() not in SITE_ACCEPTED_STATUSES:
         return None
-    host = (urlparse(website_url or "").hostname or "").casefold().removeprefix("www.")
-    labels = host.split(".")[:-1]  # without the top-level domain
+    name = host(website_url)
+    if ".".join(name.split(".")[-2:]) in _PLATFORM_DOMAINS:
+        return None
+    labels = name.split(".")[:-1]  # without the top-level domain
     words = " ".join(re.sub(r"[^a-z0-9]+", " ", label) for label in labels).split()
     return " ".join(words) or None
 

@@ -15,7 +15,6 @@ import logging
 import re
 from collections.abc import Awaitable, Callable, Sequence
 from typing import Any, Optional
-from urllib.parse import urlparse
 
 from bs4 import BeautifulSoup
 from pydantic import BaseModel, Field
@@ -38,6 +37,7 @@ from app.utils.school_facts import SITE_ACCEPTED_STATUSES
 from app.utils.website_name import (
     ATTRIBUTE_KEY,
     SCHEMA_VERSION,
+    host,
     is_latin_name,
     matches_site_or_register,
     names_other_level,
@@ -51,6 +51,8 @@ DEFAULT_MAX_USD = 0.30
 # The opening text of the home page: the name is in the header, the title or the first lines.
 MAX_TEXT_CHARS = 4000
 OUTPUT_TOKENS = 200
+# Less visible text than this (and no site name or logo text) is a page built by scripts.
+MIN_TEXT_CHARS = 200
 # State schools rarely write a Latin brand; their English name comes from the register.
 DEFAULT_TYPES = ("private", "international")
 
@@ -76,8 +78,8 @@ class SiteName(BaseModel):
 Caller = Callable[[str, int], Awaitable[SiteName]]
 
 
-def page_summary(html: str) -> tuple[str, str]:
-    """(what the reader sees, all the page's text for the on-page check)."""
+def page_summary(html: str) -> tuple[str, str, str]:
+    """(what the reader sees, all the page's text for the on-page check, its visible text)."""
     soup = BeautifulSoup(html, "html.parser")
     parts = []
     if soup.title and soup.title.get_text(strip=True):
@@ -102,7 +104,7 @@ def page_summary(html: str) -> tuple[str, str]:
     text = "\n".join(line.strip() for line in soup.get_text("\n").splitlines() if line.strip())
     parts.append("Opening text:\n" + text[:MAX_TEXT_CHARS])
     alts = " ".join(str(img.get("alt") or "") for img in soup.find_all("img"))
-    return "\n".join(parts), "\n".join(parts) + "\n" + text + "\n" + alts
+    return "\n".join(parts), "\n".join(parts) + "\n" + text + "\n" + alts, text
 
 
 def _squash(text: str) -> str:
@@ -126,17 +128,13 @@ def check_name(
         return "none on the page"
     if not is_latin_name(name):
         return "not a Latin name"
-    if _squash(name) not in _squash(page_text):
+    if not re.search(rf"(?<!\w){re.escape(_squash(name))}(?!\w)", _squash(page_text)):
         return "not on the page"
     if not matches_site_or_register(name, website_url, register_names):
         return "matches neither the site's address nor the register name"
     if shared_with_other_level and names_other_level(name, family):
         return "names the other level on a shared site"
     return None
-
-
-def _host(url: Optional[str]) -> str:
-    return (urlparse(url or "").hostname or "").casefold().removeprefix("www.")
 
 
 def _register_names(school: School) -> list[str]:
@@ -151,13 +149,16 @@ async def read_school(
     if home is None:
         return {"read": False, "outcome": "not_read"}
     final, html = home
-    if _host(final) != _host(school.website_url):
-        # Another site's name (an operator's, a network's) is not this school's; a stored
-        # one read before the move is cleared.
-        return {"read": True, "page": final, "name": None, "dropped": "redirects to another site", "outcome": "dropped"}
-    summary, page_text = page_summary(html)
-    if len(page_text.strip()) < 20:
-        return {"read": False, "outcome": "not_read", "page": final}
+    if host(final) != host(school.website_url):
+        # Another host's name (an operator's, a network's) may not be this school's, and a
+        # moved site is URL validation's to accept: not read, the stored name stays.
+        return {"read": False, "outcome": "not_read", "page": final, "note": "redirects to another host"}
+    summary, page_text, visible = page_summary(html)
+    if len(visible.strip()) < MIN_TEXT_CHARS and not any(
+        line.startswith(("og:site_name", "Logo text")) for line in summary.splitlines()
+    ):
+        # A page built by scripts the plain fetch does not run: not read, the stored name stays.
+        return {"read": False, "outcome": "not_read", "page": final, "note": "thin home page"}
     register = (school.name_i18n or {}).get("bg") or (school.name_i18n or {}).get("en") or ""
     answer = await call(
         f"Register name: {register} ({school.school_type} {school.education_level})\n\n{summary}", school.id
@@ -184,7 +185,7 @@ async def read_school(
 def model_caller(spend: Spend) -> Caller:
     async def call(message: str, school_id: int) -> SiteName:
         in_price, out_price = get_model_costs(TIER)
-        estimate = (len(message) / 3 * in_price + OUTPUT_TOKENS * out_price) / 1_000_000
+        estimate = ((len(PROMPT) + len(message)) / 3 * in_price + OUTPUT_TOKENS * out_price) / 1_000_000
         agent = create_agent(
             TIER, PROMPT, SiteName, retries=1, model_settings={"temperature": 0, "max_tokens": OUTPUT_TOKENS}
         )
@@ -245,7 +246,7 @@ async def run_website_name(
             School.country_code == country, School.website_url.isnot(None)
         )
     ):
-        families.setdefault(_host(website_url), set()).add(level_family(education_level))
+        families.setdefault(host(website_url), set()).add(level_family(education_level))
 
     spend = Spend(max_usd)
     run = await start_pipeline_run(
@@ -266,7 +267,7 @@ async def run_website_name(
                 "website": school.website_url,
             }
             try:
-                shared = len(families.get(_host(school.website_url), ())) > 1
+                shared = len(families.get(host(school.website_url), ())) > 1
                 result |= await read_school(school, fetch, call, shared_with_other_level=shared)
             except (SpendCapReached, ProviderCostError) as exc:
                 error = str(exc)[:200]
