@@ -59,6 +59,7 @@ ANTHROPIC_LONG_PROMPT_PRICES = {
     "claude-haiku-5-5": (0.50, 2.50),
 }
 ANTHROPIC_PREFIX = "anthropic/"
+ANTHROPIC_MAX_OUTPUT_TOKENS = 8_192
 OPENROUTER_PREFIX = "openrouter/"
 # Settings Haiku 5.5 rejects with a 400 when set to anything but the default.
 _ANTHROPIC_SAMPLING_SETTINGS = ("temperature", "top_p", "top_k")
@@ -230,7 +231,13 @@ class PricedAnthropicModel(AnthropicModel):
             raise
         usage = response.usage
         cost = anthropic_cost_usd(self.model_name, usage.input_tokens, usage.output_tokens)
-        response.provider_details = {**(response.provider_details or {}), "cost": cost}
+        # "cost" is what the ledger and caps read; cost_source records that it was computed
+        # from Anthropic's token counts, not reported in dollars like OpenRouter's.
+        response.provider_details = {
+            **(response.provider_details or {}),
+            "cost": cost,
+            "cost_source": "computed_from_usage",
+        }
         return response
 
 
@@ -292,6 +299,9 @@ def create_agent(
         # Haiku 5.5 thinks by default; off keeps the forced tool call that returns the
         # structured answer (Anthropic refuses forced tool calls while thinking).
         model_settings.setdefault("anthropic_thinking", {"type": "disabled"})
+        # pydantic-ai's Anthropic default is 4,096 output tokens, below the 6,000 the fee and
+        # facts reads budget for; OpenRouter calls have no such default.
+        model_settings.setdefault("max_tokens", ANTHROPIC_MAX_OUTPUT_TOKENS)
     else:
         model = get_openrouter_model(tier)
         model_settings.setdefault("openrouter_usage", {"include": True})

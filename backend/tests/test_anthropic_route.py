@@ -131,6 +131,8 @@ async def test_an_anthropic_call_sends_no_sampling_settings_and_reports_its_cost
     assert "temperature" not in body
     assert body["thinking"] == {"type": "disabled"}
     assert body["tool_choice"]["type"] == "any"
+    assert body["max_tokens"] == ai_client.ANTHROPIC_MAX_OUTPUT_TOKENS
+    assert result.response.provider_details["cost_source"] == "computed_from_usage"
     expected = 20_000 / 1e6 * 0.10 + 400 / 1e6 * 0.50
     assert ai_client.extract_provider_cost_usd(result) == pytest.approx(expected)
     # The provider ledger accepts the response as exactly attributed, as with OpenRouter.
@@ -152,6 +154,41 @@ async def test_an_account_refusal_stops_the_run(monkeypatch, haiku_pricing, stat
     agent = ai_client.create_agent("pricing", "system", Pick)
     with pytest.raises(ProviderCreditsExhausted):
         await agent.run("hello")
+
+
+def test_the_legacy_extractor_refuses_an_anthropic_tier(monkeypatch):
+    from app.scrapers import extractor
+
+    monkeypatch.setattr(extractor, "get_settings", lambda: _settings(cheap="anthropic/claude-haiku-5-5"))
+    monkeypatch.setattr(ai_client, "get_settings", lambda: _settings(cheap="anthropic/claude-haiku-5-5"))
+    with pytest.raises(ValueError, match="OpenRouter only"):
+        extractor._build_openrouter_model("cheap")
+
+
+async def test_two_requests_are_each_priced_on_their_own_prompt(monkeypatch, haiku_pricing):
+    """Two 60K-token requests stay at the base price: the 100K threshold is per request."""
+    calls = iter([
+        {"content": [{"type": "text", "text": "not json"}], "stop_reason": "end_turn"},
+        None,
+    ])
+
+    def handler(request):
+        step = next(calls)
+        if step is None:
+            response = _tool_answer(request).json()
+        else:
+            response = {"id": "msg_test_0", "type": "message", "role": "assistant", "model": "claude-haiku-5-5",
+                        "stop_sequence": None, **step}
+        response["usage"] = {"input_tokens": 60_000, "output_tokens": 100}
+        response["id"] = f"msg_{60_000}_{id(step)}"
+        return httpx.Response(200, json=response)
+
+    _mock_anthropic(monkeypatch, handler)
+    agent = ai_client.create_agent("pricing", "system", Pick, output_retries=1)
+    result = await agent.run("hello")
+    per_request = 60_000 / 1e6 * 0.10 + 100 / 1e6 * 0.50
+    assert ai_client.extract_provider_cost_usd(result) == pytest.approx(2 * per_request)
+    assert len(extract_exact_provider_attributions(result)) == 2
 
 
 async def test_other_request_errors_stay_per_call_errors(monkeypatch, haiku_pricing):
