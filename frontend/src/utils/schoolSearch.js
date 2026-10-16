@@ -54,7 +54,7 @@ export const SCHOOL_NAME_ALIASES = {
 }
 
 // Words for "saint" (Св./Свети/Света, St., Saint, Sveta); any one matches any other.
-export const SAINT_WORDS = ['sv', 'sveti', 'sveta', 'svetite', 'st', 'saint']
+export const SAINT_WORDS = ['sv', 'sveti', 'sveta', 'svetite', 'st', 'sts', 'saint', 'saints']
 
 /** Lowercase, drop "№"/"No." and punctuation, split digits from letters, drop ordinals. */
 export function normalizeSearchText(text) {
@@ -74,11 +74,6 @@ export function transliterate(text) {
   return Array.from(text, ch => (Object.prototype.hasOwnProperty.call(TRANSLIT, ch) ? TRANSLIT[ch] : ch)).join('')
 }
 
-// Transliteration for matching: "-ия" reads "ia" as parents write it (Sofia, Maria).
-function latinKey(text) {
-  return transliterate(text).replace(/iya/g, 'ia')
-}
-
 const TYPE_LATIN = new Map(
   Object.entries(TYPE_ABBREVIATIONS).map(([key, stems]) => [transliterate(key), stems.map(transliterate)])
 )
@@ -88,19 +83,21 @@ const ALIASES_LATIN = Object.entries(SCHOOL_NAME_ALIASES).map(
 
 function prepareName(value) {
   const norm = normalizeSearchText(value)
-  const latin = latinKey(norm)
-  return { norm, latin, words: [...norm.split(' '), ...latin.split(' ')] }
+  const latin = transliterate(norm)
+  const words = [...norm.split(' '), ...latin.split(' ')]
+  return { norm, latin, words, hasSaint: words.some(word => SAINT_WORDS.includes(word)) }
 }
 
 function tokenIn(token, name) {
-  const latin = latinKey(token)
-  if (SAINT_WORDS.includes(latin) && name.words.some(word => SAINT_WORDS.includes(word))) return true
+  const latin = transliterate(token)
+  if (SAINT_WORDS.includes(latin) && name.hasSaint) return true
   if (/^\d+$/.test(token)) return new RegExp(`(^|\\D)${token}(?!\\d)`).test(name.norm)
   const stems = TYPE_LATIN.get(latin)
   if (stems) {
     return name.words.includes(latin) || stems.every(stem => name.latin.includes(stem))
   }
-  return name.norm.includes(token) || name.latin.includes(latin)
+  // "-ия" transliterates to "iya", but parents type "ia" (Sofia, Maria).
+  return name.norm.includes(token) || name.latin.includes(latin) || name.latin.includes(latin.replace(/ia/g, 'iya'))
 }
 
 function tokensMatch(tokens, names) {

@@ -71,7 +71,7 @@ SCHOOL_NAME_ALIASES: dict[str, str] = {
 # "Св." / "Свети" / "Света" in registry names, "St." in English names; parents also
 # type "Saint" or "Sveta". A query word in this set also matches a name holding any of
 # them as a whole word, so "Saint Sofia" and "Sveta Sofia" find „Света София“.
-SAINT_WORDS = ("sv", "sveti", "sveta", "svetite", "st", "saint")
+SAINT_WORDS = ("sv", "sveti", "sveta", "svetite", "st", "sts", "saint", "saints")
 
 # Rank tiers (lower is better).
 RANK_ALIAS = 0
@@ -105,11 +105,6 @@ def transliterate(text: str) -> str:
     return "".join(_TRANSLIT.get(char, char) for char in text)
 
 
-def _latin_key(text: str) -> str:
-    """Transliteration for matching: "-ия" reads "ia" as parents write it (Sofia, Maria)."""
-    return transliterate(text).replace("iya", "ia")
-
-
 _TYPE_LATIN = {transliterate(key): stems for key, stems in TYPE_ABBREVIATIONS.items()}
 _ALIASES_LATIN = [
     (transliterate(alias).split(" "), normalize(target))
@@ -118,17 +113,18 @@ _ALIASES_LATIN = [
 
 
 class _Name:
-    __slots__ = ("norm", "latin", "words")
+    __slots__ = ("norm", "latin", "words", "has_saint")
 
     def __init__(self, value: object):
         self.norm = normalize(value)
-        self.latin = _latin_key(self.norm)
+        self.latin = transliterate(self.norm)
         self.words = self.norm.split(" ") + self.latin.split(" ")
+        self.has_saint = any(word in SAINT_WORDS for word in self.words)
 
 
 def _token_in(token: str, name: _Name, *, prefix: bool = False) -> bool:
-    latin = _latin_key(token)
-    if latin in SAINT_WORDS and any(word in SAINT_WORDS for word in name.words):
+    latin = transliterate(token)
+    if latin in SAINT_WORDS and name.has_saint:
         return True
     if token.isdigit():
         return re.search(rf"(?<!\d){token}(?!\d)", name.norm) is not None
@@ -136,9 +132,11 @@ def _token_in(token: str, name: _Name, *, prefix: bool = False) -> bool:
         return latin in name.words or all(
             transliterate(stem) in name.latin for stem in _TYPE_LATIN[latin]
         )
+    # "-ия" transliterates to "iya", but parents type "ia" (Sofia, Maria).
+    latins = (latin, latin.replace("ia", "iya")) if "ia" in latin else (latin,)
     if prefix:
-        return any(word.startswith(token) or word.startswith(latin) for word in name.words)
-    return token in name.norm or latin in name.latin
+        return any(word.startswith(token) or word.startswith(latins) for word in name.words)
+    return token in name.norm or any(form in name.latin for form in latins)
 
 
 def _tokens_rank(tokens: list[str], names: list[_Name]) -> Optional[int]:

@@ -10,7 +10,7 @@ const svetaSofia = {
 const smg = { name_i18n: { bg: 'Софийска математическа гимназия "Паисий Хилендарски"' } }
 
 test('Latin saint words and the "Sofia" spelling find Света София', () => {
-  for (const query of ['Saint Sofia', 'Sveta Sofia', 'Sveta Sofiya', 'St Sofia', 'Св. София', 'свети софия']) {
+  for (const query of ['Sofiy', 'Saints Sofia', 'Saint Sofia', 'Sveta Sofia', 'Sveta Sofiya', 'St Sofia', 'Св. София', 'свети софия']) {
     assert.equal(schoolMatchesQuery(svetaSofia, query), true, query)
   }
 })

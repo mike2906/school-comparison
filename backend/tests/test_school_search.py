@@ -119,6 +119,15 @@ def test_saint_words_and_sofia_spellings_match(query):
     assert rank_school(query_tokens(query), registry_name=SV_SOFIA, names=names) is not None
 
 
+def test_typing_a_name_letter_by_letter_keeps_matching():
+    for query in ("Sofi", "Sofiy", "Sofiya", "Sofia"):
+        assert _rank(query, SV_SOFIA) is not None, query
+
+
+def test_plural_saints_match():
+    assert _rank("Saints Kiril", 'СУ "Св. св. Кирил и Методий"') is not None
+
+
 def test_saint_word_needs_a_saint_in_the_name():
     assert _rank("Saint Luka", SV_LUKA) is not None
     assert _rank("Saint Paisiy", SMG) is None
@@ -155,8 +164,9 @@ def test_frontend_tables_match_backend():
     source = js_path.read_text(encoding="utf-8")
     assert _js_table(source, "SCHOOL_NAME_ALIASES") == SCHOOL_NAME_ALIASES
     assert _js_table(source, "TYPE_ABBREVIATIONS") == TYPE_ABBREVIATIONS
-    saint_words = re.search(r"export const SAINT_WORDS = \[([^\]]*)\]", source).group(1)
-    assert tuple(re.findall(r"'([^']*)'", saint_words)) == SAINT_WORDS
+    saint_words = re.search(r"export const SAINT_WORDS = \[([^\]]*)\]", source)
+    assert saint_words, "SAINT_WORDS not found in schoolSearch.js"
+    assert tuple(re.findall(r"'([^']*)'", saint_words.group(1))) == SAINT_WORDS
 
 
 async def _add_school(db, name_bg: str, *, name_en: str | None = None) -> School:

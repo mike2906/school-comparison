@@ -45,10 +45,11 @@ describe('finding a school', () => {
   })
 
   test('a Latin "Saint ..." spelling finds a school named „Света/Свети ...“', async () => {
-    // Parents write "Saint Sofia" or "Sveta Sofia" for „Света София“ (St. Sofia).
-    const school = (await allSchools()).find(s => /\bSt\. [A-Z]\w+/.test(schoolName(s, 'en')) && /Свет[аи] /.test(schoolName(s, 'bg')))
+    // Parents write "Saint Sofia" or "Sveta Sofia" for „Света София“ (St. Sofia). The
+    // whole English name with "Saint" for "St." keeps the result list to this school.
+    const school = (await allSchools()).find(s => /\bSt\. /.test(schoolName(s, 'en')) && /\bСвет[аи] /.test(schoolName(s, 'bg')))
     assert.ok(school, 'a school named after a saint')
-    const query = `Saint ${schoolName(school, 'en').match(/\bSt\. ([A-Z]\w+)/)[1]}`
+    const query = schoolName(school, 'en').replace(/\bSt\. /, 'Saint ')
     await open('bg', '/search')
     await page.getByPlaceholder(t('bg', 'nameSearch.placeholderShort')).filter({ visible: true }).first().fill(query)
     await page.waitForURL(url => url.searchParams.get('q') === query)
