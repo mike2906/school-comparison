@@ -195,3 +195,59 @@ async def test_search_finds_a_brand_in_the_web_address_below_name_matches(seeded
     await seeded_db.commit()
     rows = (await seeded_client.get("/schools/search", params={"q": "quest"})).json()
     assert [row["id"] for row in rows] == [named.id, brand.id]
+
+
+def test_on_a_shared_site_a_name_naming_only_the_other_level_is_the_siblings():
+    _, text = stage.page_summary(_html(body="UWEKIND Kindergarten and Uwekind International School"))
+    kindergarten = dict(family="kindergarten", shared_with_other_level=True)
+    assert stage.check_name("Uwekind International School", text, HOME, [REGISTER], **kindergarten) == (
+        "names the other level on a shared site"
+    )
+    assert stage.check_name("UWEKIND Kindergarten", text, HOME, [REGISTER], **kindergarten) is None
+    assert stage.check_name("UWEKIND", text, HOME, [REGISTER], **kindergarten) is None
+    assert stage.check_name("UWEKIND Kindergarten", text, HOME, [REGISTER], shared_with_other_level=True) == (
+        "names the other level on a shared site"
+    )
+    # A site of its own may call a kindergarten anything.
+    assert stage.check_name("Uwekind International School", text, HOME, [REGISTER], family="kindergarten") is None
+
+
+@pytest.mark.asyncio
+async def test_the_run_knows_a_site_is_shared_with_the_other_level(db_session):
+    kindergarten = _school(
+        name_i18n={"bg": '"ЧАСТНА НЕМСКА ДЕТСКА ГРАДИНА УВЕКИНД" ООД'}, education_level="kindergarten"
+    )
+    school = _school()
+    db_session.add_all([kindergarten, school])
+    await db_session.commit()
+    report = await stage.run_website_name(
+        db_session,
+        school_ids=[kindergarten.id, school.id],
+        fetch=_fetcher({HOME: _html()}),
+        call=_caller("Uwekind International School"),
+    )
+    by_id = {r["school_id"]: r for r in report["results"]}
+    assert by_id[kindergarten.id]["dropped"] == "names the other level on a shared site"
+    assert by_id[school.id]["name"] == "Uwekind International School"
+
+
+@pytest.mark.asyncio
+async def test_a_home_page_that_redirects_to_another_site_clears_the_name(db_session):
+    school = _school(attributes={"website_name": _block()})
+    db_session.add(school)
+    await db_session.commit()
+
+    async def fetch(url):
+        return "https://operator.example/", _html()
+
+    async def call(message, school_id):
+        raise AssertionError("no model call for another site")
+
+    report = await stage.run_website_name(db_session, school_ids=[school.id], fetch=fetch, call=call, apply=True)
+    assert report["results"][0]["dropped"] == "redirects to another site"
+    assert school.attributes["website_name"]["name"] is None
+
+
+def test_a_register_english_name_stays_before_the_website_name():
+    attrs = publication_attributes({"website_name": _block()}, "validated", HOME)
+    assert resolve_name_i18n({"bg": REGISTER, "en": "Uwekind School"}, attrs)["en"] == "Uwekind School"

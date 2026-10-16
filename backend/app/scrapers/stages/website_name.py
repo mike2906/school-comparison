@@ -15,6 +15,7 @@ import logging
 import re
 from collections.abc import Awaitable, Callable, Sequence
 from typing import Any, Optional
+from urllib.parse import urlparse
 
 from bs4 import BeautifulSoup
 from pydantic import BaseModel, Field
@@ -26,6 +27,7 @@ from app.config import get_settings
 from app.models import School
 from app.models.pipeline_run import PipelineRun
 from app.scrapers.fee_pages import fee_http_client
+from app.scrapers.shared_site_check import level_family
 from app.scrapers.stages import common as stage_common
 from app.scrapers.stages.fees_agent import Spend, SpendCapReached
 from app.scrapers.stages.social_links import Fetch, _http_fetch
@@ -33,7 +35,13 @@ from app.services.pipeline_runs import finalize_pipeline_run, start_pipeline_run
 from app.services.provider_costs import ProviderCostError, execute_billable_request, provider_cost_scope
 from app.utils.i18n_resolver import derive_english_name
 from app.utils.school_facts import SITE_ACCEPTED_STATUSES
-from app.utils.website_name import ATTRIBUTE_KEY, SCHEMA_VERSION, is_latin_name, matches_site_or_register
+from app.utils.website_name import (
+    ATTRIBUTE_KEY,
+    SCHEMA_VERSION,
+    is_latin_name,
+    matches_site_or_register,
+    names_other_level,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -102,9 +110,18 @@ def _squash(text: str) -> str:
 
 
 def check_name(
-    name: Optional[str], page_text: str, website_url: Optional[str], register_names: list[str]
+    name: Optional[str],
+    page_text: str,
+    website_url: Optional[str],
+    register_names: list[str],
+    *,
+    family: str = "school",
+    shared_with_other_level: bool = False,
 ) -> Optional[str]:
-    """Why ``name`` is not kept, or None when it is."""
+    """Why ``name`` is not kept, or None when it is.
+
+    ``shared_with_other_level``: a school of the other level (kindergarten or school) has
+    the same website, so a name naming only that level is the sibling's."""
     if not name:
         return "none on the page"
     if not is_latin_name(name):
@@ -113,7 +130,13 @@ def check_name(
         return "not on the page"
     if not matches_site_or_register(name, website_url, register_names):
         return "matches neither the site's address nor the register name"
+    if shared_with_other_level and names_other_level(name, family):
+        return "names the other level on a shared site"
     return None
+
+
+def _host(url: Optional[str]) -> str:
+    return (urlparse(url or "").hostname or "").casefold().removeprefix("www.")
 
 
 def _register_names(school: School) -> list[str]:
@@ -121,11 +144,17 @@ def _register_names(school: School) -> list[str]:
     return [bg, (school.name_i18n or {}).get("en") or "", derive_english_name(bg) or ""]
 
 
-async def read_school(school: School, fetch: Fetch, call: Caller) -> dict[str, Any]:
+async def read_school(
+    school: School, fetch: Fetch, call: Caller, *, shared_with_other_level: bool = False
+) -> dict[str, Any]:
     home = await fetch(school.website_url)
     if home is None:
         return {"read": False, "outcome": "not_read"}
     final, html = home
+    if _host(final) != _host(school.website_url):
+        # Another site's name (an operator's, a network's) is not this school's; a stored
+        # one read before the move is cleared.
+        return {"read": True, "page": final, "name": None, "dropped": "redirects to another site", "outcome": "dropped"}
     summary, page_text = page_summary(html)
     if len(page_text.strip()) < 20:
         return {"read": False, "outcome": "not_read", "page": final}
@@ -134,7 +163,14 @@ async def read_school(school: School, fetch: Fetch, call: Caller) -> dict[str, A
         f"Register name: {register} ({school.school_type} {school.education_level})\n\n{summary}", school.id
     )
     name = (answer.latin_name or "").strip() or None
-    dropped = check_name(name, page_text, school.website_url, _register_names(school))
+    dropped = check_name(
+        name,
+        page_text,
+        school.website_url,
+        _register_names(school),
+        family=level_family(school.education_level),
+        shared_with_other_level=shared_with_other_level,
+    )
     return {
         "read": True,
         "page": final,
@@ -201,6 +237,15 @@ async def run_website_name(
     if city:
         query = query.where(func.lower(School.city) == city.lower())
     ids = list((await db.execute(query.order_by(School.id).limit(limit))).scalars().all())
+    # The level families on each website host, to tell a kindergarten's name from its
+    # sister school's on a site they share (uwekind.com).
+    families: dict[str, set[str]] = {}
+    for website_url, education_level in await db.execute(
+        select(School.website_url, School.education_level).where(
+            School.country_code == country, School.website_url.isnot(None)
+        )
+    ):
+        families.setdefault(_host(website_url), set()).add(level_family(education_level))
 
     spend = Spend(max_usd)
     run = await start_pipeline_run(
@@ -221,7 +266,8 @@ async def run_website_name(
                 "website": school.website_url,
             }
             try:
-                result |= await read_school(school, fetch, call)
+                shared = len(families.get(_host(school.website_url), ())) > 1
+                result |= await read_school(school, fetch, call, shared_with_other_level=shared)
             except (SpendCapReached, ProviderCostError) as exc:
                 error = str(exc)[:200]
                 break

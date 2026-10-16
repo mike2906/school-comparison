@@ -115,6 +115,19 @@ def matches_site_or_register(name: str, website_url: Optional[str], register_nam
     )
 
 
+_KINDERGARTEN_WORDS = frozenset({"kindergarten", "kindergartens", "nursery", "preschool", "kita", "daycare"})
+_SCHOOL_WORDS = frozenset({"school", "schools", "college", "lyceum", "lycee", "lycée", "gymnasium", "high"})
+
+
+def names_other_level(name: str, family: str) -> bool:
+    """Whether ``name`` names only the other level: "Uwekind International School" for the
+    kindergarten on uwekind.com. A name with both ("School and Preschool") or neither (the
+    brand alone) is not."""
+    words = set(_WORD_RE.findall(name.casefold()))
+    kindergarten, school = bool(words & _KINDERGARTEN_WORDS), bool(words & _SCHOOL_WORDS)
+    return school and not kindergarten if family == "kindergarten" else kindergarten and not school
+
+
 def address_name(website_url: Optional[str], scrape_status: Any) -> Optional[str]:
     """The website's address as words for search ("busy school" for busy-school.com,
     "questjunior" for questjunior.bg), for an accepted website only.
