@@ -13,7 +13,7 @@ schema, checks or model moved it. `scripts/fees_eval.py` says what is scored and
 
 CI (`.github/workflows/fees-eval.yml`) runs 3 trials (about $0.10) on a PR that touches the reader, its
 checks, the publish gate or the model choice, and fails when wrong rows rise more than 6
-points or found fees drop more than 9 points below the baseline. It runs when the PR is opened
+points or found fees drop more than 9 points below the baseline. It runs when the PR is opened, reopened
 or marked ready for review, not on every push. After the last push that changes the reader's
 behaviour (prompt, schema, checks, gate, model), run it once more on the final code by adding
 the `fees-eval` label (remove it first if it is already on): `gh pr edit <n> --remove-label
