@@ -1,10 +1,12 @@
 # Fees eval: the fee reader on saved pages, scored against the blind answer keys
-# (backend/scripts/fees_eval.py). Runs only when a PR touches the reader, its checks, the
-# publish gate or the model choice; about $0.002 per school per trial.
+# (backend/scripts/fees_eval.py). Runs on a PR that touches the reader, its checks, the
+# publish gate or the model choice when it is opened or marked ready, and again when the
+# `fees-eval` label is added; not on every push. About $0.002 per school per trial.
 name: Fees eval
 
 on:
   pull_request:
+    types: [opened, reopened, ready_for_review, labeled]
     paths:
       - backend/app/scrapers/extraction/agent_fees.py
       - backend/app/scrapers/extraction/price_step.py
@@ -37,12 +39,18 @@ permissions:
   contents: read
 
 concurrency:
-  group: fees-eval-${{ github.ref }}
+  # Another label gets a group of its own, so it can't cancel an eval that is running.
+  group: fees-eval-${{ github.ref }}-${{ (github.event.action == 'labeled' && github.event.label.name != 'fees-eval') && github.run_id || 'eval' }}
   cancel-in-progress: true
 
 jobs:
   eval:
     name: Fees eval
+    # A label other than fees-eval, or a draft PR, does not spend a run.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (!github.event.pull_request.draft &&
+       (github.event.action != 'labeled' || github.event.label.name == 'fees-eval'))
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     defaults:
