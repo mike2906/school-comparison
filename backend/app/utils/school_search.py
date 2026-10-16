@@ -78,10 +78,22 @@ SAINT_WORDS = frozenset({
     "sv", "sveti", "sveta", "svetite",
 })
 
-# Latin spellings parents use where the official transliteration differs: "-ия" is
-# "iya" but they type "Sofia", "Maria"; В is "v" but school brands write "W" (UWEKIND).
-# A Latin query word also matches with each replacement applied.
-LATIN_SPELLINGS = (("ia", "iya"), ("w", "v"))
+# Parents write Bulgarian in Latin letters many ways besides the official
+# transliteration: "Car"/"Tzar" for Цар, "Khristo" for Христо, "Paisii" for Паисий,
+# "Iavorov" for Яворов, "Djon" for Джон, "Sofia" for София, "UWEKIND" for Увекинд.
+# Both the query and the transliterated name are rewritten with these rules, in order,
+# before comparing. Each rewrite keeps or lengthens text where it can ("j" -> "zh",
+# "c" -> "ts"), so a word typed halfway still matches.
+LOOSE_SPELLINGS = (
+    ("w", "v"),
+    ("j", "zh"),
+    ("kh", "h"),
+    ("tz", "ts"),
+    ("c(?!h)", "ts"),
+    ("y", "i"),
+    ("i+", "i"),
+)
+_LOOSE_RES = [(re.compile(pattern), repl) for pattern, repl in LOOSE_SPELLINGS]
 
 # Rank tiers (lower is better).
 RANK_ALIAS = 0
@@ -123,20 +135,26 @@ _ALIASES_LATIN = [
 
 
 class _Name:
-    __slots__ = ("norm", "latin", "words", "has_saint")
+    __slots__ = ("norm", "latin", "loose", "words", "has_saint")
 
     def __init__(self, value: object, *, saints: bool = True):
         self.norm = normalize(value)
         self.latin = transliterate(self.norm)
-        self.words = self.norm.split(" ") + self.latin.split(" ")
+        self.loose = _loose(self.latin)
+        self.words = self.norm.split(" ") + self.latin.split(" ") + self.loose.split(" ")
         self.has_saint = saints and not SAINT_WORDS.isdisjoint(self.norm.split(" "))
 
 
-def _latin_forms(latin: str) -> tuple[str, ...]:
-    forms = [latin]
-    for typed, official in LATIN_SPELLINGS:
-        forms += [form.replace(typed, official) for form in forms if typed in form]
-    return tuple(forms)
+def _loose(latin: str) -> str:
+    for pattern, repl in _LOOSE_RES:
+        latin = pattern.sub(repl, latin)
+    return latin
+
+
+def _loose_forms(latin: str) -> tuple[str, ...]:
+    """Loose forms of a query word; "u" may also stand for Ъ (Kushta, Dimitur)."""
+    forms = (_loose(latin),)
+    return forms + (_loose(latin.replace("u", "a")),) if "u" in latin else forms
 
 
 def _token_in(token: str, name: _Name, *, prefix: bool = False) -> bool:
@@ -149,10 +167,10 @@ def _token_in(token: str, name: _Name, *, prefix: bool = False) -> bool:
         return latin in name.words or all(
             transliterate(stem) in name.latin for stem in _TYPE_LATIN[latin]
         )
-    latins = _latin_forms(latin)
+    looses = _loose_forms(latin)
     if prefix:
-        return any(word.startswith(token) or word.startswith(latins) for word in name.words)
-    return token in name.norm or any(form in name.latin for form in latins)
+        return any(word.startswith((token, latin) + looses) for word in name.words)
+    return token in name.norm or latin in name.latin or any(form in name.loose for form in looses)
 
 
 def _tokens_rank(tokens: list[str], names: list[_Name]) -> Optional[int]:

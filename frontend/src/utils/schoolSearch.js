@@ -60,8 +60,18 @@ export const SAINT_WORDS = [
   'sv', 'sveti', 'sveta', 'svetite',
 ]
 
-// Typed Latin spelling -> official transliteration ("Sofia" for София, "UWEKIND" for Увекинд).
-export const LATIN_SPELLINGS = [['ia', 'iya'], ['w', 'v']]
+// Rewrites applied in order to the query and the transliterated name so common Latin
+// spellings match ("Car", "Khristo", "Paisii", "Djon", "Sofia", "UWEKIND"); see backend.
+export const LOOSE_SPELLINGS = [
+  ['w', 'v'],
+  ['j', 'zh'],
+  ['kh', 'h'],
+  ['tz', 'ts'],
+  ['c(?!h)', 'ts'],
+  ['y', 'i'],
+  ['i+', 'i'],
+]
+const LOOSE_RES = LOOSE_SPELLINGS.map(([pattern, repl]) => [new RegExp(pattern, 'g'), repl])
 
 /** Lowercase, drop "№"/"No." and punctuation, split digits from letters, drop ordinals. */
 export function normalizeSearchText(text) {
@@ -91,15 +101,19 @@ const ALIASES_LATIN = Object.entries(SCHOOL_NAME_ALIASES).map(
 function prepareName(value) {
   const norm = normalizeSearchText(value)
   const latin = transliterate(norm)
-  const words = [...norm.split(' '), ...latin.split(' ')]
-  return { norm, latin, words, hasSaint: norm.split(' ').some(word => SAINT_WORDS.includes(word)) }
+  const loose = looseLatin(latin)
+  const words = [...norm.split(' '), ...latin.split(' '), ...loose.split(' ')]
+  return { norm, latin, loose, words, hasSaint: norm.split(' ').some(word => SAINT_WORDS.includes(word)) }
 }
 
-function latinForms(latin) {
-  const forms = [latin]
-  for (const [typed, official] of LATIN_SPELLINGS) {
-    for (const form of [...forms]) if (form.includes(typed)) forms.push(form.split(typed).join(official))
-  }
+function looseLatin(latin) {
+  return LOOSE_RES.reduce((text, [re, repl]) => text.replace(re, repl), latin)
+}
+
+// "u" may also stand for Ъ (Kushta, Dimitur).
+function looseForms(latin) {
+  const forms = [looseLatin(latin)]
+  if (latin.includes('u')) forms.push(looseLatin(latin.split('u').join('a')))
   return forms
 }
 
@@ -111,7 +125,7 @@ function tokenIn(token, name) {
   if (stems) {
     return name.words.includes(latin) || stems.every(stem => name.latin.includes(stem))
   }
-  return name.norm.includes(token) || latinForms(latin).some(form => name.latin.includes(form))
+  return name.norm.includes(token) || name.latin.includes(latin) || looseForms(latin).some(form => name.loose.includes(form))
 }
 
 function tokensMatch(tokens, names) {
