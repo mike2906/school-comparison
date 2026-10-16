@@ -12,7 +12,7 @@ import { DateField, MobileTotal, Section, YesNo } from './fields'
 import PointsList from './PointsList'
 import { savedListFilters, savedListUrl } from '../../admission/schoolVerdict'
 import { useCatchmentSchoolName } from '../../hooks/useCatchmentSchoolName'
-import SaveAnswers from './SaveAnswers'
+import SaveAnswers, { saveBoxId } from './SaveAnswers'
 import NextTierHint from './NextTierHint'
 
 // Answers about one school: never saved, since the list compares every school.
@@ -160,6 +160,7 @@ function Grade1Calculator({ selected, startYear, school, cutoffRows = [], isCurr
   const save = () => saveStage('grade_1', toSave(), { home })
   const dirty = !saved || JSON.stringify({ ...toSave(), savedOn: saved.savedOn }) !== JSON.stringify(saved)
   const listUrl = savedListUrl(savedListFilters('grade_1', { startYear, answers: a }))
+  const saveBlocked = home ? null : t('savedAdmission.needsAddressToSave')
 
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
@@ -219,7 +220,7 @@ function Grade1Calculator({ selected, startYear, school, cutoffRows = [], isCurr
           <YesNo label={t('admissionCalc.g1.parentDeceased')} value={a.parentDeceased} onChange={v => set('parentDeceased', v)} />
           <YesNo label={t('admissionCalc.g1.fosterUnknownAdopted')} value={a.fosterUnknownAdopted} onChange={v => set('fosterUnknownAdopted', v)} />
         </Section>
-        <MobileTotal>
+        <MobileTotal saveId={dirty && !saveBlocked ? saveBoxId('grade_1') : null}>
           {results.map((result, i) => (
             <span key={i} className="mr-4 inline-block">
               {results.length > 1 && `${t('admissionCalc.g1.addressN', { n: i + 1 })}: `}
@@ -261,7 +262,7 @@ function Grade1Calculator({ selected, startYear, school, cutoffRows = [], isCurr
           onSave={save}
           dirty={dirty}
           listUrl={listUrl}
-          blockedReason={addresses[0]?.check ? null : t('savedAdmission.needsAddressToSave')}
+          blockedReason={saveBlocked}
         />
       </aside>
     </div>

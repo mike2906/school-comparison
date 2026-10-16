@@ -3,6 +3,9 @@ import { Link } from 'react-router-dom'
 import { forgetSaved } from '../../admission/saved'
 import { useSavedAdmission } from '../../hooks/useSavedAdmission'
 
+/** The save box's element id, so the phone total bar can scroll to it. */
+export const saveBoxId = stage => `save-answers-${stage}`
+
 /**
  * "Save on this device" under a result. Saving is the parent's choice: the answers can
  * include health and family details, so they are kept only in this browser and can be
@@ -12,7 +15,7 @@ function SaveAnswers({ stage, onSave, dirty, listUrl, blockedReason = null }) {
   const { t } = useTranslation()
   const saved = useSavedAdmission()[stage]
   return (
-    <div className="mt-4 rounded-lg border border-neutral-200 p-3 text-sm">
+    <div id={saveBoxId(stage)} className="mt-4 rounded-lg border border-neutral-200 p-3 text-sm">
       {saved && !dirty ? (
         <>
           <p className="text-neutral-800">{t('savedAdmission.saved')}</p>

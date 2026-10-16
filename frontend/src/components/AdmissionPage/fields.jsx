@@ -121,11 +121,31 @@ export function NumberField({ label, hint, value, onChange, min, max, step = 'an
   )
 }
 
-/** On phones the result sits below the questions, so its headline follows the reader. */
-export function MobileTotal({ children }) {
+/**
+ * On phones the result sits below the questions, so its headline follows the reader. With
+ * `saveId` (only while there is something to save) it also carries a button down to the
+ * save box, which is screens away under the questions and the breakdown.
+ */
+export function MobileTotal({ children, saveId = null }) {
+  const { t } = useTranslation()
   return (
-    <div className="sticky bottom-0 z-10 -mx-4 border-t border-neutral-200 bg-white/95 px-4 py-3 text-sm backdrop-blur lg:hidden" aria-hidden="true">
-      {children}
+    <div className="sticky bottom-0 z-10 -mx-4 flex items-center justify-between gap-3 border-t border-neutral-200 bg-white/95 px-4 py-3 text-sm backdrop-blur lg:hidden">
+      <div className="min-w-0" aria-hidden="true">{children}</div>
+      {saveId && (
+        <button
+          type="button"
+          onClick={() => {
+            const box = document.getElementById(saveId)
+            if (!box) return
+            const still = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+            box.scrollIntoView({ behavior: still ? 'auto' : 'smooth', block: 'center' })
+            box.querySelector('button')?.focus({ preventScroll: true })
+          }}
+          className="min-h-11 shrink-0 rounded-lg border border-primary-700 px-3 py-2 font-medium text-primary-700"
+        >
+          {t('savedAdmission.jumpToSave')}
+        </button>
+      )}
     </div>
   )
 }
