@@ -458,10 +458,14 @@ def request_reserves() -> dict[str, float]:
     the agent retries once on invalid output). Vision reads keep the default reserve."""
     reader = _worst_case_usd("pricing", MAX_READ_CHARS + len(READER_PROMPT) + 5_000, READ_MAX_OUTPUT_TOKENS, 2)
     picker = _worst_case_usd("cheap", MAX_PICK_INPUT_CHARS + len(PICK_PROMPT) + 5_000, PICK_MAX_OUTPUT_TOKENS, 2)
+    worst = {"pricing": reader, "cheap": picker}
     reserves: dict[str, float] = {}
-    for tier, usd in (("pricing", reader), ("cheap", picker)):
+    for tier, usd in worst.items():
         model = get_model(tier)
-        if model != MODEL_TIERS[tier]:  # MODEL_COSTS are the default models' prices
+        # MODEL_COSTS are the default models' prices, and a model another tier also resolves
+        # to (an override, or vision) may serve calls bigger than this one: default reserve.
+        sharing = [t for t in MODEL_TIERS if get_model(t) == model]
+        if any(t not in worst or get_model(t) != MODEL_TIERS[t] for t in sharing):
             continue
         reserves[model] = max(usd, reserves.get(model, 0.0))  # one model on both tiers: the larger
     return reserves

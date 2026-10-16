@@ -221,6 +221,19 @@ async def test_an_unattributed_pick_counts_at_the_request_reserve(monkeypatch):
     assert seen["max_tokens"] == fees_agent.PICK_MAX_OUTPUT_TOKENS
 
 
+def test_a_model_shared_with_an_overridden_tier_keeps_the_default_reserve(monkeypatch):
+    from app.ai.client import MODEL_TIERS
+
+    def _tiers(**overrides):
+        monkeypatch.setattr(fees_agent, "get_model", lambda tier: overrides.get(tier, MODEL_TIERS[tier]))
+
+    assert set(fees_agent.request_reserves()) == {MODEL_TIERS["pricing"], MODEL_TIERS["cheap"]}
+    _tiers(pricing=MODEL_TIERS["cheap"])  # the reader on the picker's model
+    assert fees_agent.request_reserves() == {}
+    _tiers(vision=MODEL_TIERS["pricing"])  # pictures on the reader's model
+    assert set(fees_agent.request_reserves()) == {MODEL_TIERS["cheap"]}
+
+
 async def test_a_spend_cap_during_the_pick_still_stops_the_school(monkeypatch):
     crawler = _Crawler({HOME: [("Начало " + "x" * 300, [("https://meridian22.org/taksi/", "Такси")])]})
     monkeypatch.setattr(fees_agent, "_pick", _picks(error=SpendCapReached("cap")))
