@@ -53,6 +53,26 @@ export const SCHOOL_NAME_ALIASES = {
   'acs': 'американски колеж',
 }
 
+// A query word for "saint" matches any name holding one as a whole word, checked before
+// transliteration so "Ст." (Стара Загора) is not a saint.
+export const SAINT_WORDS = [
+  'св', 'свети', 'света', 'светите', 'st', 'sts', 'saint', 'saints',
+  'sv', 'sveti', 'sveta', 'svetite',
+]
+
+// Rewrites applied in order to the query and the transliterated name so common Latin
+// spellings match ("Car", "Khristo", "Paisii", "Djon", "Sofia", "UWEKIND"); see backend.
+export const LOOSE_SPELLINGS = [
+  ['w', 'v'],
+  ['j', 'zh'],
+  ['kh', 'h'],
+  ['tz', 'ts'],
+  ['c(?!h)', 'ts'],
+  ['y', 'i'],
+  ['i+', 'i'],
+]
+const LOOSE_RES = LOOSE_SPELLINGS.map(([pattern, repl]) => [new RegExp(pattern, 'g'), repl])
+
 /** Lowercase, drop "№"/"No." and punctuation, split digits from letters, drop ordinals. */
 export function normalizeSearchText(text) {
   return String(text || '')
@@ -81,17 +101,38 @@ const ALIASES_LATIN = Object.entries(SCHOOL_NAME_ALIASES).map(
 function prepareName(value) {
   const norm = normalizeSearchText(value)
   const latin = transliterate(norm)
-  return { norm, latin, words: [...norm.split(' '), ...latin.split(' ')] }
+  const loose = looseLatin(latin)
+  const words = [...norm.split(' '), ...latin.split(' '), ...loose.split(' ')]
+  return { norm, latin, loose, words, hasSaint: norm.split(' ').some(word => SAINT_WORDS.includes(word)) }
+}
+
+function looseLatin(latin) {
+  return LOOSE_RES.reduce((text, [re, repl]) => text.replace(re, repl), latin)
+}
+
+// In a longer word "u" may also stand for Ъ (Kushta, Dimitur).
+const looseCache = new Map()
+function looseForms(latin) {
+  let forms = looseCache.get(latin)
+  if (!forms) {
+    forms = [looseLatin(latin)]
+    if (latin.includes('u') && latin.length >= 4) forms.push(looseLatin(latin.split('u').join('a')))
+    if (looseCache.size > 1000) looseCache.clear()
+    looseCache.set(latin, forms)
+  }
+  return forms
 }
 
 function tokenIn(token, name) {
   const latin = transliterate(token)
+  // "St"/"Sv" alone are also the start of Стефан, Свобода...: matched as text instead.
+  if (latin.length > 3 && SAINT_WORDS.includes(latin) && name.hasSaint) return true
   if (/^\d+$/.test(token)) return new RegExp(`(^|\\D)${token}(?!\\d)`).test(name.norm)
   const stems = TYPE_LATIN.get(latin)
   if (stems) {
     return name.words.includes(latin) || stems.every(stem => name.latin.includes(stem))
   }
-  return name.norm.includes(token) || name.latin.includes(latin)
+  return name.norm.includes(token) || name.latin.includes(latin) || looseForms(latin).some(form => name.loose.includes(form))
 }
 
 function tokensMatch(tokens, names) {

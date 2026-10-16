@@ -7,11 +7,13 @@ import pytest
 
 from app.models.school import School, SchoolLocation
 from app.utils.school_search import (
+    LOOSE_SPELLINGS,
     RANK_ADDRESS,
     RANK_ALIAS,
     RANK_CONTAINS,
     RANK_NUMBER,
     RANK_PREFIX,
+    SAINT_WORDS,
     SCHOOL_NAME_ALIASES,
     TYPE_ABBREVIATIONS,
     normalize,
@@ -104,6 +106,73 @@ def test_latin_query_matches_cyrillic_name_by_transliteration():
     assert _rank("atematich", SMG) == RANK_CONTAINS
 
 
+SV_SOFIA = '"Частно основно училище Света София" ЕООД'
+SV_SOFIA_EN = 'Private Primary School "St. Sofia"'
+SV_LUKA = 'Национална гимназия за приложни изкуства „Свети Лука“'
+
+
+@pytest.mark.parametrize(
+    "query",
+    ["Saint Sofia", "Sveta Sofia", "Sveta Sofiya", "St Sofia", "Св. София", "свети софия", "saint sofia school"],
+)
+def test_saint_words_and_sofia_spellings_match(query):
+    names = [SV_SOFIA, SV_SOFIA_EN]
+    assert rank_school(query_tokens(query), registry_name=SV_SOFIA, names=names) is not None
+
+
+def test_typing_a_name_letter_by_letter_keeps_matching():
+    for query in ("Sofi", "Sofiy", "Sofiya", "Sofia"):
+        assert _rank(query, SV_SOFIA) is not None, query
+
+
+def test_brand_w_matches_cyrillic_v():
+    assert _rank("Uwekind", '"ЧАСТНО СРЕДНО УЧИЛИЩЕ УВЕКИНД" ООД') is not None
+    assert _rank("Uvekind", '"ЧАСТНО СРЕДНО УЧИЛИЩЕ УВЕКИНД" ООД') is not None
+    assert _rank("Wonder", "Wonderland Kindergarten") is not None
+
+
+def test_saint_wildcard_skips_st_abbreviation_and_addresses():
+    assert _rank("Saint Sofia", "ПГ по транспорт гр. Ст. Загора София") is None
+    assert _rank("Sveta Sofia", SU_119, addresses=["гр. София, ул. Св. Наум 1"]) is None
+
+
+@pytest.mark.parametrize(
+    ("query", "name"),
+    [
+        ("Car Simeon", '"Цар Симеон Велики"'),
+        ("Tzar Simeon", '"Цар Симеон Велики"'),
+        ("Khristo Botev", 'СУ "Христо Ботев"'),
+        ("Otec Paisii", 'ОУ "Отец Паисий"'),
+        ("Iavorov", 'ОУ "Пейо Яворов"'),
+        ("Djon Atanasov", 'ОУ "Джон Атанасов"'),
+        ("Drujba", 'ЧСУ "Дружба"'),
+        ("Kushta", 'ЧДГ "Приятелска Къща"'),
+        ("Dimitur Talev", 'ОУ "Димитър Талев"'),
+        ("Liubomir", 'ОУ "Любомир Пипков"'),
+        ("Lui Pastior", 'СУ "Луи Пастьор"'),
+    ],
+)
+def test_common_latin_spellings_match(query, name):
+    assert _rank(query, name) is not None
+
+
+def test_loose_spellings_do_not_match_everything():
+    assert _rank("Car Simeon", 'ОУ "Христо Ботев"') is None
+    assert _rank("Khristo", 'ОУ "Пейо Яворов"') is None
+    assert _rank("Bu", 'ДГ "Балон"') is None
+    assert _rank("St", 'ОУ "Св. Иван Рилски"') is None
+
+
+def test_plural_saints_match():
+    assert _rank("Saints Kiril", 'СУ "Св. св. Кирил и Методий"') is not None
+
+
+def test_saint_word_needs_a_saint_in_the_name():
+    assert _rank("Saint Luka", SV_LUKA) is not None
+    assert _rank("Saint Paisiy", SMG) is None
+    assert _rank("sofia matematicheska", SMG) is None
+
+
 def test_address_only_match_ranks_last_and_nonsense_is_empty():
     assert _rank("Витоша", SMG, addresses=["бул. Витоша 1"]) == RANK_ADDRESS
     assert _rank("xqzv", SMG, addresses=["бул. Витоша 1"]) is None
@@ -134,6 +203,12 @@ def test_frontend_tables_match_backend():
     source = js_path.read_text(encoding="utf-8")
     assert _js_table(source, "SCHOOL_NAME_ALIASES") == SCHOOL_NAME_ALIASES
     assert _js_table(source, "TYPE_ABBREVIATIONS") == TYPE_ABBREVIATIONS
+    saint_words = re.search(r"export const SAINT_WORDS = \[([^\]]*)\]", source)
+    assert saint_words, "SAINT_WORDS not found in schoolSearch.js"
+    assert set(re.findall(r"'([^']*)'", saint_words.group(1))) == SAINT_WORDS
+    spellings = re.search(r"export const LOOSE_SPELLINGS = \[(.*?)\n\]", source, re.S)
+    assert spellings, "LOOSE_SPELLINGS not found in schoolSearch.js"
+    assert tuple(re.findall(r"\['([^']*)', '([^']*)'\]", spellings.group(1))) == LOOSE_SPELLINGS
 
 
 async def _add_school(db, name_bg: str, *, name_en: str | None = None) -> School:

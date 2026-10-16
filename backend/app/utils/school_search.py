@@ -9,6 +9,7 @@ tables; tests/test_school_search.py fails when the two tables drift apart.
 """
 
 import re
+from functools import lru_cache
 from typing import Iterable, Optional
 
 # Official Bulgarian transliteration (Transliteration Act 2009), lowercase only.
@@ -68,6 +69,33 @@ SCHOOL_NAME_ALIASES: dict[str, str] = {
     "acs": "американски колеж",  # 2213507, attributes.name_aliases "ACS"
 }
 
+# "Св." / "Свети" / "Света" in registry names, "St." in English names; parents also
+# type "Saint" or "Sveta". A query word in this set matches any school name holding one
+# of them as a whole word (whichever saint; the other query words narrow it down), so
+# "Saint Sofia" and "Sveta Sofia" find „Света София“. Names are checked before
+# transliteration, so "Ст." (Стара Загора) is not a saint.
+SAINT_WORDS = frozenset({
+    "св", "свети", "света", "светите", "st", "sts", "saint", "saints",
+    "sv", "sveti", "sveta", "svetite",
+})
+
+# Parents write Bulgarian in Latin letters many ways besides the official
+# transliteration: "Car"/"Tzar" for Цар, "Khristo" for Христо, "Paisii" for Паисий,
+# "Iavorov" for Яворов, "Djon" for Джон, "Sofia" for София, "UWEKIND" for Увекинд.
+# Both the query and the transliterated name are rewritten with these rules, in order,
+# before comparing. Rewrites lengthen text where they can ("j" -> "zh", "c" -> "ts"),
+# so a word typed halfway mostly still matches.
+LOOSE_SPELLINGS = (
+    ("w", "v"),
+    ("j", "zh"),
+    ("kh", "h"),
+    ("tz", "ts"),
+    ("c(?!h)", "ts"),
+    ("y", "i"),
+    ("i+", "i"),
+)
+_LOOSE_RES = [(re.compile(pattern), repl) for pattern, repl in LOOSE_SPELLINGS]
+
 # Rank tiers (lower is better).
 RANK_ALIAS = 0
 RANK_NUMBER = 1
@@ -108,25 +136,44 @@ _ALIASES_LATIN = [
 
 
 class _Name:
-    __slots__ = ("norm", "latin", "words")
+    __slots__ = ("norm", "latin", "loose", "words", "has_saint")
 
-    def __init__(self, value: object):
+    def __init__(self, value: object, *, saints: bool = True):
         self.norm = normalize(value)
         self.latin = transliterate(self.norm)
-        self.words = self.norm.split(" ") + self.latin.split(" ")
+        self.loose = _loose(self.latin)
+        self.words = self.norm.split(" ") + self.latin.split(" ") + self.loose.split(" ")
+        self.has_saint = saints and not SAINT_WORDS.isdisjoint(self.norm.split(" "))
+
+
+def _loose(latin: str) -> str:
+    for pattern, repl in _LOOSE_RES:
+        latin = pattern.sub(repl, latin)
+    return latin
+
+
+@lru_cache(maxsize=1024)
+def _loose_forms(latin: str) -> tuple[str, ...]:
+    """Loose forms of a query word; in a longer word "u" may also stand for Ъ (Kushta)."""
+    forms = (_loose(latin),)
+    return forms + (_loose(latin.replace("u", "a")),) if "u" in latin and len(latin) >= 4 else forms
 
 
 def _token_in(token: str, name: _Name, *, prefix: bool = False) -> bool:
     latin = transliterate(token)
+    # "St"/"Sv" alone are also the start of Стефан, Свобода...: matched as text instead.
+    if len(latin) > 3 and latin in SAINT_WORDS and name.has_saint:
+        return True
     if token.isdigit():
         return re.search(rf"(?<!\d){token}(?!\d)", name.norm) is not None
     if latin in _TYPE_LATIN:
         return latin in name.words or all(
             transliterate(stem) in name.latin for stem in _TYPE_LATIN[latin]
         )
+    looses = _loose_forms(latin)
     if prefix:
-        return any(word.startswith(token) or word.startswith(latin) for word in name.words)
-    return token in name.norm or latin in name.latin
+        return any(word.startswith((token, latin) + looses) for word in name.words)
+    return token in name.norm or latin in name.latin or any(form in name.loose for form in looses)
 
 
 def _tokens_rank(tokens: list[str], names: list[_Name]) -> Optional[int]:
@@ -187,6 +234,6 @@ def rank_school(
     rank = _tokens_rank(tokens, name_objs)
     if rank is not None:
         return rank
-    if _tokens_rank(tokens, [_Name(value) for value in addresses]) is not None:
+    if _tokens_rank(tokens, [_Name(value, saints=False) for value in addresses]) is not None:
         return RANK_ADDRESS
     return None
