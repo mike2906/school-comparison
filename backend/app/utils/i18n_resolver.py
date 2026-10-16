@@ -11,6 +11,7 @@ from app.utils.display_names import (
     tidy_bg_name,
     translate_bg_school_name,
 )
+from app.utils.website_name import PUBLISHED_KEY as WEBSITE_NAME_KEY
 
 _SCHOOL_ABBREVIATION_PREFIX = re.compile(r"^(?:ЧОУ|ЧДГ|ЧСУ|ЦДГ|ДГ|НУ|ОУ|СУ|ПГ)\s+", flags=re.IGNORECASE)
 _GENERIC_BG_NAME_MARKERS = {
@@ -368,6 +369,12 @@ def resolve_name_i18n(
     en_name = _prefer_display_english(display)
     if not en_name and not display:
         en_name = _prefer_raw_english_name(raw_name)
+    if not en_name:
+        # The Latin name the school's own website uses (UWEKIND, not our "Uvekind"), before
+        # a derived transliteration; only a shown one is under this key
+        # (``app.utils.school_facts.publication_attributes``).
+        website_name = raw_attributes.get(WEBSITE_NAME_KEY)
+        en_name = website_name if isinstance(website_name, str) and website_name.strip() else None
     if not en_name:
         derived_source = raw_name.get("bg") or raw_name.get("en")
         if display.get("bg"):

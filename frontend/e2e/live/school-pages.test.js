@@ -1,6 +1,6 @@
 /**
  * Live flows for what a parent reads on a school: finding it by name (Latin saint
- * spellings too), the facts read
+ * spellings and a brand in the web address too), the facts read
  * from its website (with open days), its Facebook and Instagram links, fees with their
  * payment plans, last year's fees left out once this year lists them again, fees for the
  * searched age first with the other ages folded away, comparing fees
@@ -50,6 +50,24 @@ describe('finding a school', () => {
     const school = (await allSchools()).find(s => /\bSt\. /.test(schoolName(s, 'en')) && /(^|[\s„"])Свет[аи] /.test(schoolName(s, 'bg')))
     assert.ok(school, 'a school named after a saint')
     const query = schoolName(school, 'en').replace(/\bSt\. /, 'Saint ')
+    await open('bg', '/search')
+    await page.getByPlaceholder(t('bg', 'nameSearch.placeholderShort')).filter({ visible: true }).first().fill(query)
+    await page.waitForURL(url => url.searchParams.get('q') === query)
+    await page.locator(`a[href="/schools/${school.id}"]`).first().waitFor()
+  })
+
+  test('a brand written only in the web address finds its school', async () => {
+    // Busy School, Quest Junior: many private schools write their Latin brand only in the
+    // logo, so a parent's spelling is in the address alone (busy-school.com, questjunior.bg).
+    const generic = /^(www|school|schools|kindergarten|sofia|private|academy|college|online|kids)$/
+    const brandWord = school => {
+      const host = new URL(school.website_url).hostname.replace(/^www\./, '')
+      const words = host.split('.').slice(0, -1).join(' ').split(/[^a-z]+/).filter(w => w.length >= 6 && !generic.test(w))
+      const names = Object.values(school.resolved_name_i18n || {}).join(' ').toLowerCase()
+      return words.find(word => !names.includes(word))
+    }
+    const school = await findSchool('with a brand only in its web address', s => s.website_url && brandWord(s), isPrivate)
+    const query = brandWord(school)
     await open('bg', '/search')
     await page.getByPlaceholder(t('bg', 'nameSearch.placeholderShort')).filter({ visible: true }).first().fill(query)
     await page.waitForURL(url => url.searchParams.get('q') === query)
