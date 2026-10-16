@@ -74,6 +74,11 @@ the calls are a large part of each school's time.
 - A run may also stop up to (N-1) x reserve early, refused while cheaper calls are still
   pending.
 - The two agents pass `max_in_flight=workers`; nothing else changes.
+- Since 2026-10-16 `fees-agent` caps its reader's and picker's output (`max_tokens`) and
+  passes `model_reserves`: each of their calls counts at its computed worst case (reader
+  about $0.053 with one retry, picker about $0.007) instead of the default reserve, so a
+  run no longer needs `PROVIDER_REQUEST_RESERVE_USD=0.01` to get past its first schools.
+  Vision reads, and any tier whose model is overridden, keep the default reserve.
 
 ### 3. One crawl for both readers: tried and dropped
 

@@ -216,8 +216,9 @@ async def test_an_unattributed_pick_counts_at_the_request_reserve(monkeypatch):
     spend = Spend(1.0)
     with pytest.raises(ProviderResponseUnattributed):
         await fees_agent._pick(_school(), [], [("https://meridian22.org/taksi/", "Такси")], spend)
-    assert spend.spent_usd == float(fees_agent.get_settings().provider_request_reserve_usd)
+    assert spend.spent_usd == fees_agent.request_reserves()[fees_agent.get_model("cheap")]
     assert seen["parallel_tool_calls"] is False
+    assert seen["max_tokens"] == fees_agent.PICK_MAX_OUTPUT_TOKENS
 
 
 async def test_a_spend_cap_during_the_pick_still_stops_the_school(monkeypatch):
