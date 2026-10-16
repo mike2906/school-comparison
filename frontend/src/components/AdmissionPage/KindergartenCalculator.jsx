@@ -214,7 +214,7 @@ function KindergartenCalculator({ selected, startYear, kindergarten, districts, 
               <YesNo label={t('admissionCalc.kg.transfer')} value={a.transfer} onChange={v => set('transfer', v)} />
             </Section>
             {result && (
-              <MobileTotal saveId={ageGroup ? saveBoxId('kindergarten') : null}>
+              <MobileTotal saveId={ageGroup && dirty ? saveBoxId('kindergarten') : null}>
                 {t('admissionCalc.kg.total')}: <strong className="tabular-nums">{formatRange(result.total)}</strong>
               </MobileTotal>
             )}

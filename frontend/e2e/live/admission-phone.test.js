@@ -20,9 +20,12 @@ describe('admission calculator on a phone', () => {
     const save = page.getByRole('button', { name: t('bg', 'savedAdmission.save'), exact: true })
     assert.ok(await save.evaluate(el => el.getBoundingClientRect().top > window.innerHeight), 'the save button starts below the screen')
     await page.getByRole('button', { name: t('bg', 'savedAdmission.jumpToSave'), exact: true }).click()
-    await page.waitForFunction(
-      label => [...document.querySelectorAll('button')].some(b => b.textContent === label && b.getBoundingClientRect().top >= 0 && b.getBoundingClientRect().bottom <= window.innerHeight),
-      t('bg', 'savedAdmission.save'),
-    )
+    // In view and not under the sticky bar: the button itself is what a tap on its middle hits.
+    const tappable = () => save.evaluate(el => {
+      const box = el.getBoundingClientRect()
+      return box.top >= 0 && el.contains(document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2))
+    })
+    for (let tries = 0; tries < 20 && !(await tappable()); tries++) await page.waitForTimeout(250)
+    assert.ok(await tappable(), 'the save button is on screen and can be tapped')
   })
 })

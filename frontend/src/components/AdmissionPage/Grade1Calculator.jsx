@@ -219,7 +219,7 @@ function Grade1Calculator({ selected, startYear, school, cutoffRows = [], isCurr
           <YesNo label={t('admissionCalc.g1.parentDeceased')} value={a.parentDeceased} onChange={v => set('parentDeceased', v)} />
           <YesNo label={t('admissionCalc.g1.fosterUnknownAdopted')} value={a.fosterUnknownAdopted} onChange={v => set('fosterUnknownAdopted', v)} />
         </Section>
-        <MobileTotal saveId={saveBoxId('grade_1')}>
+        <MobileTotal saveId={dirty && addresses[0]?.check ? saveBoxId('grade_1') : null}>
           {results.map((result, i) => (
             <span key={i} className="mr-4 inline-block">
               {results.length > 1 && `${t('admissionCalc.g1.addressN', { n: i + 1 })}: `}
