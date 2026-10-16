@@ -1,10 +1,13 @@
 # Fees eval: the fee reader on saved pages, scored against the blind answer keys
 # (backend/scripts/fees_eval.py). Runs only when a PR touches the reader, its checks, the
-# publish gate or the model choice; about $0.002 per school per trial.
+# publish gate or the model choice; about $0.002 per school per trial. A draft PR skips it:
+# open fee PRs as drafts and mark them ready once the fixes are in, so it runs once rather
+# than on every push (2026-10-16: 34 runs in one day spent most of the OpenRouter credit).
 name: Fees eval
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - backend/app/scrapers/extraction/agent_fees.py
       - backend/app/scrapers/extraction/price_step.py
@@ -36,13 +39,16 @@ on:
 permissions:
   contents: read
 
+# A newer push waits for the running eval instead of cancelling it: a cancelled run has
+# already paid for most of its calls. Pushes in between are skipped; only the latest runs.
 concurrency:
   group: fees-eval-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   eval:
     name: Fees eval
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     defaults:
