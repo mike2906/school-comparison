@@ -1,9 +1,10 @@
 """
-OpenRouter client and model tier configuration for the scraping pipeline.
+Model client and model tier configuration for the scraping pipeline.
 
 This module provides:
 - Model selection (cheap/capable tiers)
-- OpenRouter integration via PydanticAI
+- OpenRouter integration via PydanticAI, and Anthropic's API directly for tiers set to an
+  ``anthropic/`` model (paid from the Max plan's monthly API credits)
 - Cost tracking helpers
 """
 import inspect
@@ -11,10 +12,15 @@ from math import isfinite
 from typing import Any, Literal
 
 from pydantic_ai import Agent
+from pydantic_ai.exceptions import ModelHTTPError
+from pydantic_ai.messages import ModelResponse
+from pydantic_ai.models.anthropic import AnthropicModel
 from pydantic_ai.models.openrouter import OpenRouterModel
+from pydantic_ai.providers.anthropic import AnthropicProvider
 from pydantic_ai.providers.openrouter import OpenRouterProvider
 
 from app.config import get_settings
+from app.services.provider_costs import ProviderCreditsExhausted
 
 # Model tier definitions
 # See: https://openrouter.ai/models for pricing and capabilities
@@ -38,6 +44,24 @@ MODEL_COSTS = {
     "pricing": (0.10, 0.50),  # OpenRouter, 2026-10-09
     "vision": (2.00, 10.00),  # OpenRouter, 2026-10-09
 }
+
+# Anthropic's API reports tokens, not a cost, so a tier routed there needs its model's
+# price here: it is the cost every run cap and the provider ledger count. A model missing
+# from this table is refused. Prices per 1M tokens (input, output), claude-api reference
+# 2026-10-06; Haiku 5.5 doubles to (0.50, 2.50) for prompts over 100K tokens.
+# Only Haiku 5.5 is listed: Sonnet 5.5 and Opus 5.5 reject the forced tool call that
+# structured answers use and can't turn thinking off, so they need NativeOutput first.
+ANTHROPIC_PRICES = {
+    "claude-haiku-5-5": (0.10, 0.50),
+}
+ANTHROPIC_LONG_PROMPT_TOKENS = 100_000
+ANTHROPIC_LONG_PROMPT_PRICES = {
+    "claude-haiku-5-5": (0.50, 2.50),
+}
+ANTHROPIC_PREFIX = "anthropic/"
+OPENROUTER_PREFIX = "openrouter/"
+# Settings Haiku 5.5 rejects with a 400 when set to anything but the default.
+_ANTHROPIC_SAMPLING_SETTINGS = ("temperature", "top_p", "top_k")
 
 ModelTier = Literal["cheap", "capable", "pricing", "vision"]
 
@@ -64,6 +88,37 @@ def get_model(tier: ModelTier) -> str:
     return override or MODEL_TIERS[tier]
 
 
+def get_provider(tier: ModelTier) -> Literal["openrouter", "anthropic"]:
+    """Which API a tier calls: ``anthropic/<model>`` goes to Anthropic directly,
+    ``openrouter/<vendor>/<model>`` to OpenRouter. Anything else is refused."""
+    model = get_model(tier)
+    if model.startswith(ANTHROPIC_PREFIX):
+        return "anthropic"
+    if model.startswith(OPENROUTER_PREFIX):
+        return "openrouter"
+    raise ValueError(
+        f"model {model!r} for tier {tier!r} must start with {OPENROUTER_PREFIX!r} or {ANTHROPIC_PREFIX!r}"
+    )
+
+
+def _anthropic_model_name(tier: ModelTier) -> str:
+    name = get_model(tier).removeprefix(ANTHROPIC_PREFIX)
+    if name not in ANTHROPIC_PRICES:
+        raise ValueError(
+            f"no price for Anthropic model {name!r} (tier {tier!r}); add it to ANTHROPIC_PRICES"
+        )
+    return name
+
+
+def anthropic_cost_usd(model_name: str, input_tokens: int, output_tokens: int) -> float:
+    """Anthropic's price for one request, from its token counts."""
+    prices = ANTHROPIC_PRICES[model_name]
+    if input_tokens > ANTHROPIC_LONG_PROMPT_TOKENS and model_name in ANTHROPIC_LONG_PROMPT_PRICES:
+        prices = ANTHROPIC_LONG_PROMPT_PRICES[model_name]
+    input_price, output_price = prices
+    return input_tokens / 1_000_000 * input_price + output_tokens / 1_000_000 * output_price
+
+
 def get_model_costs(tier: ModelTier) -> tuple[float, float]:
     """
     Get the cost per 1M tokens for a given tier.
@@ -78,6 +133,8 @@ def get_model_costs(tier: ModelTier) -> tuple[float, float]:
         >>> get_model_costs("cheap")
         (0.10, 0.40)
     """
+    if get_provider(tier) == "anthropic":
+        return ANTHROPIC_PRICES[_anthropic_model_name(tier)]
     return MODEL_COSTS[tier]
 
 
@@ -159,6 +216,39 @@ def get_openrouter_model(tier: ModelTier) -> OpenRouterModel:
     return OpenRouterModel(model_name=model_name, provider=provider)
 
 
+class PricedAnthropicModel(AnthropicModel):
+    """Anthropic model whose responses carry their cost in ``provider_details["cost"]``,
+    as OpenRouter's do, so run caps and the provider ledger (provider_costs) work
+    unchanged. An out-of-credit or refused key stops the run (ProviderCreditsExhausted)."""
+
+    async def request(self, messages, model_settings, model_request_parameters) -> ModelResponse:
+        try:
+            response = await super().request(messages, model_settings, model_request_parameters)
+        except ModelHTTPError as exc:
+            if _is_account_error(exc):
+                raise ProviderCreditsExhausted(f"Anthropic refused the request: {exc}") from exc
+            raise
+        usage = response.usage
+        cost = anthropic_cost_usd(self.model_name, usage.input_tokens, usage.output_tokens)
+        response.provider_details = {**(response.provider_details or {}), "cost": cost}
+        return response
+
+
+def _is_account_error(exc: ModelHTTPError) -> bool:
+    # 401/403: bad or revoked key. 400 "credit balance is too low": the credits ran out.
+    if exc.status_code in (401, 403):
+        return True
+    return exc.status_code == 400 and "credit balance" in str(exc.body).lower()
+
+
+def get_anthropic_model(tier: ModelTier) -> PricedAnthropicModel:
+    settings = get_settings()
+    if not settings.anthropic_api_key:
+        raise ValueError(f"tier {tier!r} is set to {get_model(tier)!r} but ANTHROPIC_API_KEY is empty")
+    provider = AnthropicProvider(api_key=settings.anthropic_api_key)
+    return PricedAnthropicModel(_anthropic_model_name(tier), provider=provider)
+
+
 def create_agent(
     tier: ModelTier,
     system_prompt: str,
@@ -194,9 +284,17 @@ def create_agent(
         >>> print(result.data.name)
         'Sofia School #1'
     """
-    model = get_openrouter_model(tier)
     model_settings = dict(agent_kwargs.pop("model_settings", {}) or {})
-    model_settings.setdefault("openrouter_usage", {"include": True})
+    if get_provider(tier) == "anthropic":
+        model = get_anthropic_model(tier)
+        for setting in _ANTHROPIC_SAMPLING_SETTINGS:
+            model_settings.pop(setting, None)
+        # Haiku 5.5 thinks by default; off keeps the forced tool call that returns the
+        # structured answer (Anthropic refuses forced tool calls while thinking).
+        model_settings.setdefault("anthropic_thinking", {"type": "disabled"})
+    else:
+        model = get_openrouter_model(tier)
+        model_settings.setdefault("openrouter_usage", {"include": True})
     init_params = inspect.signature(Agent.__init__).parameters
     if "output_type" in init_params:
         return Agent(
@@ -220,6 +318,9 @@ def create_agent(
 __all__ = [
     "ModelTier",
     "get_model",
+    "get_provider",
+    "anthropic_cost_usd",
+    "get_anthropic_model",
     "get_model_costs",
     "calculate_cost",
     "extract_provider_cost_usd",
@@ -227,4 +328,5 @@ __all__ = [
     "create_agent",
     "MODEL_TIERS",
     "MODEL_COSTS",
+    "ANTHROPIC_PRICES",
 ]

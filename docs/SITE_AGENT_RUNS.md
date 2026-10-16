@@ -124,3 +124,31 @@ measurement below agreed, and it was dropped.
   full-output estimates. On a city run ($2 to $4 caps) that is ~2%; a short test run
   needs a cap a few times its expected spend.
 - Shared crawl: 19 of 137 fetches saved (above).
+
+## Which API a tier calls (2026-10-16)
+
+Each model tier (`MODEL_TIER_CHEAP`, `_CAPABLE`, `_PRICING`, `_VISION`) names its route in
+its model id: `openrouter/<vendor>/<model>` goes through OpenRouter (the default for every
+tier), `anthropic/<model>` calls Anthropic's API directly with `ANTHROPIC_API_KEY`, paid
+from the Max plan's monthly API credits. Every stage builds its model through
+`create_agent` in `backend/app/ai/client.py`, so the env var is the whole switch; set it
+for one run to move one job, e.g. `MODEL_TIER_PRICING=anthropic/claude-haiku-5-5 uv run
+python -m app.scrapers.cli school-facts ...`. There is no automatic fallback between the
+two: a run stops with a clear error instead of quietly changing model mid-run.
+
+- **Models:** only priced models are accepted (`ANTHROPIC_PRICES`). Today that is
+  Claude Haiku 5.5, sent with thinking off and no temperature (it refuses a non-default
+  one). Sonnet 5.5 and Opus 5.5 refuse the forced tool call the structured answers use,
+  so they need NativeOutput before they can be added.
+- **Spend:** Anthropic reports tokens, not dollars, so `PricedAnthropicModel` puts the
+  price × tokens into each response's `provider_details["cost"]`, where the run caps and
+  the provider ledger already read OpenRouter's cost. The Claude Console usage page shows
+  the real spend; give the agents' key its own workspace with a monthly spend limit as
+  the backstop.
+- **Out of credit:** an exhausted balance or a refused key raises
+  `ProviderCreditsExhausted`, a cap error, so the run stops instead of failing every
+  school. (An empty OpenRouter balance still fails school by school.)
+- **Not switched yet:** every default is still OpenRouter. Haiku replaces GPT-6 Luna on
+  the pricing tier only after it scores at least as well on the fee replay eval and a
+  facts dry run. Fee pictures stay on GPT-6.1 Sol until a Claude model passes the same
+  digits check.

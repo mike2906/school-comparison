@@ -17,6 +17,8 @@ class Settings(BaseSettings):
 
     # OpenRouter (for AI features)
     openrouter_api_key: str = ""
+    # Anthropic API key, used only by tiers set to an "anthropic/<model>" (app/ai/client.py)
+    anthropic_api_key: str = ""
 
     # Model tier overrides (Phase 1 scraping pipeline)
     # Set this to override default model selection.
@@ -24,6 +26,8 @@ class Settings(BaseSettings):
     model_tier_capable: str = ""  # Default: openai/gpt-4o-mini
     model_tier_pricing: str = ""  # Default: openai/gpt-6-luna (price extraction)
     model_tier_vision: str = ""  # Default: openai/gpt-6.1-sol (fee tables published as pictures)
+    # Each takes "openrouter/<vendor>/<model>" or "anthropic/<model>" (direct API, e.g.
+    # MODEL_TIER_PRICING=anthropic/claude-haiku-5-5); set it per run to switch one job.
 
     # Spot-check validation settings
     spot_check_sample_size: int = 10  # Number of schools to spot-check per run (-1 = all, for calibration)
