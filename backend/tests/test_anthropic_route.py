@@ -148,6 +148,8 @@ async def test_an_anthropic_call_sends_no_sampling_settings_and_reports_its_cost
         (400, {"type": "invalid_request_error", "message": "Your credit balance is too low to access the Anthropic API."}),
         (400, {"type": "invalid_request_error", "message": "You have reached your specified workspace API usage limits."}),
         (401, {"type": "authentication_error", "message": "invalid x-api-key"}),
+        (429, {"type": "rate_limit_error", "message": "Monthly spend limit reached.",
+               "details": {"error_code": "enforced_spend_limit_reached"}}),
     ],
 )
 async def test_an_account_refusal_stops_the_run(monkeypatch, haiku_pricing, status, error):
@@ -192,9 +194,18 @@ async def test_two_requests_are_each_priced_on_their_own_prompt(monkeypatch, hai
     assert len(extract_exact_provider_attributions(result)) == 2
 
 
-async def test_other_request_errors_stay_per_call_errors(monkeypatch, haiku_pricing):
-    error = {"type": "invalid_request_error", "message": "prompt is too long"}
-    _mock_anthropic(monkeypatch, lambda request: httpx.Response(400, json={"type": "error", "error": error}))
+@pytest.mark.parametrize(
+    ("status", "error"),
+    [
+        (400, {"type": "invalid_request_error", "message": "prompt is too long"}),
+        (429, {"type": "rate_limit_error", "message": "Number of request tokens has exceeded your per-minute rate limit"}),
+    ],
+)
+async def test_other_request_errors_stay_per_call_errors(monkeypatch, haiku_pricing, status, error):
+    _mock_anthropic(
+        monkeypatch,
+        lambda request: httpx.Response(status, json={"type": "error", "error": error}, headers={"retry-after": "0"}),
+    )
     agent = ai_client.create_agent("pricing", "system", Pick)
     with pytest.raises(Exception) as caught:
         await agent.run("hello")

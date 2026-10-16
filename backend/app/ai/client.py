@@ -238,8 +238,10 @@ class PricedAnthropicModel(AnthropicModel):
 
 
 # A 400 with one of these means no later call can succeed: the credits ran out ("Your
-# credit balance is too low ...") or the workspace's spend limit was reached ("You have
-# reached your specified workspace API usage limits ...").
+# credit balance is too low ...") or an organization or workspace spend limit was reached
+# ("You have reached your specified ... API usage limits ..."). A usage tier's monthly cap
+# comes back as a 429 with error_code "enforced_spend_limit_reached" (Anthropic's
+# rate-limit docs); other 429s are ordinary rate limits that pydantic-ai retries.
 _ACCOUNT_LIMIT_MESSAGES = ("credit balance", "usage limit", "spend limit")
 
 
@@ -247,6 +249,8 @@ def _is_account_error(exc: ModelHTTPError) -> bool:
     if exc.status_code in (401, 403):  # a bad or revoked key
         return True
     body = str(exc.body).lower()
+    if exc.status_code == 429:
+        return "enforced_spend_limit_reached" in body
     return exc.status_code == 400 and any(message in body for message in _ACCOUNT_LIMIT_MESSAGES)
 
 
