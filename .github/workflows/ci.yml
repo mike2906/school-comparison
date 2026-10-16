@@ -132,6 +132,11 @@ jobs:
       - name: Run tests
         run: npm test
 
+      # This PR's calculator and fee code on today's live API data: a realistic parent must
+      # still get an answer at most schools with the data (e2e/live/coverage.test.js).
+      - name: Coverage for realistic parents
+        run: npm run test:coverage || { echo "Retrying once in 30 seconds."; sleep 30; npm run test:coverage; }
+
       - name: Cache Playwright browser
         uses: actions/cache@v4
         with:
