@@ -28,7 +28,8 @@ you picked, and go to Mike only for the short list in "Still goes to Mike".
 6. Push, open the PR, and review it by size (below). Fix what blocks, push one batch.
    A PR that touches a path listed in `.github/workflows/fees-eval.yml` opens as a draft
    and is marked ready once the review fixes are in: the fees eval costs money on every
-   run and skips drafts.
+   run and skips drafts. A skipped Fees eval is not a pass: after marking the PR ready, merge
+   only once the Fees eval run on the head has completed green.
 7. Merge on green CI once the review is settled (see "Merging").
 
 ## Review by size
