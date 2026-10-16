@@ -124,7 +124,7 @@ class AgentFees(BaseModel):
 READER_PROMPT = """You read a school's own web pages and list the fees it states. Each page starts with a "=== PAGE <url>" line.
 Rules:
 - Only fees of the named institution. A shared site may also list a sibling school or kindergarten; skip their fees.
-- Only the current or upcoming school year. If several appear, list the most recent.
+- Only the current or upcoming school year. If several appear, list the most recent: where a page shows one fee for two years side by side, list only the later price. A fee shown once, on a page for the current or upcoming year, counts as that year's even when its column or a note names the previous year: the school still charges it. Skip a page or table that is itself for an earlier year.
 - One entry per fee and group (grade, age group, full or half day). A discounted, prepaid or promotional price the site prints as an amount is its own entry, and its plan_name says on what terms, in the site's words ("Еднократно плащане за 6 месеца", "Промоционална такса за първите 3 месеца").
 - Two entries of the same category, group and period never share a plan_name: the site's words that tell them apart (half day, full day, paid for 6 months at once) are their plan_name.
 - Paying one fee in parts is not a fee of its own. When the site offers the same fee paid in one go and also in parts (2 instalments, quarterly or monthly instalments, "Plan 1 / Plan 2 / Plan 3", "1 x A + 9 x B"), list one entry: amount is the price paid in one go, and each way of paying in parts goes in payment_options with the numbers the site prints (total, payments, instalment, first_payment). Paying in one go is the entry itself, never an option.
@@ -246,8 +246,10 @@ _DEPOSIT_RE = re.compile(r"депозит|капаро|deposit")
 # (price_evidence._AGE_RE), but spaced only before a child word: "€ 3000 годишно" and
 # "€ 3000 – годишно" are yearly prices.
 _AGE_RE = re.compile(r"\d+[-–](?:годиш|месеч)\w*|\d+ ?[-–]? ?(?:годиш|месеч)\w* (?:деца|дете|бебета|възраст)")
-# Only a currency and the marker may sit between a range's ends: "550 – 600", "550 EUR to 600".
-_RANGE_JOIN_RE = re.compile(r"(?:eur|€|евро|лв\.?|лева|bgn)?\s*(?:[–—-]|до|to)", re.IGNORECASE)
+# Only a currency and the marker may sit between a range's ends: "550 – 600", "550 EUR to 600",
+# "€ 1,290 – € 1,340" (596's food, held as unjoined until the currency could follow the marker).
+_RANGE_CURRENCY = r"(?:eur|€|евро|лв\.?|лева|bgn)?"
+_RANGE_JOIN_RE = re.compile(rf"{_RANGE_CURRENCY}\s*(?:[–—-]|до|to)\s*{_RANGE_CURRENCY}", re.IGNORECASE)
 _FIRST_INSTALMENT_BEFORE_RE = re.compile(r"(?<!\d)1\s*[xх×]\s*$")  # latin x, cyrillic х, ×
 _PLUS_N_TIMES_AFTER_RE = re.compile(r"\s*(?:eur|€|евро|лв\.?|лева|bgn)?\s*\+\s*\d+\s*[xх×]")
 
@@ -284,6 +286,68 @@ def _names_period(period: PricePeriod, evidence: str, amounts: list[Decimal], ca
     if period is not PricePeriod.YEARLY:
         return False
     return any(_YEAR_ON_AMOUNT_LINE_RE.search(line) for line in amount_lines)
+
+
+# A page titled for one period of tuition: 596's PDFs open with "ANNUAL TUITION FEES 2026-2027",
+# and a read that quoted a row without that title lost the period of every tuition in them.
+_TITLE_LINES = 5
+_TUITION_WORD_RE = re.compile(r"tuition|обучение|учебн\w* такс|frais de scolarit|schulgeld")
+_PRICE_RE = re.compile(r"[€$£]|\b(?:eur|euros?|bgn|лв|лева|евро)\b")
+# A title names the period in its own word: "annual", "месечни". Not a bare "year": "fees for the
+# school year" heads monthly fees too (_YEAR_ON_AMOUNT_LINE_RE).
+_TITLE_PERIOD_WORDS = {
+    PricePeriod.YEARLY: r"(?<!полу)(?<!дву)годишн|\b(?:yearly|annual)\b|annuel|(?<![a-zäöü])jährlich",
+    PricePeriod.MONTHLY: _PERIOD_WORDS[PricePeriod.MONTHLY],
+}
+_CURRENCY_OPT = r"(?:eur|€|евро|лв\.?|лева|bgn)?"
+_INSTALMENT_BEFORE_RE = re.compile(rf"\d+\s*[xх×]\s*{_CURRENCY_OPT}\s*$")
+_INSTALMENT_AFTER_RE = re.compile(rf"\s*{_CURRENCY_OPT}\s*[xх×]\s*\d")  # "€ 4.575 x 2"
+
+
+def _titles(line: str, period: PricePeriod) -> bool:
+    """A line with no price that names tuition and this one period in a title's words."""
+    return bool(
+        _TUITION_WORD_RE.search(line)
+        and not _PRICE_RE.search(line)
+        and re.search(_TITLE_PERIOD_WORDS[period], line)
+        and not any(re.search(_PERIOD_WORDS[other], line) for other in _PERIOD_WORDS if other is not period)
+    )
+
+
+def _title_names_period(period: PricePeriod, page_text: str, evidence: str, fee: AgentFee) -> bool:
+    """The page's title names the period of its tuition, and the fee's own lines say nothing else.
+
+    Only tuition, only monthly or yearly, and only a title line (one of the page's first five
+    lines, above its first price) that names tuition and that one period. No line of the page may
+    title tuition with the other period (a second sheet joined into one PDF), no evidence line may
+    name another period, and the amount's own lines must not print it only as an instalment
+    ("2 x € 4.575", "€ 4.575 x 2"): the title names the fee's period, not a way of paying it.
+    """
+    if fee.category is not PriceCategory.TUITION or period not in _TITLE_PERIOD_WORDS:
+        return False
+    lines = [_normalized(text) for text in page_text.splitlines() if text.strip()]
+    title = []
+    for line in lines[:_TITLE_LINES]:
+        if _PRICE_RE.search(line):
+            break
+        title.append(line)
+    if not any(_titles(line, period) for line in title):
+        return False
+    if any(_titles(line, other) for line in lines for other in _TITLE_PERIOD_WORDS if other is not period):
+        return False
+    others = [other for other in _PERIOD_WORDS if other is not period]
+    amounts = fee_amounts(fee)
+    for line in evidence.splitlines():
+        line = _AGE_RE.sub(" ", line)
+        # Any evidence line, a heading too ("Monthly tuition plan"), that names another period wins.
+        if any(re.search(_PERIOD_WORDS[other], line) for other in others) or _ONE_TIME_EN_RE.search(line):
+            return False
+        spans = [(start, end) for start, end, values in number_spans(line) if set(amounts) & values]
+        if spans and all(
+            _INSTALMENT_BEFORE_RE.search(line[:start]) or _INSTALMENT_AFTER_RE.match(line[end:]) for start, end in spans
+        ):
+            return False
+    return True
 
 
 def _is_first_instalment(evidence: str, amount: Decimal) -> bool:
@@ -347,7 +411,11 @@ def check_fee(fee: AgentFee, page_text: str) -> CheckedFee:
     evidence = _without_option_lines(lines, fee)
     checks: list[str] = []
     period = fee.period
-    if period is not None and not _names_period(period, evidence, fee_amounts(fee), fee.category):
+    if (
+        period is not None
+        and not _names_period(period, evidence, fee_amounts(fee), fee.category)
+        and not _title_names_period(period, page_text, evidence, fee)
+    ):
         checks.append(f"period {period.value} cleared: the evidence does not name it")
         period = None
     if period is PricePeriod.ONE_TIME and fee.category is not PriceCategory.REGISTRATION:

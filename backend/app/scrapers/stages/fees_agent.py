@@ -551,6 +551,30 @@ def _english_for(site_words: str | None, english: str | None) -> str | None:
     return english
 
 
+def _ungrouped_elsewhere(entry: tuple, built: list[tuple]) -> bool:
+    """The entry has a group, and another page lists the same fee with none: 596's secondary
+    sheet repeats the primary sheet's extras (transport, uniforms, registration) and a read
+    may name the group "Secondary School" on that page only. One fee, kept as the ungrouped row.
+    A plan name must match, or be blank on one side."""
+    _, page, fields, _, _ = entry
+    if fields["age_group"] is None:
+        return False
+
+    def same(other: dict) -> bool:
+        plans = (fields["plan_name"], other["plan_name"])
+        return None in plans or plans[0] == plans[1]
+
+    rest = {name: value for name, value in fields.items() if name not in ("age_group", "plan_name")}
+    return any(
+        other_page.id != page.id
+        and other["age_group"] is None
+        and other_result.confidence >= entry[0].confidence  # never give way to a held row
+        and same(other)
+        and {name: value for name, value in other.items() if name not in ("age_group", "plan_name")} == rest
+        for other_result, other_page, other, _, _ in built
+    )
+
+
 def _build_rows(
     school: School, checked: list[tuple[CheckedFee, SourcePage]]
 ) -> tuple[list[Pricing], list[FieldSource]]:
@@ -591,6 +615,7 @@ def _build_rows(
 
     restated = {unperiodic(f) for r, _, f, _, _ in built if not _single_payment(r.fee)}
     built = [b for b in built if not (_single_payment(b[0].fee) and unperiodic(b[2]) in restated)]
+    built = [b for b in built if not _ungrouped_elsewhere(b, built)]
     # The same fee on two pages is one row (564 lists its fees on three). On one page a
     # second fee with the same fields but its own label is a fee of its own: two grade
     # tiers at one price when the reader left their groups empty. So each set of fields

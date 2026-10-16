@@ -9,6 +9,7 @@ fetches are stubbed in the stage tests.
 
 from __future__ import annotations
 
+import dataclasses
 import json
 from decimal import Decimal
 
@@ -1027,6 +1028,34 @@ def test_the_same_fee_read_from_two_pages_is_one_row():
     assert len(rows) == len(sources) == 1
 
 
+def test_the_same_fee_with_a_group_on_one_page_only_is_one_row():
+    """596's secondary sheet repeats the primary sheet's transport; a read named it "Secondary School" there."""
+    school = School(id=1, name_i18n={}, country_code="bg", school_type="private", education_level="primary")
+    page = SourcePage(id=-1, school_id=1, scrape_type=ScrapeType.WEBSITE, source_url=URL)
+    other = SourcePage(id=-2, school_id=1, scrape_type=ScrapeType.WEBSITE, source_url=HOME)
+    line = "TRANSPORTATION € 2,550 annual fee (two-way service)"
+
+    def transport(**kw):
+        read = fee(PriceCategory.TRANSPORT, line, amount=2550, period=PricePeriod.YEARLY, **kw)
+        return check_fee(read, line)
+
+    rows, _ = fees_agent._build_rows(
+        school, [(transport(), page), (transport(age_group="Secondary School", plan_name="Two-way"), other)]
+    )
+    assert [(r.age_group, r.plan_name) for r in rows] == [(None, None)]
+    # Another group's fee on the same page, or another plan, stays its own row.
+    rows, _ = fees_agent._build_rows(school, [(transport(), page), (transport(age_group="Grade 1"), page)])
+    assert len(rows) == 2
+    rows, _ = fees_agent._build_rows(
+        school, [(transport(plan_name="One-way"), page), (transport(age_group="Grade 1", plan_name="Two-way"), other)]
+    )
+    assert len(rows) == 2
+    # A held ungrouped row does not take the place of a publishable grouped one.
+    held = dataclasses.replace(transport(), confidence=HELD_CONFIDENCE)
+    rows, _ = fees_agent._build_rows(school, [(held, page), (transport(age_group="Grade 1"), other)])
+    assert len(rows) == 2
+
+
 async def test_an_amount_read_as_another_kind_of_fee_replaces_the_old_row(db_session, frozen_today):
     page_text = "Месечна такса: 700 евро\nЕднократна такса за записване: 200 евро.\nХрана: 90 евро"
     school = await _school(db_session)
@@ -1668,8 +1697,10 @@ def test_a_cleaned_header_matches_the_table_its_pdf_prints_twice():
 
 
 # 596's primary PDF: the tuition table as text under its heading, and again as cells far below.
+# A price above the heading keeps it from being the page's title (_title_names_period).
 PAGE_TWO_LAYOUTS = "\n".join(
     [
+        "Application fee: € 100",
         "ANNUAL TUITION FEES 2026-2027",
         "Grade Payment Plan Plan 1 Plan 2 Plan 3",
         "Grade 0 Plan 1 - € 8.950 1 x € 8.950 2 x € 4.575 1 x € 2.650 initial",
@@ -1789,3 +1820,82 @@ async def test_a_stored_proof_of_another_row_with_the_group_in_a_column_lends_no
         db_session, school, find=_find(pages), read=_read([robotics, FEES_STAGE[1]]), apply=False
     )
     assert not _stored_notes(report), report["fees"]
+
+
+# --- 596's gaps in the fees eval: ranges with a currency on each end, the title's period ---
+
+
+@pytest.mark.parametrize(
+    "line, low, high, period",
+    [
+        ("FOOD Licensed catering company € 1,290 – € 1,340 annual /", 1290, 1340, PricePeriod.YEARLY),
+        ("€ 200 - € 550 per term,", 200, 550, PricePeriod.TERM),
+        ("2,524 BGN – 2,620 BGN annual fee", 2524, 2620, PricePeriod.YEARLY),
+    ],
+)
+def test_a_range_with_a_currency_on_each_end_publishes(line, low, high, period):
+    result = check_fee(fee(PriceCategory.FOOD, line, amount_min=low, amount_max=high, period=period), line)
+    assert published(result) and result.fee.period is period, result.checks
+
+
+def test_two_priced_items_are_still_no_range():
+    line = "Sweatshirt: € 25 - Polo T-shirt: € 14"
+    result = check_fee(fee(PriceCategory.UNIFORMS, line, amount_min=14, amount_max=25), line)
+    assert result.kept and not published(result)
+
+
+PAGE_TITLED = "\n".join(
+    [
+        "Maple Bear Sofia School",
+        "ANNUAL TUITION FEES 2026-2027",
+        "REGISTRATION FEE: One-time fee for initial enrollment of € 800, paid upon enrollment.",
+        "Grade 0 Plan 1 - € 8.950 1 x € 8.950 2 x € 4.575 1 x € 2.650 initial",
+        "Plan 2 - € 9.150 9 x € 750 monthly",
+        "Plan 3 - € 9.400",
+    ]
+)
+
+
+@pytest.mark.parametrize(
+    "evidence, amount, period, kept",
+    [
+        ("Grade 0 Plan 1 - € 8.950 1 x € 8.950 2 x € 4.575 1 x € 2.650 initial", 8950, PricePeriod.YEARLY, True),
+        ("Plan 3 - € 9.400", 9400, PricePeriod.YEARLY, True),
+        ("Plan 3 - € 9.400", 9400, PricePeriod.MONTHLY, False),  # the title names the year
+        ("Grade 0 Plan 1 - € 8.950 1 x € 8.950 2 x € 4.575 1 x € 2.650 initial", 4575, PricePeriod.YEARLY, False),
+        ("Plan 2 - € 9.150 9 x € 750 monthly", 9150, PricePeriod.YEARLY, False),  # its line says monthly
+    ],
+)
+def test_a_page_titled_annual_tuition_names_the_period_of_its_tuition(evidence, amount, period, kept):
+    result = check_fee(fee(PriceCategory.TUITION, evidence, amount=amount, period=period), PAGE_TITLED)
+    assert published(result)
+    assert result.fee.period is (period if kept else None), result.checks
+
+
+def test_the_title_names_no_period_for_other_fees_or_below_a_price():
+    extra = check_fee(
+        fee(PriceCategory.MATERIALS, "Plan 3 - € 9.400", amount=9400, period=PricePeriod.YEARLY), PAGE_TITLED
+    )
+    assert extra.fee.period is None
+    below = "Registration: € 800\n" + PAGE_TITLED
+    tuition = check_fee(fee(PriceCategory.TUITION, "Plan 3 - € 9.400", amount=9400, period=PricePeriod.YEARLY), below)
+    assert tuition.fee.period is None
+
+
+def test_an_evidence_heading_naming_another_period_beats_the_title():
+    page = PAGE_TITLED + "\nMonthly tuition plan\nGrade 1: € 900"
+    read = fee(PriceCategory.TUITION, "Monthly tuition plan\nGrade 1: € 900", amount=900, period=PricePeriod.YEARLY)
+    assert check_fee(read, page).fee.period is None
+
+
+@pytest.mark.parametrize(
+    "page, evidence, amount",
+    [
+        ("Tuition fees for the school year 2026/2027\nGrade 1 | € 650", "Grade 1 | € 650", 650),  # a bare "year"
+        (PAGE_TITLED + "\nMonthly tuition - nursery\nNursery | € 900", "Nursery | € 900", 900),  # a second sheet
+        ("ANNUAL TUITION FEES\nGrade 5 | € 4.575 x 2", "Grade 5 | € 4.575 x 2", 4575),  # an instalment
+    ],
+)
+def test_the_title_lends_no_period_where_it_may_not_head_the_fee(page, evidence, amount):
+    read = fee(PriceCategory.TUITION, evidence, amount=amount, period=PricePeriod.YEARLY)
+    assert check_fee(read, page).fee.period is None
