@@ -119,6 +119,7 @@ describe('admission calculator', () => {
     await page.getByLabel(g8('grade.first')).selectOption('6')
     await page.getByLabel(g8('grade.second')).selectOption('5')
     await answer(g8('hasExam'), t('bg', 'admissionCalc.no')).click()
+    assert.equal(await answer(g8('hasExam'), t('bg', 'admissionCalc.notSure')).count(), 1, 'whether a class has an aptitude exam keeps "not sure"')
 
     const rows = page.locator('table tbody tr')
     assert.equal(await rows.count(), variants.length, 'one row per formula the law allows')

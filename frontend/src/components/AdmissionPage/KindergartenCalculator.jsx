@@ -87,7 +87,7 @@ function KindergartenCalculator({ selected, startYear, kindergarten, districts, 
               title={t('admissionCalc.kg.addressTitle')}
               intro={t(usesParentAddress ? 'admissionCalc.kg.addressParent' : 'admissionCalc.kg.addressChild')}
             >
-              <YesNo label={t('admissionCalc.kg.inSofia')} value={a.inSofia} onChange={v => set('inSofia', v)} />
+              <YesNo unsure label={t('admissionCalc.kg.inSofia')} value={a.inSofia} onChange={v => set('inSofia', v)} />
               {usesParentAddress && (
                 <YesNo
                   label={t('admissionCalc.kg.sameAddress')}

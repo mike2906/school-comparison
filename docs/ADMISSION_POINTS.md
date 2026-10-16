@@ -64,8 +64,9 @@ grade) and the catchment map. Research: `/mnt/project-files/admission-points/res
 8. **Unknown is an answer.** A question left unanswered counts as unknown, and the result
    is then a range; its maximum assumes every unknown is favourable, so the page says "up
    to". A "not sure" button appears only where a parent may really not know: whether an
-   address is in a school's area or a kindergarten in their district, whether a sibling
-   will attend at the same time, and future exam results and grades. Facts about the
+   address is in Sofia Municipality, a school's area or a kindergarten's district, whether
+   a sibling will attend at the same time, whether a class has an aptitude exam, and
+   future exam results and grades. Facts about the
    family (twins, parents' work, siblings' ages) have none (Mike, 2026-10-16).
 9. **Golden tests per rule file.** Each file carries worked examples, including exact
    anniversaries, mutually exclusive criteria, unknowns and invalid input;
