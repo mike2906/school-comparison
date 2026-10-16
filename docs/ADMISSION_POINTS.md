@@ -61,8 +61,12 @@ grade) and the catchment map. Research: `/mnt/project-files/admission-points/res
    localStorage (`src/admission/saved.js`), so the search list and school pages can
    compare every school. Every place that uses them has "forget". Sending them to our
    server would be collecting user data and needs Mike's own decision.
-8. **Unknown is an answer.** Every question has "not sure". The result is then a range;
-   its maximum assumes every unknown is favourable, so the page says "up to".
+8. **Unknown is an answer.** A question left unanswered counts as unknown, and the result
+   is then a range; its maximum assumes every unknown is favourable, so the page says "up
+   to". A "not sure" button appears only where a parent may really not know: whether an
+   address is in a school's area or a kindergarten in their district, whether a sibling
+   will attend at the same time, and future exam results and grades. Facts about the
+   family (twins, parents' work, siblings' ages) have none (Mike, 2026-10-16).
 9. **Golden tests per rule file.** Each file carries worked examples, including exact
    anniversaries, mutually exclusive criteria, unknowns and invalid input;
    `rules.test.js` runs every example against its evaluator and checks the file's

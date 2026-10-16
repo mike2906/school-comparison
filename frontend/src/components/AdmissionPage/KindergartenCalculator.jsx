@@ -56,7 +56,6 @@ function KindergartenCalculator({ selected, startYear, kindergarten, districts, 
     { value: 'working', label: t('admissionCalc.kg.activity.working') },
     { value: 'student', label: t('admissionCalc.kg.activity.student') },
     { value: 'none', label: t('admissionCalc.kg.activity.none') },
-    { value: null, label: t('admissionCalc.notSure') },
   ]
 
   return (
@@ -119,7 +118,7 @@ function KindergartenCalculator({ selected, startYear, kindergarten, districts, 
                     onChange={event => set('homeDistrict', event.target.value || null)}
                     className={INPUT_CLASS}
                   >
-                    <option value="">{t('admissionCalc.notSure')}</option>
+                    <option value="">{t('admissionCalc.choose')}</option>
                     {sortedDistricts(districts, i18n.language).map(f => (
                       <option key={f.properties.code} value={f.properties.code}>{districtLabel(f.properties.name, i18n.language)}</option>
                     ))}
@@ -127,7 +126,7 @@ function KindergartenCalculator({ selected, startYear, kindergarten, districts, 
                 )}
               </Field>
               {!knownDistrict && (
-                <YesNo label={t('admissionCalc.kg.sameDistrict')} value={a.sameDistrict} onChange={v => set('sameDistrict', v)} />
+                <YesNo unsure label={t('admissionCalc.kg.sameDistrict')} value={a.sameDistrict} onChange={v => set('sameDistrict', v)} />
               )}
             </Section>
 
@@ -172,7 +171,6 @@ function KindergartenCalculator({ selected, startYear, kindergarten, districts, 
                   { value: 'none', label: t('admissionCalc.no') },
                   { value: 'one', label: t('admissionCalc.kg.deceasedOne') },
                   { value: 'both', label: t('admissionCalc.kg.deceasedBoth') },
-                  { value: null, label: t('admissionCalc.notSure') },
                 ]}
               />
               {SOCIAL_FLAGS.map(flag => (
@@ -191,7 +189,6 @@ function KindergartenCalculator({ selected, startYear, kindergarten, districts, 
                   { value: 'none', label: t('admissionCalc.no') },
                   { value: 'sen', label: t('admissionCalc.kg.sen') },
                   { value: 'chronic', label: t('admissionCalc.kg.chronic') },
-                  { value: null, label: t('admissionCalc.notSure') },
                 ]}
               />
             </Section>
@@ -200,7 +197,7 @@ function KindergartenCalculator({ selected, startYear, kindergarten, districts, 
               title={kindergarten ? t('admissionCalc.kg.thisKindergarten', { name: kindergarten.name }) : t('admissionCalc.kg.perKindergartenTitle')}
               intro={t('admissionCalc.kg.perKindergartenIntro')}
             >
-              <YesNo label={t('admissionCalc.kg.siblingThere')} value={a.siblingThere} onChange={v => set('siblingThere', v)} />
+              <YesNo unsure label={t('admissionCalc.kg.siblingThere')} value={a.siblingThere} onChange={v => set('siblingThere', v)} />
               <Choice
                 label={t('admissionCalc.kg.wishRank')}
                 hint={t('admissionCalc.kg.wishRankHint')}

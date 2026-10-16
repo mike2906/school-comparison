@@ -78,6 +78,10 @@ describe('admission calculator', () => {
     const nursery = answer(kg('nursery'), t('bg', 'admissionCalc.no'))
     if (await nursery.count()) await nursery.click()
     await answer(kg('siblingThere'), t('bg', 'admissionCalc.no')).click()
+    // Facts a parent knows have no "not sure"; whether a kindergarten is in their district may not be known.
+    assert.equal(await answer(kg('twins'), t('bg', 'admissionCalc.notSure')).count(), 0, 'no "not sure" on the twins question')
+    assert.equal(await answer(kg('parentActivity', { n: 1 }), t('bg', 'admissionCalc.notSure')).count(), 0, 'no "not sure" on a parent\'s work')
+    assert.equal(await answer(kg('sameDistrict'), t('bg', 'admissionCalc.notSure')).count(), 1, 'the district question keeps "not sure"')
 
     const aside = page.locator('aside').filter({ hasText: kg('total') })
     const total = number(await aside.locator('p.text-4xl').innerText())

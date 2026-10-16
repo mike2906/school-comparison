@@ -3,7 +3,7 @@
  * evaluators in ./evaluators read their own parameters and use these for the arithmetic
  * every rule set shares. See docs/ADMISSION_POINTS.md.
  *
- * Unknown answers: every answer may be `null` (the parent chose "not sure"). Points are
+ * Unknown answers: every answer may be `null` (unanswered, or "not sure"). Points are
  * then a range `{ min, max }` covering every possible answer, so the result can say
  * "8 to 12 points" instead of guessing.
  */

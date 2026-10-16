@@ -78,7 +78,7 @@ export function SavedVerdictWord({ verdict }) {
 /** Social priority and SEN / chronic-illness places: admission paths a cut-off says nothing about. */
 function PriorityNote({ verdict, className }) {
   const { t } = useTranslation()
-  // As on the calculator: null means a "not sure" answer may give priority.
+  // As on the calculator: null means an unanswered or "not sure" question may give priority.
   const priority = verdict.stage === 'kindergarten' && verdict.socialPriority !== false
   if (!priority && !verdict.specialPlaces) return null
   return (
