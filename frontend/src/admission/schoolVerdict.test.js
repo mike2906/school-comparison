@@ -66,6 +66,15 @@ test('a saved kindergarten result is compared with each kindergarten, counting i
   assert.equal(savedVerdictFor(kindergarten(home, [{ ...kgRow(1), birth_year: 2022 }]), saved, null, data).verdict, 'noCutoff')
 })
 
+test('a child starting next year is compared with the last campaign rows for the same group', () => {
+  const answers = { ...kgAnswers, birthYear: 2024 }
+  const saved = { kindergarten: { startYear: 2027, answers } }
+  // kg.sofia.bg's 2026/2027 first group is the children born in 2023.
+  const lastYear = { ...kgRow(1), campaign: '2026/2027' }
+  assert.equal(savedVerdictFor(kindergarten(home, [lastYear]), saved, null, data).verdict, 'above')
+  assert.equal(savedVerdictFor(kindergarten(home, [{ ...lastYear, birth_year: 2022 }]), saved, null, data).verdict, 'noCutoff')
+})
+
 test('saved answers show only where they apply', () => {
   const saved = { kindergarten: { startYear: 2026, answers: kgAnswers } }
   assert.equal(savedVerdictFor(kindergarten(home), saved, 'grade_1_4', data), null, 'a first-grade search')

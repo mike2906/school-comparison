@@ -14,6 +14,7 @@ import {
   formatRange,
   measuredOnFor,
   pickLanguage,
+  rowFitsChild,
   ruleSetFor,
   sameRules,
   sofiaToday,
@@ -171,4 +172,16 @@ test('a row is compared on its latest round unless that one had no places', () =
   assert.equal(comparableRound({ rounds: 3, first, latest: { places: 0 } }), first)
   const everyone = { undersubscribed: true }
   assert.equal(comparableRound({ rounds: 2, first, latest: everyone }), everyone, 'everyone got in now: worth saying')
+})
+
+test('a kindergarten row fits a child by age at the start, not by birth year', () => {
+  const row = { age_group: 'nursery', birth_year: 2024, campaign: '2026/2027' }
+  assert.equal(rowFitsChild(row, 'nursery', 2024, 2026), true)
+  assert.equal(rowFitsChild(row, 'nursery', 2025, 2027), true)
+  // The same group, but the younger of its two birth years.
+  assert.equal(rowFitsChild(row, 'nursery', 2026, 2027), false)
+  assert.equal(rowFitsChild(row, 'first', 2025, 2027), false)
+  assert.equal(rowFitsChild({ ...row, campaign: '2027/2028', birth_year: 2025 }, 'nursery', 2024, 2026), false, 'a later campaign')
+  assert.equal(rowFitsChild({ age_group: 'first', birth_year: 2023 }, 'first', 2023, 2026), true)
+  assert.equal(rowFitsChild({ age_group: 'first' }, 'first', 2024, 2027), true)
 })

@@ -5,7 +5,7 @@
  * school has no sibling and no preparatory group of theirs. Never a chance or a
  * percentage: only where the parent's points stand against the last admitted child.
  */
-import { comparableRound, compareWithCutoff, ruleSetFor, sameRules, stageById, summaryRowsFor } from './calculator.js'
+import { comparableRound, compareWithCutoff, rowFitsChild, ruleSetFor, sameRules, stageById, summaryRowsFor } from './calculator.js'
 import { addressFactsForSchool, districtAt, districtByName, schoolCatchmentIds } from './catchments.js'
 import { evaluateGrade1, evaluateKindergarten, KINDERGARTEN_GROUPS, kindergartenAgeGroup } from './inputs.js'
 import { usesSofiaKindergartenSystem } from '../utils/admission.js'
@@ -72,7 +72,7 @@ function kindergartenVerdict(school, entry, { ruleSets, districts, today }, sear
   const result = evaluateKindergarten(selected.ruleSet, entry.answers, entry.startYear, { district, ...KINDERGARTEN_ASSUMED }, today)
   if (!result) return null
   const rows = summaryRowsFor(summary, stageById('kindergarten'))
-    .filter(row => row.age_group === ageGroup && (row.birth_year == null || row.birth_year === entry.answers.birthYear))
+    .filter(row => rowFitsChild(row, ageGroup, entry.answers.birthYear, entry.startYear))
   const yours = { points: result.total }
   return {
     stage: 'kindergarten',

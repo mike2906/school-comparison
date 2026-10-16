@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { formatRange, measuredOnFor, sofiaToday } from '../../admission/calculator'
+import { formatRange, measuredOnFor, rowFitsChild, sofiaToday } from '../../admission/calculator'
 import { districtLabel, sortedDistricts } from '../../admission/catchments'
 import { evaluateKindergarten, KINDERGARTEN_GROUPS, KINDERGARTEN_INITIAL, kindergartenAgeGroup, SOCIAL_FLAGS } from '../../admission/inputs'
 import { getSaved, saveStage } from '../../admission/saved'
@@ -232,8 +232,8 @@ function KindergartenCalculator({ selected, startYear, kindergarten, districts, 
             </div>
             {ageGroup && (
               <CutoffComparison
-                // Only this child's group and birth year: other groups rank other children.
-                rows={cutoffRows.filter(row => row.age_group === ageGroup && (row.birth_year == null || row.birth_year === a.birthYear))}
+                // Only this child's age group and birth-year slot in it: others rank other children.
+                rows={cutoffRows.filter(row => rowFitsChild(row, ageGroup, a.birthYear, startYear))}
                 yours={{ points: result.total }}
                 isCurrentRules={isCurrentRules}
               />
