@@ -158,7 +158,8 @@ before touching `app/services/geocoding`.
 
 **Environment** — copy `backend/.env.example` (every variable, with defaults) to
 `backend/.env`. Required:
-`DATABASE_URL`; `OPENROUTER_API_KEY` for LLM stages.
+`DATABASE_URL`; `OPENROUTER_API_KEY` for LLM stages; `ANTHROPIC_API_KEY` only when a model
+tier is set to `anthropic/<model>` (`docs/SITE_AGENT_RUNS.md` → Which API a tier calls).
 
 ---
 

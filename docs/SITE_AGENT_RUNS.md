@@ -129,3 +129,45 @@ measurement below agreed, and it was dropped.
   full-output estimates. On a city run ($2 to $4 caps) that is ~2%; a short test run
   needs a cap a few times its expected spend.
 - Shared crawl: 19 of 137 fetches saved (above).
+
+## Which API a tier calls (2026-10-16)
+
+Each model tier (`MODEL_TIER_CHEAP`, `_CAPABLE`, `_PRICING`, `_VISION`) names its route in
+its model id: `openrouter/<vendor>/<model>` goes through OpenRouter (the default for every
+tier), `anthropic/<model>` calls Anthropic's API directly with `ANTHROPIC_API_KEY`, paid
+from the Max plan's monthly API credits. Every stage builds its model through
+`create_agent` in `backend/app/ai/client.py`, so the env var is the whole switch; set it
+for one run to move one job, e.g. `MODEL_TIER_PRICING=anthropic/claude-haiku-5-5 uv run
+python -m app.scrapers.cli school-facts ...`. There is no automatic fallback between the
+two: a run stops with a clear error instead of quietly changing model mid-run.
+
+- **Models:** only priced models are accepted (`ANTHROPIC_PRICES`). Today that is
+  Claude Haiku 5.5, sent with thinking off and no temperature (it refuses a non-default
+  one). Sonnet 5.5 and Opus 5.5 refuse the forced tool call the structured answers use,
+  so they need NativeOutput before they can be added.
+- **Spend:** Anthropic reports tokens, not dollars, so `PricedAnthropicModel` puts the
+  price × tokens into each response's `provider_details["cost"]`, where the run caps and
+  the provider ledger already read OpenRouter's cost. The Claude Console usage page shows
+  the real spend; give the agents' key its own workspace with a monthly spend limit as
+  the backstop.
+- **Out of credit:** an exhausted balance (Anthropic's "credit balance is too low" 400)
+  or a refused key raises `ProviderCreditsExhausted`, a cap error, so the fees, facts,
+  open-days and pin runs stop instead of failing every school. The older stages
+  (url_validator, validator, identity checks, summaries) still turn it into a per-item
+  failure, as they do with any OpenRouter error. The monthly Max credits only stop calls
+  when nothing else pays: purchased credits or auto-reload in the Console keep them
+  going, so leave auto-reload off. (An empty OpenRouter balance still fails school by
+  school.)
+- **Output limit:** Anthropic calls send `max_tokens` 20,000. A fee page with 114 fees
+  needed more than 8,192 from Haiku, and an answer cut off at the limit comes back as an
+  empty result, so a cut-off answer now fails the call (the school counts as not read).
+- **Legacy extractor:** `app/scrapers/extractor.py` builds its own OpenRouter model and
+  refuses any tier set to `anthropic/` (each school then fails its extraction). It uses
+  `cheap` and `capable` on every run and `pricing` when `EXTRACTION_PIPELINE_PRICES=true`,
+  so keep those on OpenRouter while it runs.
+- **Not switched yet:** every default is still OpenRouter. Haiku replaces GPT-6 Luna on
+  the pricing tier only after it scores at least as well on the fee replay eval and a
+  facts dry run. First eval (2026-10-16, 6 trials, $0.51, thinking off): wrong 22%,
+  found 30%, against Luna's 10% and 52%; leaving out the cut-off school, found 41% vs
+  45%, and wrong was still about double. Fee pictures stay on GPT-6.1 Sol until a Claude model passes the same
+  digits check.

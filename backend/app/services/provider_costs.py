@@ -31,6 +31,11 @@ class ProviderCostCapExceeded(ProviderCostError):
     pass
 
 
+class ProviderCreditsExhausted(ProviderCostCapExceeded):
+    """The provider account is out of credit or refused the key: no later call can succeed,
+    so the run stops like a reached cap instead of failing every school one by one."""
+
+
 class ProviderAttributionUncertain(ProviderCostError):
     pass
 

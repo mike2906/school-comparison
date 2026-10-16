@@ -19,7 +19,7 @@ from pydantic_ai.providers.openrouter import OpenRouterProvider
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.ai.client import get_model, get_usage
+from app.ai.client import get_model, get_provider, get_usage
 from app.config import get_settings
 from app.models.field_source import FieldSource, SourceType
 from app.models.school import School, SchoolLocation
@@ -208,6 +208,8 @@ class DisplayNameOnlyExtractionOutput(BaseModel):
 
 def _build_openrouter_model(tier: str = "cheap") -> OpenRouterModel:
     settings = get_settings()
+    if get_provider(tier) != "openrouter":
+        raise ValueError(f"the legacy extractor calls OpenRouter only; tier {tier!r} is not on OpenRouter")
     model_name = (get_model(tier) or "openrouter/google/gemini-2.5-flash-lite").replace("openrouter/", "")
     provider = OpenRouterProvider(api_key=settings.openrouter_api_key)
     return OpenRouterModel(model_name=model_name, provider=provider)
