@@ -159,6 +159,8 @@ def test_common_latin_spellings_match(query, name):
 def test_loose_spellings_do_not_match_everything():
     assert _rank("Car Simeon", 'ОУ "Христо Ботев"') is None
     assert _rank("Khristo", 'ОУ "Пейо Яворов"') is None
+    assert _rank("Bu", 'ДГ "Балон"') is None
+    assert _rank("St", 'ОУ "Св. Иван Рилски"') is None
 
 
 def test_plural_saints_match():

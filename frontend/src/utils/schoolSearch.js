@@ -110,16 +110,23 @@ function looseLatin(latin) {
   return LOOSE_RES.reduce((text, [re, repl]) => text.replace(re, repl), latin)
 }
 
-// "u" may also stand for Ъ (Kushta, Dimitur).
+// In a longer word "u" may also stand for Ъ (Kushta, Dimitur).
+const looseCache = new Map()
 function looseForms(latin) {
-  const forms = [looseLatin(latin)]
-  if (latin.includes('u')) forms.push(looseLatin(latin.split('u').join('a')))
+  let forms = looseCache.get(latin)
+  if (!forms) {
+    forms = [looseLatin(latin)]
+    if (latin.includes('u') && latin.length >= 4) forms.push(looseLatin(latin.split('u').join('a')))
+    if (looseCache.size > 1000) looseCache.clear()
+    looseCache.set(latin, forms)
+  }
   return forms
 }
 
 function tokenIn(token, name) {
   const latin = transliterate(token)
-  if (SAINT_WORDS.includes(latin) && name.hasSaint) return true
+  // "St"/"Sv" alone are also the start of Стефан, Свобода...: matched as text instead.
+  if (latin.length > 3 && SAINT_WORDS.includes(latin) && name.hasSaint) return true
   if (/^\d+$/.test(token)) return new RegExp(`(^|\\D)${token}(?!\\d)`).test(name.norm)
   const stems = TYPE_LATIN.get(latin)
   if (stems) {

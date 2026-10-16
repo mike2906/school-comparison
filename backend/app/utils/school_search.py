@@ -9,6 +9,7 @@ tables; tests/test_school_search.py fails when the two tables drift apart.
 """
 
 import re
+from functools import lru_cache
 from typing import Iterable, Optional
 
 # Official Bulgarian transliteration (Transliteration Act 2009), lowercase only.
@@ -82,8 +83,8 @@ SAINT_WORDS = frozenset({
 # transliteration: "Car"/"Tzar" for Цар, "Khristo" for Христо, "Paisii" for Паисий,
 # "Iavorov" for Яворов, "Djon" for Джон, "Sofia" for София, "UWEKIND" for Увекинд.
 # Both the query and the transliterated name are rewritten with these rules, in order,
-# before comparing. Each rewrite keeps or lengthens text where it can ("j" -> "zh",
-# "c" -> "ts"), so a word typed halfway still matches.
+# before comparing. Rewrites lengthen text where they can ("j" -> "zh", "c" -> "ts"),
+# so a word typed halfway mostly still matches.
 LOOSE_SPELLINGS = (
     ("w", "v"),
     ("j", "zh"),
@@ -151,15 +152,17 @@ def _loose(latin: str) -> str:
     return latin
 
 
+@lru_cache(maxsize=1024)
 def _loose_forms(latin: str) -> tuple[str, ...]:
-    """Loose forms of a query word; "u" may also stand for Ъ (Kushta, Dimitur)."""
+    """Loose forms of a query word; in a longer word "u" may also stand for Ъ (Kushta)."""
     forms = (_loose(latin),)
-    return forms + (_loose(latin.replace("u", "a")),) if "u" in latin else forms
+    return forms + (_loose(latin.replace("u", "a")),) if "u" in latin and len(latin) >= 4 else forms
 
 
 def _token_in(token: str, name: _Name, *, prefix: bool = False) -> bool:
     latin = transliterate(token)
-    if latin in SAINT_WORDS and name.has_saint:
+    # "St"/"Sv" alone are also the start of Стефан, Свобода...: matched as text instead.
+    if len(latin) > 3 and latin in SAINT_WORDS and name.has_saint:
         return True
     if token.isdigit():
         return re.search(rf"(?<!\d){token}(?!\d)", name.norm) is not None
