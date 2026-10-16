@@ -136,6 +136,20 @@ export function summaryRowsFor(summary, stage, { ageGroup = null } = {}) {
   )
 }
 
+/**
+ * Whether a kindergarten row ranked children of this child's age: the same age group and,
+ * when the row names one, a birth year as far before its campaign as the child's is
+ * before `startYear` (nursery groups take two birth years). A row from an earlier
+ * campaign is last year's cut-off for the same group, not another child's.
+ */
+export function rowFitsChild(row, ageGroup, birthYear, startYear) {
+  if (row.age_group !== ageGroup) return false
+  if (row.birth_year == null) return true
+  const campaignStart = Number.parseInt(String(row.campaign || '').slice(0, 4), 10)
+  if (!Number.isFinite(campaignStart)) return row.birth_year === birthYear
+  return campaignStart - row.birth_year === startYear - birthYear
+}
+
 /** The cut-off a row reports for a round: points, group and points, or a min score. */
 export function cutoffValue(round) {
   if (!round) return null

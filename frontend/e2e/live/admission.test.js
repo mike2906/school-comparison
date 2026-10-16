@@ -147,13 +147,15 @@ describe('admission from a school page', () => {
     await page.getByRole('heading', { name: t('bg', 'cutoffs.title') }).waitFor()
     await page.getByRole('tab', { name: t('bg', 'admissionCalc.stages.kindergarten'), selected: true }).waitFor()
 
-    // A child born in a year this kindergarten ranked: the result card compares the
-    // total with that group's last admitted child.
+    // A child the age of a group this kindergarten ranked: the result card compares the
+    // total with that group's last admitted child, also when the row is from the
+    // campaign before the start year chosen.
     const start = Number((await campaign()).slice(0, 4))
     const row = school.admission_info.cutoff_summary.find(r =>
-      r.birth_year && r.campaign === `${start}/${start + 1}` && (r.latest || r.first)?.last_admitted_points != null)
+      r.birth_year && r.stage === 'kindergarten' && r.campaign && (r.latest || r.first)?.last_admitted_points != null)
     if (row) {
-      await page.getByLabel(t('bg', 'admissionCalc.kg.birthYear')).selectOption(String(row.birth_year))
+      const birthYear = row.birth_year + start - Number(row.campaign.slice(0, 4))
+      await page.getByLabel(t('bg', 'admissionCalc.kg.birthYear')).selectOption(String(birthYear))
       await page.locator('aside').getByText(t('bg', 'cutoffs.compare.title')).waitFor()
     }
   })
