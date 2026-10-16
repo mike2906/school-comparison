@@ -12,6 +12,7 @@ from app.utils.school_search import (
     RANK_CONTAINS,
     RANK_NUMBER,
     RANK_PREFIX,
+    LATIN_SPELLINGS,
     SAINT_WORDS,
     SCHOOL_NAME_ALIASES,
     TYPE_ABBREVIATIONS,
@@ -124,6 +125,17 @@ def test_typing_a_name_letter_by_letter_keeps_matching():
         assert _rank(query, SV_SOFIA) is not None, query
 
 
+def test_brand_w_matches_cyrillic_v():
+    assert _rank("Uwekind", '"ЧАСТНО СРЕДНО УЧИЛИЩЕ УВЕКИНД" ООД') is not None
+    assert _rank("Uvekind", '"ЧАСТНО СРЕДНО УЧИЛИЩЕ УВЕКИНД" ООД') is not None
+    assert _rank("Wonder", "Wonderland Kindergarten") is not None
+
+
+def test_saint_wildcard_skips_st_abbreviation_and_addresses():
+    assert _rank("Saint Sofia", "ПГ по транспорт гр. Ст. Загора София") is None
+    assert _rank("Sveta Sofia", SU_119, addresses=["гр. София, ул. Св. Наум 1"]) is None
+
+
 def test_plural_saints_match():
     assert _rank("Saints Kiril", 'СУ "Св. св. Кирил и Методий"') is not None
 
@@ -166,7 +178,10 @@ def test_frontend_tables_match_backend():
     assert _js_table(source, "TYPE_ABBREVIATIONS") == TYPE_ABBREVIATIONS
     saint_words = re.search(r"export const SAINT_WORDS = \[([^\]]*)\]", source)
     assert saint_words, "SAINT_WORDS not found in schoolSearch.js"
-    assert tuple(re.findall(r"'([^']*)'", saint_words.group(1))) == SAINT_WORDS
+    assert set(re.findall(r"'([^']*)'", saint_words.group(1))) == SAINT_WORDS
+    spellings = re.search(r"export const LATIN_SPELLINGS = \[(.*)\]\n", source)
+    assert spellings, "LATIN_SPELLINGS not found in schoolSearch.js"
+    assert tuple(re.findall(r"\['([^']*)', '([^']*)'\]", spellings.group(1))) == LATIN_SPELLINGS
 
 
 async def _add_school(db, name_bg: str, *, name_en: str | None = None) -> School:

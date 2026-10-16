@@ -53,8 +53,15 @@ export const SCHOOL_NAME_ALIASES = {
   'acs': 'американски колеж',
 }
 
-// Words for "saint" (Св./Свети/Света, St., Saint, Sveta); any one matches any other.
-export const SAINT_WORDS = ['sv', 'sveti', 'sveta', 'svetite', 'st', 'sts', 'saint', 'saints']
+// A query word for "saint" matches any name holding one as a whole word, checked before
+// transliteration so "Ст." (Стара Загора) is not a saint.
+export const SAINT_WORDS = [
+  'св', 'свети', 'света', 'светите', 'st', 'sts', 'saint', 'saints',
+  'sv', 'sveti', 'sveta', 'svetite',
+]
+
+// Typed Latin spelling -> official transliteration ("Sofia" for София, "UWEKIND" for Увекинд).
+export const LATIN_SPELLINGS = [['ia', 'iya'], ['w', 'v']]
 
 /** Lowercase, drop "№"/"No." and punctuation, split digits from letters, drop ordinals. */
 export function normalizeSearchText(text) {
@@ -85,7 +92,15 @@ function prepareName(value) {
   const norm = normalizeSearchText(value)
   const latin = transliterate(norm)
   const words = [...norm.split(' '), ...latin.split(' ')]
-  return { norm, latin, words, hasSaint: words.some(word => SAINT_WORDS.includes(word)) }
+  return { norm, latin, words, hasSaint: norm.split(' ').some(word => SAINT_WORDS.includes(word)) }
+}
+
+function latinForms(latin) {
+  const forms = [latin]
+  for (const [typed, official] of LATIN_SPELLINGS) {
+    for (const form of [...forms]) if (form.includes(typed)) forms.push(form.split(typed).join(official))
+  }
+  return forms
 }
 
 function tokenIn(token, name) {
@@ -96,8 +111,7 @@ function tokenIn(token, name) {
   if (stems) {
     return name.words.includes(latin) || stems.every(stem => name.latin.includes(stem))
   }
-  // "-ия" transliterates to "iya", but parents type "ia" (Sofia, Maria).
-  return name.norm.includes(token) || name.latin.includes(latin) || name.latin.includes(latin.replace(/ia/g, 'iya'))
+  return name.norm.includes(token) || latinForms(latin).some(form => name.latin.includes(form))
 }
 
 function tokensMatch(tokens, names) {

@@ -19,3 +19,9 @@ test('a saint word needs a saint in the name', () => {
   assert.equal(schoolMatchesQuery(smg, 'Saint Paisiy'), false)
   assert.equal(schoolMatchesQuery(smg, 'SMG'), true)
 })
+
+test('a W in a Latin brand matches В (UWEKIND for Увекинд)', () => {
+  const uvekind = { name_i18n: { bg: '"ЧАСТНО СРЕДНО УЧИЛИЩЕ УВЕКИНД" ООД' } }
+  assert.equal(schoolMatchesQuery(uvekind, 'Uwekind'), true)
+  assert.equal(schoolMatchesQuery({ name_i18n: { bg: 'ПГ гр. Ст. Загора София' } }, 'Saint Sofia'), false)
+})

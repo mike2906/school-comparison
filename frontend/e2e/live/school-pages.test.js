@@ -46,8 +46,8 @@ describe('finding a school', () => {
 
   test('a Latin "Saint ..." spelling finds a school named „Света/Свети ...“', async () => {
     // Parents write "Saint Sofia" or "Sveta Sofia" for „Света София“ (St. Sofia). The
-    // whole English name with "Saint" for "St." keeps the result list to this school.
-    const school = (await allSchools()).find(s => /\bSt\. /.test(schoolName(s, 'en')) && /\bСвет[аи] /.test(schoolName(s, 'bg')))
+    // whole English name with "Saint" for "St." keeps the result list short.
+    const school = (await allSchools()).find(s => /\bSt\. /.test(schoolName(s, 'en')) && /(^|[\s„"])Свет[аи] /.test(schoolName(s, 'bg')))
     assert.ok(school, 'a school named after a saint')
     const query = schoolName(school, 'en').replace(/\bSt\. /, 'Saint ')
     await open('bg', '/search')

@@ -69,9 +69,19 @@ SCHOOL_NAME_ALIASES: dict[str, str] = {
 }
 
 # "Св." / "Свети" / "Света" in registry names, "St." in English names; parents also
-# type "Saint" or "Sveta". A query word in this set also matches a name holding any of
-# them as a whole word, so "Saint Sofia" and "Sveta Sofia" find „Света София“.
-SAINT_WORDS = ("sv", "sveti", "sveta", "svetite", "st", "sts", "saint", "saints")
+# type "Saint" or "Sveta". A query word in this set matches any school name holding one
+# of them as a whole word (whichever saint; the other query words narrow it down), so
+# "Saint Sofia" and "Sveta Sofia" find „Света София“. Names are checked before
+# transliteration, so "Ст." (Стара Загора) is not a saint.
+SAINT_WORDS = frozenset({
+    "св", "свети", "света", "светите", "st", "sts", "saint", "saints",
+    "sv", "sveti", "sveta", "svetite",
+})
+
+# Latin spellings parents use where the official transliteration differs: "-ия" is
+# "iya" but they type "Sofia", "Maria"; В is "v" but school brands write "W" (UWEKIND).
+# A Latin query word also matches with each replacement applied.
+LATIN_SPELLINGS = (("ia", "iya"), ("w", "v"))
 
 # Rank tiers (lower is better).
 RANK_ALIAS = 0
@@ -115,11 +125,18 @@ _ALIASES_LATIN = [
 class _Name:
     __slots__ = ("norm", "latin", "words", "has_saint")
 
-    def __init__(self, value: object):
+    def __init__(self, value: object, *, saints: bool = True):
         self.norm = normalize(value)
         self.latin = transliterate(self.norm)
         self.words = self.norm.split(" ") + self.latin.split(" ")
-        self.has_saint = any(word in SAINT_WORDS for word in self.words)
+        self.has_saint = saints and not SAINT_WORDS.isdisjoint(self.norm.split(" "))
+
+
+def _latin_forms(latin: str) -> tuple[str, ...]:
+    forms = [latin]
+    for typed, official in LATIN_SPELLINGS:
+        forms += [form.replace(typed, official) for form in forms if typed in form]
+    return tuple(forms)
 
 
 def _token_in(token: str, name: _Name, *, prefix: bool = False) -> bool:
@@ -132,8 +149,7 @@ def _token_in(token: str, name: _Name, *, prefix: bool = False) -> bool:
         return latin in name.words or all(
             transliterate(stem) in name.latin for stem in _TYPE_LATIN[latin]
         )
-    # "-ия" transliterates to "iya", but parents type "ia" (Sofia, Maria).
-    latins = (latin, latin.replace("ia", "iya")) if "ia" in latin else (latin,)
+    latins = _latin_forms(latin)
     if prefix:
         return any(word.startswith(token) or word.startswith(latins) for word in name.words)
     return token in name.norm or any(form in name.latin for form in latins)
@@ -197,6 +213,6 @@ def rank_school(
     rank = _tokens_rank(tokens, name_objs)
     if rank is not None:
         return rank
-    if _tokens_rank(tokens, [_Name(value) for value in addresses]) is not None:
+    if _tokens_rank(tokens, [_Name(value, saints=False) for value in addresses]) is not None:
         return RANK_ADDRESS
     return None
