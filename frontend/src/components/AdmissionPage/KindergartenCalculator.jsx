@@ -235,7 +235,7 @@ function KindergartenCalculator({ selected, startYear, kindergarten, districts, 
             </div>
             {ageGroup && (
               <CutoffComparison
-                // Only this child's age group: other groups rank other children.
+                // Only this child's age group and birth-year slot in it: others rank other children.
                 rows={cutoffRows.filter(row => rowFitsChild(row, ageGroup, a.birthYear, startYear))}
                 yours={{ points: result.total }}
                 isCurrentRules={isCurrentRules}

@@ -151,8 +151,10 @@ describe('admission from a school page', () => {
     // total with that group's last admitted child, also when the row is from the
     // campaign before the start year chosen.
     const start = Number((await campaign()).slice(0, 4))
+    const age = r => Number(r.campaign.slice(0, 4)) - r.birth_year
     const row = school.admission_info.cutoff_summary.find(r =>
-      r.birth_year && r.stage === 'kindergarten' && r.campaign && (r.latest || r.first)?.last_admitted_points != null)
+      r.birth_year && r.stage === 'kindergarten' && r.campaign && Number(r.campaign.slice(0, 4)) <= start &&
+      age(r) >= 1 && age(r) < 7 && (r.latest || r.first)?.last_admitted_points != null)
     if (row) {
       const birthYear = row.birth_year + start - Number(row.campaign.slice(0, 4))
       await page.getByLabel(t('bg', 'admissionCalc.kg.birthYear')).selectOption(String(birthYear))

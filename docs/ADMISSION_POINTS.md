@@ -215,7 +215,9 @@ snapshots per city, stage, campaign and round, and `admission_info.cutoffs` /
 `cutoff_summary` in the API, each row tagged with `rule_set` (`<id>@<version>`).
 
 **On the calculator.** With a school chosen, the result card compares the parent's
-total (kindergarten: the child's age group and birth year) or group and points (first
+total (kindergarten: the child's age group, and a birth year as far before the row's
+campaign as the child's is before the start year, so a child starting next year meets
+last campaign's cut-off for the same group) or group and points (first
 grade) with the last admitted child of the school's latest ranking: above, below, tie
 (drawn by lot), or "depends on your not-sure answers" when the range spans it. Rows
 ranked under other rules are marked. Eighth grade has no comparison, since the class's

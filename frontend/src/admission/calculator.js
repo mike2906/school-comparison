@@ -147,7 +147,8 @@ export function rowFitsChild(row, ageGroup, birthYear, startYear) {
   if (row.birth_year == null) return true
   const campaignStart = Number.parseInt(String(row.campaign || '').slice(0, 4), 10)
   if (!Number.isFinite(campaignStart)) return row.birth_year === birthYear
-  return campaignStart - row.birth_year === startYear - birthYear
+  // A later campaign's ranking is not a cut-off this child could have met.
+  return campaignStart <= startYear && campaignStart - row.birth_year === startYear - birthYear
 }
 
 /** The cut-off a row reports for a round: points, group and points, or a min score. */

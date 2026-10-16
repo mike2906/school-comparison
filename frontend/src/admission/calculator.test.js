@@ -181,6 +181,7 @@ test('a kindergarten row fits a child by age at the start, not by birth year', (
   // The same group, but the younger of its two birth years.
   assert.equal(rowFitsChild(row, 'nursery', 2026, 2027), false)
   assert.equal(rowFitsChild(row, 'first', 2025, 2027), false)
+  assert.equal(rowFitsChild({ ...row, campaign: '2027/2028', birth_year: 2025 }, 'nursery', 2024, 2026), false, 'a later campaign')
   assert.equal(rowFitsChild({ age_group: 'first', birth_year: 2023 }, 'first', 2023, 2026), true)
   assert.equal(rowFitsChild({ age_group: 'first' }, 'first', 2024, 2027), true)
 })
