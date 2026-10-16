@@ -27,6 +27,9 @@ you picked, and go to Mike only for the short list in "Still goes to Mike".
    error branches) and confirm it fires exactly where it should.
 6. Push, open the PR, and review it by size (below). Fix what blocks, push one batch.
 7. Merge on green CI once the review is settled (see "Merging").
+   The fees eval runs only when a PR is opened, reopened or marked ready; if a later push changed the
+   reader's behaviour, re-run it on the final code with the `fees-eval` label first
+   (`backend/evals/fees/README.md`).
 
 ## Review by size
 
