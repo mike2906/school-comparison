@@ -48,7 +48,7 @@ MODEL_COSTS = {
 # Anthropic's API reports tokens, not a cost, so a tier routed there needs its model's
 # price here: it is the cost every run cap and the provider ledger count. A model missing
 # from this table is refused. Prices per 1M tokens (input, output), claude-api reference
-# 2026-10-06; Haiku 5.5 doubles to (0.50, 2.50) for prompts over 100K tokens.
+# 2026-10-06; Haiku 5.5 costs (0.50, 2.50) for a whole request whose prompt is over 100K tokens.
 # Only Haiku 5.5 is listed: Sonnet 5.5 and Opus 5.5 reject the forced tool call that
 # structured answers use and can't turn thinking off, so they need NativeOutput first.
 ANTHROPIC_PRICES = {
@@ -90,16 +90,10 @@ def get_model(tier: ModelTier) -> str:
 
 
 def get_provider(tier: ModelTier) -> Literal["openrouter", "anthropic"]:
-    """Which API a tier calls: ``anthropic/<model>`` goes to Anthropic directly,
-    ``openrouter/<vendor>/<model>`` to OpenRouter. Anything else is refused."""
-    model = get_model(tier)
-    if model.startswith(ANTHROPIC_PREFIX):
-        return "anthropic"
-    if model.startswith(OPENROUTER_PREFIX):
-        return "openrouter"
-    raise ValueError(
-        f"model {model!r} for tier {tier!r} must start with {OPENROUTER_PREFIX!r} or {ANTHROPIC_PREFIX!r}"
-    )
+    """Which API a tier calls: ``anthropic/<model>`` goes to Anthropic directly; anything
+    else (``openrouter/<vendor>/<model>``, or a bare ``<vendor>/<model>`` as before) goes
+    to OpenRouter. ``anthropic/...`` on OpenRouter is spelled ``openrouter/anthropic/...``."""
+    return "anthropic" if get_model(tier).startswith(ANTHROPIC_PREFIX) else "openrouter"
 
 
 def _anthropic_model_name(tier: ModelTier) -> str:
@@ -222,6 +216,8 @@ class PricedAnthropicModel(AnthropicModel):
     as OpenRouter's do, so run caps and the provider ledger (provider_costs) work
     unchanged. An out-of-credit or refused key stops the run (ProviderCreditsExhausted)."""
 
+    # Only request() is priced: no stage streams. A streamed call would come back without
+    # a cost, and the ledger would reject it as unattributed rather than undercount it.
     async def request(self, messages, model_settings, model_request_parameters) -> ModelResponse:
         try:
             response = await super().request(messages, model_settings, model_request_parameters)
@@ -241,11 +237,17 @@ class PricedAnthropicModel(AnthropicModel):
         return response
 
 
+# A 400 with one of these means no later call can succeed: the credits ran out ("Your
+# credit balance is too low ...") or the workspace's spend limit was reached ("You have
+# reached your specified workspace API usage limits ...").
+_ACCOUNT_LIMIT_MESSAGES = ("credit balance", "usage limit", "spend limit")
+
+
 def _is_account_error(exc: ModelHTTPError) -> bool:
-    # 401/403: bad or revoked key. 400 "credit balance is too low": the credits ran out.
-    if exc.status_code in (401, 403):
+    if exc.status_code in (401, 403):  # a bad or revoked key
         return True
-    return exc.status_code == 400 and "credit balance" in str(exc.body).lower()
+    body = str(exc.body).lower()
+    return exc.status_code == 400 and any(message in body for message in _ACCOUNT_LIMIT_MESSAGES)
 
 
 def get_anthropic_model(tier: ModelTier) -> PricedAnthropicModel:

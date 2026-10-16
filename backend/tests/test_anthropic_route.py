@@ -73,10 +73,10 @@ def test_provider_follows_the_tier_prefix(monkeypatch):
     assert ai_client.get_provider("cheap") == "openrouter"
 
 
-def test_an_unknown_prefix_is_refused(monkeypatch):
-    monkeypatch.setattr(ai_client, "get_settings", lambda: _settings(pricing="claude-haiku-5-5"))
-    with pytest.raises(ValueError, match="must start with"):
-        ai_client.get_provider("pricing")
+def test_a_bare_vendor_model_id_stays_on_openrouter(monkeypatch):
+    monkeypatch.setattr(ai_client, "get_settings", lambda: _settings(capable="openai/gpt-4o-mini"))
+    assert ai_client.get_provider("capable") == "openrouter"
+    assert ai_client.get_model_costs("capable") == ai_client.MODEL_COSTS["capable"]
 
 
 def test_an_unpriced_anthropic_model_is_refused(monkeypatch):
@@ -146,6 +146,7 @@ async def test_an_anthropic_call_sends_no_sampling_settings_and_reports_its_cost
     ("status", "error"),
     [
         (400, {"type": "invalid_request_error", "message": "Your credit balance is too low to access the Anthropic API."}),
+        (400, {"type": "invalid_request_error", "message": "You have reached your specified workspace API usage limits."}),
         (401, {"type": "authentication_error", "message": "invalid x-api-key"}),
     ],
 )

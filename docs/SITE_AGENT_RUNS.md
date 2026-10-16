@@ -156,8 +156,9 @@ two: a run stops with a clear error instead of quietly changing model mid-run.
 - **Output limit:** Anthropic calls send `max_tokens` 8,192 (pydantic-ai's default of
   4,096 is below the 6,000 the fee and facts reads budget for).
 - **Legacy extractor:** `app/scrapers/extractor.py` builds its own OpenRouter model and
-  refuses a tier set to `anthropic/`; keep `MODEL_TIER_CHEAP` on OpenRouter while the old
-  general-information extraction still runs on it.
+  refuses any tier set to `anthropic/` (each school then fails its extraction). It uses
+  `cheap` and `capable` on every run and `pricing` when `EXTRACTION_PIPELINE_PRICES=true`,
+  so keep those on OpenRouter while it runs.
 - **Not switched yet:** every default is still OpenRouter. Haiku replaces GPT-6 Luna on
   the pricing tier only after it scores at least as well on the fee replay eval and a
   facts dry run. Fee pictures stay on GPT-6.1 Sol until a Claude model passes the same
