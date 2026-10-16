@@ -94,6 +94,7 @@ function AddressQuestions({ index, value, onChange, school, catchments, measured
       {!checkedHere && (
         <>
           <YesNo
+            unsure
             label={t('admissionCalc.g1.inCatchment')}
             hint={t('admissionCalc.g1.inCatchmentHint')}
             value={value.inCatchment}
@@ -101,6 +102,7 @@ function AddressQuestions({ index, value, onChange, school, catchments, measured
           />
           {value.inCatchment !== true && (
             <YesNo
+              unsure
               label={t('admissionCalc.g1.inNeighbouring')}
               value={value.inNeighbouring}
               onChange={v => onChange(prev => ({ ...prev, inNeighbouring: v }))}

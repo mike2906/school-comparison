@@ -78,7 +78,7 @@ function Grade8Calculator({ selected }) {
             </Field>
           ))}
         </div>
-        <YesNo label={t('admissionCalc.g8.hasExam')} hint={t('admissionCalc.g8.hasExamHint')} value={hasExam} onChange={setHasExam} />
+        <YesNo unsure label={t('admissionCalc.g8.hasExam')} hint={t('admissionCalc.g8.hasExamHint')} value={hasExam} onChange={setHasExam} />
         {hasExam !== false && (
           <NumberField
             label={t('admissionCalc.g8.exam', { max: params.exam_max })}

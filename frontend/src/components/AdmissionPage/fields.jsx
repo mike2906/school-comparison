@@ -14,7 +14,7 @@ export function Section({ title, intro, children }) {
 
 /**
  * One question as a row of buttons. `options` are `{ value, label }`; null is a valid
- * value ("not sure"), so the selected option is compared by identity.
+ * value (unanswered, or "not sure"), so the selected option is compared by identity.
  */
 export function Choice({ label, hint, options, value, onChange }) {
   const id = useId()
@@ -47,8 +47,12 @@ export function Choice({ label, hint, options, value, onChange }) {
   )
 }
 
-/** Yes / no / not sure. */
-export function YesNo({ label, hint, value, onChange }) {
+/**
+ * Yes / no. Left unanswered (null) it counts as either, like "not sure". Pass `unsure` only
+ * where a parent may really not know the answer (whether an address is in a school's area,
+ * a future state); facts about the family get no "not sure" button.
+ */
+export function YesNo({ label, hint, value, onChange, unsure = false }) {
   const { t } = useTranslation()
   return (
     <Choice
@@ -59,7 +63,7 @@ export function YesNo({ label, hint, value, onChange }) {
       options={[
         { value: true, label: t('admissionCalc.yes') },
         { value: false, label: t('admissionCalc.no') },
-        { value: null, label: t('admissionCalc.notSure') },
+        ...(unsure ? [{ value: null, label: t('admissionCalc.notSure') }] : []),
       ]}
     />
   )
