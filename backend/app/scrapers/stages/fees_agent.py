@@ -29,7 +29,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.ai.client import create_agent, extract_provider_cost_usd, get_model, get_model_costs
+from app.ai.client import MODEL_TIERS, create_agent, extract_provider_cost_usd, get_model, get_model_costs
 from app.config import CRAWLER_USER_AGENT, get_settings
 from app.database import async_session_maker
 from app.models import Pricing, School
@@ -88,6 +88,13 @@ THIN_PAGE_CHARS = 300
 RETRY_SECONDS = 2.0
 READ_OUTPUT_TOKENS_RESERVE = 6000
 PICK_COST_ESTIMATE_USD = 0.002
+# Output caps, so a call's worst case is known and the run's spend guard can count a call in
+# flight, or one that timed out unbilled, at that worst case instead of the $0.10 default
+# (which stopped a $1 Sofia run after $0.20-0.30 of real spend on 2026-10-16). 596's
+# 49 fees took about 8k output tokens.
+READ_MAX_OUTPUT_TOKENS = 32_000
+PICK_MAX_OUTPUT_TOKENS = 1_000
+MAX_PICK_INPUT_CHARS = 40_000
 # When the picker returns nothing, follow links whose URL or text names fees or admissions.
 _FEE_LINK_RE = re.compile(r"такс|цени|цена|прием|fee|tuition|pric|admission", re.IGNORECASE)
 _SKIPPED = (".jpg", ".jpeg", ".png", ".gif", ".svg", ".webp", ".css", ".js", ".zip", ".mp4", ".mp3", ".doc", ".docx")
@@ -240,11 +247,15 @@ async def _pick(
         prompt,
         Picks,
         retries=1,
-        model_settings={"temperature": settings.extraction_temperature, "parallel_tool_calls": False},
+        model_settings={
+            "temperature": settings.extraction_temperature,
+            "parallel_tool_calls": False,
+            "max_tokens": PICK_MAX_OUTPUT_TOKENS,
+        },
     )
     name = (school.name_i18n or {}).get("bg") or (school.name_i18n or {}).get("en")
     pages = "\n".join(f"- {page.url} ({'shows prices' if page.prices else 'no prices'})" for page in read)
-    shown = "\n".join(f"{url} | {text}" for url, text in links[:MAX_LINKS_SHOWN])
+    shown = "\n".join(f"{url} | {text}" for url, text in links[:MAX_LINKS_SHOWN])[:MAX_PICK_INPUT_CHARS]
     try:
         with spend.hold(PICK_COST_ESTIMATE_USD):
             result = await execute_billable_request(
@@ -256,7 +267,7 @@ async def _pick(
             )
     except ProviderResponseUnattributed:
         # Counted at its assumed maximum, as the ledger counts it; the caller falls back to keyword links.
-        spend.spent_usd += float(settings.provider_request_reserve_usd)
+        spend.spent_usd += request_reserves().get(get_model("cheap"), float(settings.provider_request_reserve_usd))
         raise
     spend.spent_usd += extract_provider_cost_usd(result)
     allowed = {url for url, _ in links}
@@ -426,8 +437,38 @@ def reader_agent():
         READER_PROMPT,
         AgentFees,
         retries=1,
-        model_settings={"temperature": get_settings().extraction_temperature},
+        model_settings={"temperature": get_settings().extraction_temperature, "max_tokens": READ_MAX_OUTPUT_TOKENS},
     )
+
+
+def _worst_case_usd(tier: str, input_chars: int, max_output_tokens: int, attempts: int) -> float:
+    """A call's most expensive outcome: every attempt resends the input and the previous
+    attempts' output, reads at 1.5 characters a token (Cyrillic tokenizes densely) and
+    writes the full output cap."""
+    in_price, out_price = get_model_costs(tier)
+    total, input_tokens = 0.0, input_chars / 1.5
+    for _ in range(attempts):
+        total += (input_tokens * in_price + max_output_tokens * out_price) / 1_000_000
+        input_tokens += max_output_tokens
+    return total
+
+
+def request_reserves() -> dict[str, float]:
+    """The run's spend guard counts a reader or picker call at its worst case (two attempts:
+    the agent retries once on invalid output). Vision reads keep the default reserve."""
+    reader = _worst_case_usd("pricing", MAX_READ_CHARS + len(READER_PROMPT) + 5_000, READ_MAX_OUTPUT_TOKENS, 2)
+    picker = _worst_case_usd("cheap", MAX_PICK_INPUT_CHARS + len(PICK_PROMPT) + 5_000, PICK_MAX_OUTPUT_TOKENS, 2)
+    worst = {"pricing": reader, "cheap": picker}
+    reserves: dict[str, float] = {}
+    for tier, usd in worst.items():
+        model = get_model(tier)
+        # MODEL_COSTS are the default models' prices, and a model another tier also resolves
+        # to (an override, or vision) may serve calls bigger than this one: default reserve.
+        sharing = [t for t in MODEL_TIERS if get_model(t) == model]
+        if any(t not in worst or get_model(t) != MODEL_TIERS[t] for t in sharing):
+            continue
+        reserves[model] = max(usd, reserves.get(model, 0.0))  # one model on both tiers: the larger
+    return reserves
 
 
 async def read_fees(school: School, pages: list[PageRead], spend: Spend, missed: Sequence[Decimal]) -> FeeRead:
@@ -1382,6 +1423,7 @@ async def run_fees_agent(
             cap_usd=max_usd,
             request_reserve_usd=float(settings.provider_request_reserve_usd),
             max_in_flight=workers,
+            model_reserves=request_reserves(),
         ):
             async with (
                 pipeline_run_heartbeat(

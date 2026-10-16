@@ -733,3 +733,54 @@ async def test_calls_in_flight_count_at_the_reserve_in_the_cap_check(monkeypatch
             await execute_billable_request(_held, model="mock", school_id=3)
         release.set()
         await asyncio.gather(first, second)
+
+
+async def test_a_models_own_reserve_counts_its_uncertain_calls_and_its_next_call(db_session):
+    """The fee reader caps its output: its calls count at their worst case, not the $0.10 default."""
+    run = await _run(db_session)
+    cheap = {"openrouter/test-model": Decimal("0.02")}
+
+    async def reserve(model):
+        return await reserve_provider_request(
+            db_session,
+            pipeline_run_id=run.id,
+            stage="fees-agent",
+            school_id=None,
+            model=model,
+            cap_usd=0.25,
+            request_reserve_usd=0.1,
+            model_reserves=cheap,
+        )
+
+    for _ in range(10):  # ten in flight at 0.02 each: 0.20 held
+        await reserve("openrouter/test-model")
+    await reserve("openrouter/test-model")  # 0.22 of 0.25: still allowed
+    with pytest.raises(ProviderCostCapExceeded):
+        await reserve("openrouter/other-model")  # 0.22 + the 0.10 default is over the cap
+
+
+async def test_a_scope_passes_model_reserves_to_each_reservation(db_session, monkeypatch):
+    seen = []
+
+    async def _reserve_stub(_db, **kwargs):
+        seen.append(kwargs["model_reserves"])
+        return SimpleNamespace(client_request_id="c")
+
+    import app.services.provider_costs as provider_costs
+
+    monkeypatch.setattr(provider_costs, "reserve_provider_request", _reserve_stub)
+    monkeypatch.setattr(provider_costs, "mark_provider_request_uncertain", lambda *a, **k: asyncio.sleep(0))
+
+    async def _call():
+        raise TimeoutError
+
+    with provider_cost_scope(
+        pipeline_run_id="run-1",
+        stage="fees-agent",
+        cap_usd=1.0,
+        request_reserve_usd=0.1,
+        model_reserves={"m": 0.05},
+    ):
+        with pytest.raises(TimeoutError):
+            await execute_billable_request(_call, model="m", school_id=None)
+    assert seen == [{"m": Decimal("0.05000000")}]

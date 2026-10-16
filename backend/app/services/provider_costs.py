@@ -7,9 +7,9 @@ import contextvars
 import datetime
 import inspect
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from decimal import Decimal, InvalidOperation
-from typing import Any, Awaitable, Callable, Optional
+from typing import Any, Awaitable, Callable, Mapping, Optional
 from uuid import uuid4
 
 from sqlalchemy import select
@@ -51,6 +51,9 @@ class ProviderCostScope:
     # each cap check counts every call still in flight at the request reserve.
     dispatch_slots: asyncio.Semaphore
     reserve_lock: asyncio.Lock
+    # A model's own reserve where its calls have a known worst case (the fee reader caps its
+    # output); any other model counts at request_reserve_usd.
+    model_reserves: Mapping[str, Decimal] = field(default_factory=dict)
 
 
 _SCOPE: contextvars.ContextVar[ProviderCostScope | None] = contextvars.ContextVar(
@@ -76,14 +79,22 @@ def provider_cost_scope(
     cap_usd: float,
     request_reserve_usd: float,
     max_in_flight: int = 1,
+    model_reserves: Optional[Mapping[str, float]] = None,
 ):
     cap = _usd(cap_usd, field="provider cost cap")
     reserve = _usd(request_reserve_usd, field="provider request reserve")
-    if cap <= 0 or reserve <= 0:
+    per_model = {model: _usd(value, field="model request reserve") for model, value in (model_reserves or {}).items()}
+    if cap <= 0 or reserve <= 0 or any(value <= 0 for value in per_model.values()):
         raise ProviderAttributionUncertain("provider cost cap and request reserve must be positive")
     token = _SCOPE.set(
         ProviderCostScope(
-            pipeline_run_id, stage, cap, reserve, asyncio.Semaphore(max(1, int(max_in_flight))), asyncio.Lock()
+            pipeline_run_id,
+            stage,
+            cap,
+            reserve,
+            asyncio.Semaphore(max(1, int(max_in_flight))),
+            asyncio.Lock(),
+            per_model,
         )
     )
     try:
@@ -102,10 +113,19 @@ async def reserve_provider_request(
     cap_usd: Decimal | float,
     request_reserve_usd: Decimal | float,
     client_request_id: Optional[str] = None,
+    model_reserves: Optional[Mapping[str, Decimal]] = None,
 ) -> ProviderRequestLedger:
-    """Persist a pre-dispatch reservation after checking spend against the cap."""
+    """Persist a pre-dispatch reservation after checking spend against the cap.
+
+    ``model_reserves`` gives a model's own reserve; others count at ``request_reserve_usd``."""
     cap = _usd(cap_usd, field="provider cost cap")
-    reserve = _usd(request_reserve_usd, field="provider request reserve")
+    default_reserve = _usd(request_reserve_usd, field="provider request reserve")
+    reserves = {name: _usd(value, field="model request reserve") for name, value in (model_reserves or {}).items()}
+
+    def reserve_for(name: str) -> Decimal:
+        return reserves.get(name, default_reserve)
+
+    reserve = reserve_for(model)
     run = (
         await db.execute(
             select(PipelineRun).where(PipelineRun.id == pipeline_run_id).with_for_update()
@@ -124,11 +144,11 @@ async def reserve_provider_request(
         ).scalars()
     )
     # A pending or uncertain request (e.g. a timeout; the provider may have billed it)
-    # counts at the request reserve, its assumed maximum cost, so it does not block the
-    # rest of the run but still counts toward the cap.
-    uncertain_count = sum(
-        row.status != ProviderRequestStatus.ATTRIBUTED for row in existing
-    )
+    # counts at its model's request reserve, its assumed maximum cost, so it does not block
+    # the rest of the run but still counts toward the cap.
+    uncertain = [row for row in existing if row.status != ProviderRequestStatus.ATTRIBUTED]
+    uncertain_count = len(uncertain)
+    uncertain_usd = sum((reserve_for(row.model) for row in uncertain), Decimal("0"))
     spend = sum(
         (
             _usd(row.provider_cost_usd, field="provider cost")
@@ -136,11 +156,11 @@ async def reserve_provider_request(
             if row.status == ProviderRequestStatus.ATTRIBUTED
         ),
         Decimal("0"),
-    ) + reserve * uncertain_count
+    ) + uncertain_usd
     if spend + reserve > cap:
         raise ProviderCostCapExceeded(
             f"provider cost cap would be exceeded: spent={spend} "
-            f"(incl. {uncertain_count} uncertain at {reserve}) reserve={reserve} cap={cap}"
+            f"(incl. {uncertain_count} uncertain at {uncertain_usd}) reserve={reserve} cap={cap}"
         )
 
     row = ProviderRequestLedger(
@@ -487,6 +507,7 @@ async def _execute_tracked_billable_request(
             model=model,
             cap_usd=scope.cap_usd,
             request_reserve_usd=scope.request_reserve_usd,
+            model_reserves=scope.model_reserves,
         )
     try:
         result = await _bounded(call, timeout_seconds)
