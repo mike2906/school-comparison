@@ -6,6 +6,7 @@ from types import SimpleNamespace
 import httpx
 import pytest
 from pydantic import BaseModel
+from pydantic_ai.exceptions import UnexpectedModelBehavior
 from pydantic_ai.providers.anthropic import AnthropicProvider
 
 from app.ai import client as ai_client
@@ -140,6 +141,21 @@ async def test_an_anthropic_call_sends_no_sampling_settings_and_reports_its_cost
     assert attribution["provider_request_id"] == "msg_test_1"
     assert attribution["input_tokens"] == 20_000
     assert float(attribution["provider_cost_usd"]) == pytest.approx(expected)
+
+
+async def test_an_answer_cut_off_at_max_tokens_fails_instead_of_reading_as_empty(monkeypatch, haiku_pricing):
+    def cut_off(request):
+        response = _tool_answer(request)
+        body = response.json()
+        body["content"][0]["input"] = {}
+        body["stop_reason"] = "max_tokens"
+        body["usage"]["output_tokens"] = ai_client.ANTHROPIC_MAX_OUTPUT_TOKENS
+        return httpx.Response(200, json=body)
+
+    _mock_anthropic(monkeypatch, cut_off)
+    agent = ai_client.create_agent("pricing", "system", Pick)
+    with pytest.raises(UnexpectedModelBehavior, match="cut off"):
+        await agent.run("hello")
 
 
 @pytest.mark.parametrize(

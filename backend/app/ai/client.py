@@ -12,7 +12,7 @@ from math import isfinite
 from typing import Any, Literal
 
 from pydantic_ai import Agent
-from pydantic_ai.exceptions import ModelHTTPError
+from pydantic_ai.exceptions import ModelHTTPError, UnexpectedModelBehavior
 from pydantic_ai.messages import ModelResponse
 from pydantic_ai.models.anthropic import AnthropicModel
 from pydantic_ai.models.openrouter import OpenRouterModel
@@ -59,7 +59,11 @@ ANTHROPIC_LONG_PROMPT_PRICES = {
     "claude-haiku-5-5": (0.50, 2.50),
 }
 ANTHROPIC_PREFIX = "anthropic/"
-ANTHROPIC_MAX_OUTPUT_TOKENS = 8_192
+# pydantic-ai's default (4096) is far too low: one fee page with 114 fees needed more than
+# 8192 tokens from Haiku 5.5 (eval 2026-10-16). 20K stays under the SDK's non-streaming
+# limit (~21K), so every call is one plain request; a longer answer fails as cut off
+# (below) instead of reading as empty. At Haiku's price that is at most $0.01 of output.
+ANTHROPIC_MAX_OUTPUT_TOKENS = 20_000
 OPENROUTER_PREFIX = "openrouter/"
 # Settings Haiku 5.5 rejects with a 400 when set to anything but the default.
 _ANTHROPIC_SAMPLING_SETTINGS = ("temperature", "top_p", "top_k")
@@ -225,6 +229,13 @@ class PricedAnthropicModel(AnthropicModel):
             if _is_account_error(exc):
                 raise ProviderCreditsExhausted(f"Anthropic refused the request: {exc}") from exc
             raise
+        if response.finish_reason == "length":
+            # A structured answer cut off at max_tokens parses as an empty or partial
+            # result; fail the call so the school counts as not read, not as "no fees".
+            # The provider-cost guard counts a failed call at the request reserve.
+            raise UnexpectedModelBehavior(
+                f"Anthropic answer cut off at {response.usage.output_tokens} output tokens"
+            )
         usage = response.usage
         cost = anthropic_cost_usd(self.model_name, usage.input_tokens, usage.output_tokens)
         # "cost" is what the ledger and caps read; cost_source records that it was computed
