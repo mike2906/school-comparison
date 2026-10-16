@@ -141,7 +141,7 @@ export function MobileTotal({ children, saveId = null }) {
             box.scrollIntoView({ behavior: still ? 'auto' : 'smooth', block: 'center' })
             box.querySelector('button')?.focus({ preventScroll: true })
           }}
-          className="shrink-0 rounded-lg border border-primary-700 px-3 py-1.5 font-medium text-primary-700"
+          className="min-h-11 shrink-0 rounded-lg border border-primary-700 px-3 py-2 font-medium text-primary-700"
         >
           {t('savedAdmission.jumpToSave')}
         </button>
