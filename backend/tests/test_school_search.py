@@ -7,12 +7,12 @@ import pytest
 
 from app.models.school import School, SchoolLocation
 from app.utils.school_search import (
+    LATIN_SPELLINGS,
     RANK_ADDRESS,
     RANK_ALIAS,
     RANK_CONTAINS,
     RANK_NUMBER,
     RANK_PREFIX,
-    LATIN_SPELLINGS,
     SAINT_WORDS,
     SCHOOL_NAME_ALIASES,
     TYPE_ABBREVIATIONS,
