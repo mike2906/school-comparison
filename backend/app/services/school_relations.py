@@ -208,7 +208,7 @@ async def continues_to(db, school) -> Optional[dict[str, Any]]:
     from app.models import School
     from app.services.school_service import SchoolService
     from app.utils.i18n_resolver import resolve_name_i18n
-    from app.utils.website_data import attributes_for_publication
+    from app.utils.school_facts import publication_attributes
 
     source = Institution.from_row(school)
     if level_family(source.education_level) != "kindergarten" or not website_passed_site_checks(source):
@@ -225,6 +225,7 @@ async def continues_to(db, school) -> Optional[dict[str, Any]]:
                 School.education_level,
                 School.scrape_status,
                 School.attributes,
+                School.website_url,
             ).where(
                 School.id == target_id,
                 SchoolService._has_listable_location(source.city),
@@ -236,7 +237,7 @@ async def continues_to(db, school) -> Optional[dict[str, Any]]:
     return {
         "id": int(target.id),
         "resolved_name_i18n": resolve_name_i18n(
-            target.name_i18n, attributes_for_publication(target.attributes, target.scrape_status)
+            target.name_i18n, publication_attributes(target.attributes, target.scrape_status, target.website_url)
         ),
         "school_type": target.school_type,
         "education_level": target.education_level,
@@ -250,7 +251,7 @@ async def continued_from(db, school) -> list[dict[str, Any]]:
     from app.models import School
     from app.services.school_service import SchoolService
     from app.utils.i18n_resolver import resolve_name_i18n
-    from app.utils.website_data import attributes_for_publication
+    from app.utils.school_facts import publication_attributes
 
     target = Institution.from_row(school)
     if level_family(target.education_level) != "school" or not website_passed_site_checks(target):
@@ -273,6 +274,7 @@ async def continued_from(db, school) -> list[dict[str, Any]]:
                 School.education_level,
                 School.scrape_status,
                 School.attributes,
+                School.website_url,
             ).where(
                 School.id.in_(source_ids),
                 SchoolService._has_listable_location(target.city),
@@ -283,7 +285,7 @@ async def continued_from(db, school) -> list[dict[str, Any]]:
         {
             "id": int(row.id),
             "resolved_name_i18n": resolve_name_i18n(
-                row.name_i18n, attributes_for_publication(row.attributes, row.scrape_status)
+                row.name_i18n, publication_attributes(row.attributes, row.scrape_status, row.website_url)
             ),
             "school_type": row.school_type,
             "education_level": row.education_level,
@@ -374,7 +376,7 @@ async def same_place_by_school(db, *, country_code: str, city: Optional[str]) ->
     from app.services.school_service import SchoolService
     from app.utils.display_gating import UNVERIFIED_PIN_PRECISION
     from app.utils.i18n_resolver import resolve_name_i18n
-    from app.utils.website_data import attributes_for_publication
+    from app.utils.school_facts import publication_attributes
 
     precision = SchoolLocation.geocode_meta["precision"].as_string()
 
@@ -424,7 +426,7 @@ async def same_place_by_school(db, *, country_code: str, city: Optional[str]) ->
         int(row.id): {
             "id": int(row.id),
             "resolved_name_i18n": resolve_name_i18n(
-                row.name_i18n, attributes_for_publication(row.attributes, row.scrape_status)
+                row.name_i18n, publication_attributes(row.attributes, row.scrape_status, row.website_url)
             ),
             "school_type": row.school_type,
             "education_level": row.education_level,
@@ -438,6 +440,7 @@ async def same_place_by_school(db, *, country_code: str, city: Optional[str]) ->
                     School.education_level,
                     School.scrape_status,
                     School.attributes,
+                    School.website_url,
                 ).where(School.id.in_(ids))
             )
         ).all()

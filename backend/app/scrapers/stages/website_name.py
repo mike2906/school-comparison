@@ -1,0 +1,285 @@
+"""Website-name stage: the name a school's own website writes in Latin letters.
+
+Reads the home page (its title, site name, logo text, headings and opening text), asks one
+cheap call for the Latin name the site uses for this institution, and keeps it only when
+code finds it on the page and a distinctive word of it is in the site's address or matches
+the register name (``app.utils.website_name``). Stores ``attributes["website_name"]``; the
+English page shows it and search finds it. The default is a dry run that writes nothing.
+Not part of ``all``.
+"""
+
+from __future__ import annotations
+
+import datetime
+import logging
+import re
+from collections.abc import Awaitable, Callable, Sequence
+from typing import Any, Optional
+
+from bs4 import BeautifulSoup
+from pydantic import BaseModel, Field
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.ai.client import create_agent, extract_provider_cost_usd, get_model, get_model_costs
+from app.config import get_settings
+from app.models import School
+from app.models.pipeline_run import PipelineRun
+from app.scrapers.fee_pages import fee_http_client
+from app.scrapers.stages import common as stage_common
+from app.scrapers.stages.fees_agent import Spend, SpendCapReached
+from app.scrapers.stages.social_links import Fetch, _http_fetch
+from app.services.pipeline_runs import finalize_pipeline_run, start_pipeline_run
+from app.services.provider_costs import ProviderCostError, execute_billable_request, provider_cost_scope
+from app.utils.i18n_resolver import derive_english_name
+from app.utils.school_facts import SITE_ACCEPTED_STATUSES
+from app.utils.website_name import ATTRIBUTE_KEY, SCHEMA_VERSION, is_latin_name, matches_site_or_register
+
+logger = logging.getLogger(__name__)
+
+STAGE = "website-name"
+TIER = "cheap"
+DEFAULT_MAX_USD = 0.30
+# The opening text of the home page: the name is in the header, the title or the first lines.
+MAX_TEXT_CHARS = 4000
+OUTPUT_TOKENS = 200
+# State schools rarely write a Latin brand; their English name comes from the register.
+DEFAULT_TYPES = ("private", "international")
+
+PROMPT = """You get the home page of a school or kindergarten website (its title, site name, logo text,
+headings and opening text) and the institution's name in the Bulgarian register.
+Return the name the website uses for this institution written in Latin letters, exactly as the site
+writes it (keep its capitals and spelling), such as "UWEKIND", "Funky Monkey Kindergarten" or
+"Maple Bear Sofia".
+- Only a name the page itself writes in Latin letters. Never transliterate or translate a Cyrillic
+  name yourself: if the site writes the name only in Cyrillic, return null.
+- The institution's own name, not the company that runs it, a network or group of several
+  kindergartens or schools, a sister school, the web designer, or the site's template ("My Blog").
+- If the site is shared by a school and a kindergarten, give the name it uses for this institution
+  ("UWEKIND Kindergarten"); if it uses one brand for both, give the brand.
+- Leave out page words around the name: "Home", "Начало", taglines, slogans.
+- Return null when you are not sure."""
+
+
+class SiteName(BaseModel):
+    latin_name: Optional[str] = Field(description="The name in Latin letters as the site writes it, or null")
+
+
+Caller = Callable[[str, int], Awaitable[SiteName]]
+
+
+def page_summary(html: str) -> tuple[str, str]:
+    """(what the reader sees, all the page's text for the on-page check)."""
+    soup = BeautifulSoup(html, "html.parser")
+    parts = []
+    if soup.title and soup.title.get_text(strip=True):
+        parts.append(f"Title: {soup.title.get_text(' ', strip=True)}")
+    for prop in ("og:site_name", "og:title"):
+        tag = soup.find("meta", attrs={"property": prop})
+        if tag and str(tag.get("content") or "").strip():
+            parts.append(f"{prop}: {str(tag['content']).strip()}")
+    logos = []
+    for img in soup.find_all("img"):
+        alt = str(img.get("alt") or "").strip()
+        marks = " ".join([alt, str(img.get("src") or ""), " ".join(img.get("class") or [])]).casefold()
+        if alt and "logo" in marks and alt not in logos:
+            logos.append(alt)
+    if logos:
+        parts.append("Logo text: " + " | ".join(logos[:5]))
+    headings = [h.get_text(" ", strip=True) for h in soup.find_all(["h1", "h2"])][:6]
+    if headings := [h for h in headings if h]:
+        parts.append("Headings: " + " | ".join(headings))
+    for tag in soup(["script", "style", "noscript", "svg"]):
+        tag.decompose()
+    text = "\n".join(line.strip() for line in soup.get_text("\n").splitlines() if line.strip())
+    parts.append("Opening text:\n" + text[:MAX_TEXT_CHARS])
+    alts = " ".join(str(img.get("alt") or "") for img in soup.find_all("img"))
+    return "\n".join(parts), "\n".join(parts) + "\n" + text + "\n" + alts
+
+
+def _squash(text: str) -> str:
+    return " ".join(re.sub(r"[’`]", "'", text).casefold().split())
+
+
+def check_name(
+    name: Optional[str], page_text: str, website_url: Optional[str], register_names: list[str]
+) -> Optional[str]:
+    """Why ``name`` is not kept, or None when it is."""
+    if not name:
+        return "none on the page"
+    if not is_latin_name(name):
+        return "not a Latin name"
+    if _squash(name) not in _squash(page_text):
+        return "not on the page"
+    if not matches_site_or_register(name, website_url, register_names):
+        return "matches neither the site's address nor the register name"
+    return None
+
+
+def _register_names(school: School) -> list[str]:
+    bg = (school.name_i18n or {}).get("bg") or ""
+    return [bg, (school.name_i18n or {}).get("en") or "", derive_english_name(bg) or ""]
+
+
+async def read_school(school: School, fetch: Fetch, call: Caller) -> dict[str, Any]:
+    home = await fetch(school.website_url)
+    if home is None:
+        return {"read": False, "outcome": "not_read"}
+    final, html = home
+    summary, page_text = page_summary(html)
+    if len(page_text.strip()) < 20:
+        return {"read": False, "outcome": "not_read", "page": final}
+    register = (school.name_i18n or {}).get("bg") or (school.name_i18n or {}).get("en") or ""
+    answer = await call(
+        f"Register name: {register} ({school.school_type} {school.education_level})\n\n{summary}", school.id
+    )
+    name = (answer.latin_name or "").strip() or None
+    dropped = check_name(name, page_text, school.website_url, _register_names(school))
+    return {
+        "read": True,
+        "page": final,
+        "answer": name,
+        "name": None if dropped else name,
+        "dropped": dropped if name else None,
+        "outcome": "found" if not dropped else ("dropped" if name else "none"),
+    }
+
+
+def model_caller(spend: Spend) -> Caller:
+    async def call(message: str, school_id: int) -> SiteName:
+        in_price, out_price = get_model_costs(TIER)
+        estimate = (len(message) / 3 * in_price + OUTPUT_TOKENS * out_price) / 1_000_000
+        agent = create_agent(
+            TIER, PROMPT, SiteName, retries=1, model_settings={"temperature": 0, "max_tokens": OUTPUT_TOKENS}
+        )
+        with spend.hold(estimate):
+            result = await execute_billable_request(
+                lambda: agent.run(message), model=get_model(TIER), school_id=school_id, stage=STAGE, timeout_seconds=60
+            )
+        spend.spent_usd += extract_provider_cost_usd(result)
+        return result.output
+
+    return call
+
+
+def name_block(name: Optional[str], website_url: Optional[str], page: Optional[str]) -> dict[str, Any]:
+    return {
+        "_schema_version": SCHEMA_VERSION,
+        "read_at": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
+        "website_url": website_url,
+        "source_url": page,
+        "model": get_model(TIER),
+        "name": name,
+    }
+
+
+async def run_website_name(
+    db: AsyncSession,
+    *,
+    country: str = "bg",
+    city: Optional[str] = None,
+    school_ids: Sequence[int] = (),
+    school_types: Sequence[str] = DEFAULT_TYPES,
+    limit: Optional[int] = None,
+    max_usd: float = DEFAULT_MAX_USD,
+    apply: bool = False,
+    fetch: Optional[Fetch] = None,
+    call: Optional[Caller] = None,
+) -> dict[str, Any]:
+    """Run over schools with a website URL validation accepted (the given ids, or the given
+    school types); returns the report. A home page not read keeps the stored name; one read
+    with no name kept clears it."""
+    query = select(School.id).where(
+        School.country_code == country,
+        School.website_url.isnot(None),
+        School.scrape_status.in_(SITE_ACCEPTED_STATUSES),
+    )
+    if school_ids:
+        query = query.where(School.id.in_(list(school_ids)))
+    elif school_types:
+        query = query.where(School.school_type.in_(list(school_types)))
+    if city:
+        query = query.where(func.lower(School.city) == city.lower())
+    ids = list((await db.execute(query.order_by(School.id).limit(limit))).scalars().all())
+
+    spend = Spend(max_usd)
+    run = await start_pipeline_run(
+        db, country=country, city=city, cli_stage=STAGE, config={"provider_cost_cap_usd": max_usd, "apply": apply}
+    )
+    run_id = run.id
+    call = call or model_caller(spend)
+    results: list[dict[str, Any]] = []
+    error: Optional[str] = None
+
+    async def run_all(fetch: Fetch) -> None:
+        nonlocal error
+        for school_id in ids:
+            school = await db.get(School, school_id)
+            result: dict[str, Any] = {
+                "school_id": school_id,
+                "name_bg": (school.name_i18n or {}).get("bg"),
+                "website": school.website_url,
+            }
+            try:
+                result |= await read_school(school, fetch, call)
+            except (SpendCapReached, ProviderCostError) as exc:
+                error = str(exc)[:200]
+                break
+            except Exception as exc:  # one school's page must not stop the run; it keeps its name
+                logger.exception("website-name failed for school %s", school_id)
+                result |= {"read": False, "outcome": "error", "note": str(exc)[:200]}
+            if result["read"] and apply:
+                await db.refresh(school, attribute_names=["attributes"], with_for_update=True)
+                school.attributes = {
+                    **(school.attributes or {}),
+                    ATTRIBUTE_KEY: name_block(result["name"], school.website_url, result.get("page")),
+                }
+                await db.commit()
+                result["stored"] = True
+            results.append(result)
+
+    try:
+        with provider_cost_scope(
+            pipeline_run_id=run.id,
+            stage=STAGE,
+            cap_usd=max_usd,
+            request_reserve_usd=float(get_settings().provider_request_reserve_usd),
+            max_in_flight=1,
+        ):
+            if fetch is not None:
+                await run_all(fetch)
+            else:
+                from crawl4ai.utils import RobotsParser  # type: ignore
+
+                async with fee_http_client() as client:
+                    await run_all(_http_fetch(client, RobotsParser()))
+    except Exception as exc:
+        logger.exception("website-name run %s stopped", run_id)
+        if db.in_transaction():
+            await db.rollback()
+        error = f"run stopped: {str(exc)[:200]}"
+    failed = sum(r["outcome"] == "error" for r in results)
+    run = await db.get(PipelineRun, run_id, populate_existing=True)
+    await finalize_pipeline_run(
+        db,
+        run,
+        country=country,
+        city=city,
+        stage_summaries=[
+            stage_common.stage_summary(processed=len(results), succeeded=len(results) - failed, failed=failed)
+        ],
+        error_summary=error,
+    )
+    outcomes: dict[str, int] = {}
+    for result in results:
+        outcomes[result["outcome"]] = outcomes.get(result["outcome"], 0) + 1
+    return {
+        "apply": apply,
+        "pipeline_run_id": run_id,
+        "model": get_model(TIER),
+        "schools": len(results),
+        "outcomes": outcomes,
+        "spent_usd": round(max(spend.spent_usd, float(run.total_llm_cost_usd or 0)), 6),
+        "stopped": error,
+        "results": results,
+    }

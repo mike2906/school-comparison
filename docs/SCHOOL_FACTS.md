@@ -158,6 +158,31 @@ PATH=/home/mike2906/.local/bin:/usr/local/bin:/usr/bin:/bin
 Not covered: open days announced only on Facebook or Instagram (see `social-media/research.md`
 in the project files), and pages robots.txt blocks.
 
+## Website name (`website-name` stage) and brands in search
+
+Parents search for a private school by the brand it writes in Latin letters (UWEKIND, Busy
+School); our English name transliterated the register name ("Uvekind", "Bizi"), and the old
+pipeline's display name needs two pieces of evidence, so most brands were missing
+(2026-10-16). Two parts, separate from the facts read so that a name run never replaces
+stored facts:
+
+1. **Website name** (`app/scrapers/stages/website_name.py`, rules in
+   `app/utils/website_name.py`). The home page only (title, site name, logo text, headings,
+   opening text) and one `cheap`-tier call for the Latin name the site uses for this
+   institution, about $0.001 a school. Code keeps it only when it is in Latin letters, on
+   the page, and a distinctive word of it is in the site's address or matches the register
+   name the way search does (so "My Blog" or "Kidscool Site", a template's name, is
+   dropped). Stored as `attributes["website_name"]`; a home page not read keeps the stored
+   name, one read with no name kept clears it. Shown under the school-facts rules
+   (`shown_website_name`: no withholding marker, accepted website, same site) as the English
+   name when the old pipeline has no corroborated display name, and searched.
+   `uv run python -m app.scrapers.cli website-name [--school-id N] [--apply] --out report.json`
+   (private and international schools by default; dry run by default).
+2. **Web address in search.** Many brands are written on the site only in the logo picture,
+   so the address is their one Latin spelling (busy-school.com, questjunior.bg). Search
+   matches the address words of an accepted website, ranked with addresses below every name
+   match. No model, nothing shown.
+
 ## Retiring the website reading pipeline
 
 Mike asked (2026-10-13) what else the pipeline does before going agent-only. Agents should

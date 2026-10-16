@@ -14,9 +14,7 @@ from app.utils import school_search
 from app.utils.i18n_resolver import resolve_address_i18n, resolve_name_i18n
 from app.utils.school_attributes import build_filterable_attributes
 from app.utils.school_facts import publication_attributes
-from app.utils.website_data import (
-    attributes_for_publication,
-)
+from app.utils.website_name import address_name, shown_website_name
 
 SOFIA_MAP_BOUNDS = SOFIA_MUNICIPALITY_BOUNDS
 
@@ -359,6 +357,7 @@ class SchoolService:
                 School.name_i18n,
                 School.attributes,
                 School.scrape_status,
+                School.website_url,
                 SchoolLocation.address_i18n,
             )
             .outerjoin(SchoolLocation, SchoolLocation.school_id == School.id)
@@ -369,7 +368,7 @@ class SchoolService:
             query = query.where(city_clause)
 
         schools: dict[int, dict] = {}
-        for school_id, name_i18n, attributes, scrape_status, address_i18n in (
+        for school_id, name_i18n, attributes, scrape_status, website_url, address_i18n in (
             await self.db.execute(query)
         ).all():
             entry = schools.get(school_id)
@@ -379,13 +378,18 @@ class SchoolService:
                 names.extend(
                     resolve_name_i18n(
                         name_i18n,
-                        attributes_for_publication(attributes, scrape_status),
+                        publication_attributes(attributes, scrape_status, website_url),
                     ).values()
                 )
+                # The website's own Latin name, also when a corroborated display name wins.
+                if website_name := shown_website_name(attributes, scrape_status, website_url):
+                    names.append(website_name)
                 entry = schools[school_id] = {
                     "registry_name": name_i18n.get("bg", ""),
                     "names": names,
-                    "addresses": [],
+                    # A brand written only in its logo has its one Latin spelling in the web
+                    # address (busy-school.com); ranked with addresses, below any name match.
+                    "addresses": [address] if (address := address_name(website_url, scrape_status)) else [],
                 }
             entry["addresses"].extend((address_i18n or {}).values())
             entry["addresses"].extend(resolve_address_i18n(address_i18n).values())

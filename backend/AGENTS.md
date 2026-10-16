@@ -82,6 +82,9 @@ and an accepted website (`SITE_ACCEPTED_STATUSES`). The old pipeline's rows stil
 Social links (`attributes.social_links`, `social-links` stage) pass the same three checks
 through `app/utils/social_links.py` `shown_social_links` and reach the detail and compare
 responses as `social_links`.
+The website's own Latin name (`attributes.website_name`, `website-name` stage) passes the
+same checks through `app/utils/website_name.py` `shown_website_name` and reaches responses
+only as the English `resolved_name_i18n` (`docs/SCHOOL_FACTS.md` → Website name).
 
 `app/utils/display_gating.py` drops display fields, pricing rows, and summaries flagged by
 error-level issues / actionable spot-check discrepancies, plus pricing rows with no

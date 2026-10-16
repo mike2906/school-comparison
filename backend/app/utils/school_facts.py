@@ -19,6 +19,8 @@ from app.utils.website_data import (  # noqa: F401 (SITE_ACCEPTED_STATUSES is im
     attributes_for_publication,
     website_data_withheld_reasons,
 )
+from app.utils.website_name import PUBLISHED_KEY as WEBSITE_NAME_KEY
+from app.utils.website_name import shown_website_name
 
 SCHEMA_VERSION = 1
 ATTRIBUTE_KEY = "school_facts"
@@ -335,9 +337,12 @@ def shown_school_facts(attributes: Any, scrape_status: Any, website_url: Optiona
 
 def publication_attributes(attributes: Any, scrape_status: Any, website_url: Optional[str]) -> dict[str, Any]:
     """``attributes_for_publication``, plus the shown facts under ``PUBLISHED_KEY`` so the
-    display and filter projections can use their tags, languages and class size."""
+    display and filter projections can use their tags, languages and class size, and the
+    shown website name for the English name (``app.utils.i18n_resolver``)."""
     attrs = attributes_for_publication(attributes, scrape_status)
     facts = shown_school_facts(attributes, scrape_status, website_url)
     if facts:
         attrs[PUBLISHED_KEY] = facts
+    if website_name := shown_website_name(attributes, scrape_status, website_url):
+        attrs[WEBSITE_NAME_KEY] = website_name
     return attrs
