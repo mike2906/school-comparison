@@ -316,9 +316,12 @@ def create_agent(
         # Haiku 5.5 thinks by default; off keeps the forced tool call that returns the
         # structured answer (Anthropic refuses forced tool calls while thinking).
         model_settings.setdefault("anthropic_thinking", {"type": "disabled"})
-        # pydantic-ai's Anthropic default is 4,096 output tokens, below the 6,000 the fee and
-        # facts reads budget for; OpenRouter calls have no such default.
-        model_settings.setdefault("max_tokens", ANTHROPIC_MAX_OUTPUT_TOKENS)
+        # pydantic-ai's Anthropic default is 4,096 output tokens, too low for a fee read. A
+        # stage's own higher limit (the fee reader asks for 32,000) is lowered to ours: above
+        # it pydantic-ai streams the call, and a streamed answer is not priced.
+        model_settings["max_tokens"] = min(
+            model_settings.get("max_tokens", ANTHROPIC_MAX_OUTPUT_TOKENS), ANTHROPIC_MAX_OUTPUT_TOKENS
+        )
     else:
         model = get_openrouter_model(tier)
         model_settings.setdefault("openrouter_usage", {"include": True})

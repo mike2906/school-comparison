@@ -226,3 +226,17 @@ async def test_other_request_errors_stay_per_call_errors(monkeypatch, haiku_pric
     with pytest.raises(Exception) as caught:
         await agent.run("hello")
     assert not isinstance(caught.value, ProviderCreditsExhausted)
+
+
+def test_a_stage_output_limit_above_ours_is_lowered(monkeypatch, haiku_pricing):
+    captured = {}
+
+    class DummyAgent:
+        def __init__(self, **kwargs):
+            captured.update(kwargs)
+
+    monkeypatch.setattr(ai_client, "Agent", DummyAgent)
+    ai_client.create_agent("pricing", "system", Pick, model_settings={"max_tokens": 32_000})
+    assert captured["model_settings"]["max_tokens"] == ai_client.ANTHROPIC_MAX_OUTPUT_TOKENS
+    ai_client.create_agent("pricing", "system", Pick, model_settings={"max_tokens": 200})
+    assert captured["model_settings"]["max_tokens"] == 200
