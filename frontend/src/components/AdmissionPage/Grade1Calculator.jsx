@@ -12,7 +12,7 @@ import { DateField, MobileTotal, Section, YesNo } from './fields'
 import PointsList from './PointsList'
 import { savedListFilters, savedListUrl } from '../../admission/schoolVerdict'
 import { useCatchmentSchoolName } from '../../hooks/useCatchmentSchoolName'
-import SaveAnswers from './SaveAnswers'
+import SaveAnswers, { saveBoxId } from './SaveAnswers'
 import NextTierHint from './NextTierHint'
 
 // Answers about one school: never saved, since the list compares every school.
@@ -219,7 +219,7 @@ function Grade1Calculator({ selected, startYear, school, cutoffRows = [], isCurr
           <YesNo label={t('admissionCalc.g1.parentDeceased')} value={a.parentDeceased} onChange={v => set('parentDeceased', v)} />
           <YesNo label={t('admissionCalc.g1.fosterUnknownAdopted')} value={a.fosterUnknownAdopted} onChange={v => set('fosterUnknownAdopted', v)} />
         </Section>
-        <MobileTotal>
+        <MobileTotal saveId={saveBoxId('grade_1')}>
           {results.map((result, i) => (
             <span key={i} className="mr-4 inline-block">
               {results.length > 1 && `${t('admissionCalc.g1.addressN', { n: i + 1 })}: `}

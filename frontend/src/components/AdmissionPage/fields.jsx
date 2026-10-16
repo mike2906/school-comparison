@@ -121,11 +121,25 @@ export function NumberField({ label, hint, value, onChange, min, max, step = 'an
   )
 }
 
-/** On phones the result sits below the questions, so its headline follows the reader. */
-export function MobileTotal({ children }) {
+/**
+ * On phones the result sits below the questions, so its headline follows the reader. With
+ * `saveId` it also carries a button down to the save box, which is screens away under the
+ * questions and the breakdown.
+ */
+export function MobileTotal({ children, saveId = null }) {
+  const { t } = useTranslation()
   return (
-    <div className="sticky bottom-0 z-10 -mx-4 border-t border-neutral-200 bg-white/95 px-4 py-3 text-sm backdrop-blur lg:hidden" aria-hidden="true">
-      {children}
+    <div className="sticky bottom-0 z-10 -mx-4 flex items-center justify-between gap-3 border-t border-neutral-200 bg-white/95 px-4 py-3 text-sm backdrop-blur lg:hidden">
+      <div aria-hidden="true">{children}</div>
+      {saveId && (
+        <button
+          type="button"
+          onClick={() => document.getElementById(saveId)?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
+          className="shrink-0 rounded-lg border border-primary-700 px-3 py-1.5 font-medium text-primary-700"
+        >
+          {t('savedAdmission.jumpToSave')}
+        </button>
+      )}
     </div>
   )
 }

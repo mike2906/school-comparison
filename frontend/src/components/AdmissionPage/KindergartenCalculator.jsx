@@ -8,7 +8,7 @@ import { useSavedAdmission } from '../../hooks/useSavedAdmission'
 import { birthYearsFor } from '../../utils/ageSelection'
 import { Choice, DateField, Field, INPUT_CLASS, MobileTotal, Section, YesNo } from './fields'
 import PointsList from './PointsList'
-import SaveAnswers from './SaveAnswers'
+import SaveAnswers, { saveBoxId } from './SaveAnswers'
 import NextTierHint from './NextTierHint'
 import CutoffComparison from '../Admission/CutoffComparison'
 import { savedListFilters, savedListUrl } from '../../admission/schoolVerdict'
@@ -214,7 +214,7 @@ function KindergartenCalculator({ selected, startYear, kindergarten, districts, 
               <YesNo label={t('admissionCalc.kg.transfer')} value={a.transfer} onChange={v => set('transfer', v)} />
             </Section>
             {result && (
-              <MobileTotal>
+              <MobileTotal saveId={ageGroup ? saveBoxId('kindergarten') : null}>
                 {t('admissionCalc.kg.total')}: <strong className="tabular-nums">{formatRange(result.total)}</strong>
               </MobileTotal>
             )}
