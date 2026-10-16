@@ -19,7 +19,9 @@ you picked, and go to Mike only for the short list in "Still goes to Mike".
    `frontend/e2e/live/` in the same PR: one file per feature area, the school picked from
    the live API, texts from the i18n files. The flows run after every deploy and daily
    (`.github/workflows/live-flows.yml`), so after merging, check that the run following
-   your deploy is green.
+   your deploy is green. A change to a result a parent gets (a calculator answer, a fee
+   or cut-off for an age, a filter) also adds its parent to
+   `frontend/e2e/live/coverage.test.js`, which CI runs on every PR against live data.
 4. Run the checks for what you touched (`CONTRIBUTING.md` lists them). Quiet output:
    `uv run pytest -q 2>&1 | tail -3`.
 5. Read your own complete diff against the requirement and the invariants. For every check
@@ -41,6 +43,10 @@ you picked, and go to Mike only for the short list in "Still goes to Mike".
   what the API publishes (response fields, gates, allowlists), adds a migration, changes
   how data is extracted or published, changes CI workflows, gate thresholds or the
   accuracy reference set, or is hard to review in one sitting. When unsure, treat it as big.
+- **Parent-facing PRs** (step 3): the review also reads the change as a Sofia parent
+  would. Flag an answer option that makes no sense for the question ("Not sure" on
+  twins), a result that is empty or odd for an ordinary family, and wording only an
+  insider understands.
 - **After a substantial round of fixes** (several fixes, or any that change logic rather
   than wording), run the built-in review once more on the whole PR.
 - **Then stop.** Don't request another round when the last one only found more page
