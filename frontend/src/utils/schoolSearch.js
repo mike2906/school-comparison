@@ -53,6 +53,9 @@ export const SCHOOL_NAME_ALIASES = {
   'acs': 'американски колеж',
 }
 
+// Words for "saint" (Св./Свети/Света, St., Saint, Sveta); any one matches any other.
+export const SAINT_WORDS = ['sv', 'sveti', 'sveta', 'svetite', 'st', 'saint']
+
 /** Lowercase, drop "№"/"No." and punctuation, split digits from letters, drop ordinals. */
 export function normalizeSearchText(text) {
   return String(text || '')
@@ -71,6 +74,11 @@ export function transliterate(text) {
   return Array.from(text, ch => (Object.prototype.hasOwnProperty.call(TRANSLIT, ch) ? TRANSLIT[ch] : ch)).join('')
 }
 
+// Transliteration for matching: "-ия" reads "ia" as parents write it (Sofia, Maria).
+function latinKey(text) {
+  return transliterate(text).replace(/iya/g, 'ia')
+}
+
 const TYPE_LATIN = new Map(
   Object.entries(TYPE_ABBREVIATIONS).map(([key, stems]) => [transliterate(key), stems.map(transliterate)])
 )
@@ -80,12 +88,13 @@ const ALIASES_LATIN = Object.entries(SCHOOL_NAME_ALIASES).map(
 
 function prepareName(value) {
   const norm = normalizeSearchText(value)
-  const latin = transliterate(norm)
+  const latin = latinKey(norm)
   return { norm, latin, words: [...norm.split(' '), ...latin.split(' ')] }
 }
 
 function tokenIn(token, name) {
-  const latin = transliterate(token)
+  const latin = latinKey(token)
+  if (SAINT_WORDS.includes(latin) && name.words.some(word => SAINT_WORDS.includes(word))) return true
   if (/^\d+$/.test(token)) return new RegExp(`(^|\\D)${token}(?!\\d)`).test(name.norm)
   const stems = TYPE_LATIN.get(latin)
   if (stems) {

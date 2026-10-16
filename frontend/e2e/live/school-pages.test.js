@@ -1,5 +1,6 @@
 /**
- * Live flows for what a parent reads on a school: finding it by name, the facts read
+ * Live flows for what a parent reads on a school: finding it by name (Latin saint
+ * spellings too), the facts read
  * from its website (with open days), its Facebook and Instagram links, fees with their
  * payment plans, last year's fees left out once this year lists them again, fees for the
  * searched age first with the other ages folded away, comparing fees
@@ -41,6 +42,17 @@ describe('finding a school', () => {
     await page.getByRole('link', { name: 'EN', exact: true }).first().click()
     await page.waitForURL(url => url.pathname === `/en/schools/${school.id}`)
     await page.getByRole('heading', { level: 1, name: schoolName(school, 'en'), exact: true }).waitFor()
+  })
+
+  test('a Latin "Saint ..." spelling finds a school named „Света/Свети ...“', async () => {
+    // Parents write "Saint Sofia" or "Sveta Sofia" for „Света София“ (St. Sofia).
+    const school = (await allSchools()).find(s => /\bSt\. [A-Z]\w+/.test(schoolName(s, 'en')) && /Свет[аи] /.test(schoolName(s, 'bg')))
+    assert.ok(school, 'a school named after a saint')
+    const query = `Saint ${schoolName(school, 'en').match(/\bSt\. ([A-Z]\w+)/)[1]}`
+    await open('bg', '/search')
+    await page.getByPlaceholder(t('bg', 'nameSearch.placeholderShort')).filter({ visible: true }).first().fill(query)
+    await page.waitForURL(url => url.searchParams.get('q') === query)
+    await page.locator(`a[href="/schools/${school.id}"]`).first().waitFor()
   })
 
   test("a private kindergarten's name keeps its type, as the school writes it", async () => {

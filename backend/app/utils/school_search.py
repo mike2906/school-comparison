@@ -68,6 +68,11 @@ SCHOOL_NAME_ALIASES: dict[str, str] = {
     "acs": "американски колеж",  # 2213507, attributes.name_aliases "ACS"
 }
 
+# "Св." / "Свети" / "Света" in registry names, "St." in English names; parents also
+# type "Saint" or "Sveta". A query word in this set also matches a name holding any of
+# them as a whole word, so "Saint Sofia" and "Sveta Sofia" find „Света София“.
+SAINT_WORDS = ("sv", "sveti", "sveta", "svetite", "st", "saint")
+
 # Rank tiers (lower is better).
 RANK_ALIAS = 0
 RANK_NUMBER = 1
@@ -100,6 +105,11 @@ def transliterate(text: str) -> str:
     return "".join(_TRANSLIT.get(char, char) for char in text)
 
 
+def _latin_key(text: str) -> str:
+    """Transliteration for matching: "-ия" reads "ia" as parents write it (Sofia, Maria)."""
+    return transliterate(text).replace("iya", "ia")
+
+
 _TYPE_LATIN = {transliterate(key): stems for key, stems in TYPE_ABBREVIATIONS.items()}
 _ALIASES_LATIN = [
     (transliterate(alias).split(" "), normalize(target))
@@ -112,12 +122,14 @@ class _Name:
 
     def __init__(self, value: object):
         self.norm = normalize(value)
-        self.latin = transliterate(self.norm)
+        self.latin = _latin_key(self.norm)
         self.words = self.norm.split(" ") + self.latin.split(" ")
 
 
 def _token_in(token: str, name: _Name, *, prefix: bool = False) -> bool:
-    latin = transliterate(token)
+    latin = _latin_key(token)
+    if latin in SAINT_WORDS and any(word in SAINT_WORDS for word in name.words):
+        return True
     if token.isdigit():
         return re.search(rf"(?<!\d){token}(?!\d)", name.norm) is not None
     if latin in _TYPE_LATIN:
