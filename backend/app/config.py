@@ -19,6 +19,9 @@ class Settings(BaseSettings):
     openrouter_api_key: str = ""
     # Anthropic API key, used only by tiers set to an "anthropic/<model>" (app/ai/client.py)
     anthropic_api_key: str = ""
+    # Thinking on Anthropic tiers: "" = off; "low", "medium" or "high" = adaptive thinking at
+    # that effort, with structured answers through Anthropic's JSON-schema output.
+    anthropic_thinking_effort: str = ""
 
     # Model tier overrides (Phase 1 scraping pipeline)
     # Set this to override default model selection.

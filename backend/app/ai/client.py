@@ -8,6 +8,7 @@ This module provides:
 - Cost tracking helpers
 """
 import inspect
+from dataclasses import replace
 from math import isfinite
 from typing import Any, Literal
 
@@ -16,6 +17,7 @@ from pydantic_ai.exceptions import ModelHTTPError, UnexpectedModelBehavior
 from pydantic_ai.messages import ModelResponse
 from pydantic_ai.models.anthropic import AnthropicModel
 from pydantic_ai.models.openrouter import OpenRouterModel
+from pydantic_ai.profiles.anthropic import AnthropicModelProfile, anthropic_model_profile
 from pydantic_ai.providers.anthropic import AnthropicProvider
 from pydantic_ai.providers.openrouter import OpenRouterProvider
 
@@ -270,7 +272,31 @@ def get_anthropic_model(tier: ModelTier) -> PricedAnthropicModel:
     if not settings.anthropic_api_key:
         raise ValueError(f"tier {tier!r} is set to {get_model(tier)!r} but ANTHROPIC_API_KEY is empty")
     provider = AnthropicProvider(api_key=settings.anthropic_api_key)
-    return PricedAnthropicModel(_anthropic_model_name(tier), provider=provider)
+    name = _anthropic_model_name(tier)
+    return PricedAnthropicModel(name, provider=provider, profile=_anthropic_profile(name))
+
+
+ANTHROPIC_THINKING_EFFORTS = ("low", "medium", "high")
+
+
+def _anthropic_profile(model_name: str) -> AnthropicModelProfile:
+    """pydantic-ai 1.107's profile predates Haiku 5.5. Haiku 5.5 takes adaptive thinking,
+    an effort level and JSON-schema output, and rejects non-default sampling settings."""
+    base = anthropic_model_profile(model_name) or AnthropicModelProfile()
+    return replace(
+        AnthropicModelProfile.from_profile(base),
+        supports_json_schema_output=True,
+        anthropic_supports_adaptive_thinking=True,
+        anthropic_supports_effort=True,
+        anthropic_disallows_sampling_settings=True,
+    )
+
+
+def _anthropic_thinking_effort() -> str:
+    effort = get_settings().anthropic_thinking_effort.strip().lower()
+    if effort and effort not in ANTHROPIC_THINKING_EFFORTS:
+        raise ValueError(f"ANTHROPIC_THINKING_EFFORT must be empty or one of {ANTHROPIC_THINKING_EFFORTS}, not {effort!r}")
+    return effort
 
 
 def create_agent(
@@ -313,9 +339,14 @@ def create_agent(
         model = get_anthropic_model(tier)
         for setting in _ANTHROPIC_SAMPLING_SETTINGS:
             model_settings.pop(setting, None)
-        # Haiku 5.5 thinks by default; off keeps the forced tool call that returns the
-        # structured answer (Anthropic refuses forced tool calls while thinking).
-        model_settings.setdefault("anthropic_thinking", {"type": "disabled"})
+        # Haiku 5.5 thinks by default. Off (the default here) keeps the forced tool call that
+        # returns the structured answer; Anthropic refuses forced tool calls while thinking,
+        # so with thinking on pydantic-ai asks for the answer as JSON-schema output instead.
+        if effort := _anthropic_thinking_effort():
+            model_settings.setdefault("anthropic_thinking", {"type": "adaptive"})
+            model_settings.setdefault("anthropic_effort", effort)
+        else:
+            model_settings.setdefault("anthropic_thinking", {"type": "disabled"})
         # pydantic-ai's Anthropic default is 4,096 output tokens, too low for a fee read. A
         # stage's own higher limit (the fee reader asks for 32,000) is lowered to ours: above
         # it pydantic-ai streams the call, and a streamed answer is not priced.

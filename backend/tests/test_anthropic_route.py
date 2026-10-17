@@ -21,6 +21,8 @@ def _settings(**tiers):
     return SimpleNamespace(
         openrouter_api_key="or-key",
         anthropic_api_key="ant-key",
+        anthropic_thinking_effort="",
+        extraction_temperature=0,
         model_tier_cheap=tiers.get("cheap", ""),
         model_tier_capable=tiers.get("capable", ""),
         model_tier_pricing=tiers.get("pricing", ""),
@@ -240,3 +242,61 @@ def test_a_stage_output_limit_above_ours_is_lowered(monkeypatch, haiku_pricing):
     assert captured["model_settings"]["max_tokens"] == ai_client.ANTHROPIC_MAX_OUTPUT_TOKENS
     ai_client.create_agent("pricing", "system", Pick, model_settings={"max_tokens": 200})
     assert captured["model_settings"]["max_tokens"] == 200
+
+
+def _json_answer(text: str):
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={
+                "id": "msg_test_json",
+                "type": "message",
+                "role": "assistant",
+                "model": "claude-haiku-5-5",
+                "content": [{"type": "thinking", "thinking": "", "signature": "sig"}, {"type": "text", "text": text}],
+                "stop_reason": "end_turn",
+                "stop_sequence": None,
+                "usage": {"input_tokens": 1_000, "output_tokens": 300},
+            },
+        )
+
+    return handler
+
+
+def _thinking(monkeypatch, effort):
+    settings = _settings(pricing="anthropic/claude-haiku-5-5")
+    settings.anthropic_thinking_effort = effort
+    monkeypatch.setattr(ai_client, "get_settings", lambda: settings)
+
+
+async def test_thinking_on_asks_for_json_schema_output_instead_of_a_forced_tool(monkeypatch):
+    _thinking(monkeypatch, "low")
+    sent = _mock_anthropic(monkeypatch, _json_answer('{"url": "/fees"}'))
+    agent = ai_client.create_agent("pricing", "Pick the fee page.", Pick, model_settings={"temperature": 0})
+
+    result = await agent.run("links: /fees /about")
+
+    assert result.output == Pick(url="/fees")
+    body = sent[0]
+    assert body["thinking"] == {"type": "adaptive"}
+    assert body["output_config"]["effort"] == "low"
+    assert body["output_config"]["format"]["type"] == "json_schema"
+    assert "tool_choice" not in body and "temperature" not in body
+    assert result.response.provider_details["cost"] == pytest.approx(1_000 / 1e6 * 0.10 + 300 / 1e6 * 0.50)
+
+
+async def test_the_fee_reader_schema_goes_out_as_json_schema_output(monkeypatch):
+    from app.scrapers.stages import fees_agent
+
+    _thinking(monkeypatch, "medium")
+    monkeypatch.setattr(fees_agent, "get_settings", ai_client.get_settings)
+    sent = _mock_anthropic(monkeypatch, _json_answer(fees_agent.AgentFees().model_dump_json()))
+    await fees_agent.reader_agent().run("page text")
+    assert sent and sent[0]["output_config"]["format"]["type"] == "json_schema"
+    assert sent[0]["max_tokens"] == ai_client.ANTHROPIC_MAX_OUTPUT_TOKENS
+
+
+def test_an_unknown_thinking_effort_is_refused(monkeypatch):
+    _thinking(monkeypatch, "max")
+    with pytest.raises(ValueError, match="ANTHROPIC_THINKING_EFFORT"):
+        ai_client.create_agent("pricing", "system", Pick)

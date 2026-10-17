@@ -158,6 +158,10 @@ two: a run stops with a clear error instead of quietly changing model mid-run.
   when nothing else pays: purchased credits or auto-reload in the Console keep them
   going, so leave auto-reload off. (An empty OpenRouter balance still fails school by
   school.)
+- **Thinking:** off by default (`ANTHROPIC_THINKING_EFFORT` empty), so the structured answer
+  comes back through a forced tool call. `low`, `medium` or `high` turns on adaptive thinking
+  at that effort; the answer then comes back as JSON-schema output, since Anthropic refuses
+  forced tool calls while thinking. Thinking tokens bill as output.
 - **Output limit:** Anthropic calls send `max_tokens` 20,000. A fee page with 114 fees
   needed more than 8,192 from Haiku, and an answer cut off at the limit comes back as an
   empty result, so a cut-off answer now fails the call (the school counts as not read).
