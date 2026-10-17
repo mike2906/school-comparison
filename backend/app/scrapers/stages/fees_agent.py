@@ -29,7 +29,14 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.ai.client import MODEL_TIERS, create_agent, extract_provider_cost_usd, get_model, get_model_costs
+from app.ai.client import (
+    MODEL_TIERS,
+    create_agent,
+    extract_provider_cost_usd,
+    get_model,
+    get_model_costs,
+    get_provider,
+)
 from app.config import CRAWLER_USER_AGENT, get_settings
 from app.database import async_session_maker
 from app.models import Pricing, School
@@ -59,8 +66,8 @@ from app.scrapers.fee_pages import fee_http_client, page_key, pdf_text
 from app.scrapers.price_evidence import _PRICE_RE, PriceRow, _amount_key
 from app.scrapers.shared_site_check import registrable_domain
 from app.scrapers.stages import common as stage_common
+from app.scrapers.stages import fee_check, school_pool
 from app.scrapers.stages import fee_images as fee_images_module
-from app.scrapers.stages import school_pool
 from app.scrapers.stages.fee_images import fee_images
 from app.scrapers.validator import validate_school_data
 from app.services.pipeline_runs import finalize_pipeline_run, pipeline_run_heartbeat, start_pipeline_run
@@ -149,6 +156,7 @@ class PageRead:
 
 Finder = Callable[[School], Awaitable[list[PageRead]]]
 Reader = Callable[[School, list[PageRead], Sequence[Decimal]], Awaitable[list[AgentFee]]]
+Checker = Callable[[School, list[PageRead], list[AgentFee]], Awaitable[fee_check.FeeCheck]]
 
 
 # ---------------------------------------------------------------------------
@@ -421,7 +429,8 @@ def reader_message(school: School, pages: list[PageRead], missed: Sequence[Decim
     text = reader_text(pages)
     if missed:
         text += (
-            "\n\nAn earlier read of these pages left out amounts that the school's stored fees have and "
+            "\n\nAn earlier read of these pages left out amounts that the school's stored fees or a check of the "
+            "pages have and "
             f"the pages still show: {', '.join(format(amount, 'f') for amount in missed)}. Read the pages again "
             "in full and list every fee, including every row of each fee table. Some of these "
             "amounts may be from an older year or not be fees: the rules above still decide."
@@ -458,7 +467,9 @@ def request_reserves() -> dict[str, float]:
     the agent retries once on invalid output). Vision reads keep the default reserve."""
     reader = _worst_case_usd("pricing", MAX_READ_CHARS + len(READER_PROMPT) + 5_000, READ_MAX_OUTPUT_TOKENS, 2)
     picker = _worst_case_usd("cheap", MAX_PICK_INPUT_CHARS + len(PICK_PROMPT) + 5_000, PICK_MAX_OUTPUT_TOKENS, 2)
-    worst = {"pricing": reader, "cheap": picker}
+    # The read's fees follow the pages in the checker's input: a full page of fees is ~20K characters.
+    checker = fee_check.worst_case_usd(MAX_READ_CHARS + len(fee_check.CHECK_PROMPT) + 25_000)
+    worst = {"pricing": reader, "cheap": picker, fee_check.TIER: checker}
     reserves: dict[str, float] = {}
     for tier, usd in worst.items():
         model = get_model(tier)
@@ -469,6 +480,13 @@ def request_reserves() -> dict[str, float]:
             continue
         reserves[model] = max(usd, reserves.get(model, 0.0))  # one model on both tiers: the larger
     return reserves
+
+
+async def check_read(school: School, pages: list[PageRead], fees: list[AgentFee], spend: Spend) -> fee_check.FeeCheck:
+    """The fee check (stages/fee_check.py) over the pages the reader saw and the fees it gave."""
+    name = (school.name_i18n or {}).get("bg") or (school.name_i18n or {}).get("en") or ""
+    kind = f"{name} ({school.school_type} {school.education_level})"
+    return await fee_check.check_fees(school.id, kind, reader_text(pages), fees, spend, stage=STAGE)
 
 
 async def read_fees(school: School, pages: list[PageRead], spend: Spend, missed: Sequence[Decimal]) -> FeeRead:
@@ -1130,8 +1148,13 @@ async def run_school(
     read: Reader,
     apply: bool = False,
     gone: Optional[Callable[[str], Awaitable[bool]]] = None,
+    check: Optional[Checker] = None,
 ) -> dict[str, Any]:
-    """Find, read, check and (with ``apply``) store one school's fees. Returns its report."""
+    """Find, read, check and (with ``apply``) store one school's fees. Returns its report.
+
+    ``check`` (the fee check) reads the pages against the first read; the amounts it says
+    were missed join the second read's.
+    """
     report: dict[str, Any] = {"school_id": school.id, "outcome": None, "pages": [], "fees": [], "discounts": []}
     pages = await find(school)
     report["pages"] = [{"url": p.url, "chars": len(p.text), "prices": p.prices, "note": p.note} for p in pages]
@@ -1189,6 +1212,21 @@ async def run_school(
     proofs = await _stored_proofs(db, school)
     passing = [fee for fee in fees if (page := _page_for(fee, priced)) and _checked(fee, page, proofs).kept]
     missed = await _missed_amounts(db, school, priced, passing)
+    if check is not None:
+        try:
+            found = await check(school, priced, passing)
+        except (SpendCapReached, ProviderCostCapExceeded) as exc:  # the read is paid for: use it
+            report["check"] = {"error": str(exc)}
+        except ProviderCostError:  # the run is no longer running: write nothing
+            raise
+        except Exception as exc:  # a failed check leaves the read as it was
+            logger.warning("fees-agent check failed for school %s: %s", school.id, exc)
+            report["check"] = {"error": str(exc)[:200]}
+        else:
+            report["check"] = fee_check.check_report(found, passing)
+            extra = fee_check.amounts_to_reread(found, reader_text(priced), passing)
+            report["check"]["reread"] = [format(amount, "f") for amount in extra]
+            missed = sorted(set(missed) | set(extra))
     if missed:
         report["reread"] = {"missed": [format(amount, "f") for amount in missed], "added": 0}
         try:
@@ -1366,8 +1404,12 @@ async def run_fees_agent(
     lines_path: Optional[Path] = None,
     workers: int = 1,
     pages_dir: Optional[Path] = None,
+    check: bool = True,
 ) -> dict[str, Any]:
     """Run the agent over private and international schools with a website; returns the report.
+
+    ``check`` runs the fee check (stages/fee_check.py) after each school's first read; it is
+    off, with a warning, when its tier calls Anthropic and no ANTHROPIC_API_KEY is set.
 
     ``workers`` schools are read at a time, each with its own session; lines are still
     appended in id order, so ``after_id`` with the last line's id skips no school.
@@ -1398,12 +1440,19 @@ async def run_fees_agent(
     run_ids = [row.id for row in rows]
     sites = {row.id: row.website_url for row in rows}
 
+    settings = get_settings()
+    if check and get_provider(fee_check.TIER) == "anthropic" and not settings.anthropic_api_key:
+        logger.warning("fees-agent: no ANTHROPIC_API_KEY, so the fee check is off")
+        check = False
     spend = Spend(max_usd)
     run = await start_pipeline_run(
-        db, country=country, city=city, cli_stage=STAGE, config={"provider_cost_cap_usd": max_usd, "apply": apply}
+        db,
+        country=country,
+        city=city,
+        cli_stage=STAGE,
+        config={"provider_cost_cap_usd": max_usd, "apply": apply, "check": check},
     )
     run_id = run.id  # a rollback after a failed school expires ``run``
-    settings = get_settings()
     browser = BrowserConfig(headless=True, verbose=False, ignore_https_errors=True, user_agent=CRAWLER_USER_AGENT)
     run_config = CrawlerRunConfig(
         cache_mode=CacheMode.BYPASS,
@@ -1446,6 +1495,7 @@ async def run_fees_agent(
                         read=lambda s, pages, missed: read_fees(s, pages, spend, missed),
                         apply=apply,
                         gone=lambda url: page_gone(client, url),
+                        check=(lambda s, pages, fees: check_read(s, pages, fees, spend)) if check else None,
                     )
 
                 results, error = await school_pool.run_schools(
@@ -1478,6 +1528,7 @@ async def run_fees_agent(
     spent = max(spend.spent_usd, float(run.total_llm_cost_usd or 0))
     return {
         "apply": apply,
+        "check": check,
         "pipeline_run_id": run_id,
         "schools": len(results),
         "spent_usd": round(spent, 6),

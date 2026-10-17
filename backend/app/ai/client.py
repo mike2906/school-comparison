@@ -16,6 +16,7 @@ from pydantic_ai.exceptions import ModelHTTPError, UnexpectedModelBehavior
 from pydantic_ai.messages import ModelResponse
 from pydantic_ai.models.anthropic import AnthropicModel
 from pydantic_ai.models.openrouter import OpenRouterModel
+from pydantic_ai.profiles.anthropic import AnthropicModelProfile
 from pydantic_ai.providers.anthropic import AnthropicProvider
 from pydantic_ai.providers.openrouter import OpenRouterProvider
 
@@ -35,6 +36,10 @@ MODEL_TIERS = {
     # Reading a fee table off a picture. GPT-6 Luna's two readings of St George's tables
     # disagreed on digits; this model's agreed. A handful of pictures per city.
     "vision": "openrouter/openai/gpt-6.1-sol",
+    # Checking a fee read against its pages (stages/fee_check.py). In a trial on 15 keyed
+    # schools (2026-10-16) Sonnet flagged all 9 with real problems and 1 of 4 clean ones;
+    # Haiku missed 2 and flagged 3 clean ones.
+    "fee_check": "anthropic/claude-sonnet-5-5",
 }
 
 # Cost per 1M tokens (input/output), verified against OpenRouter 2026-07-13.
@@ -43,16 +48,16 @@ MODEL_COSTS = {
     "capable": (0.15, 0.60),
     "pricing": (0.10, 0.50),  # OpenRouter, 2026-10-09
     "vision": (2.00, 10.00),  # OpenRouter, 2026-10-09
+    "fee_check": (2.00, 10.00),  # Sonnet 5.5, if the tier is pointed at OpenRouter
 }
 
 # Anthropic's API reports tokens, not a cost, so a tier routed there needs its model's
 # price here: it is the cost every run cap and the provider ledger count. A model missing
 # from this table is refused. Prices per 1M tokens (input, output), claude-api reference
 # 2026-10-06; Haiku 5.5 costs (0.50, 2.50) for a whole request whose prompt is over 100K tokens.
-# Only Haiku 5.5 is listed: Sonnet 5.5 and Opus 5.5 reject the forced tool call that
-# structured answers use and can't turn thinking off, so they need NativeOutput first.
 ANTHROPIC_PRICES = {
     "claude-haiku-5-5": (0.10, 0.50),
+    "claude-sonnet-5-5": (2.00, 10.00),
 }
 ANTHROPIC_LONG_PROMPT_TOKENS = 100_000
 ANTHROPIC_LONG_PROMPT_PRICES = {
@@ -68,7 +73,23 @@ OPENROUTER_PREFIX = "openrouter/"
 # Settings Haiku 5.5 rejects with a 400 when set to anything but the default.
 _ANTHROPIC_SAMPLING_SETTINGS = ("temperature", "top_p", "top_k")
 
-ModelTier = Literal["cheap", "capable", "pricing", "vision"]
+# Models that can't turn thinking off and refuse the forced tool call that structured
+# answers use by default: they think and answer through structured outputs
+# (output_config.format). pydantic-ai 1.107 doesn't know them yet, so their profile is
+# given here; drop an entry once pydantic-ai's own profile covers the model.
+ANTHROPIC_THINKING_PROFILES = {
+    "claude-sonnet-5-5": AnthropicModelProfile(
+        supports_json_schema_output=True,
+        anthropic_supports_adaptive_thinking=True,
+        anthropic_supports_effort=True,
+        anthropic_supports_xhigh_effort=True,
+        anthropic_disallows_budget_thinking=True,
+        anthropic_disallows_sampling_settings=True,
+        anthropic_supports_forced_tool_choice=False,
+    ),
+}
+
+ModelTier = Literal["cheap", "capable", "pricing", "vision", "fee_check"]
 
 
 def get_model(tier: ModelTier) -> str:
@@ -270,7 +291,11 @@ def get_anthropic_model(tier: ModelTier) -> PricedAnthropicModel:
     if not settings.anthropic_api_key:
         raise ValueError(f"tier {tier!r} is set to {get_model(tier)!r} but ANTHROPIC_API_KEY is empty")
     provider = AnthropicProvider(api_key=settings.anthropic_api_key)
-    return PricedAnthropicModel(_anthropic_model_name(tier), provider=provider)
+    name = _anthropic_model_name(tier)
+    profile = provider.model_profile(name)
+    if name in ANTHROPIC_THINKING_PROFILES:
+        profile = AnthropicModelProfile.from_profile(profile).update(ANTHROPIC_THINKING_PROFILES[name])
+    return PricedAnthropicModel(name, provider=provider, profile=profile)
 
 
 def create_agent(
@@ -313,9 +338,13 @@ def create_agent(
         model = get_anthropic_model(tier)
         for setting in _ANTHROPIC_SAMPLING_SETTINGS:
             model_settings.pop(setting, None)
-        # Haiku 5.5 thinks by default; off keeps the forced tool call that returns the
-        # structured answer (Anthropic refuses forced tool calls while thinking).
-        model_settings.setdefault("anthropic_thinking", {"type": "disabled"})
+        if model.model_name in ANTHROPIC_THINKING_PROFILES:
+            # Thinking on makes pydantic-ai answer through structured outputs, not a tool call.
+            model_settings.setdefault("anthropic_thinking", {"type": "adaptive"})
+        else:
+            # Haiku 5.5 thinks by default; off keeps the forced tool call that returns the
+            # structured answer (Anthropic refuses forced tool calls while thinking).
+            model_settings.setdefault("anthropic_thinking", {"type": "disabled"})
         # pydantic-ai's Anthropic default is 4,096 output tokens, below the 6,000 the fee and
         # facts reads budget for; OpenRouter calls have no such default.
         model_settings.setdefault("max_tokens", ANTHROPIC_MAX_OUTPUT_TOKENS)

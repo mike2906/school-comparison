@@ -227,11 +227,12 @@ def test_a_model_shared_with_an_overridden_tier_keeps_the_default_reserve(monkey
     def _tiers(**overrides):
         monkeypatch.setattr(fees_agent, "get_model", lambda tier: overrides.get(tier, MODEL_TIERS[tier]))
 
-    assert set(fees_agent.request_reserves()) == {MODEL_TIERS["pricing"], MODEL_TIERS["cheap"]}
+    checker = MODEL_TIERS["fee_check"]
+    assert set(fees_agent.request_reserves()) == {MODEL_TIERS["pricing"], MODEL_TIERS["cheap"], checker}
     _tiers(pricing=MODEL_TIERS["cheap"])  # the reader on the picker's model
-    assert fees_agent.request_reserves() == {}
+    assert set(fees_agent.request_reserves()) == {checker}
     _tiers(vision=MODEL_TIERS["pricing"])  # pictures on the reader's model
-    assert set(fees_agent.request_reserves()) == {MODEL_TIERS["cheap"]}
+    assert set(fees_agent.request_reserves()) == {MODEL_TIERS["cheap"], checker}
 
 
 async def test_a_spend_cap_during_the_pick_still_stops_the_school(monkeypatch):

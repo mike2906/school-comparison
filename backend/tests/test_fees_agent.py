@@ -30,7 +30,7 @@ from app.scrapers.extraction.agent_fees import (
     check_fee,
     page_numbers,
 )
-from app.scrapers.stages import fees_agent
+from app.scrapers.stages import fee_check, fees_agent
 from app.scrapers.stages.fees_agent import PageRead, Spend, SpendCapReached
 from app.utils.display_gating import pricing_row_is_publishable
 from app.utils.website_data import website_data_is_publishable
@@ -1899,3 +1899,105 @@ def test_an_evidence_heading_naming_another_period_beats_the_title():
 def test_the_title_lends_no_period_where_it_may_not_head_the_fee(page, evidence, amount):
     read = fee(PriceCategory.TUITION, evidence, amount=amount, period=PricePeriod.YEARLY)
     assert check_fee(read, page).fee.period is None
+
+
+def _check(missed=(), wrong=()):
+    return fee_check.FeeCheck(
+        missed=[
+            fee_check.MissedFee(
+                category="food", amount=amount, amount_min=None, amount_max=None, currency="EUR",
+                period="monthly", who=None, evidence="Храна: 90 евро месечно", page=URL,
+            )
+            for amount in missed
+        ],
+        wrong=[fee_check.WrongFee(fee=index, problem="period", evidence="…") for index in wrong],
+    )  # fmt: skip
+
+
+def _checker(result=None, error=None):
+    seen = []
+
+    async def check(school, pages, fees):
+        seen.append(list(fees))
+        if error:
+            raise error
+        return result
+
+    check.seen = seen
+    return check
+
+
+async def test_a_fee_the_check_finds_is_read_again(db_session, pages, frozen_today):
+    school = await _school(db_session)  # no stored rows: only the check knows about the food fee
+    await db_session.commit()
+    food = fee(
+        PriceCategory.FOOD, "Храна: 90 евро месечно", amount=90, period=PricePeriod.MONTHLY, academic_year="2026/2027"
+    )
+    asked = []
+
+    async def read(school, pages, missed):
+        asked.append(list(missed))
+        return [*FEES_STAGE, food] if missed else FEES_STAGE
+
+    # 90 is printed and not read; 1234 is not on the page; 700 was read already.
+    check = _checker(_check(missed=[90, 1234, 700], wrong=[0, 7]))
+    report = await fees_agent.run_school(db_session, school, find=_find(pages), read=read, apply=True, check=check)
+    assert asked == [[], [Decimal("90")]]
+    assert check.seen == [FEES_STAGE]
+    assert report["check"]["reread"] == ["90"]
+    assert report["reread"] == {"missed": ["90"], "added": 1}
+    assert [w["category"] for w in report["check"]["wrong"]] == ["tuition", None]  # 7: no such fee
+    assert report["check"]["wrong"][0]["amounts"] == ["700"]
+    rows = await _rows(db_session, school)
+    assert sorted(float(r.amount) for r in rows) == [90.0, 200.0, 700.0]
+
+
+async def test_a_clean_check_reads_once(db_session, pages, frozen_today):
+    school = await _school(db_session)
+    await db_session.commit()
+    asked = []
+
+    async def read(school, pages, missed):
+        asked.append(list(missed))
+        return FEES_STAGE
+
+    report = await fees_agent.run_school(
+        db_session, school, find=_find(pages), read=read, check=_checker(_check())
+    )
+    assert asked == [[]] and "reread" not in report
+    assert report["check"] == {"missed": [], "wrong": [], "reread": []}
+
+
+@pytest.mark.parametrize("error", [SpendCapReached("cap"), RuntimeError("timed out")])
+async def test_a_failed_check_leaves_the_read_as_it_was(db_session, pages, frozen_today, error):
+    school = await _school(db_session)
+    await db_session.commit()
+    report = await fees_agent.run_school(
+        db_session, school, find=_find(pages), read=_read(FEES_STAGE), apply=True, check=_checker(error=error)
+    )
+    assert "error" in report["check"] and "reread" not in report
+    assert report["outcome"] == "written", report
+    assert sorted(float(r.amount) for r in await _rows(db_session, school)) == [200.0, 700.0]
+
+
+def test_the_check_names_each_read_fee_once():
+    message = fee_check.check_message("Meridian", "=== PAGE x\nтекст", FEES_STAGE)
+    assert message.endswith(
+        "=== FEES THE READ GAVE\n"
+        f"0. tuition | 700 EUR | period monthly | year 2026/2027 | page {URL}\n"
+        f"1. registration | 200 EUR | period one_time | year 2026/2027 | page {URL}"
+    )
+    assert fee_check.check_message("Meridian", "", []).endswith("(no fees)")
+
+
+def test_a_missed_range_rereads_both_ends():
+    check = fee_check.FeeCheck(
+        missed=[
+            fee_check.MissedFee(
+                category="activities", amount=None, amount_min=200, amount_max=550, currency="EUR",
+                period=None, who=None, evidence="от 200 до 550 евро", page=URL,
+            )
+        ],
+        wrong=[],
+    )  # fmt: skip
+    assert fee_check.amounts_to_reread(check, "Занимания: от 200 до 550 евро", []) == [Decimal("200"), Decimal("550")]

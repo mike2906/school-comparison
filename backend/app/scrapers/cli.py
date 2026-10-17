@@ -409,8 +409,11 @@ async def _shared_site_check_command(*, school_ids, city, country, dry_run, repo
     type=click.Path(file_okay=False, path_type=Path),
     help="Also write each school's found pages here (the fees eval's input)",
 )
+@click.option(
+    "--no-check", "no_check", is_flag=True, help="Skip the fee check after each read (stages/fee_check.py)"
+)
 def fees_agent_command(
-    school_ids, city, country, limit, max_usd, apply_changes, report_path, after_id, workers, pages_dir
+    school_ids, city, country, limit, max_usd, apply_changes, report_path, after_id, workers, pages_dir, no_check
 ):
     """Read private and international schools' fee pages with the fee agent (experimental, not in `all`)."""
     asyncio.run(
@@ -425,12 +428,13 @@ def fees_agent_command(
             after_id=after_id,
             workers=workers,
             pages_dir=pages_dir,
+            check=not no_check,
         )
     )
 
 
 async def _fees_agent_command(
-    *, school_ids, city, country, limit, max_usd, apply, report_path, after_id, workers, pages_dir
+    *, school_ids, city, country, limit, max_usd, apply, report_path, after_id, workers, pages_dir, check
 ):
     import json
 
@@ -455,6 +459,7 @@ async def _fees_agent_command(
             lines_path=lines_path,
             workers=workers,
             pages_dir=pages_dir,
+            check=check,
         )
     console.print(
         f"{'Applied' if apply else 'Dry run'}: {report['schools']} schools, ${report['spent_usd']:.4f} spent, "
