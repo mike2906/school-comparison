@@ -35,6 +35,7 @@ class TestModelTier:
             "capable": "openrouter/openai/gpt-4o-mini",
             "pricing": "openrouter/openai/gpt-6-luna",
             "vision": "openrouter/openai/gpt-6.1-sol",
+            "fee_check": "anthropic/claude-sonnet-5-5",
         }
 
     def test_model_costs_defined(self):
@@ -43,6 +44,7 @@ class TestModelTier:
             "capable": (0.15, 0.60),
             "pricing": (0.10, 0.50),
             "vision": (2.00, 10.00),
+            "fee_check": (2.00, 10.00),
         }
 
     def test_get_model_cheap(self):

@@ -25,6 +25,7 @@ def _settings(**tiers):
         model_tier_capable=tiers.get("capable", ""),
         model_tier_pricing=tiers.get("pricing", ""),
         model_tier_vision=tiers.get("vision", ""),
+        model_tier_fee_check=tiers.get("fee_check", ""),
     )
 
 
@@ -81,7 +82,7 @@ def test_a_bare_vendor_model_id_stays_on_openrouter(monkeypatch):
 
 
 def test_an_unpriced_anthropic_model_is_refused(monkeypatch):
-    monkeypatch.setattr(ai_client, "get_settings", lambda: _settings(pricing="anthropic/claude-sonnet-5-5"))
+    monkeypatch.setattr(ai_client, "get_settings", lambda: _settings(pricing="anthropic/claude-opus-5-5"))
     with pytest.raises(ValueError, match="no price"):
         ai_client.create_agent("pricing", "system", Pick)
     with pytest.raises(ValueError, match="no price"):
@@ -226,3 +227,41 @@ async def test_other_request_errors_stay_per_call_errors(monkeypatch, haiku_pric
     with pytest.raises(Exception) as caught:
         await agent.run("hello")
     assert not isinstance(caught.value, ProviderCreditsExhausted)
+
+
+async def test_a_thinking_model_answers_in_json_with_adaptive_thinking(monkeypatch):
+    """Sonnet 5.5 refuses a forced tool and disabled thinking: it gets structured output instead."""
+    monkeypatch.setattr(ai_client, "get_settings", lambda: _settings())
+
+    def answer(request):
+        return httpx.Response(
+            200,
+            json={
+                "id": "msg_test_s",
+                "type": "message",
+                "role": "assistant",
+                "model": "claude-sonnet-5-5",
+                "content": [
+                    {"type": "thinking", "thinking": "the fee page", "signature": "sig"},
+                    {"type": "text", "text": '{"url": "/fees"}'},
+                ],
+                "stop_reason": "end_turn",
+                "stop_sequence": None,
+                "usage": {"input_tokens": 10_000, "output_tokens": 1_000},
+            },
+        )
+
+    sent = _mock_anthropic(monkeypatch, answer)
+    agent = ai_client.create_agent("fee_check", "Pick the fee page.", Pick, model_settings={"anthropic_effort": "medium"})
+
+    result = await agent.run("links: /fees /about")
+
+    assert result.output == Pick(url="/fees")
+    body = sent[0]
+    assert body["model"] == "claude-sonnet-5-5"
+    assert body["thinking"] == {"type": "adaptive"}
+    assert "tool_choice" not in body and "temperature" not in body
+    assert body["output_config"]["format"]["type"] == "json_schema"
+    assert body["output_config"]["effort"] == "medium"
+    expected = 10_000 / 1e6 * 2.00 + 1_000 / 1e6 * 10.00
+    assert ai_client.extract_provider_cost_usd(result) == pytest.approx(expected)

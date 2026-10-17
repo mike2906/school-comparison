@@ -104,6 +104,20 @@ For one school, with its `website_url`:
    (220's 1540, 569's 155) depend on what the page line says, so the step-2 tests check every
    case on the recorded pages, and that the valid fees next to them survive (see Steps).
 
+5. **A second look (2026-10-17).** After the first read, a stronger model (`fee_check` tier,
+   Sonnet 5.5 on Anthropic's API, `stages/fee_check.py`) reads the same pages and the read's
+   passing fees, and lists fees the pages state that the read left out, and read fees that
+   look wrong. Its missed amounts that the pages print join the second read's list (with the
+   amounts of published rows the read left out), so whatever it adds still passes every check
+   above: the checker never writes a fee. Wrong-looking fees go to the run report only. A
+   failed or capped check leaves the read as it was. Why: parents' problems kept being found
+   by Mike on the site (Maple Bear's extras, ranges, periods); in a trial on 15 keyed schools
+   Sonnet flagged all 9 with real problems and 1 of 4 clean ones (Haiku was too noisy), but
+   found only ~40% of missed fees, so it steers a re-read rather than scoring fees. It runs
+   per school read, so its cost follows how often fee pages change, not a monthly sweep over
+   every school. `fees-agent --no-check` turns it off; with no `ANTHROPIC_API_KEY` it is off
+   with a warning.
+
 The publish boundary does not change: rows go through `pricing_row_is_publishable`, the
 validation stage's evidence check (`price_evidence.py`, which stays) and the
 implausible-tuition check, so a page that turns invalid still withholds its fees. For agent
