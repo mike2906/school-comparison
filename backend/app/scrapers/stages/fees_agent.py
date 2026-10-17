@@ -74,6 +74,7 @@ from app.services.pipeline_runs import finalize_pipeline_run, pipeline_run_heart
 from app.services.provider_costs import (
     ProviderCostCapExceeded,
     ProviderCostError,
+    ProviderCreditsExhausted,
     ProviderResponseUnattributed,
     execute_billable_request,
     provider_cost_scope,
@@ -1215,6 +1216,8 @@ async def run_school(
     if check is not None:
         try:
             found = await check(school, priced, passing)
+        except ProviderCreditsExhausted:  # the checker's account refuses: stop, or every school pays a read for it
+            raise
         except (SpendCapReached, ProviderCostCapExceeded) as exc:  # the read is paid for: use it
             report["check"] = {"error": str(exc)}
         except ProviderCostError:  # the run is no longer running: write nothing

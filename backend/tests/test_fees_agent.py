@@ -2001,3 +2001,13 @@ def test_a_missed_range_rereads_both_ends():
         wrong=[],
     )  # fmt: skip
     assert fee_check.amounts_to_reread(check, "Занимания: от 200 до 550 евро", []) == [Decimal("200"), Decimal("550")]
+
+
+async def test_a_refused_checker_account_stops_the_run(db_session, pages, frozen_today):
+    from app.services.provider_costs import ProviderCreditsExhausted
+
+    school = await _school(db_session)
+    await db_session.commit()
+    check = _checker(error=ProviderCreditsExhausted("credit balance is too low"))
+    with pytest.raises(ProviderCreditsExhausted):
+        await fees_agent.run_school(db_session, school, find=_find(pages), read=_read(FEES_STAGE), check=check)
