@@ -864,6 +864,34 @@ def site_city_command(school_ids, city, country, limit, apply_changes, report_pa
         report_path.write_text(json.dumps(report, ensure_ascii=False, indent=1), encoding="utf-8")
 
 
+@cli.command("site-grades")
+@click.option("--school-id", "school_ids", type=int, multiple=True, help="Run these schools (repeatable)")
+@click.option("--city", default="sofia", show_default=True, help="City")
+@click.option("--country", default="bg", show_default=True, help="Country code")
+@click.option("--apply", "apply_changes", is_flag=True, help="Write the bands (default is a dry run that writes nothing)")
+@click.option("--out", "report_path", type=click.Path(dir_okay=False, path_type=Path), help="Write the JSON report")
+def site_grades_command(school_ids, city, country, apply_changes, report_path):
+    """Add or hide schools' grade bands by what their own published site data says they teach."""
+    import json
+
+    from app.database import async_session_maker
+    from app.scrapers.stages import site_grades
+
+    async def _run():
+        async with async_session_maker() as db:
+            return await site_grades.run_site_grades(
+                db, country=country, city=city, school_ids=school_ids, apply=apply_changes
+            )
+
+    report = asyncio.run(_run())
+    console.print(f"Checked {report['checked']} schools; bands change on {len(report['changes'])}")
+    for change in report["changes"]:
+        console.print(f"  {change['school_id']} {change['name_bg']}: register {change['register']}, add {change['add']}, hide {change['hide']}")
+    if report_path is not None:
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        report_path.write_text(json.dumps(report, ensure_ascii=False, indent=1), encoding="utf-8")
+
+
 @cli.command("publish-diff")
 @click.option("--city", default="sofia", show_default=True, help="City")
 @click.option("--country", default="bg", show_default=True, help="Country code")
