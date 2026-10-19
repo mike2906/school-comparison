@@ -1,7 +1,7 @@
 // A price row's plan name and age group are the school website's own words, usually in
 // Bulgarian. Words we have our own label for (a fee category, a grade, a kindergarten
-// stage) are shown in the page language; on the English page other text is shown in the
-// fees agent's English when it gave one, else as written and marked with its language.
+// stage) are shown in the page language; other text in the page language's translation when
+// the API has one, else as written and marked with its language.
 import { gradeBandLabel, gradesInText, gradesNamedIn, parseGradeBand } from './gradeBand.js'
 
 const LANGUAGES = ['bg', 'en']
@@ -39,14 +39,15 @@ function gradesOnlyLabel(text, t) {
 }
 
 /**
- * A row's website words (`plan_name`, `age_group`) for the page: on the English page the
- * fees agent's English (`pricing_context.<field>_en`) when it gave one, else as written.
+ * A row's website words (`plan_name`, `age_group`) for the page: in the page language
+ * (`pricing_context.<field>_en` / `<field>_bg`, the fees agent's English or the API's stored
+ * translation) when there is one, else as written.
  */
 export function websiteWords(price, field, language) {
   const raw = price?.[field]?.trim()
   if (!raw) return null
-  const english = price?.pricing_context?.[`${field}_en`]?.trim()
-  return String(language || '').startsWith('en') && english ? english : raw
+  const lang = String(language || '').startsWith('en') ? 'en' : 'bg'
+  return price?.pricing_context?.[`${field}_${lang}`]?.trim() || raw
 }
 
 /**

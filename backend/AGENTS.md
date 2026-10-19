@@ -86,6 +86,13 @@ The website's own Latin name (`attributes.website_name`, `website-name` stage) p
 same checks through `app/utils/website_name.py` `shown_website_name` and reaches responses
 only as the English `resolved_name_i18n` (`docs/SCHOOL_FACTS.md` → Website name).
 
+Website and register text a page shows as written (fee names and age groups, 8th-grade class
+names, programme and facility items) gets the other language's words from the school's
+`attributes.text_translations`, filled by the `translate-texts` stage before every publish
+(`app/utils/text_translations.py`): fee rows carry `plan_name_en`/`plan_name_bg` (the fees
+agent's English first), cut-off rows `class_name_en`/`building_en`, and list items are
+translated in `attributes_i18n`. The block itself never ships.
+
 `app/utils/display_gating.py` drops display fields, pricing rows, and summaries flagged by
 error-level issues / actionable spot-check discrepancies, plus pricing rows with no
 `source_url` or confidence below `PRICING_CONFIDENCE_FLOOR`. When adding a response field, go

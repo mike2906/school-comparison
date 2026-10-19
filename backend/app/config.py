@@ -27,6 +27,7 @@ class Settings(BaseSettings):
     model_tier_pricing: str = ""  # Default: openai/gpt-6-luna (price extraction)
     model_tier_vision: str = ""  # Default: openai/gpt-6.1-sol (fee tables published as pictures)
     model_tier_fee_check: str = ""  # Default: anthropic/claude-sonnet-5-5 (checks a fee read against its pages)
+    model_tier_translation: str = ""  # Default: anthropic/claude-haiku-5-5 (translate-texts)
     # Each takes "openrouter/<vendor>/<model>" or "anthropic/<model>" (direct API, e.g.
     # MODEL_TIER_PRICING=anthropic/claude-haiku-5-5); set it per run to switch one job.
 

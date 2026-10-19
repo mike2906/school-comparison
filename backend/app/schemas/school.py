@@ -14,7 +14,7 @@ from pydantic import (
 
 from app.models.pricing import PriceSource
 from app.schemas.field_source import FieldSourceResponse
-from app.schemas.pricing import PricingResponse
+from app.schemas.pricing import PricingContextResponse, PricingResponse
 from app.utils.display_gating import (
     UNVERIFIED_PIN_PRECISION,
     blocked_pricing_row_ids,
@@ -31,6 +31,8 @@ from app.utils.location_tags import semantic_location_tags
 from app.utils.school_attributes import build_display_attributes, publishable_display_i18n
 from app.utils.school_facts import SITE_ACCEPTED_STATUSES, publication_attributes, shown_school_facts
 from app.utils.social_links import shown_social_links
+from app.utils.text_translations import stored as stored_translations
+from app.utils.text_translations import translate_cutoffs, translate_price_context
 from app.utils.website_data import (
     agent_fees_publishable,
     website_data_is_publishable,
@@ -204,6 +206,7 @@ class SchoolAttributesMixin(BaseModel):
         raw = {key: value for key, value in self.raw_admission_info.items() if key not in self.admission_exclude}
         public = SchoolAdmissionInfo.model_validate(raw)
         payload = public.model_dump(mode="json", exclude_none=True, exclude_defaults=True)
+        translate_cutoffs(payload, stored_translations(self.raw_attributes))
         return payload or None
 
 
@@ -243,11 +246,16 @@ class SchoolPricingMixin(SchoolAttributesMixin):
             and (not is_scraped_price(row) or (agent_ok if is_agent_price(row) else website_ok))
         ]
         blocked_ids |= implausible_tuition_row_ids(publishable)
+        translations = stored_translations(self.raw_attributes)
         published: list[PricingResponse] = []
         for raw_row in publishable:
             row = PricingResponse.model_validate(raw_row)
             if row.id in blocked_ids:
                 continue
+            context = row.pricing_context or PricingContextResponse()
+            translate_price_context(context, row, translations)
+            if row.pricing_context is None and context.model_dump(exclude_defaults=True):
+                row.pricing_context = context
             published.append(row)
 
         # Deterministic order: newest academic year first, undated rows last, then a

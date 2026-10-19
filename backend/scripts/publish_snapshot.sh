@@ -13,8 +13,9 @@
 #         '<write> && PUBLISH_LOCK_HELD=1 backend/scripts/publish_snapshot.sh'
 #
 # The lock is released only once the deploy run has finished (or after two hours).
-# Before uploading, it compares the school list with the live one and stops if many
-# schools would lose something they show now (cli publish-diff).
+# Before uploading, it translates new website and register text (cli translate-texts) and
+# compares the school list with the live one, stopping if many schools would lose something
+# they show now (cli publish-diff).
 # Prints the dump name, the run URL and its summary; exits non-zero if the run fails.
 # Check the live API afterwards (skills/common-tasks/SKILL.md, Publish data to production).
 set -euo pipefail
@@ -40,6 +41,12 @@ if [ -z "${PUBLISH_LOCK_HELD:-}" ]; then
 	flock -w 3600 9 || die "another publish held the lock for an hour"
 fi
 
+# Translate the website and register text the pages would show in the other language
+# (cli translate-texts: fee names, 8th-grade class names, list items). It calls the model only
+# for text no school has a translation for yet. A failure only leaves that text as written,
+# so the publish goes ahead.
+(cd "$repo_root/backend" && uv run python -m app.scrapers.cli translate-texts --apply) >&2 \
+	|| echo "publish: translate-texts failed; the new text shows as written" >&2
 # Stop a publish that would take away what many schools show now (publish_diff.py), and
 # say so in one rolling issue. When the live list can't be read (exit 75) the publish goes
 # ahead, since it may be the fix; any other failure, such as a launch DB the list can't be

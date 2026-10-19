@@ -102,7 +102,9 @@ backend/scripts/publish_snapshot.sh      # upload a dump, run deploy.yml with it
 It holds a machine-wide publish lock, so publishes from several threads (and the hourly
 cut-off publish, `docs/ADMISSION_CUTOFFS.md`) never overlap; it waits for the lock. The
 run loads the dump on the host (backup first, automatic restore on failure) and rebuilds
-the site; the API is down for about a minute. Before uploading it compares the school
+the site; the API is down for about a minute. Before uploading it translates new website and
+register text the pages would show in the other language (`cli translate-texts`, see
+`backend/app/utils/text_translations.py`), then compares the school
 list with the live one and stops if many schools would lose what they show now
 (`cli publish-diff`, run it alone to preview a publish). Run it in one background command, then
 check the run summary (`schools: <before> -> <after>`) and the live API against the launch DB
