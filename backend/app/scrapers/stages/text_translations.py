@@ -36,7 +36,7 @@ from app.scrapers.stages import common as stage_common
 from app.scrapers.stages.fees_agent import Spend, SpendCapReached
 from app.services.pipeline_runs import finalize_pipeline_run, start_pipeline_run
 from app.services.provider_costs import ProviderCostError, execute_billable_request, provider_cost_scope
-from app.utils.list_translations import is_untranslated
+from app.utils.list_translations import translate_items
 from app.utils.school_attributes import build_localized_attributes
 from app.utils.school_facts import publication_attributes
 from app.utils.text_translations import (
@@ -145,7 +145,7 @@ def shown_texts(school: School) -> dict[str, set[str]]:
             out[locale].update(
                 key(item)
                 for item in localized.get(field) or []
-                if needs_translation(item, locale) and is_untranslated(item, locale)
+                if needs_translation(item, locale) and translate_items([item], locale) == [item]
             )
     return out
 
