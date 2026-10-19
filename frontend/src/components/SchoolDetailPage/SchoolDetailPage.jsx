@@ -203,7 +203,8 @@ function SchoolDetailPage({ schoolId = null, embedded = false, onClose = null })
   const compareBarVisible = compareList.length > 0
 
   // Check if we have various data to display
-  const hasExamResults = nvoDetail != null
+  // Any NVO exam: the tabs open on one the school has, not only its own level's exam.
+  const hasExamResults = availableExamTypes.length > 0
   const hasPricing = school.school_type !== 'state' && pricing.length > 0
   const hasLanguageInfo = normalizeLanguageFocus(attributes.language_focus).length > 0 || (attributes.languages_of_instruction || []).length > 0
   const hasTeachingApproach = (attributes.teaching_approach || []).length > 0
@@ -668,11 +669,13 @@ function SchoolDetailPage({ schoolId = null, embedded = false, onClose = null })
                   </h2>
                   <div className="text-sm text-neutral-500">
                     {examGradeLabel(chartExamType, t)}
-                    {chartYears.length > 1 && (
-                      <> • {t('academicPerformance.basedOnYears', {
-                        start: chartYears[0],
-                        end: chartYears[chartYears.length - 1]
-                      })}</>
+                    {chartYears.length > 0 && (
+                      <> • {chartYears.length === 1
+                        ? t('academicPerformance.basedOnYear', { year: chartYears[0] })
+                        : t('academicPerformance.basedOnYears', {
+                          start: chartYears[0],
+                          end: chartYears[chartYears.length - 1]
+                        })}</>
                     )}
                   </div>
                 </div>
@@ -708,7 +711,7 @@ function SchoolDetailPage({ schoolId = null, embedded = false, onClose = null })
                 <Suspense fallback={<div className="h-[400px]" />}>
                   <NvoTimelineChart
                     examResults={school.exam_results}
-                    examType={activeExamType || getExamTypeForEducationLevel(school.education_level)}
+                    examType={chartExamType}
                     selectedSubjects={selectedSubjects}
                     examAverages={examAverages}
                   />

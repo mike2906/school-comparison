@@ -308,6 +308,7 @@
   "academicPerformance": {
     "title": "Академични резултати",
     "basedOnYears": "Данни от {{start}} до {{end}}",
+    "basedOnYear": "Данни от {{year}}",
     "yearAverage": "{{year}}-годишна средна",
     "trend": "Тенденция",
     "dataFrom": "Данни от",

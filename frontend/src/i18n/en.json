@@ -308,6 +308,7 @@
   "academicPerformance": {
     "title": "Academic Performance",
     "basedOnYears": "Data from {{start}} to {{end}}",
+    "basedOnYear": "Data from {{year}}",
     "yearAverage": "{{year}}-year average",
     "trend": "Trend",
     "dataFrom": "Data from",
