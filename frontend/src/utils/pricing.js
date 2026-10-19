@@ -244,8 +244,9 @@ export function toEur(amount, currency) {
 const HEADLINE_PERIODS = ['monthly', 'quarter', 'term', 'semester', 'yearly']
 
 // A total the school prints of several fees: "Общо" under tuition, activities and a
-// development fee (633), "Total Fee for New Students" (506). Not a total paid in instalments.
-const STATED_TOTAL_RE = /^\s*(?:общо|обща\s+(?:сума|такса)|total)(?![\p{L}])|(?<![\p{L}])total\s+(?:fees?|cost|annual|yearly)(?![\p{L}])/iu
+// development fee (633), "Total Fee for New Students" (506). Not a whole fee's own name
+// ("Обща такса за обучение", "Total annual fee"), nor a total paid in instalments.
+const STATED_TOTAL_RE = /^\s*(?:общо|обща\s+сума)(?![\p{L}])|^\s*total(?:\s+(?:fees?|cost))?\s*(?:$|[:(,–-]|for\b|per\b)/iu
 
 /** True for a row that is the school's own total of several fees. */
 export function isStatedTotal(row) {
@@ -259,8 +260,9 @@ export function isStatedTotal(row) {
 function tuitionRows(rows, ageGroup = null) {
   const whole = rows.filter(row => row.category === 'tuition' && !isInstallmentPlan(row) && !isClosedGroupFee(row))
   const forGroup = rowsForAgeGroup(whole, ageGroup)
+  // A total that names no age group covers every group.
   const totalled = new Set(forGroup.filter(isStatedTotal).map(row => row.age_group || ''))
-  return forGroup.filter(row => isStatedTotal(row) || !totalled.has(row.age_group || ''))
+  return forGroup.filter(row => isStatedTotal(row) || !(totalled.has('') || totalled.has(row.age_group || '')))
 }
 
 function rangeOf(rows, convert) {
