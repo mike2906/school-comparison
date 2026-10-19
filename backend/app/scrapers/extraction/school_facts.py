@@ -76,6 +76,9 @@ classes, teachers, rooms, computers, years since founding). Class size and times
 Rules:
 - Only what the pages state about this institution. If a page covers a sister school or kindergarten,
   leave its facts out unless they plainly apply to this one.
+- Only what the school itself states: a pupil's, parent's or graduate's quoted remark or review is not a fact.
+- A fact about one part of the school (one grade or intake, a profile, a course, a summer school or camp) says
+  which part, in its own words.
 - Each fact is one short line in English (fact_en) and Bulgarian (fact_bg), saying only what its quote says.
 - For every fact, copy into "quote" the page line it comes from, verbatim and in the page's language, and the
   URL from that page's PAGE line. When one line is not enough (a list or table, such as shift times by grade),
@@ -103,7 +106,8 @@ Rules:
     For a language the quote gives weekly hours for, add hours_per_week.
   - instruction_languages: the languages most lessons are taught in, when the quote says.
   - max_class_size: the most pupils in a class or group of the school year, as a number, only when the quote gives
-    it; never a summer school's, camp's or holiday programme's.
+    it for the whole school; never one grade's, intake's, profile's or course's, nor a summer school's, camp's or
+    holiday programme's.
   - admission: how children are admitted, only as the quote states it: any of entrance_exam, interview,
     trial_day, open_entry (the quote says there is no test or interview); admission_grade: the grade it is
     for (0 for kindergarten or preschool), when stated; for a range of grades (grades 2 to 4), admission_grade

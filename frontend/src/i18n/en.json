@@ -1142,8 +1142,11 @@
     },
     "score": "{{score}} points",
     "groupNoPoints": "Group {{group}}, no extra points",
+    "places_one": "{{count}} place",
+    "places_other": "{{count}} places",
     "currentRound": "later ranking for free places",
     "legend": {
+      "rounds": "Each ranking is separate: a later ranking fills only the places still free or freed up, among the children still looking for a place. So a group or class that filled up can later show \"Everyone admitted\" for a single free place, and a later cut-off can be higher or lower than an earlier one.",
       "current": "Later ranking for free places: a ranking after the main one, for the places still free. The official site no longer shows some main rankings, so the first ranking we have can be a later one.",
       "everyone": "Everyone admitted: every child who applied got a place, so there was no cut-off.",
       "noPlaces": "No free places: the ranking had no places for this group."
