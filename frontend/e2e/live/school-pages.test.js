@@ -80,7 +80,7 @@ describe('finding a school', () => {
 
   test('a typed name sorts by best match first, and clearing it brings the old sort back', async () => {
     // "Saint Sofia" once listed a seminary named after another saint first, sorted by distance.
-    const phrase = /(^|[\s„"])Свет[аи] София/i
+    const phrase = /(^|[\s„"])Св(\.|ет[аи])\s*София/i
     const best = new Set((await allSchools()).filter(s => phrase.test(schoolName(s, 'bg'))).map(s => s.id))
     assert.ok(best.size > 0, 'a school named „Света София“')
     await open('bg', '/search?sort=type')
@@ -89,8 +89,8 @@ describe('finding a school', () => {
     await box.fill('Saint Sofia')
     await page.waitForURL(url => url.searchParams.get('q') === 'Saint Sofia')
     await page.waitForFunction(() => document.querySelector('#results-sort')?.value === 'match')
-    const firstHref = await page.locator('a[href^="/schools/"]').first().getAttribute('href')
-    assert.ok(best.has(Number(firstHref.split('/').pop())), `first result ${firstHref} is a „Света София“`)
+    const first = await page.locator('article[data-school-id]').first().getAttribute('data-school-id')
+    assert.ok(best.has(Number(first)), `first result ${first} is a „Света София“`)
     await box.fill('')
     await page.waitForFunction(() => document.querySelector('#results-sort')?.value === 'type')
     assert.equal(await sort.inputValue(), 'type')

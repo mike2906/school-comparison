@@ -182,8 +182,8 @@ def _token_in(token: str, name: _Name, *, prefix: bool = False) -> bool:
 def _word_starts(token: str, row: tuple[str, str, str]) -> bool:
     norm, latin_word, loose_word = row
     latin = transliterate(token)
-    if latin in SAINT_WORDS:
-        return norm in SAINT_WORDS
+    if latin in SAINT_WORDS and norm in SAINT_WORDS:
+        return True
     if token.isdigit():
         return norm == token
     return norm.startswith(token) or latin_word.startswith(latin) or loose_word.startswith(_loose_forms(latin))

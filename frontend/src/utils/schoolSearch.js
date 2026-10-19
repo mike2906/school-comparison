@@ -147,9 +147,18 @@ function tokensMatch(tokens, names) {
 
 function wordStarts(token, [norm, latinWord, looseWord]) {
   const latin = transliterate(token)
-  if (SAINT_WORDS.includes(latin)) return SAINT_WORDS.includes(norm)
+  if (SAINT_WORDS.includes(latin) && SAINT_WORDS.includes(norm)) return true
   if (/^\d+$/.test(token)) return norm === token
   return norm.startsWith(token) || latinWord.startsWith(latin) || looseForms(latin).some(form => looseWord.startsWith(form))
+}
+
+// Like tokenIn, but plain words must start a word of the name.
+function tokenStartsWord(token, name) {
+  const latin = transliterate(token)
+  if (latin.length > 3 && SAINT_WORDS.includes(latin) && name.hasSaint) return true
+  if (/^\d+$/.test(token) || TYPE_LATIN.has(latin)) return tokenIn(token, name)
+  const starts = [token, latin, ...looseForms(latin)]
+  return name.words.some(word => starts.some(start => word.startsWith(start)))
 }
 
 // The query's words, in order, start consecutive words of the name.
@@ -171,7 +180,7 @@ function tokensRank(tokens, names) {
     let rank = MATCH_RANK.contains
     if (firstNumber && name.norm.match(/\d+/)?.[0] === firstNumber) rank = MATCH_RANK.number
     else if (isPhrase(tokens, name)) rank = MATCH_RANK.phrase
-    else if (tokens.every(token => name.rows.some(row => wordStarts(token, row)))) rank = MATCH_RANK.prefix
+    else if (tokens.every(token => tokenStartsWord(token, name))) rank = MATCH_RANK.prefix
     best = Math.min(best, rank)
   }
   return best

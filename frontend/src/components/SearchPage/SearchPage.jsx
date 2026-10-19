@@ -23,6 +23,7 @@ import { useHiddenBelow } from '../../hooks/useSavedAdmission'
 import { useSearchHits } from '../../hooks/useSearchHits'
 import { useReportSearchMiss } from '../../hooks/useReportSearchMiss'
 import SchoolCard from '../SchoolCard/SchoolCard'
+import { useQuerySort } from '../../hooks/useQuerySort'
 import SchoolCardSkeleton from '../SchoolCard/SchoolCardSkeleton'
 import SchoolDetailPanel from './SchoolDetailPanel'
 import AgePicker from './AgePicker'
@@ -146,14 +147,7 @@ function SearchPage() {
   const [sortBy, setSortBy] = useState(() => (
     searchParams.has('sort') || !userLocation ? initialView.sort : 'distance'
   ))
-  // While a name is typed the list shows the best match first, unless the parent picks
-  // another sort then; clearing the name goes back to sortBy.
-  const [querySort, setQuerySort] = useState(null)
-  const hasNameQuery = nameQuery.trim() !== ''
-  const activeSort = hasNameQuery ? (querySort ?? 'match') : sortBy
-  useEffect(() => {
-    if (!hasNameQuery) setQuerySort(null)
-  }, [hasNameQuery])
+  const { hasNameQuery, activeSort, setActiveSort, dropQuerySort } = useQuerySort(nameQuery, sortBy, setSortBy)
   const [searchInBounds, setSearchInBounds] = useState(false)
   const [mapBounds, setMapBounds] = useState(null)
   const [openLocationsId, setOpenLocationsId] = useState(null)
@@ -356,6 +350,7 @@ function SearchPage() {
     if (!userLocation && (sortBy === 'distance' || sortBy === 'drive')) {
       setSortBy('name')
     }
+    if (!userLocation) dropQuerySort(['distance', 'drive'])
     previousLocationRef.current = userLocation
   }, [userLocation, sortBy])
 
@@ -1031,6 +1026,7 @@ function SearchPage() {
 
   useEffect(() => {
     if (kindergartensOnly && sortBy === 'nvo') setSortBy('name')
+    if (kindergartensOnly) dropQuerySort(['nvo'])
   }, [kindergartensOnly, sortBy])
 
   const renderMapBoundsFilter = () => (
@@ -1275,7 +1271,7 @@ function SearchPage() {
                     <select
                       id="results-sort"
                       value={activeSort}
-                      onChange={(e) => (hasNameQuery ? setQuerySort : setSortBy)(e.target.value)}
+                      onChange={(e) => setActiveSort(e.target.value)}
                       className="h-11 md:h-auto max-w-[44vw] md:max-w-none border border-neutral-300 rounded-lg px-2 md:px-3 md:py-1.5 text-sm bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-shadow"
                     >
                       {sortOptions.map(option => (
