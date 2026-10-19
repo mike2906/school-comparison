@@ -306,7 +306,7 @@ class SchoolLocationBase(BaseModel):
     )
     is_primary: bool = True
     # The kg.sofia district of this building; the school's settlement and district are set
-    # by the school response (``SchoolPlaceMixin``) for the display address.
+    # by the school response (``SchoolAttributesMixin.place_location_addresses``).
     raw_district: Optional[str] = Field(default=None, validation_alias="district", exclude=True)
     _school_town: Optional[str] = PrivateAttr(default=None)
     _school_district: Optional[str] = PrivateAttr(default=None)

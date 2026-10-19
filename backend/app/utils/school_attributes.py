@@ -412,8 +412,11 @@ def build_localized_attributes(
             # Both locales' readings: the language list is a fact, the same on either page.
             + _normalize_focus_entries([
                 item
-                for other in DISPLAY_LOCALES
-                for item in _as_list(_localized_extracted(attrs, other).get("languages"))
+                for source in (
+                    _as_mapping(attrs.get("extracted")),
+                    *(_as_mapping(_as_mapping(attrs.get("extracted_i18n")).get(other)) for other in DISPLAY_LOCALES),
+                )
+                for item in _as_list(source.get("languages"))
             ])
             + _normalize_focus_entries(
                 [item for fact in _published_facts(attrs) for item in _as_list(fact.get("languages"))]

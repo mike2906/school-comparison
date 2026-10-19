@@ -432,8 +432,10 @@ _FOREIGN_NAMES = (
     ("Yan Amos Komenski", "Jan Amos Komenský"),
 )
 _FOREIGN_NAME_PATTERNS = tuple(
-    (re.compile(rf"(?<![\w-]){re.escape(translit)}(?![\w-])"), english) for translit, english in _FOREIGN_NAMES
+    (re.compile(rf"(?<![\w-]){re.escape(translit)}(?![\w-])", flags=re.IGNORECASE), english)
+    for translit, english in _FOREIGN_NAMES
 )
+_EN_NAME_PATTERNS = _EN_NAME_REPLACEMENTS + _FOREIGN_NAME_PATTERNS
 _PHRASE_PATTERNS = tuple(
     (re.compile(rf"(?<![\w-]){re.escape(bg)}(?![\w-])", flags=re.IGNORECASE), en)
     for bg, en in sorted(_BG_TYPE_PHRASES, key=lambda item: -len(item[0]))
@@ -491,7 +493,7 @@ def translate_bg_school_name(name: str | None, *, source: str | None = None) -> 
     if ordinal_match:
         # "82. Основно училище" → "82nd Primary School"; "101 Защо" stays "101 Zashto".
         text = f"{ordinal if starts_with_type else ordinal_match.group(0).strip()} {text}"
-    for pattern, replacement in _EN_NAME_REPLACEMENTS + _FOREIGN_NAME_PATTERNS:
+    for pattern, replacement in _EN_NAME_PATTERNS:
         text = pattern.sub(replacement, text)
     text = _english_quotes(text)
     text = re.sub(r"No\.\s+", "No. ", text)

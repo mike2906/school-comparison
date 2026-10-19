@@ -62,3 +62,20 @@ def test_school_response_places_each_location():
         "ул. Х 1, Горни Богров, район Сердика",
     ]
     assert "district" not in school.model_dump()["locations"][0]
+
+
+def test_a_street_named_after_a_place_does_not_name_the_place():
+    assert place_suffix_bg("ул. „С. Врачански“ 4", town="Бусманци", district="Искър") == "Бусманци, район Искър"
+    assert place_suffix_bg("ул. Сливница 3", town="Сливница", district=None) == "Сливница"
+    assert place_suffix_bg("бул. „Витоша“ 3", town=None, district="Витоша") == "район Витоша"
+
+
+def test_only_sofia_districts_are_shown():
+    assert place_suffix_bg("ул. Х 1", town=None, district="Кършияка") is None
+
+
+def test_a_stored_english_address_is_not_given_a_place_twice():
+    resolved = {"bg": "ул. Х 5", "en": "ul. H 5, Gorni Bogrov"}
+    assert with_place(resolved, town="Горни Богров", district="Кремиковци")["en"] == (
+        "ul. H 5, Gorni Bogrov, Kremikovtsi district"
+    )

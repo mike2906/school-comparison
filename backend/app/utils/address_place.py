@@ -19,10 +19,22 @@ SOFIA = "София"
 # София-град and София-област: the settlements whose names we show beside an address.
 SOFIA_REGION_CODES = frozenset({22, 23})
 
+# The capital's districts, as kg.sofia and the cut-off import name them. A location's
+# ``district`` column can hold another place's neighbourhood; only these are shown.
+SOFIA_DISTRICTS = frozenset({
+    "Банкя", "Витоша", "Връбница", "Възраждане", "Изгрев", "Илинден", "Искър",
+    "Красна поляна", "Красно село", "Кремиковци", "Лозенец", "Люлин", "Младост",
+    "Надежда", "Нови Искър", "Оборище", "Овча купел", "Панчарево", "Подуяне", "Сердика",
+    "Слатина", "Средец", "Студентски", "Триадица",
+})
+
 # An address that names a settlement or district itself ("с. Лозен", "гр. Банкя",
-# "район Витоша", "р-н Панчарево") already says where it is.
-_SETTLEMENT_RE = re.compile(r"(?<![\w-])(?:[сС]\.|[гГ][рР]\.|[сС]ело\s)\s*[А-Я]")
+# "район Витоша", "р-н Панчарево") already says where it is. A settlement opens the
+# address or follows a comma: "ул. „С. Врачански“" is a street.
+_SETTLEMENT_RE = re.compile(r"(?:^|,)\s*(?:[сС]\.|[гГ][рР]\.|[сС]ело\s)\s*[А-Я]")
 _DISTRICT_RE = re.compile(r"(?<![\w-])(?:район|р-н)(?![\w-])", flags=re.IGNORECASE)
+# "ул. Сливница 3", "бул. „Витоша“": the name is a street's, not the place's.
+_STREET_BEFORE_RE = re.compile(r"(?:ул|бул|пл|площад|улица|булевард)\.?\s*[„\"]?\s*$", flags=re.IGNORECASE)
 
 
 def school_town(attributes: Mapping[str, Any] | None) -> str | None:
@@ -41,7 +53,11 @@ def school_town(attributes: Mapping[str, Any] | None) -> str | None:
 
 
 def _names(address: str, name: str) -> bool:
-    return re.search(rf"(?<![\w]){re.escape(name)}(?![а-я])", address, flags=re.IGNORECASE) is not None
+    """Whether the address names this place itself (not a street called after it)."""
+    for match in re.finditer(rf"(?<![\w]){re.escape(name)}(?![а-я])", address, flags=re.IGNORECASE):
+        if not _STREET_BEFORE_RE.search(address[: match.start()]):
+            return True
+    return False
 
 
 def place_suffix_bg(address_bg: str | None, *, town: str | None, district: str | None) -> str | None:
@@ -53,7 +69,7 @@ def place_suffix_bg(address_bg: str | None, *, town: str | None, district: str |
         parts.append(town)
     district = " ".join(district.split()) if isinstance(district, str) else ""
     if (
-        district
+        district in SOFIA_DISTRICTS
         and district.casefold() != town.casefold()
         and not _DISTRICT_RE.search(address)
         and not _names(address, district)
@@ -73,5 +89,9 @@ def with_place(
     if out.get("bg"):
         out["bg"] = f"{out['bg']}, {suffix}"
     if out.get("en"):
-        out["en"] = f"{out['en']}, {english_address(suffix) or suffix}"
+        # A stored English address may already name a part the Bulgarian one leaves out.
+        parts = [english_address(part) or part for part in suffix.split(", ")]
+        missing = [part for part in parts if part.split(" district")[0].casefold() not in out["en"].casefold()]
+        if missing:
+            out["en"] = f"{out['en']}, {', '.join(missing)}"
     return out
