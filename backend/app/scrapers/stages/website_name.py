@@ -39,6 +39,7 @@ from app.utils.website_name import (
     SCHEMA_VERSION,
     host,
     is_latin_name,
+    is_web_address,
     matches_site_or_register,
     names_other_level,
 )
@@ -128,13 +129,27 @@ def check_name(
         return "none on the page"
     if not is_latin_name(name):
         return "not a Latin name"
-    if not re.search(rf"(?<!\w){re.escape(_squash(name))}(?!\w)", _squash(page_text)):
+    if is_web_address(name, website_url):
+        return "the web address, not a name"
+    if not _on_page(name, page_text):
         return "not on the page"
     if not matches_site_or_register(name, website_url, register_names):
         return "matches neither the site's address nor the register name"
     if shared_with_other_level and names_other_level(name, family):
         return "names the other level on a shared site"
     return None
+
+
+def _on_page(name: str, page_text: str) -> bool:
+    """The name is a whole phrase on the page, or written there as one word ("questjunior"
+    for Quest Junior: the reader adds the spaces a logo or handle leaves out), but not only
+    inside an e-mail or web address."""
+    text = _squash(page_text)
+    phrase = _squash(name)
+    if re.search(rf"(?<!\w){re.escape(phrase)}(?!\w)", text):
+        return True
+    joined = phrase.replace(" ", "")
+    return joined != phrase and bool(re.search(rf"(?<![\w@./]){re.escape(joined)}(?![\w@]|\.\w)", text))
 
 
 def _register_names(school: School) -> list[str]:

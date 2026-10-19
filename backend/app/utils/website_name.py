@@ -124,6 +124,34 @@ def matches_site_or_register(name: str, website_url: Optional[str], register_nam
     )
 
 
+# Common endings of a web address, besides the site's own (".com" in "izgrevou.com").
+_TLDS = frozenset({"com", "bg", "eu", "org", "net", "info", "biz", "edu", "academy", "school", "space"})
+# Second-level parts of an address ending (wonderhouse-bg.com.bg).
+_SECOND_LEVEL = frozenset({"com", "org", "net", "edu", "co"})
+
+
+def is_web_address(name: Any, website_url: Optional[str]) -> bool:
+    """A domain ("izgrevou.com", "Eduteh.EU") or the address's handle with a country or city
+    tag ("Wonderhouse-bg", "Lincolnsofia"): the reader took the address for the name. A
+    brand that is its address ("Kidsville" for kidsville.space) is still a name, and so is
+    an abbreviation with a dot ("St.George")."""
+    if not isinstance(name, str):
+        return False
+    name = name.strip()
+    site = host(website_url)
+    tlds = _TLDS | {site.rsplit(".", 1)[-1]}
+    if (match := re.fullmatch(r"[\w-]+((?:\.[a-z]{2,8})+)", name, flags=re.IGNORECASE)) and all(
+        part.casefold() in tlds for part in match.group(1).split(".")[1:]
+    ):
+        return True
+    labels = site.split(".")[:-1]
+    while len(labels) > 1 and labels[-1] in _SECOND_LEVEL:
+        labels.pop()
+    handle = re.sub(r"[^a-z0-9]", "", labels[-1]) if labels else ""
+    letters = re.sub(r"[^a-z0-9]", "", name.casefold())
+    return " " not in name and letters == handle and bool(re.search(r"(?:bg|sofia|eu)$", handle))
+
+
 _KINDERGARTEN_WORDS = frozenset({"kindergarten", "kindergartens", "nursery", "preschool", "kita", "daycare"})
 _SCHOOL_WORDS = frozenset({"school", "schools", "college", "lyceum", "lycee", "lycée", "gymnasium", "high"})
 
@@ -175,4 +203,4 @@ def shown_website_name(attributes: Any, scrape_status: Any, website_url: Optiona
     if not _site(website_url) or _site(block.get("website_url")) != _site(website_url):
         return None
     name = block.get("name")
-    return name.strip() if is_latin_name(name) else None
+    return name.strip() if is_latin_name(name) and not is_web_address(name, website_url) else None

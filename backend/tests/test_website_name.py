@@ -9,7 +9,13 @@ from app.models import School, SchoolLocation
 from app.scrapers.stages import website_name as stage
 from app.utils.i18n_resolver import resolve_name_i18n
 from app.utils.school_facts import publication_attributes
-from app.utils.website_name import address_name, is_latin_name, matches_site_or_register, shown_website_name
+from app.utils.website_name import (
+    address_name,
+    is_latin_name,
+    is_web_address,
+    matches_site_or_register,
+    shown_website_name,
+)
 
 HOME = "https://uwekind.com/"
 REGISTER = '"ЧАСТНО СРЕДНО УЧИЛИЩЕ УВЕКИНД" ООД'
@@ -270,3 +276,34 @@ def test_a_fragment_of_a_word_or_a_short_word_inside_the_address_is_not_enough()
 def test_a_register_english_name_stays_before_the_website_name():
     attrs = publication_attributes({"website_name": _block()}, "validated", HOME)
     assert resolve_name_i18n({"bg": REGISTER, "en": "Uwekind School"}, attrs)["en"] == "Uwekind School"
+
+
+@pytest.mark.parametrize(
+    ("name", "url", "expected"),
+    [
+        ("izgrevou.com", "https://izgrevou.com/", True),
+        ("Eduteh.EU", "https://eduteh.eu/", True),
+        ("Wonderhouse-bg", "https://www.wonderhouse-bg.com/", True),
+        ("Lincolnsofia", "https://www.lincolnsofia.com/", True),
+        ("Kidsville", "https://kidsville.space/", False),
+        ("Lincoln Sofia", "https://www.lincolnsofia.com/", False),
+        ("Little Steps", "https://littlesteps.bg/", False),
+        ("St.George", "https://stgeorgeschool.eu/", False),
+        ("Wonderhouse-bg", "https://wonderhouse-bg.com.bg/", True),
+    ],
+)
+def test_a_web_address_is_not_a_name(name, url, expected):
+    assert is_web_address(name, url) is expected
+
+
+def test_a_stored_web_address_is_not_shown():
+    assert shown_website_name({"website_name": _block(name="izgrevou.com")}, "validated", HOME) is None
+
+
+def test_a_name_written_as_one_word_on_the_page_is_on_the_page():
+    _, text, _ = stage.page_summary(_html(title="questjunior", body="Добре дошли"))
+    assert stage.check_name("Quest Junior", text, "https://questjunior.bg/", ["ЧДГ КУЕСТ"]) is None
+    assert stage.check_name("Quest Juniors", text, "https://questjunior.bg/", ["ЧДГ КУЕСТ"]) == "not on the page"
+    # Only in an e-mail address is not on the page.
+    _, mail, _ = stage.page_summary(_html(title="Начало", body="info@lincolnsofia.com"))
+    assert stage.check_name("Lincoln Sofia", mail, "https://lincolnsofia.com/", ["ЧСУ Линкълн"]) == "not on the page"

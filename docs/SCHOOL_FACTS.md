@@ -170,9 +170,12 @@ stored facts:
    `app/utils/website_name.py`). The home page only (title, site name, logo text, headings,
    opening text) and one `cheap`-tier call for the Latin name the site uses for this
    institution, about $0.001 a school. Code keeps it only when it is in Latin letters, on
-   the page, and a distinctive word of it is in the site's address or matches the register
-   name the way search does (so "My Blog" or "Kidscool Site", a template's name, is
-   dropped). Stored as `attributes["website_name"]`; a home page not read keeps the stored
+   the page (as a phrase, or as one word: "questjunior" for Quest Junior, but not only
+   inside an e-mail or web address), not the web address itself ("izgrevou.com",
+   "Wonderhouse-bg", "Lincolnsofia"; also checked when shown), and a distinctive word of it
+   is in the site's address or matches the register name the way search does (so "My
+   Blog" or "Kidscool Site", a template's name, is dropped). First dry run, 2026-10-19:
+   138 Sofia schools on Haiku, $0.04. Stored as `attributes["website_name"]`; a home page not read keeps the stored
    name, one read with no name kept clears it. Shown under the school-facts rules
    (`shown_website_name`: no withholding marker, accepted website, same site) as the English
    name when the old pipeline has no corroborated display name, and searched.
