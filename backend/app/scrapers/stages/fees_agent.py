@@ -483,6 +483,21 @@ def request_reserves() -> dict[str, float]:
     return reserves
 
 
+async def _mark_reported(db: AsyncSession, school_ids: list[int]) -> None:
+    """The checks of these schools reached GitHub: the next run may skip them while nothing changes.
+    Until then a school is checked, and its wrong fees reported, again."""
+    try:
+        for school_id in school_ids:
+            school = await db.get(School, school_id)
+            await _lock_attributes(db, school)
+            school.attributes = fee_check.mark_reported(school.attributes)
+        await db.commit()
+    except Exception:
+        logger.exception("fees-agent could not record the reported fee checks")
+        if db.in_transaction():
+            await db.rollback()
+
+
 async def check_read(school: School, pages: list[PageRead], fees: list[AgentFee], spend: Spend) -> fee_check.FeeCheck:
     """The fee check (stages/fee_check.py) over the pages the reader saw and the fees it gave."""
     name = (school.name_i18n or {}).get("bg") or (school.name_i18n or {}).get("en") or ""
@@ -1213,7 +1228,10 @@ async def run_school(
     proofs = await _stored_proofs(db, school)
     passing = [fee for fee in fees if (page := _page_for(fee, priced)) and _checked(fee, page, proofs).kept]
     missed = await _missed_amounts(db, school, priced, passing)
-    if check is not None:
+    digest = fee_check.pages_hash(reader_text(priced))
+    if check is not None and fee_check.already_checked(school.attributes, digest, passing):
+        report["check"] = {"skipped": "pages unchanged since the last check"}
+    elif check is not None:
         try:
             found = await check(school, priced, passing)
         except ProviderCreditsExhausted:  # the checker's account refuses: stop, or every school pays a read for it
@@ -1230,6 +1248,10 @@ async def run_school(
             extra = fee_check.amounts_to_reread(found, reader_text(priced), passing)
             report["check"]["reread"] = [format(amount, "f") for amount in extra]
             missed = sorted(set(missed) | set(extra))
+            if apply:  # saved now: the check is paid for whatever the rest of the read does
+                await _lock_attributes(db, school)
+                school.attributes = fee_check.checked(school.attributes, digest, passing, reported=not found.wrong)
+                await db.commit()
     if missed:
         report["reread"] = {"missed": [format(amount, "f") for amount in missed], "added": 0}
         try:
@@ -1529,9 +1551,14 @@ async def run_fees_agent(
     )
     # The ledger also holds a call billed just before the cap stopped the run.
     spent = max(spend.spent_usd, float(run.total_llm_cost_usd or 0))
+    # A dry run is a trial: only a run that writes reports its wrong-looking fees.
+    reported = fee_check.open_wrong_fees_issue(results, run_id=run_id) if apply and check else None
+    if reported and not reported.startswith("not reported"):
+        await _mark_reported(db, [r["school_id"] for r in results if (r.get("check") or {}).get("wrong")])
     return {
         "apply": apply,
         "check": check,
+        "wrong_fees": reported,
         "pipeline_run_id": run_id,
         "schools": len(results),
         "spent_usd": round(spent, 6),
