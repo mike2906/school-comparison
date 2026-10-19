@@ -834,6 +834,36 @@ def osm_check_command(city, country, report_path, issue_path):
         console.print(f"Report: {report_path}")
 
 
+@cli.command("publish-diff")
+@click.option("--city", default="sofia", show_default=True, help="City")
+@click.option("--country", default="bg", show_default=True, help="Country code")
+@click.option("--live-api", default="https://api.schooldecider.com", show_default=True, help="The live API to compare with")
+@click.option("--out", "report_path", type=click.Path(dir_okay=False, path_type=Path), help="Write the JSON report")
+@click.option("--issue-body", "issue_path", type=click.Path(dir_okay=False, path_type=Path), help="Write the GitHub issue text when stopping")
+def publish_diff_command(city, country, live_api, report_path, issue_path):
+    """Before a publish: exit 3 if many schools would lose something they show now (writes nothing)."""
+    import json
+
+    from app.database import async_session_maker
+    from app.scrapers.stages import publish_diff
+
+    async def _run():
+        live = await publish_diff.read_live_list(live_api, country=country, city=city)
+        async with async_session_maker() as db:
+            new = await publish_diff.build_new_list(db, country=country, city=city)
+        return publish_diff.diff_lists(live, new)
+
+    report = asyncio.run(_run())
+    console.print(publish_diff.summary(report), markup=False)
+    if report_path is not None:
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        report_path.write_text(json.dumps(report, ensure_ascii=False, indent=1), encoding="utf-8")
+    if report["stop"]:
+        if issue_path is not None:
+            issue_path.write_text(publish_diff.issue_body(report), encoding="utf-8")
+        raise SystemExit(3)
+
+
 @cli.command("promote-curated-identities")
 @click.option(
     "--school-id",

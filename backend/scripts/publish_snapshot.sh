@@ -13,6 +13,8 @@
 #         '<write> && PUBLISH_LOCK_HELD=1 backend/scripts/publish_snapshot.sh'
 #
 # The lock is released only once the deploy run has finished (or after two hours).
+# Before uploading, it compares the school list with the live one and stops if many
+# schools would lose something they show now (cli publish-diff).
 # Prints the dump name, the run URL and its summary; exits non-zero if the run fails.
 # Check the live API afterwards (skills/common-tasks/SKILL.md, Publish data to production).
 set -euo pipefail
@@ -36,6 +38,30 @@ exec 9>>"$lock"
 if [ -z "${PUBLISH_LOCK_HELD:-}" ]; then
 	echo "publish: waiting for the publish lock" >&2
 	flock -w 3600 9 || die "another publish held the lock for an hour"
+fi
+
+# Stop a publish that would take away what many schools show now (publish_diff.py), and
+# say so in one rolling issue. A check that cannot run (the live API is down) does not
+# stop it: the publish may be the fix. PUBLISH_ALLOW_DROPS=1 publishes an intended drop.
+if [ -z "${PUBLISH_ALLOW_DROPS:-}" ]; then
+	title="Publish stopped: schools would lose data"
+	body="$(dirname "$lock")/publish-diff-issue.md"
+	rm -f "$body"
+	rc=0
+	(cd "$repo_root/backend" && uv run python -m app.scrapers.cli publish-diff --issue-body "$body") || rc=$?
+	if [ "$rc" = 3 ]; then
+		# A failed lookup must not open a second issue; the next try raises it.
+		if number="$(gh issue list -R "$repo" --state open --search "in:title \"$title\"" --json number -q '.[0].number')"; then
+			if [ -n "$number" ]; then
+				gh issue edit "$number" -R "$repo" --body-file "$body" > /dev/null || true
+			else
+				gh issue create -R "$repo" --title "$title" --body-file "$body" > /dev/null || true
+			fi
+		fi
+		die "stopped: many schools would lose data they show now (GitHub issue \"$title\")"
+	elif [ "$rc" != 0 ]; then
+		echo "publish: the publish diff could not run (exit $rc); publishing without it" >&2
+	fi
 fi
 
 output="$("$repo_root/backend/scripts/backup_offsite.sh")" || die "backup_offsite.sh failed"

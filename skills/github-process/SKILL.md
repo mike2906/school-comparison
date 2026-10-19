@@ -101,6 +101,10 @@ While the site has no users, agents may change the launch DB and publish without
   it on 2026-10-14) runs these steps itself and reports only through its log and a GitHub
   issue when it stops. Agents publishing by hand use `publish_snapshot.sh`, which shares
   its lock.
+- `publish_snapshot.sh` stops when many schools would lose something they show now (fees,
+  pins, results...) and raises the issue "Publish stopped: schools would lose data". Publish
+  the drop with `PUBLISH_ALLOW_DROPS=1` only when you made it on purpose and can say why;
+  otherwise it is a diff you cannot explain: find what wiped the data, or ask Mike.
 - Provider spend stays under $0.50 a run unless Mike agreed a bigger run.
 
 ## Commit / PR conventions
