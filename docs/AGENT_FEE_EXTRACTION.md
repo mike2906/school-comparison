@@ -120,13 +120,14 @@ For one school, with its `website_url`:
    found only ~40% of missed fees, so it steers a re-read rather than scoring fees.
    `fees-agent --no-check` turns it off; with no `ANTHROPIC_API_KEY` it is off with a warning.
    - **Cost.** A first dry run (4 schools, 2026-10-19) cost about $0.047 a check, ten times the
-     read. So a school is checked only when the pages it read differ from the last check's
-     (`attributes.fee_check.pages_hash`, stored by a run with `--apply`): its cost follows how
-     often fee pages change, not how many schools a run reads.
+     read. So a run with `--apply` records what each check saw (`attributes.fee_check`: the
+     pages' hash and the fees read), and a school is checked again only when its pages change,
+     the read gives a fee the last check did not see, or the last check's wrong fees did not
+     reach GitHub: its cost follows how often fee pages change, not how many schools a run reads.
    - **Wrong fees reach a person.** A run with `--apply` lists every wrong-looking fee in one
      GitHub issue, "Fee check: fees that look wrong" (a comment when it is already open), with
-     the gh CLI like the PC's other jobs. A school is not flagged again until its pages change,
-     so the issue is the record.
+     the gh CLI like the PC's other jobs. Once reported, a school is not flagged again until
+     its pages or fees change, so the issue is the record.
 
 The publish boundary does not change: rows go through `pricing_row_is_publishable`, the
 validation stage's evidence check (`price_evidence.py`, which stays) and the

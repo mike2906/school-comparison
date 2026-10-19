@@ -2062,6 +2062,27 @@ async def test_a_school_whose_pages_have_not_changed_is_not_checked_again(db_ses
     changed = [pages[0], dataclasses.replace(pages[1], text=pages[1].text + "\nТранспорт: 60 евро месечно")]
     await fees_agent.run_school(db_session, school, find=_find(changed), read=_read(FEES_STAGE), check=check)
     assert len(check.seen) == 3
+    # Same pages, but the reader gives a fee the last check did not see: checked.
+    food = fee(PriceCategory.FOOD, "Храна: 90 евро месечно", amount=90, period=PricePeriod.MONTHLY)
+    await fees_agent.run_school(db_session, school, find=_find(pages), read=_read([*FEES_STAGE, food]), check=check)
+    assert len(check.seen) == 4
+    # Fewer fees than were checked: nothing new to check.
+    await fees_agent.run_school(db_session, school, find=_find(pages), read=_read(FEES_STAGE[:1]), check=check)
+    assert len(check.seen) == 4
+
+
+async def test_wrong_fees_are_checked_again_until_they_reach_github(db_session, pages, frozen_today):
+    school = await _school(db_session)
+    await db_session.commit()
+    check = _checker(_check(wrong=[0]))
+    for _ in range(2):  # not reported yet: checked, and reported, again
+        await fees_agent.run_school(db_session, school, find=_find(pages), read=_read(FEES_STAGE), apply=True, check=check)
+    assert len(check.seen) == 2 and school.attributes["fee_check"]["reported"] is False
+    await fees_agent._mark_reported(db_session, [school.id])
+    report = await fees_agent.run_school(
+        db_session, school, find=_find(pages), read=_read(FEES_STAGE), apply=True, check=check
+    )
+    assert report["check"] == {"skipped": "pages unchanged since the last check"} and len(check.seen) == 2
 
 
 def test_wrong_fees_go_to_one_github_issue(monkeypatch):

@@ -187,18 +187,41 @@ def pages_hash(pages_text: str) -> str:
     return hashlib.sha256(pages_text.encode()).hexdigest()
 
 
-def already_checked(attributes: Optional[dict], digest: str) -> bool:
-    """True when the last check read these same pages: checking them again would find the same.
+def fee_signature(fee: AgentFee) -> str:
+    amounts = "/".join(format(amount, "f") for amount in fee_amounts(fee))
+    period = fee.period.value if fee.period else ""
+    return f"{fee.category.value}|{amounts}|{fee.currency}|{period}|{fee.age_group or ''}|{fee.plan_name or ''}"
+
+
+def already_checked(attributes: Optional[dict], digest: str, fees: list[AgentFee]) -> bool:
+    """True when the last check read these same pages and every fee this read gives, and its
+    findings reached GitHub: checking again would find the same.
 
     The check costs about ten times the read, and most schools' fee pages change once a year.
+    A fee the last check did not see (the reader varies from run to run) is checked.
     """
-    return ((attributes or {}).get(ATTRIBUTE) or {}).get("pages_hash") == digest
+    block = (attributes or {}).get(ATTRIBUTE) or {}
+    return (
+        block.get("pages_hash") == digest
+        and block.get("reported", True)
+        and {fee_signature(fee) for fee in fees} <= set(block.get("fees") or [])
+    )
 
 
-def checked(attributes: Optional[dict], digest: str) -> dict[str, Any]:
-    """``attributes`` with this check's pages recorded."""
-    block = {"pages_hash": digest, "checked_on": datetime.date.today().isoformat()}
+def checked(attributes: Optional[dict], digest: str, fees: list[AgentFee], *, reported: bool) -> dict[str, Any]:
+    """``attributes`` with this check recorded; ``reported`` is False while its wrong fees wait for GitHub."""
+    block = {
+        "pages_hash": digest,
+        "fees": sorted({fee_signature(fee) for fee in fees}),
+        "checked_on": datetime.date.today().isoformat(),
+        "reported": reported,
+    }
     return {**(attributes or {}), ATTRIBUTE: block}
+
+
+def mark_reported(attributes: Optional[dict]) -> dict[str, Any]:
+    block = (attributes or {}).get(ATTRIBUTE)
+    return {**(attributes or {}), ATTRIBUTE: {**block, "reported": True}} if block else dict(attributes or {})
 
 
 def wrong_fees_body(results: list[dict[str, Any]]) -> Optional[str]:
