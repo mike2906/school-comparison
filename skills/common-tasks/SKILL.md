@@ -115,11 +115,10 @@ publishing. A publish whose diff you cannot explain goes to Mike.
 
 ## Searches that found nothing
 
-`GET https://api.schooldecider.com/search-misses` lists name searches that found no school
-on at least two of the last 30 days, most searched first. Use it to add the names parents
-type (a spelling, a nickname, a brand) to search or to the school's names. The counts live
-only in the production database (schema `telemetry`, kept across publishes); what is kept
-and why is in `backend/app/services/search_misses.py`.
+The search page counts name searches that found no school (text and daily count only, kept
+90 days) in the production database's `telemetry` schema, which publishes keep. Nothing
+reads them back over the API yet: a typed name can be personal, so how to read them is
+Mike's call. `backend/app/services/search_misses.py` says what is kept and why.
 
 ## Data-quality scoreboard
 ```bash

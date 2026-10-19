@@ -50,4 +50,15 @@ async def test_the_endpoint_never_fails_the_page(client):
     assert (await client.post("/search-misses", json={"q": "tatkovagradina"})).status_code == 204
     assert (await client.post("/search-misses", json={"q": "a@b.c"})).status_code == 204
     assert (await client.post("/search-misses", json={"q": "x" * 300})).status_code == 422
-    assert (await client.get("/search-misses")).json() == []
+    # Nothing is read back over the API.
+    assert (await client.get("/search-misses")).status_code == 405
+
+
+@pytest.mark.asyncio
+async def test_rows_older_than_the_keep_window_go(db_session):
+    await search_misses.record_miss(db_session, "old miss", today=DAY - datetime.timedelta(days=100))
+    await search_misses.record_miss(db_session, "old miss", today=DAY - datetime.timedelta(days=99))
+    await search_misses.record_miss(db_session, "new miss", today=DAY)
+    assert await search_misses.list_misses(db_session, days=200, min_days=1, today=DAY) == [
+        {"query": "new miss", "searches": 1, "days": 1}
+    ]

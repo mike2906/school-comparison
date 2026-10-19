@@ -25,9 +25,3 @@ async def record_search_miss(body: SearchMiss, db: AsyncSession = Depends(get_db
         # Counting is best effort: a parent's page never waits on it or sees it fail.
         logger.warning("Could not count a search miss", exc_info=True)
     return Response(status_code=204)
-
-
-@router.get("")
-async def list_search_misses(db: AsyncSession = Depends(get_db)):
-    """Searches that found nothing on at least two of the last 30 days."""
-    return await search_misses.list_misses(db)
