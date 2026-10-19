@@ -128,13 +128,35 @@ def check_name(
         return "none on the page"
     if not is_latin_name(name):
         return "not a Latin name"
-    if not re.search(rf"(?<!\w){re.escape(_squash(name))}(?!\w)", _squash(page_text)):
+    if is_web_address(name, website_url):
+        return "the web address, not a name"
+    if not _on_page(name, page_text):
         return "not on the page"
     if not matches_site_or_register(name, website_url, register_names):
         return "matches neither the site's address nor the register name"
     if shared_with_other_level and names_other_level(name, family):
         return "names the other level on a shared site"
     return None
+
+
+def _on_page(name: str, page_text: str) -> bool:
+    """The name is a whole phrase on the page, or written there as one word ("questjunior"
+    for Quest Junior: the reader adds the spaces a logo or handle leaves out)."""
+    text = _squash(page_text)
+    phrases = {_squash(name), _squash(name).replace(" ", "")}
+    return any(re.search(rf"(?<!\w){re.escape(phrase)}(?!\w)", text) for phrase in phrases if phrase)
+
+
+def is_web_address(name: str, website_url: Optional[str]) -> bool:
+    """A domain ("izgrevou.com", "Eduteh.EU") or the address's handle with a country or city
+    tag ("Wonderhouse-bg", "Lincolnsofia"): the reader took the address for the name. A
+    brand that is its address ("Kidsville" for kidsville.space) is still a name."""
+    if re.fullmatch(r"[\w-]+(?:\.[a-z]{2,6})+", name.strip(), flags=re.IGNORECASE):
+        return True
+    letters = re.sub(r"[^a-z0-9]", "", name.casefold())
+    labels = host(website_url).split(".")[:-1]
+    handle = re.sub(r"[^a-z0-9]", "", labels[-1]) if labels else ""
+    return " " not in name.strip() and letters == handle and bool(re.search(r"(?:bg|sofia|eu)$", handle))
 
 
 def _register_names(school: School) -> list[str]:
