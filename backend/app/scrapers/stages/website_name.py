@@ -39,6 +39,7 @@ from app.utils.website_name import (
     SCHEMA_VERSION,
     host,
     is_latin_name,
+    is_web_address,
     matches_site_or_register,
     names_other_level,
 )
@@ -141,22 +142,14 @@ def check_name(
 
 def _on_page(name: str, page_text: str) -> bool:
     """The name is a whole phrase on the page, or written there as one word ("questjunior"
-    for Quest Junior: the reader adds the spaces a logo or handle leaves out)."""
+    for Quest Junior: the reader adds the spaces a logo or handle leaves out), but not only
+    inside an e-mail or web address."""
     text = _squash(page_text)
-    phrases = {_squash(name), _squash(name).replace(" ", "")}
-    return any(re.search(rf"(?<!\w){re.escape(phrase)}(?!\w)", text) for phrase in phrases if phrase)
-
-
-def is_web_address(name: str, website_url: Optional[str]) -> bool:
-    """A domain ("izgrevou.com", "Eduteh.EU") or the address's handle with a country or city
-    tag ("Wonderhouse-bg", "Lincolnsofia"): the reader took the address for the name. A
-    brand that is its address ("Kidsville" for kidsville.space) is still a name."""
-    if re.fullmatch(r"[\w-]+(?:\.[a-z]{2,6})+", name.strip(), flags=re.IGNORECASE):
+    phrase = _squash(name)
+    if re.search(rf"(?<!\w){re.escape(phrase)}(?!\w)", text):
         return True
-    letters = re.sub(r"[^a-z0-9]", "", name.casefold())
-    labels = host(website_url).split(".")[:-1]
-    handle = re.sub(r"[^a-z0-9]", "", labels[-1]) if labels else ""
-    return " " not in name.strip() and letters == handle and bool(re.search(r"(?:bg|sofia|eu)$", handle))
+    joined = phrase.replace(" ", "")
+    return joined != phrase and bool(re.search(rf"(?<![\w@./]){re.escape(joined)}(?![\w@]|\.\w)", text))
 
 
 def _register_names(school: School) -> list[str]:
