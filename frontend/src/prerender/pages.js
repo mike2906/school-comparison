@@ -97,7 +97,8 @@ function tuitionLine(school, t) {
   if (!tuition || tuition.currency !== 'EUR' || !tuition.period || tuition.yearStatus === 'dated_other') return ''
   const [min, max] = [tuition.min, tuition.max].map((value) => Math.round(value))
   const period = t(`pricing.per.${tuition.period}`)
-  return min === max ? t('seo.tuitionOne', { min, period }) : t('seo.tuitionRange', { min, max, period })
+  const [one, range] = tuition.total ? ['seo.totalOne', 'seo.totalRange'] : ['seo.tuitionOne', 'seo.tuitionRange']
+  return min === max ? t(one, { min, period }) : t(range, { min, max, period })
 }
 
 /**

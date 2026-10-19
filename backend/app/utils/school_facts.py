@@ -264,7 +264,8 @@ def _class_size(value: Any) -> Optional[int]:
 
 
 # A summer school, camp or holiday programme: its group size is not the school year's (541).
-_SEASONAL_RE = re.compile(r"лят(?:н|о)|лагер|ваканц|summer|camp|holiday", re.IGNORECASE)
+# Whole words for English: "campus" is not a camp.
+_SEASONAL_RE = re.compile(r"лят(?:н|о)|лагер|ваканц|\bsummer\b|\bcamps?\b|\bholidays?\b", re.IGNORECASE)
 
 
 def _seasonal(fact: Mapping[str, Any]) -> bool:

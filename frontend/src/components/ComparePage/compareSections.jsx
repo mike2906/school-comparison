@@ -151,7 +151,7 @@ export function buildCompareSections({
                 </div>
                 <div className="text-xs text-neutral-500">
                   {[
-                    t('pricing.tuition'),
+                    t(pricingRange.total ? 'pricing.totalFees' : 'pricing.tuition'),
                     pricingRange.academicYear,
                     pricingRange.yearStatus === YEAR_STATUS.DATED_OTHER ? t('pricing.notCurrentYear') : null,
                     pricingRange.yearStatus === YEAR_STATUS.NEXT ? t('pricing.nextYear') : null,

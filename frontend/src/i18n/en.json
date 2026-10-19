@@ -763,7 +763,9 @@
     "nvoBulgarian": "Bulgarian {{value}}",
     "nvoMath": "maths {{value}}",
     "tuitionOne": "Tuition: €{{min}} per {{period}}",
-    "tuitionRange": "Tuition: €{{min}}–€{{max}} per {{period}}"
+    "tuitionRange": "Tuition: €{{min}}–€{{max}} per {{period}}",
+    "totalOne": "Total fees: €{{min}} per {{period}}",
+    "totalRange": "Total fees: €{{min}}–€{{max}} per {{period}}"
   },
   "dzi": {
     "title": "Matura exam results (DZI, 12th grade)",

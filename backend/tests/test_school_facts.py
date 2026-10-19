@@ -710,6 +710,7 @@ def test_at_a_glance_lists_upcoming_open_days_only():
         ({"quote": "Лятна академия: групи до 18 деца"}, None),  # 541: a summer school's group size
         ({"text_i18n": {"bg": "Лагер до 18 деца.", "en": "Camp groups of up to 18."}}, None),
         ({"source_url": "https://www.school.example/summer-school"}, None),
+        ({"source_url": "https://www.school.example/campus", "quote": "Up to 18 pupils on our campus"}, 18),
     ],
 )
 def test_a_summer_programmes_class_size_is_not_the_schools(overrides, shown):
