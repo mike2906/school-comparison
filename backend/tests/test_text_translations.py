@@ -172,3 +172,25 @@ async def test_the_api_shows_the_translations_on_each_page(seeded_db, seeded_cli
 
     listed = next(row for row in (await seeded_client.get("/schools")).json() if row["id"] == school.id)
     assert listed["admission_info"]["cutoff_summary"][0]["class_name_en"] == ANSWERS[CLASS_NAME]
+
+
+@pytest.mark.asyncio
+async def test_a_mismatched_batch_is_asked_again_and_a_failed_language_does_not_stop_the_other(db_session):
+    school = await _priced_school(db_session)
+
+    async def call(texts, locale):
+        if locale == "en":
+            raise stage.BatchMismatch("ids shifted")
+        return [ANSWERS.get(text) for text in texts]
+
+    report = await stage.run_text_translations(db_session, school_ids=[school.id], call=call, apply=True)
+    assert report["translated"] == {"en": 0, "bg": 1} and report["stopped"] is None
+    assert stored(school.attributes)["en"] == {}  # nothing stored, so asked again next run
+
+    async def broken(texts, locale):
+        raise RuntimeError("provider down")
+
+    report = await stage.run_text_translations(db_session, school_ids=[school.id], call=broken, apply=True)
+    assert "en: run stopped: provider down" in report["stopped"]
+    # What was stored before stays.
+    assert stored(school.attributes)["bg"] == {ENGLISH_PLAN: "Целодневна програма"}

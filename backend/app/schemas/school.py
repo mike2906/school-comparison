@@ -180,6 +180,11 @@ class SchoolAttributesMixin(BaseModel):
             self.public_attributes_input, getattr(self, "school_type", None)
         )
 
+    @cached_property
+    def text_translations(self) -> dict[str, dict[str, Optional[str]]]:
+        # The translate-texts stage's translations, shared by the fee and cut-off projections.
+        return stored_translations(self.raw_attributes)
+
     @computed_field(return_type=SchoolDisplayAttributes)
     @property
     def attributes(self) -> SchoolDisplayAttributes:
@@ -206,7 +211,7 @@ class SchoolAttributesMixin(BaseModel):
         raw = {key: value for key, value in self.raw_admission_info.items() if key not in self.admission_exclude}
         public = SchoolAdmissionInfo.model_validate(raw)
         payload = public.model_dump(mode="json", exclude_none=True, exclude_defaults=True)
-        translate_cutoffs(payload, stored_translations(self.raw_attributes))
+        translate_cutoffs(payload, self.text_translations)
         return payload or None
 
 
@@ -246,7 +251,7 @@ class SchoolPricingMixin(SchoolAttributesMixin):
             and (not is_scraped_price(row) or (agent_ok if is_agent_price(row) else website_ok))
         ]
         blocked_ids |= implausible_tuition_row_ids(publishable)
-        translations = stored_translations(self.raw_attributes)
+        translations = self.text_translations
         published: list[PricingResponse] = []
         for raw_row in publishable:
             row = PricingResponse.model_validate(raw_row)

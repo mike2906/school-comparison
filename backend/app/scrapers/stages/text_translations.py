@@ -95,6 +95,10 @@ class Translations(BaseModel):
 Caller = Callable[[list[str], str], Awaitable[list[Optional[str]]]]
 
 
+class BatchMismatch(RuntimeError):
+    """The model's answer does not give each item of the batch exactly once."""
+
+
 def checked(source: str, target: Optional[str], locale: str) -> Optional[str]:
     """``target`` when it is a usable translation of ``source`` into ``locale``, else None:
     in the target language (no Cyrillic in English, mostly Cyrillic in Bulgarian), not
@@ -142,8 +146,13 @@ def model_caller(spend: Spend) -> Caller:
                 lambda: agent.run(message), model=get_model(TIER), school_id=None, stage=STAGE, timeout_seconds=120
             )
         spend.spent_usd += extract_provider_cost_usd(result)
+        ids = [item.id for item in result.output.items]
+        if sorted(ids) != list(range(len(texts))):
+            # A skipped or repeated id may have shifted the answers onto the wrong items:
+            # keep none of the batch (it is asked again next run).
+            raise BatchMismatch(f"{len(texts)} items asked, ids {len(ids)} back")
         answers = {item.id: item.text for item in result.output.items}
-        return [answers.get(i) for i in range(len(texts))]
+        return [answers[i] for i in range(len(texts))]
 
     return call
 
@@ -154,7 +163,11 @@ async def translate(texts: Sequence[str], locale: str, call: Caller, out: dict[s
     texts = list(texts)
     for start in range(0, len(texts), BATCH_SIZE):
         batch = texts[start:start + BATCH_SIZE]
-        answers = await call(batch, locale)
+        try:
+            answers = await call(batch, locale)
+        except BatchMismatch:
+            logger.warning("translate-texts: a %s batch came back mismatched; asked again next run", locale)
+            continue
         out.update({text: checked(text, answer, locale) for text, answer in zip(batch, answers)})
 
 
@@ -201,14 +214,17 @@ async def run_text_translations(
     }
 
     spend = Spend(max_usd)
-    run = await start_pipeline_run(
-        db, country=country, city=city, cli_stage=STAGE, config={"provider_cost_cap_usd": max_usd, "apply": apply}
-    )
-    run_id = run.id
     call = call or model_caller(spend)
-    error: Optional[str] = None
+    errors: list[str] = []
     new: dict[str, dict[str, Optional[str]]] = {locale: {} for locale in LOCALES}
-    try:
+    run_id = None
+    if any(asked.values()):
+        # Only a run that asks the model is a pipeline run (the cost ledger counts its calls):
+        # the hourly cut-off publish runs this stage too, and usually has nothing to ask.
+        run = await start_pipeline_run(
+            db, country=country, city=city, cli_stage=STAGE, config={"provider_cost_cap_usd": max_usd, "apply": apply}
+        )
+        run_id = run.id
         with provider_cost_scope(
             pipeline_run_id=run.id,
             stage=STAGE,
@@ -217,43 +233,57 @@ async def run_text_translations(
             max_in_flight=1,
         ):
             for locale in LOCALES:
-                await translate(asked[locale], locale, call, new[locale])
-    except (SpendCapReached, ProviderCostError) as exc:
-        error = str(exc)[:200]
-    except Exception as exc:  # a failed call keeps what was translated before it
-        logger.exception("translate-texts run %s stopped", run_id)
-        error = f"run stopped: {str(exc)[:200]}"
+                try:
+                    await translate(asked[locale], locale, call, new[locale])
+                except (SpendCapReached, ProviderCostError) as exc:
+                    errors.append(f"{locale}: {str(exc)[:200]}")
+                    break
+                except Exception as exc:  # the batches done before a failed call are kept
+                    logger.exception("translate-texts run %s stopped in %s", run_id, locale)
+                    errors.append(f"{locale}: run stopped: {str(exc)[:200]}")
     for locale in LOCALES:
         known[locale].update(new[locale])
 
     changed = 0
-    for school in schools:
-        wanted = {
-            locale: {text: known[locale][text] for text in needed[school.id][locale] if text in known[locale]}
-            for locale in LOCALES
-        }
-        if wanted == have[school.id]:
-            continue
-        changed += 1
-        if apply:
-            await db.refresh(school, attribute_names=["attributes"], with_for_update=True)
-            attributes = dict(school.attributes or {})
-            if any(wanted.values()):
-                attributes[ATTRIBUTE_KEY] = translation_block(wanted)
-            else:
-                attributes.pop(ATTRIBUTE_KEY, None)
-            school.attributes = attributes
-            await db.commit()
+    try:
+        for school in schools:
+            wanted = {
+                locale: {text: known[locale][text] for text in needed[school.id][locale] if text in known[locale]}
+                for locale in LOCALES
+            }
+            if wanted == have[school.id]:
+                continue
+            changed += 1
+            if apply:
+                await db.refresh(school, attribute_names=["attributes"], with_for_update=True)
+                attributes = dict(school.attributes or {})
+                if any(wanted.values()):
+                    attributes[ATTRIBUTE_KEY] = translation_block(wanted)
+                else:
+                    attributes.pop(ATTRIBUTE_KEY, None)
+                school.attributes = attributes
+                await db.commit()
+    except Exception as exc:
+        logger.exception("translate-texts could not store translations")
+        if db.in_transaction():
+            await db.rollback()
+        errors.append(f"storing stopped: {str(exc)[:200]}")
 
-    run = await db.get(PipelineRun, run_id, populate_existing=True)
-    await finalize_pipeline_run(
-        db,
-        run,
-        country=country,
-        city=city,
-        stage_summaries=[stage_common.stage_summary(processed=len(schools), succeeded=len(schools), failed=0)],
-        error_summary=error,
-    )
+    error = "; ".join(errors) or None
+    spent = spend.spent_usd
+    if run_id is not None:
+        run = await db.get(PipelineRun, run_id, populate_existing=True)
+        await finalize_pipeline_run(
+            db,
+            run,
+            country=country,
+            city=city,
+            stage_summaries=[
+                stage_common.stage_summary(processed=len(schools), succeeded=len(schools) - bool(error), failed=int(bool(error)))
+            ],
+            error_summary=error,
+        )
+        spent = max(spent, float(run.total_llm_cost_usd or 0))
     return {
         "apply": apply,
         "pipeline_run_id": run_id,
@@ -262,7 +292,7 @@ async def run_text_translations(
         "schools_changed": changed,
         "asked": {locale: len(asked[locale]) for locale in LOCALES},
         "translated": {locale: sum(value is not None for value in new[locale].values()) for locale in LOCALES},
-        "spent_usd": round(max(spend.spent_usd, float(run.total_llm_cost_usd or 0)), 6),
+        "spent_usd": round(spent, 6),
         "stopped": error,
         "new": new,
     }

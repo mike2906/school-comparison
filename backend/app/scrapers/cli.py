@@ -656,12 +656,13 @@ def translate_texts_command(school_ids, city, country, max_usd, apply_changes, r
         f"{mode}: {report['schools']} schools, {report['schools_changed']} changed, asked {report['asked']}, "
         f"translated {report['translated']}, ${report['spent_usd']:.4f}"
     )
-    if report["stopped"]:
-        console.print(f"[yellow]{report['stopped']}[/yellow]")
     if report_path is not None:
         report_path.parent.mkdir(parents=True, exist_ok=True)
         report_path.write_text(json.dumps(report, ensure_ascii=False, indent=1, default=str), encoding="utf-8")
         console.print(f"Report: {report_path}")
+    if report["stopped"]:
+        console.print(f"[yellow]{report['stopped']}[/yellow]")
+        raise SystemExit(1)
 
 
 @cli.command("confirm-pins")
