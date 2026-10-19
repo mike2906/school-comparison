@@ -274,9 +274,10 @@ function tuitionRows(rows, ageGroup = null) {
   return shown.filter(row => !priceTerms(row) || !hasRegular(row))
 }
 
-// The rows a range runs from and to, so it can say what each end is; null for one price.
+// The rows a range runs from and to, so it can say what each end is; null for one price
+// (to the euro: 454 EUR and 888 BGN show as one price).
 function rangeEnds(rows, convert, range) {
-  if (range.min === range.max) return null
+  if (Math.round(range.min) === Math.round(range.max)) return null
   const low = rows.filter(row => convert(row.amount_min ?? row.amount ?? row.amount_max, row) === range.min)
   const high = rows.filter(row => convert(row.amount_max ?? row.amount ?? row.amount_min, row) === range.max)
   return low.length > 0 && high.length > 0 ? { low, high } : null
@@ -339,23 +340,14 @@ function namedBand(text, planName) {
   return named
 }
 
-// Our label for an age group stored as one of our keys ("grade_1_4"), else null. Website text
-// is never looked up: i18next reads a colon as a namespace, so "4-7 клас до 15:00 ч."
-// came back as "00 ч." (300).
-function ageGroupKeyLabel(raw, t) {
-  if (!/^[a-z0-9_]+$/.test(raw)) return null
-  const key = `ageGroups.${raw}`
-  const translated = t(key)
-  return translated && translated !== key ? translated : null
-}
-
 // The age group a row names in the UI language: a known `ageGroups` key, else the grades
 // it names ("ПК" → "Preschool"), else the website's own words (`websiteWords`).
 function ageGroupName(price, t, language) {
   const raw = price?.age_group?.trim()
   if (!raw) return null
-  const translated = ageGroupKeyLabel(raw, t)
-  if (translated) return translated
+  const key = `ageGroups.${raw}`
+  const translated = t(key)
+  if (translated && translated !== key) return translated
   const stage = stageLabel(raw, t)
   if (stage) return stage
   // Grades named in free text too: "Гимназия", or Buditel's whole sentence "Годишна такса за
@@ -376,8 +368,9 @@ function ageGroupName(price, t, language) {
 export function priceAgeGroupLabel(price, t, language) {
   const raw = price?.age_group?.trim()
   if (!raw) return null
-  const translated = ageGroupKeyLabel(raw, t)
-  if (translated) return translated
+  const key = `ageGroups.${raw}`
+  const translated = t(key)
+  if (translated && translated !== key) return translated
   // A plan name that already says it needs no repeat, unless it starts at preschool:
   // "PK"/"ПК" is an abbreviation parents may not know.
   const band = rowGradeBand(price)
@@ -490,17 +483,19 @@ function isOptionalFee(row) {
 
 // The optional fees a printed total adds up, so the headline can say so: 633's 7,850 €
 // is tuition, activities and a recommended 785 € donation. Only when the school's total is
-// one figure that is the sum of the other fees of its period, so the fees are known to be
-// in it; otherwise none.
+// one figure that is the sum, in euro, of the other whole regular fees of its period, so
+// the fees are known to be in it; otherwise none.
 function optionalInTotal(totals, rows) {
   if (totals.length !== 1) return []
   const [total] = totals
-  if (total.amount == null) return []
+  const totalEur = toEur(total.amount, total.currency)
+  if (totalEur == null) return []
   const parts = rows.filter(row => row !== total && !isStatedTotal(row) && row.amount != null &&
-    row.currency === total.currency && pricePeriod(row) === pricePeriod(total) &&
+    !isInstallmentPlan(row) && !priceTerms(row) && !isClosedGroupFee(row) &&
+    pricePeriod(row) === pricePeriod(total) &&
     (!row.age_group || !total.age_group || row.age_group === total.age_group))
-  const sum = parts.reduce((value, row) => value + Number(row.amount), 0)
-  return Math.abs(sum - Number(total.amount)) < 1 ? parts.filter(isOptionalFee) : []
+  const sum = parts.reduce((value, row) => value + (toEur(row.amount, row.currency) ?? NaN), 0)
+  return Math.abs(sum - totalEur) < 1 ? parts.filter(isOptionalFee) : []
 }
 
 // Longer names (a whole sentence copied as the age group) would crowd the fact.
@@ -534,21 +529,25 @@ export function rangeEndLabels(fee, t, language) {
 /**
  * The lines under a headline fee: what each end of the range is ("Half day: 8,064 EUR",
  * "Full day: 9,141 EUR") and the optional fees a printed total adds up ("Includes an
- * optional fee: …"). `format` writes a number in the page's locale.
+ * optional fee: …"). `formatPrice(value, currency)` writes a price as the headline does.
  */
-export function feeRangeNotes(fee, t, language, format) {
+export function feeRangeNotes(fee, t, language, formatPrice) {
   if (!fee) return []
-  const price = value => t('pricing.priceOnly', { price: format(value), currency: fee.currency })
   const ends = rangeEndLabels(fee, t, language)
   const optional = (fee.optionalIncluded || []).map(row => {
     const shown = displayPrice(row.amount, row.currency)
     return t('pricing.includesOptional', {
       name: planNameLabel(row, t, language) || t(`pricing.${row.category}`),
-      price: t('pricing.priceOnly', { price: format(shown.value), currency: shown.currency }),
+      price: formatPrice(shown.value, shown.currency),
     })
   })
   return [
-    ends ? t('pricing.rangeEnds', { low: ends.low, lowPrice: price(fee.min), high: ends.high, highPrice: price(fee.max) }) : null,
+    ends ? t('pricing.rangeEnds', {
+      low: ends.low,
+      lowPrice: formatPrice(fee.min, fee.currency),
+      high: ends.high,
+      highPrice: formatPrice(fee.max, fee.currency),
+    }) : null,
     ...optional,
   ].filter(Boolean)
 }

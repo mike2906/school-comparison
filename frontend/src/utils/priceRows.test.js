@@ -193,7 +193,9 @@ test('priceTerms: the terms a fee name puts a price on, null for the regular pri
   // The English name counts too.
   assert.equal(priceTerms({ plan_name: 'x', pricing_context: { plan_name_en: 'Paid for a whole year at once' } }), 'prepaid')
   for (const name of [null, 'целодневно гледане', 'Цял ден, при месечно плащане', 'annual subscription',
-    'monthly enrollment', 'Total tuition fees (year) — 1st child', 'Total Fee for New Students', 'Пълен ден']) {
+    'monthly enrollment', 'Total tuition fees (year) — 1st child', 'Total Fee for New Students', 'Пълен ден',
+    'Месечна такса, платима авансово', 'Намалена програма (до 13:00)', 'Reduced hours (8:00-13:00)',
+    'Целодневна група (първите 2 месеца адаптация)']) {
     assert.equal(priceTerms({ plan_name: name }), null, String(name))
   }
 })

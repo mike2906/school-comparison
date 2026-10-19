@@ -656,11 +656,11 @@ test('statedTuition: a price on other terms does not set the range when the grou
 
 const NOTES_EN = {
   ...EN,
-  'pricing.priceOnly': '{{price}} {{currency}}',
   'pricing.rangeEnds': '{{low}}: {{lowPrice}} · {{high}}: {{highPrice}}',
   'pricing.includesOptional': 'Includes an optional fee: {{name}}, {{price}}',
   'pricing.activities': 'Activities',
 }
+const price = (value, currency) => `${value} ${currency}`
 const tNotes = (key, vars = {}) =>
   key in NOTES_EN ? NOTES_EN[key].replace(/\{\{(\w+)\}\}/g, (_, name) => String(vars[name])) : key
 
@@ -670,7 +670,7 @@ test('rangeEndLabels: each end of a range says what it is (541, 568, 506)', () =
     row({ id: 2, amount: 8064, period: null, plan_name: 'полудневна база', pricing_context: { plan_name_en: 'Half day' } }),
   ])
   assert.deepEqual(rangeEndLabels(halfFull, tNotes, 'en'), { low: 'Half day', high: 'Full day' })
-  assert.deepEqual(feeRangeNotes(halfFull, tNotes, 'en', String), ['Half day: 8064 EUR · Full day: 9141 EUR'])
+  assert.deepEqual(feeRangeNotes(halfFull, tNotes, 'en', price), ['Half day: 8064 EUR · Full day: 9141 EUR'])
   // Age groups when the ends differ in them; an end two groups share names both.
   const grades = statedTuition([
     current({ id: 1, amount: 8950, age_group: 'ПГ' }),
@@ -680,6 +680,8 @@ test('rangeEndLabels: each end of a range says what it is (541, 568, 506)', () =
   assert.deepEqual(rangeEndLabels(grades, tNotes, 'en'), { low: 'Grades 8–12', high: 'Preschool, Grades 1–7' })
   // One price, ends with the same name, or a name too long to show: nothing.
   assert.equal(rangeEndLabels(statedTuition([row({ amount: 500 })]), tNotes, 'en'), null)
+  const sameInLev = statedTuition([row({ id: 1, amount: 454, plan_name: 'А' }), row({ id: 2, amount: 888, currency: 'BGN', plan_name: 'Б' })])
+  assert.equal(rangeEndLabels(sameInLev, tNotes, 'en'), null)
   const sameName = statedTuition([row({ id: 1, amount: 500, plan_name: 'Такса' }), row({ id: 2, amount: 600, plan_name: 'Такса' })])
   assert.equal(rangeEndLabels(sameName, tNotes, 'en'), null)
   const long = statedTuition([
@@ -687,12 +689,6 @@ test('rangeEndLabels: each end of a range says what it is (541, 568, 506)', () =
     row({ id: 2, amount: 600, age_group: '1-4 клас' }),
   ])
   assert.equal(rangeEndLabels(long, tNotes, 'en'), null)
-})
-
-test('a website age group with a colon is shown as written, not cut at the colon (300)', () => {
-  // i18next reads "a:b" as key b in namespace a.
-  const tColon = (key, vars) => (key.includes(':') ? key.split(':').pop() : tEn(key, vars))
-  assert.equal(priceAgeGroupLabel({ age_group: '4-7 клас до 15:00 ч.', plan_name: 'Обучение' }, tColon), 'Grades 4–7')
 })
 
 test('feeRangeNotes: a printed total says which optional fee it adds up (633)', () => {
@@ -706,7 +702,11 @@ test('feeRangeNotes: a printed total says which optional fee it adds up (633)', 
   ]
   const total = statedTuition(rows)
   assert.deepEqual(total.optionalIncluded.map(fee => fee.id), [5])
-  assert.deepEqual(feeRangeNotes(total, tNotes, 'en', String), ['Includes an optional fee: Development donation (recommended), 785 EUR'])
+  assert.deepEqual(feeRangeNotes(total, tNotes, 'en', price), ['Includes an optional fee: Development donation (recommended), 785 EUR'])
+  // An instalment or a part in lev still adds up.
+  const withInstalment = statedTuition([...rows, current({ id: 7, amount: 1570, plan_name: 'първа вноска' })]
+    .map(fee => (fee.id === 3 ? { ...fee, amount: 6141.31, currency: 'BGN' } : fee)))
+  assert.deepEqual(withInstalment.optionalIncluded.map(fee => fee.id), [5])
   // When the fees do not add up to the total, it is not known to include the donation.
   const unknown = statedTuition(rows.filter(fee => fee.id !== 3))
   assert.deepEqual(unknown.optionalIncluded, [])

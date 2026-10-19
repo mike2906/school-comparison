@@ -110,14 +110,15 @@ function KeyFacts({ school, examAverages, nvoExamType, ageGroup = null }) {
         ].filter(Boolean).join(' · ')
       : null
     // What each end of the range is, and any optional fee a printed total adds up.
-    const notes = [...feeRangeNotes(tuition, t, i18n.language, formatNumber), currentYear].filter(Boolean)
+    const formatPrice = (value, currency) => t('pricing.priceOnly', { price: formatNumber(value), currency })
+    const notes = [...feeRangeNotes(tuition, t, i18n.language, formatPrice), currentYear].filter(Boolean)
     facts.tuition = (
       <Fact
         key="tuition"
         label={t(tuition.total ? 'pricing.totalFees' : 'pricing.tuition')}
         value={priceText(tuition)}
         detail={[tuition.period ? null : t('pricing.periodNotStated'), yearDetail].filter(Boolean).join(' · ')}
-        note={notes.length > 0 ? notes.map(line => <div key={line}>{line}</div>) : null}
+        note={notes.length > 0 ? notes.map((line, index) => <div key={index}>{line}</div>) : null}
       />
     )
   }

@@ -75,11 +75,13 @@ export function isClosedGroupFee(row) {
 // Not "при месечно плащане" (185), the regular way to pay, nor 154's "annual subscription",
 // its regular contract next to a dearer flexible one.
 const PRICE_TERMS = [
-  ['promotion', /промоци|(?<![\p{L}])промо(?![\p{L}])|promo(?:tion|tional)?(?![\p{L}])|special offer|специална (?:оферта|цена)|коледн|christmas|early[- ]bird|ранно записване|(?:първите|first) \d+ (?:месеца|months)/iu],
-  ['discount', /отстъпк|discount|намален|reduced|(?:втор|трет|четвърт)(?:о|ото) дете|(?:second|third|fourth|2nd|3rd|4th) child|sibling|[(\s][-−–+]\s?\d+(?:[.,]\d+)?\s?%/iu],
-  ['prepaid', /предплащ|авансов|prepa(?:id|y)|in advance|(?:еднократно|наведнъж)(?: плащане)? за (?:\d+|цял|една)|at once/iu],
+  ['promotion', /промоци|(?<![\p{L}])промо(?![\p{L}])|promo(?:tion|tional)?(?![\p{L}])|special offer|специална (?:оферта|цена)|коледн|christmas|early[- ]bird|ранно записване/iu],
+  ['discount', /отстъпк|discount|намаление|(?:втор|трет|четвърт)(?:о|ото) дете|(?:second|third|fourth|2nd|3rd|4th) child|sibling|[(\s][-−–+]\s?\d+(?:[.,]\d+)?\s?%/iu],
+  // Paid ahead for a stated stretch: "за 6 месеца", "за цяла година", "for 6 months". A
+  // monthly fee "платима авансово" (paid at the start of the month) is the regular price.
+  ['prepaid', /(?:предплащ|авансов|еднократно|наведнъж|prepa(?:id|y)|in advance|at once)[^/]*?(?:за|for) (?:\d+|цял|целия|една|един|a whole|the whole|a full|the full|one) ?(?:\p{L}+ )?(?:месец|месеца|година|срок|семест|months?|year|term|semester)|(?:за|for) (?:\d+|цял\p{L}*|a whole|the whole) (?:учебна )?(?:месеца|година|months|year)[^/]*?(?:at once|наведнъж|предварително|in advance)/iu],
   ['instalments', /разсроч|deferred|(?<![\p{L}])(?:на|в|in)\s+(?:[2-9]|1\d|две|три|четири|пет|шест|девет|десет|two|three|four|five|six|nine|ten)\s+(?:равни\s+|equal\s+|месечни\s+|monthly\s+)?(?:вноски|instal+ments|payments)|(?<![\p{L}])(?:на|in)\s+(?:вноски|instal+ments)/iu],
-  ['one_payment', /еднократно плащане|one-time payment|single payment|paid in full/iu],
+  ['one_payment', /еднократно плащане|one-time payment|paid in full/iu],
 ]
 
 /**

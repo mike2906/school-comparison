@@ -3,7 +3,7 @@ import { orderAgeGroups } from '../../utils/ageGroupOrder'
 import TagList from '../SchoolDetailPage/TagList'
 import PhoneLinks from '../SchoolDetailPage/PhoneLinks'
 import { calculateDistance } from '../../utils/distance'
-import { formatAmount, formatDistance } from '../../utils/format'
+import { formatDistance } from '../../utils/format'
 import { getAddress, getSummary } from '../../utils/i18n'
 import { hasAnySchoolSummary } from './summaryVisibility'
 import { atAGlanceKeysIn, atAGlanceLines, factTopicsIn, getSchoolFacts } from '../../utils/schoolFacts'
@@ -158,8 +158,8 @@ export function buildCompareSections({
                     pricingRange.yearStatus === YEAR_STATUS.NEXT ? t('pricing.nextYear') : null,
                   ].filter(Boolean).join(' · ')}
                 </div>
-                {feeRangeNotes(pricingRange, t, language, value => formatAmount(value, language)).map(line => (
-                  <div key={line} className="text-xs text-neutral-500">{line}</div>
+                {feeRangeNotes(pricingRange, t, language, (value, currency) => formatCurrency(value, language, currency)).map((line, index) => (
+                  <div key={index} className="text-xs text-neutral-500">{line}</div>
                 ))}
                 {current && (
                   <div className="text-xs text-neutral-500">

@@ -2062,9 +2062,8 @@ the session scratchpad only.
       terms counts only for a group with no regular price. A range names its two ends under
       the figure ("Half day: 8,064 EUR · Full day: 9,141 EUR"), and a printed total that is
       the sum of the listed fees says which optional fee it includes. Grade lists ("7, 8, …,
-      12 клас"), ПУК and a Cyrillic "І" in Roman numerals now read as grades, and a website
-      age group with a colon is no longer cut at it ("00 ч." on 300). The fee list itself is
-      unchanged: every price stays listed under its own name.
+      12 клас"), ПУК and a Cyrillic "І" in Roman numerals now read as grades. The fee list
+      itself is unchanged: every price stays listed under its own name.
 
 ## Phase 3 — Go live
 
