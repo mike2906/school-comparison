@@ -203,7 +203,7 @@ async def _read_dates(
     verdict: Graded = await call(
         facts_rules.JUDGE_PROMPT,
         Graded,
-        rules.judge_note(today, [fact for fact, _ in quoted]) + facts_rules.judge_message(quoted),
+        rules.judge_note(today, [fact for fact, _ in quoted]) + facts_rules.judge_message(quoted, readable),
         school.id,
     )
     kept = []

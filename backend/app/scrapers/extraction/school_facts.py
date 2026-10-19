@@ -147,7 +147,9 @@ on), and a quote
 (usually Bulgarian). Pass an item when the quote states what the fact and every label say; translation and plain
 rewording are fine. A heading, list item or link title that names
 a specialty, subject, club, sport or room is enough for a fact that only says the school offers or has it.
-The page's address can supply context the quote leaves out (a quote on /anglijski-ezik/ is about English).
+The page's address and the lines above the quote can supply context the quote leaves out (a quote on
+/anglijski-ezik/ is about English; "70 деца" under a heading "Кандидатстване за ПУК" is about the
+preparatory class), but the fact itself must still be in the quote.
 Fail an item when the fact adds something neither says (a number, a grade, a scope, a claim), when the quote
 describes a plan for something that does not exist yet (a menu or timetable set for the current or coming
 school year is not a plan), or
@@ -236,9 +238,15 @@ class Graded(BaseModel):
         return next((rank for rank in RANKS if n in getattr(self, rank)), None)
 
 
+_EMOJI_RE = re.compile("[\u2190-\u21ff\u2300-\u23ff\u2460-\u27bf\u2b00-\u2bff\U0001f000-\U0001faff\ufe0f\u200d]")
+
+
 @lru_cache(maxsize=512)  # each page is matched against every quote part
 def _normalise(text: str) -> str:
     text = re.sub(r"!\[[^\]]*\]\([^)]*\)", " ", text)  # markdown images
+    # WordPress serves emoji as pictures, which the line above drops, while the reader quotes
+    # the emoji itself (609's "✅ Заявления се приемат..."): neither side keeps them.
+    text = _EMOJI_RE.sub(" ", text)
     text = re.sub(r"\[([^\]]*)\]\([^)]*\)", r"\1", text)  # markdown links keep their text
     text = re.sub(r"[*_#>|`\\\[\]]+", " ", text)  # also a link's text quoted without its address
     text = text.replace("“", '"').replace("”", '"').replace("„", '"').replace("’", "'")
@@ -349,12 +357,41 @@ def _label_text(item: object) -> str:
     return str(item)
 
 
-def judge_message(quoted: Sequence[tuple[Fact, str]]) -> str:
-    """The numbered items for the judge: each fact, its labels, its quote, and the page the quote is on."""
+def judge_message(quoted: Sequence[tuple[Fact, str]], pages: Sequence[tuple[str, str]] = ()) -> str:
+    """The numbered items for the judge: each fact, its labels, the page the quote is on, the
+    lines just above the quote on that page (``pages``, when given), and the quote."""
+    texts = dict(pages)
+
+    def above(fact: Fact, url: str) -> str:
+        lines = quote_context(fact.quote, texts.get(url, ""))
+        return "\nAbove the quote: " + " / ".join(lines) if lines else ""
+
     return "\n\n".join(
-        f"{n}. Fact: {fact.fact_en}{_labels(fact)}\nPage: {url}\nQuote: {fact.quote}"
+        f"{n}. Fact: {fact.fact_en}{_labels(fact)}\nPage: {url}{above(fact, url)}\nQuote: {fact.quote}"
         for n, (fact, url) in enumerate(quoted, 1)
     )
+
+
+CONTEXT_LINES = 3
+CONTEXT_LINE_CHARS = 160
+
+
+def quote_context(quote: str, text: str) -> list[str]:
+    """Up to ``CONTEXT_LINES`` page lines above the quote's first line, nearest last.
+
+    A quote such as "ще приемем 70 деца" (172) or "II кръг ... изпит по английски език" names
+    neither the class nor the grades; the heading above it does, and the judge failed the facts
+    for lacking it."""
+    first = next((_strip(_normalise(line)) for line in quote.splitlines() if _strip(_normalise(line))), "")
+    if not first:
+        return []
+    lines = [line for line in (_strip(_normalise(raw)) for raw in text.splitlines()) if line]
+    at = next((i for i, line in enumerate(lines) if first in line), None)
+    if at is None:  # the quote's first line runs on past a page line
+        at = next((i for i, line in enumerate(lines) if len(line) >= 12 and first.startswith(line)), None)
+    if at is None:
+        return []
+    return [line[:CONTEXT_LINE_CHARS] for line in lines[max(0, at - CONTEXT_LINES) : at]]
 
 
 def stored_fact(fact: Fact, url: str, rank: str) -> dict:

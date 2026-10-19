@@ -402,6 +402,26 @@ def test_the_judge_reads_admission_grade_0_as_kindergarten():
     assert "Admission grade: 0 (kindergarten or preschool class)" in judge_message([(fact, HOME)])
 
 
+def test_emoji_pictures_and_emoji_in_quotes_match():
+    # 609: WordPress shows emoji as pictures; the reader quotes the emoji itself.
+    page = [(HOME, "![✅](https://s.w.org/images/core/emoji/17.0.2/svg/2705.svg) Заявления се приемат от 02.02.2026 г.")]
+    assert quote_on_page(_fact("admissions", "✅ Заявления се приемат от 02.02.2026 г."), page) == HOME
+
+
+def test_the_judge_sees_the_heading_above_the_quote():
+    page = (
+        "Меню\n\n## Kандидатстване\n\nКандидатстване за II-VII клас за учебната 2027/2028 г.\n\n"
+        "Дати изпит I кръг: очаквайте през месец февруари\n\n"
+        "При успешно преминаване на I кръг следва покана за II кръг. Той е индивидуален и се състои от изпит "
+        "по английски език и разговор с психолог."
+    )
+    quote = "При успешно преминаване на I кръг следва покана за II кръг."
+    message = judge_message([(_fact("admissions", quote), HOME)], [(HOME, page)])
+    assert "Above the quote: kандидатстване / кандидатстване за ii-vii клас" in message
+    assert "дати изпит i кръг" in message
+    assert "Above the quote" not in judge_message([(_fact("admissions", "Няма го"), HOME)], [(HOME, page)])
+
+
 def test_admission_links_match_both_alphabets_and_k():
     from app.scrapers.extraction.school_facts import ADMISSION_LINK_RE
 

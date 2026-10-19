@@ -141,7 +141,9 @@ async def read_school(school: School, pages: list[PageRead], call: Caller) -> di
     quoted = [(fact, url) for fact, url in quoted if all(fact is not repeat for repeat in repeats)]
     grades: dict[int, str] = {}
     if quoted:
-        verdict: Graded = await call(facts_rules.JUDGE_PROMPT, Graded, facts_rules.judge_message(quoted), school.id)
+        verdict: Graded = await call(
+            facts_rules.JUDGE_PROMPT, Graded, facts_rules.judge_message(quoted, readable), school.id
+        )
         grades = {n: rank for n in range(1, len(quoted) + 1) if (rank := verdict.rank(n))}
     passed = [(fact, url, grades[n]) for n, (fact, url) in enumerate(quoted, 1) if n in grades]
     kept = _ordered(passed)

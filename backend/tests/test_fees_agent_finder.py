@@ -390,3 +390,22 @@ async def test_must_read_takes_this_years_page_and_no_pdf(monkeypatch):
     must = re.compile(r"priem", re.IGNORECASE)
     read = await fees_agent.find_pages(crawler, None, _Client(), _school(), Spend(0.05), must_read=must)
     assert [p.url for p in read][:3] == [HOME, now, old]
+
+
+async def test_must_read_pages_come_on_top_of_the_fetch_cap(monkeypatch):
+    # 514: the admissions pages took the places of the page its stored facts came from.
+    admission = "https://meridian22.org/priem/"
+    others = [f"https://meridian22.org/p{n}/" for n in range(20)]
+    crawler = _Crawler({
+        HOME: [("Начало " + "x" * 300, [(admission, "Прием"), *[(url, "Страница") for url in others]])],
+        **{url: [("Текст " + "x" * 300, [(u, "Страница") for u in others])] for url in [admission, *others]},
+    })  # fmt: skip
+
+    async def pick(school, read, links, spend, *args):
+        return [url for url, _ in links if url != admission][:4]
+
+    monkeypatch.setattr(fees_agent, "_pick", pick)
+    must = re.compile(r"priem", re.IGNORECASE)
+    read = await fees_agent.find_pages(crawler, None, _Client(), _school(), Spend(0.05), must_read=must)
+    assert admission in [p.url for p in read]
+    assert len(read) == fees_agent.MAX_FETCHES + 1

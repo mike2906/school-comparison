@@ -28,7 +28,7 @@ some picks were trivia, yearly counts go stale, the paragraph only restated the 
    curriculum, school day, admissions, clubs, transport, meals, support pages; testimonials
    are skipped. Up to 2 admissions links (`ADMISSION_LINK_RE`: прием, кандидатстване,
    priem, admission, enrol; not приемно време), this school year's first and no PDFs, are
-   always opened ahead of the picker's choices: on 2026-10-14, 27 of
+   always opened ahead of the picker's choices and on top of the 12-page limit: on 2026-10-14, 27 of
    the 40 private Sofia schools with no admissions fact never had their admissions page
    read (172's picker took the pupils' testimonials over /kandidatstvane/).
 2. **Read.** One `pricing`-tier call lists up to 20 facts, each under one fixed topic
@@ -45,9 +45,11 @@ some picks were trivia, yearly counts go stale, the paragraph only restated the 
    (`CURRICULA`) and whether the diploma is recognised, application open/close dates, bus
    areas by district, special-needs support, and open-day dates with a sign-up link (kept only
    when code finds that link on a page read).
-3. **Check.** Code keeps a fact only if its quote is on a page read (markup and quote marks
-   ignored). A second call on the same tier confirms each quote states the whole fact and
-   its labels, and grades it: `key` (what parents choose on: programme, languages, hours,
+3. **Check.** Code keeps a fact only if its quote is on a page read (markup, quote marks and
+   emoji ignored: WordPress shows emoji as pictures). A second call on the same tier confirms
+   each quote states the whole fact and its labels, seeing the 3 page lines above the quote
+   for which class or grade it is about (172's "ще приемем 70 деца" sits under "Кандидатстване
+   за ПУК"), and grades it: `key` (what parents choose on: programme, languages, hours,
    bus, meals, class size, support, admissions), `more` (concrete but secondary) or `minor`.
 4. **Store** (`--apply` only): `attributes["school_facts"]` =
    `{_schema_version, read_at, website_url, model, facts: [{topic, text_i18n, source_url, quote, rank, <labels>}]}`,
