@@ -119,3 +119,9 @@ async def test_validator_reads_the_same_texts_as_the_stage():
             "https://48ou.bg", use_llm_fallback=False, school_name="48 основно училище"
         )
     assert (result, reason) == (ValidationResult.INVALID, "Website names another town: Варна")
+
+
+def test_a_patron_named_like_a_town_is_not_another_town():
+    # 74 СУ "Гоце Делчев": a patron, unless written as a town.
+    assert other_town_named(["74 СУ - Гоце Делчев"], "sofia") is None
+    assert other_town_named(["СУ гр. Гоце Делчев"], "sofia") == "Гоце Делчев"

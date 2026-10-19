@@ -492,9 +492,9 @@ class URLValidator:
         directory_signals = self._count_directory_signals(final_url, text_content, soup)
         identity_mismatch = self._find_identity_mismatch(page_identity_labels, expected_names)
         # The title, main headings and site name only: a site's other labels are its menu and
-        # links. A page read by the browser has its first heading only.
-        town_texts = site_identity_texts(soup) if soup is not None else page_identity_labels[:1]
-        other_town = other_town_named(town_texts, self.school_city)
+        # links. A page read by the browser has none of those apart, so it is not checked
+        # (nor does the weekly site-city stage read it).
+        other_town = other_town_named(site_identity_texts(soup), self.school_city) if soup is not None else None
         if other_town:
             return ValidationResult.INVALID, None, f"Website names another town: {other_town}"
 

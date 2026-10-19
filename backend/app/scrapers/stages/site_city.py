@@ -60,11 +60,15 @@ async def run_site_city(
 
         async def check(row) -> Optional[dict[str, Any]]:
             school_id, website_url, school_city, name_i18n = row
-            async with semaphore:
-                page = await fetch(website_url)
-            if page is None:
+            try:
+                async with semaphore:
+                    page = await fetch(website_url)
+                if page is None:
+                    return None
+                town = other_town_named(identity_texts(BeautifulSoup(page[1], "html.parser")), school_city)
+            except Exception:  # one odd page must not stop the run: it counts as not read
+                logger.exception("site-city could not check school %s", school_id)
                 return None
-            town = other_town_named(identity_texts(BeautifulSoup(page[1], "html.parser")), school_city)
             return {
                 "school_id": school_id,
                 "name_bg": (name_i18n or {}).get("bg"),
@@ -84,12 +88,14 @@ async def run_site_city(
             hits, unread = await check_all(_http_fetch(client, RobotsParser()))
 
     if apply:
-        from app.scrapers.url_validator import ValidationResult, _update_validation_result
+        from app.scrapers.url_validator import URLValidator, ValidationResult, _update_validation_result
 
+        normalize = URLValidator(country).normalize_url
         for hit in hits:
+            # The form validation stores its source page under (validate_school_url).
             await _update_validation_result(
                 hit["school_id"],
-                hit["website"],
+                normalize(hit["website"]) or hit["website"],
                 ValidationResult.INVALID,
                 None,
                 f"Website names another town: {hit['town']}",
