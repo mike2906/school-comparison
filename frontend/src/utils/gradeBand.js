@@ -5,7 +5,7 @@
  */
 
 const ROMAN = { i: 1, ii: 2, iii: 3, iv: 4, v: 5, vi: 6, vii: 7, viii: 8, ix: 9, x: 10, xi: 11, xii: 12 }
-const PRESCHOOL = 'пгу|пк|пг|pk|подготвителна група|подготвителен клас|pre-?school'
+const PRESCHOOL = 'пгу|пук|пк|пг|pk|подготвителна група|подготвителен клас|pre-?school'
 const ITEM = `(${PRESCHOOL}|[ivx]{1,4}|\\d{1,2})\\.?`
 const GRADE_WORD = '(?:клас(?:ове)?|кл\\.?|grades?)'
 const WHOLE_BAND_RE = new RegExp(
@@ -14,7 +14,7 @@ const WHOLE_BAND_RE = new RegExp(
 )
 const PRESCHOOL_RE = new RegExp(`^(?:${PRESCHOOL})$`, 'u')
 // A range inside free text ("PK–7: full payment"), not part of a date, time or longer number.
-const RANGE_IN_TEXT_RE = /(?<![\p{L}\p{N}.:])(пк|пг|pk|[ivx]{1,4}|\d{1,2})\s*-\s*([ivx]{1,4}|\d{1,2})(?![\p{L}\p{N}]|\.\d)/gu
+const RANGE_IN_TEXT_RE = /(?<![\p{L}\p{N}.:])(пгу|пук|пк|пг|pk|[ivx]{1,4}|\d{1,2})\s*-\s*([ivx]{1,4}|\d{1,2})(?![\p{L}\p{N}]|\.\d)/gu
 // Bare numbers ("3-6") are grades only when grade words frame them, or when they open the
 // plan name as its label ("8–12: full payment"); a kindergarten's "3-6 години" is ages, and
 // "Вноски 1-2:" counts instalments.
@@ -29,6 +29,7 @@ function normalize(text) {
     .toLocaleLowerCase('bg')
     .replace(/[–—]/g, '-')
     .replace(/х/g, 'x') // Cyrillic "Х" is often typed for the Roman ten
+    .replace(/і/g, 'i') // and Cyrillic "І" for the Roman one (568's "I - VIІ клас")
     .replace(/\s+/g, ' ')
     .trim()
 }
@@ -97,6 +98,17 @@ const GRADES_IN_TEXT_RES = [
   new RegExp(`(?<![\\p{L}\\p{N}])(\\d{1,2})(?:st|nd|rd|th)\\s+grade(?![\\p{L}])`, 'gu'),
 ]
 
+// A list of grades: "7, 8, 9, 10, 11, 12 клас", "1, 2, 3, 4, 5, 6 и 7 клас" (170, 520). Only
+// a run of consecutive grades is a band; "1 и 5 клас" is not grades 1 to 5.
+const GRADE_LIST_RE = /(?<![\p{L}\p{N}.])((?:\d{1,2}|[ivx]{1,4})(?:\s*(?:,|и|and)\s*(?:\d{1,2}|[ivx]{1,4}))+)\.?\s*(?:клас|кл(?!\p{L}))/gu
+
+function gradeList(text) {
+  const grades = text.split(/\s*(?:,|и|and)\s*/).map(gradeOf)
+  if (grades.some(grade => grade == null)) return null
+  const consecutive = grades.every((grade, index) => index === 0 || grade === grades[index - 1] + 1)
+  return consecutive ? { from: grades[0], to: grades[grades.length - 1] } : null
+}
+
 // School stages by name, when a whole part of the text is the stage ("Гимназия",
 // "Начален и Прогимназиален етап", "Гимназия / 8 – 10. клас"); a school called "Частна
 // гимназия …" may teach grades 1-12, and "Начално плащане" is a first payment.
@@ -151,6 +163,7 @@ export function gradesInText(text) {
       found = widen(found, band(match[1], match[2]))
     }
   }
+  for (const match of normalized.matchAll(GRADE_LIST_RE)) found = widen(found, gradeList(match[1]))
   return found
 }
 

@@ -66,6 +66,34 @@ export function isClosedGroupFee(row) {
     || CLOSED_GROUP_NOTE_RE.test(String(context.notes || ''))
 }
 
+// The terms a price is on when it is not the school's regular price, by the words the fees
+// reader is told to put in its name (`docs/AGENT_FEE_EXTRACTION.md`): a promotion (625's
+// "промоционална такса за първите 3 месеца", 171's Christmas offer), a discount (505's
+// "2nd child (-9%)", 286's second child) or surcharge ("+5%"), a prepaid price (625's
+// "Еднократно плащане за 6 месеца", 185's "при предплащане"), a price for paying in parts
+// (568's "при разсрочено плащане") or for paying the whole fee at once (220's €250 off).
+// Not "при месечно плащане" (185), the regular way to pay, nor 154's "annual subscription",
+// its regular contract next to a dearer flexible one.
+const PRICE_TERMS = [
+  ['promotion', /промоци|(?<![\p{L}])промо(?![\p{L}])|promo(?:tion|tional)?(?![\p{L}])|special offer|специална (?:оферта|цена)|коледн|christmas|early[- ]bird|ранно записване|(?:първите|first) \d+ (?:месеца|months)/iu],
+  ['discount', /отстъпк|discount|намален|reduced|(?:втор|трет|четвърт)(?:о|ото) дете|(?:second|third|fourth|2nd|3rd|4th) child|sibling|[(\s][-−–+]\s?\d+(?:[.,]\d+)?\s?%/iu],
+  ['prepaid', /предплащ|авансов|prepa(?:id|y)|in advance|(?:еднократно|наведнъж)(?: плащане)? за (?:\d+|цял|една)|at once/iu],
+  ['instalments', /разсроч|deferred|(?<![\p{L}])(?:на|в|in)\s+(?:[2-9]|1\d|две|три|четири|пет|шест|девет|десет|two|three|four|five|six|nine|ten)\s+(?:равни\s+|equal\s+|месечни\s+|monthly\s+)?(?:вноски|instal+ments|payments)|(?<![\p{L}])(?:на|in)\s+(?:вноски|instal+ments)/iu],
+  ['one_payment', /еднократно плащане|one-time payment|single payment|paid in full/iu],
+]
+
+/**
+ * The terms a fee's own name puts it on (`promotion`, `discount`, `prepaid`, `instalments`,
+ * `one_payment`), or null for the school's regular price.
+ */
+export function priceTerms(row) {
+  const words = [row?.plan_name, row?.pricing_context?.plan_name_en].filter(Boolean).join(' / ')
+  if (!words) return null
+  const found = PRICE_TERMS.find(([, re]) => re.test(words))
+  if (found) return found[0]
+  return isOnePayment(row?.plan_name) ? 'one_payment' : null
+}
+
 // Registration fees are paid once and uniform items are bought once, so a missing period is no news.
 const ONE_OFF_CATEGORIES = new Set(['registration', 'uniforms'])
 

@@ -285,6 +285,8 @@
     },
     "pricePerPeriod": "{{price}} {{currency}} / {{period}}",
     "priceOnly": "{{price}} {{currency}}",
+    "rangeEnds": "{{low}}: {{lowPrice}} · {{high}}: {{highPrice}}",
+    "includesOptional": "Включва незадължителна такса: {{name}}, {{price}}",
     "other": "Други такси",
     "sourceLink": "Източник: {{site}}",
     "sourceLinkLabel": "Вижте тези цени на {{site}} (отваря се в нов прозорец)",
