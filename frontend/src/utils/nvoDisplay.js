@@ -5,16 +5,22 @@ import { getBenchmarkComparison, getBenchmarkToneClasses } from './nvo.js'
 // How NVO results are coloured and explained on the card, the compare page and the detail
 // page. Kept in one place so the three agree.
 
+const percentFormatters = new Map()
+
 /**
  * A result with a fixed number of decimals in the page language's style ("56,4" on the
  * Bulgarian page, "56.4" on the English one); null for no value.
  */
 export function formatPercent(value, decimals = 1, language = i18next.language) {
   if (value == null || Number.isNaN(Number(value))) return null
-  return new Intl.NumberFormat(intlLocale(language), {
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals,
-  }).format(Number(value))
+  const key = `${intlLocale(language)}:${decimals}`
+  if (!percentFormatters.has(key)) {
+    percentFormatters.set(key, new Intl.NumberFormat(intlLocale(language), {
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals,
+    }))
+  }
+  return percentFormatters.get(key).format(Number(value))
 }
 
 export function getPerformanceStyle(value) {

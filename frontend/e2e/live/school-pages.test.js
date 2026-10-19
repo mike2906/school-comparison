@@ -231,8 +231,8 @@ describe('a school page', () => {
   })
 
   test('the Bulgarian page writes exam results with a decimal comma', async () => {
-    const school = await findSchool('with an NVO result that has decimals', s =>
-      (s.exam_results || []).some(row => /^nvo/.test(row.exam_type) && !Number.isInteger(Number(row.value))))
+    // Results always show one decimal ("56,0 т."), so any school with NVO results will do.
+    const school = await findSchool('with NVO results', s => getAvailableExamTypes(s.exam_results || []).length > 0)
     await open('bg', `/schools/${school.id}`)
     const section = card(t('bg', 'schools.academicPerformance'))
     await section.getByText(/\d,\d т\./).first().waitFor()
