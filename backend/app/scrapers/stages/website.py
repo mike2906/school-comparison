@@ -125,7 +125,7 @@ async def run_validate_urls_batch(
     from app.models import School
     from app.scrapers.url_validator import extract_validation_aliases, validate_school_url
 
-    query = select(School.id, School.website_url, School.name_i18n, School.attributes).where(
+    query = select(School.id, School.website_url, School.name_i18n, School.attributes, School.city).where(
         School.country_code == country,
         School.website_url.isnot(None),
     )
@@ -181,6 +181,7 @@ async def run_validate_urls_batch(
             website_url: str,
             school_name: Optional[str],
             school_aliases: list[str],
+            school_city: Optional[str],
         ) -> tuple[int, str, dict]:
             async with semaphore:
                 school_usage: dict = {}
@@ -193,6 +194,7 @@ async def run_validate_urls_batch(
                         school_name=school_name,
                         school_aliases=school_aliases,
                         usage_out=school_usage,
+                        school_city=school_city,
                     )
                     return school_id, result.value, school_usage
                 except Exception as exc:
@@ -206,9 +208,10 @@ async def run_validate_urls_batch(
                     website_url=website_url,
                     school_name=(name_i18n or {}).get("bg") or (name_i18n or {}).get("en"),
                     school_aliases=extract_validation_aliases(attributes),
+                    school_city=city_code,
                 )
             )
-            for school_id, website_url, name_i18n, attributes in schools
+            for school_id, website_url, name_i18n, attributes, city_code in schools
             if website_url
         ]
 
@@ -485,6 +488,7 @@ async def run_validate_url(db, school_id: int, country: str):
         update_db=True,
         school_name=(school.name_i18n or {}).get("bg") or (school.name_i18n or {}).get("en"),
         school_aliases=extract_validation_aliases(school.attributes),
+        school_city=school.city,
     )
 
     console.print(f"  Result: {validation_result.value} - {reason}")

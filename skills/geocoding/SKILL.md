@@ -122,6 +122,14 @@ over 300 m from OSM's, whose school number differs, or whose website differs go 
 issue "Schools that disagree with OpenStreetMap", after the week's pins are published, with its text replaced only when the list changes. Each is a
 lead: fix from the school's site or an official source, never by copying OSM (ODbL).
 
+The weekly run also runs `site-city` (free, no model): an accepted website whose home page
+title, main heading or site name names another town ("гр.Варна" on a Sofia school's site,
+2026-10-19) takes the URL-validation failure path, so its data leaves the site with that
+run's publish and `recover-failed-urls` looks for the real site. More than `SITE_CITY_MAX`
+(3) at once withholds none and opens the issue "Website town check stopped"; the pins go
+ahead either way. URL validation applies the same rule to new sites
+(`app/scrapers/site_city.py`).
+
 A new city needs its write bounds and its local name in `website_pins.CITY_NAMES`, then
 one supervised run before the cron takes it (`PINS_CITY`).
 

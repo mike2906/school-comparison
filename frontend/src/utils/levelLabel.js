@@ -46,8 +46,10 @@ export function schoolLevelLabel(school, t, config = null) {
   const kindergartenGroups = config ? getExclusiveAgeGroups(config, 'kindergarten') : FALLBACK_KINDERGARTEN_GROUPS
   const gradeBands = config ? getGradeBands(config) : FALLBACK_GRADE_BANDS
   const parts = []
-  if (kindergartenGroups.some(group => groups.has(group))) {
-    parts.push(t('educationLevels.kindergarten'))
+  const earlyYears = kindergartenGroups.filter(group => groups.has(group))
+  if (earlyYears.length > 0) {
+    // A nursery (СДЯ) takes only the youngest children; it is not a kindergarten.
+    parts.push(t(earlyYears.every(group => group === 'nursery') ? 'educationLevels.nursery' : 'educationLevels.kindergarten'))
   }
   const ranges = gradeRanges(groups, gradeBands)
   if (ranges.length > 0) {

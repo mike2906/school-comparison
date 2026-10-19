@@ -877,6 +877,36 @@ def osm_check_command(city, country, report_path, issue_path):
         console.print(f"Report: {report_path}")
 
 
+@cli.command("site-city")
+@click.option("--school-id", "school_ids", type=int, multiple=True, help="Check these schools (repeatable)")
+@click.option("--city", default="sofia", show_default=True, help="City")
+@click.option("--country", default="bg", show_default=True, help="Country code")
+@click.option("--limit", type=int, default=None, help="Maximum schools")
+@click.option("--apply", "apply_changes", is_flag=True, help="Withhold the sites hit (default is a dry run that writes nothing)")
+@click.option("--out", "report_path", type=click.Path(dir_okay=False, path_type=Path), help="Write the JSON report")
+def site_city_command(school_ids, city, country, limit, apply_changes, report_path):
+    """Withhold accepted websites whose home page title names another town."""
+    import json
+
+    from app.database import async_session_maker
+    from app.scrapers.stages import site_city
+
+    async def _run():
+        async with async_session_maker() as db:
+            return await site_city.run_site_city(
+                db, country=country, city=city, school_ids=school_ids, limit=limit, apply=apply_changes
+            )
+
+    report = asyncio.run(_run())
+    console.print(f"Checked {report['checked']} sites ({report['unread']} not read); another town on {len(report['hits'])}")
+    for hit in report["hits"]:
+        state = "withheld" if hit.get("withheld") else "would withhold"
+        console.print(f"  {hit['school_id']} {hit['name_bg']}: {hit['website']} names {hit['town']} ({state})")
+    if report_path is not None:
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        report_path.write_text(json.dumps(report, ensure_ascii=False, indent=1), encoding="utf-8")
+
+
 @cli.command("publish-diff")
 @click.option("--city", default="sofia", show_default=True, help="City")
 @click.option("--country", default="bg", show_default=True, help="Country code")

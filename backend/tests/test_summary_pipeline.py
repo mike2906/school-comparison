@@ -755,7 +755,7 @@ def test_fallback_summary_derives_shorter_en_name_and_article():
     result = ai_summariser._build_fallback_summary(summary_input)
 
     assert result["bg"]["short"] == 'Френско училище "Виктор Юго" в София е международно училище в София.'
-    assert result["en"]["short"] == "Viktor Yugo is an international school in Sofia."
+    assert result["en"]["short"] == "Victor Hugo is an international school in Sofia."
 
 
 def test_fallback_summary_uses_acronym_for_generic_bg_name():

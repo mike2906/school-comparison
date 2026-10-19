@@ -30,6 +30,7 @@ from app.utils.display_gating import (
     blocked_display_fields,
 )
 from app.utils.display_lists import (
+    INSTRUCTION_LANGUAGE_STATE,
     canonical_language,
     instruction_languages,
     is_list_noise,
@@ -406,20 +407,33 @@ def build_localized_attributes(
     instruction = instruction_languages(
         _as_list(attrs.get("languages_of_instruction")), school_type
     )
+    # A plain "Bulgarian" at a school taught in Bulgarian says nothing, and every school
+    # here but an international one is; a focus with a level ("English: immersion" at a
+    # bilingual school) is kept.
+    plain_dropped = set(instruction) | ({INSTRUCTION_LANGUAGE_STATE} if school_type != "international" else set())
     focus = _normalize_focus_entries([
         {**entry, "language": language}
         for entry in _normalize_focus_entries(
             _normalize_focus_entries(attrs.get("language_focus"))
-            + _normalize_focus_entries(extracted.get("languages"))
+            # Both locales' readings: the language list is a fact, the same on either page.
+            + _normalize_focus_entries([
+                item
+                for source in (
+                    _as_mapping(attrs.get("extracted")),
+                    *(_as_mapping(_as_mapping(attrs.get("extracted_i18n")).get(other)) for other in DISPLAY_LOCALES),
+                )
+                for item in _as_list(source.get("languages"))
+            ])
             + _normalize_focus_entries(
                 [item for fact in _published_facts(attrs) for item in _as_list(fact.get("languages"))]
             )
         )
-        # A plain "Bulgarian" at a school taught in Bulgarian says nothing; a focus with a
-        # level ("English: immersion" at a bilingual school) is kept.
         if (language := canonical_language(entry["language"]))
-        and (entry.get("level") or language not in instruction)
+        and (entry.get("level") or language not in plain_dropped)
     ])
+    # "English" beside "English (enrichment)" is the same language listed twice.
+    with_level = {entry["language"] for entry in focus if entry.get("level")}
+    focus = [entry for entry in focus if entry.get("level") or entry["language"] not in with_level]
 
     def admission_values(field_name: str) -> list[str]:
         return [

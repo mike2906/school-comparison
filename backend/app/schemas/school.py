@@ -7,6 +7,7 @@ from pydantic import (
     ConfigDict,
     Field,
     JsonValue,
+    PrivateAttr,
     computed_field,
     field_validator,
     model_validator,
@@ -15,6 +16,7 @@ from pydantic import (
 from app.models.pricing import PriceSource
 from app.schemas.field_source import FieldSourceResponse
 from app.schemas.pricing import PricingContextResponse, PricingResponse
+from app.utils.address_place import school_town, with_place
 from app.utils.display_gating import (
     UNVERIFIED_PIN_PRECISION,
     blocked_pricing_row_ids,
@@ -214,6 +216,18 @@ class SchoolAttributesMixin(BaseModel):
         translate_cutoffs(payload, self.text_translations)
         return payload or None
 
+    @model_validator(mode="after")
+    def place_location_addresses(self) -> "SchoolAttributesMixin":
+        """Give each location the school's settlement and district for its display address."""
+        town = school_town(self.raw_attributes)
+        admission = self.raw_admission_info if isinstance(self.raw_admission_info, dict) else {}
+        district = admission.get("admin_district")
+        for location in getattr(self, "locations", None) or []:
+            if isinstance(location, SchoolLocationBase):
+                location._school_town = town
+                location._school_district = district if isinstance(district, str) else None
+        return self
+
 
 class SchoolPricingMixin(SchoolAttributesMixin):
     """Projects the ORM pricing rows into the public payload, gated by P1.7.
@@ -304,6 +318,11 @@ class SchoolLocationBase(BaseModel):
         exclude=True,
     )
     is_primary: bool = True
+    # The kg.sofia district of this building; the school's settlement and district are set
+    # by the school response (``SchoolAttributesMixin.place_location_addresses``).
+    raw_district: Optional[str] = Field(default=None, validation_alias="district", exclude=True)
+    _school_town: Optional[str] = PrivateAttr(default=None)
+    _school_district: Optional[str] = PrivateAttr(default=None)
 
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
@@ -336,7 +355,12 @@ class SchoolLocationBase(BaseModel):
     @computed_field(return_type=dict[str, str])
     @property
     def resolved_address_i18n(self) -> dict[str, str]:
-        return publishable_display_i18n(resolve_address_i18n(self.address_i18n))
+        resolved = with_place(
+            resolve_address_i18n(self.address_i18n),
+            town=self._school_town,
+            district=self.raw_district or self._school_district,
+        )
+        return publishable_display_i18n(resolved)
 
 
 class SchoolLocationResponse(SchoolLocationBase):

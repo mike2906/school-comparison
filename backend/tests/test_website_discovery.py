@@ -845,6 +845,7 @@ class TestWebsiteDiscovery:
             update_db,
             school_name,
             school_aliases=None,
+            school_city=None,
         ):
             await db_session.refresh(school)
             if "zvezdichka" in url:
@@ -899,7 +900,7 @@ class TestWebsiteDiscovery:
         discoverer = WebsiteDiscoverer(country_code="bg")
         validated: list[str] = []
 
-        async def mock_validate(school_id, url, country_code, update_db, school_name, school_aliases=None):
+        async def mock_validate(school_id, url, country_code, update_db, school_name, school_aliases=None, school_city=None):
             validated.append(url)
             school.website_url = url
             school.scrape_status = "validated"
