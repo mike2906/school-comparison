@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { periodFromLabel, periodUnknown, pricePeriod, rowAgeGroupKeys, rowsForAgeGroup, splitRowsForAgeGroup } from './priceRows.js'
+import { isClosedGroupFee, periodFromLabel, periodUnknown, pricePeriod, rowAgeGroupKeys, rowsForAgeGroup, splitRowsForAgeGroup } from './priceRows.js'
 
 test('periodFromLabel: the period a fee name states', () => {
   const cases = {
@@ -147,4 +147,24 @@ test('periodUnknown: not for registration fees or uniform items, which are paid 
   assert.equal(periodUnknown({ category: 'uniforms', plan_name: 'Тениска с къс ръкав', period: null }), false)
   assert.equal(periodUnknown({ category: 'food', plan_name: 'Храна обяд', period: null }), true)
   assert.equal(periodUnknown({ category: 'food', plan_name: 'Месечна такса храна', period: null }), false)
+})
+
+test('isClosedGroupFee: special needs, returning pupils and staff children only', () => {
+  for (const row of [
+    { plan_name: 'Ученици със СОП' },
+    { plan_name: 'FOR SEPTEMBER-MAY/JUNE — returning children with signed contracts before 31.05.2026' },
+    { pricing_context: { notes: 'For returning students with signed contracts before 30.04.2025.' } },
+    { age_group: 'Деца на служители' },
+    { pricing_context: { plan_name_en: 'Pupils with special educational needs' } },
+  ]) {
+    assert.equal(isClosedGroupFee(row), true, JSON.stringify(row))
+  }
+  for (const row of [
+    { plan_name: 'FOR SEPTEMBER-MAY/JUNE — new children' },
+    { plan_name: 'Такса обучение / При записване след 20.02.2026 г.' },
+    { plan_name: 'Сопрано и пиано' },
+    { plan_name: 'Senior school' },
+  ]) {
+    assert.equal(isClosedGroupFee(row), false, JSON.stringify(row))
+  }
 })

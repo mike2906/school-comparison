@@ -49,6 +49,17 @@ export function pricePeriod(row) {
   return null
 }
 
+// A fee for pupils a new family's child is not: special educational needs (171's "Ученици със
+// СОП"), pupils already at the school (555's and 594's returning-children rates), staff's children.
+const CLOSED_GROUP_RE = /(?<![\p{L}])(?:соп|sen)(?![\p{L}])|специални образователни потребности|special (?:educational )?needs|(?:returning|existing|current) (?:students|pupils|children)|настоящи ученици|деца на (?:служители|учители|персонала)|(?:staff|employees?)['’]?s? children|children of (?:staff|employees)/iu
+
+/** True when a fee's own words say it is only for a closed group of pupils. */
+export function isClosedGroupFee(row) {
+  const context = row?.pricing_context || {}
+  const words = [row?.plan_name, row?.age_group, context.notes, context.plan_name_en, context.age_group_en]
+  return words.some(text => CLOSED_GROUP_RE.test(String(text || '')))
+}
+
 // Registration fees are paid once and uniform items are bought once, so a missing period is no news.
 const ONE_OFF_CATEGORIES = new Set(['registration', 'uniforms'])
 
