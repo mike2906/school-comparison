@@ -84,3 +84,10 @@ def test_a_stored_english_address_is_not_given_a_place_twice():
 def test_a_longer_english_word_does_not_count_as_the_place():
     resolved = {"bg": "ул. Изгревска 3", "en": "ul. Izgrevska 3"}
     assert with_place(resolved, town=None, district="Изгрев")["en"] == "ul. Izgrevska 3, Izgrev district"
+
+
+def test_a_sofia_city_school_with_only_the_town_code_gets_its_village():
+    # Sofia-city rows carry the MoE town code (EKATTE) without its name.
+    assert school_town({"moe_region_code": 22, "moe_town_code": 16448}) == "Горни Богров"
+    assert school_town({"moe_region_code": 22, "moe_town_code": 68134}) is None
+    assert school_town({"moe_region_code": 22, "moe_town_code": 99999}) is None

@@ -16,6 +16,48 @@ from typing import Any
 from app.utils.display_names import english_address
 
 SOFIA = "София"
+# Столична municipality's settlements outside the city by EKATTE code, which is what the
+# MoE register's ``moe_town_code`` is. Sofia-city rows were imported before the importer
+# stored ``moe_town_name``, so the code is often all a school has (НСИ ЕКАТТЕ, SOF46).
+STOLICHNA_SETTLEMENTS = {
+    357: "Нови Искър",
+    2511: "Балша",
+    2659: "Банкя",
+    4234: "Бистрица",
+    7106: "Бусманци",
+    7140: "Бухово",
+    11394: "Владая",
+    11884: "Войнеговци",
+    12084: "Волуяк",
+    14831: "Герман",
+    16448: "Горни Богров",
+    21662: "Доброславци",
+    22304: "Долни Богров",
+    22472: "Долни Пасарел",
+    29150: "Железница",
+    29204: "Желява",
+    29430: "Житен",
+    32216: "Иваняне",
+    35239: "Казичене",
+    37280: "Клисура",
+    37914: "Кокаляне",
+    39791: "Кривина",
+    40436: "Кубратово",
+    41010: "Кътина",
+    44063: "Лозен",
+    44224: "Локорско",
+    46721: "Мало Бучино",
+    48393: "Мировяне",
+    49206: "Мрамор",
+    49597: "Мърчаево",
+    51250: "Негован",
+    55419: "Панчарево",
+    56624: "Плана",
+    57011: "Подгумер",
+    65601: "Световрачене",
+    80409: "Чепинци",
+    87401: "Яна",
+}
 # София-град and София-област: the settlements whose names we show beside an address.
 SOFIA_REGION_CODES = frozenset({22, 23})
 
@@ -46,6 +88,11 @@ def school_town(attributes: Mapping[str, Any] | None) -> str | None:
     except (TypeError, ValueError):
         return None
     town = attrs.get("moe_town_name")
+    if not isinstance(town, str) and region == 22:
+        try:
+            town = STOLICHNA_SETTLEMENTS.get(int(attrs.get("moe_town_code")))
+        except (TypeError, ValueError):
+            town = None
     if region not in SOFIA_REGION_CODES or not isinstance(town, str):
         return None
     town = " ".join(town.split())
