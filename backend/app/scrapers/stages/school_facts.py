@@ -309,6 +309,7 @@ async def run_school_facts(
                         pick_prompt=facts_rules.PICK_PROMPT,
                         fallback_links=facts_rules.FALLBACK_LINK_RE,
                         stage=STAGE,
+                        must_read=facts_rules.ADMISSION_LINK_RE,
                     )
 
                 async def one(school_db: AsyncSession, current_id: int) -> dict[str, Any]:

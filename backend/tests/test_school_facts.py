@@ -395,6 +395,26 @@ def test_the_judge_sees_the_page_of_each_quote():
     assert "Page: https://school.example/anglijski-ezik/" in message
 
 
+def test_the_judge_reads_admission_grade_0_as_kindergarten():
+    # 545, 616: "accepts children aged 2 to 7" failed against a bare "Admission grade: 0".
+    fact = _fact("admissions", "ЧДГ приема деца на възраст от 2 до 7 год.")
+    fact.admission_grade = 0
+    assert "Admission grade: 0 (kindergarten or preschool class)" in judge_message([(fact, HOME)])
+
+
+def test_admission_links_match_both_alphabets_and_k():
+    from app.scrapers.extraction.school_facts import ADMISSION_LINK_RE
+
+    for text in (
+        "https://www.svetasofia.com/kandidatstvane/ Kандидатстване",
+        "/priem-v-parvi-klas/",
+        "Прием",
+        "/admission/",
+    ):
+        assert ADMISSION_LINK_RE.search(text)
+    assert not ADMISSION_LINK_RE.search("https://www.svetasofia.com/drugite-za-nas/ot-decata От децата")
+
+
 @pytest.mark.asyncio
 async def test_a_full_read_with_no_fact_kept_replaces_the_stored_facts():
     old = {"_schema_version": 1, "facts": [{"topic": "meals"}]}

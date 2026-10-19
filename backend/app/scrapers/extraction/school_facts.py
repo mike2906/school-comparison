@@ -45,8 +45,12 @@ and a parent: about the school, curriculum or programme, subjects and languages 
 daily schedule and after-school care, admissions, clubs and activities, transport, meals, facilities,
 support for children with special needs. You get the institution's name, the pages read so far, and the
 same-site links not yet opened, as "URL | link text". Return up to 4 URLs, copied exactly from the list,
-most useful first. Skip news, galleries, events, contacts, documents and policies, and fee pages.
-Return none if nothing fits."""
+most useful first. Skip news, galleries, events, contacts, documents and policies, fee pages, and
+testimonials or reviews (отзиви, мнения, "от децата", "от родителите"). Return none if nothing fits."""
+
+# Always opened (up to 2 a site): how admission works is a key fact the picker can pass over.
+# "андидатств" also matches 172's menu, which spells "Кандидатстване" with a Latin K.
+ADMISSION_LINK_RE = re.compile(r"прием|андидатств|kandidat|priem|admission|enrol", re.IGNORECASE)
 
 # When the picker returns nothing, follow links whose URL or text names one of these topics.
 FALLBACK_LINK_RE = re.compile(
@@ -68,11 +72,15 @@ a parent comparing schools would use. File each fact under one topic:
 - activities: named sports, clubs, teams and arts on offer
 - facilities: notable rooms and grounds (pool, sports hall, labs, library)
 - support: psychologist, speech therapist, resource teacher, support for special educational needs
-- admissions: how admission works (test, interview, ranking) when stated as the current process
+- admissions: how admission works for each grade or age as the page describes it now: an entrance exam or
+  test and its subjects or rounds, an interview or talk with a psychologist, trial days, year-round admission
+  while places are free, which ages or birth years are taken; and, for the current or coming school year (name
+  it), the places offered and the exam dates
 Do not list: fees or prices; exam results, rankings or competitions won; mission statements, values or claims
 anyone could make ("individual approach", "modern facilities", "caring environment", "excellent conditions");
 news, events, one-off projects; anything dated to a past school year; counts that change every year (pupils,
-classes, teachers, rooms, computers, years since founding). Class size and times of day are not such counts.
+classes, teachers, rooms, computers, years since founding). Class size, times of day and the places offered in
+an intake are not such counts. An admissions page whose dates have passed still states how admission works.
 Rules:
 - Only what the pages state about this institution. If a page covers a sister school or kindergarten,
   leave its facts out unless they plainly apply to this one.
@@ -110,7 +118,8 @@ Rules:
     holiday programme's.
   - admission: how children are admitted, only as the quote states it: any of entrance_exam, interview,
     trial_day, open_entry (the quote says there is no test or interview); admission_grade: the grade it is
-    for (0 for kindergarten or preschool), when stated; for a range of grades (grades 2 to 4), admission_grade
+    for (0 for kindergarten or preschool), only when the quote names the grade or the kindergarten or
+    preschool class; for a range of grades (grades 2 to 4), admission_grade
     is the first and admission_grade_to the last; exam_subjects: the subjects of an entrance exam, each as {"bg", "en"}.
   - places: full or waiting_list when the quote says a class or grade has no places or a waiting list for the
     current or coming school year (admission_grade for which grade).
@@ -320,6 +329,8 @@ def _labels(fact: Fact) -> str:
             continue
         if isinstance(value, list):
             value = ", ".join(_label_text(item) for item in value)
+        elif key in ("admission_grade", "admission_grade_to") and value == 0:
+            value = "0 (kindergarten or preschool class)"  # a bare 0 reads as a grade the quote never names
         lines.append(f"\n{key.replace('_', ' ').capitalize()}: {value}")
     return "".join(lines)
 

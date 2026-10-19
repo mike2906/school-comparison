@@ -25,7 +25,11 @@ some picks were trivia, yearly counts go stale, the paragraph only restated the 
 ## How it works (`school-facts` stage, not part of `all`)
 
 1. **Find.** The fees agent's finder (`find_pages`) with its own link prompt: about,
-   curriculum, school day, admissions, clubs, transport, meals, support pages.
+   curriculum, school day, admissions, clubs, transport, meals, support pages; testimonials
+   are skipped. Up to 2 admissions links (`ADMISSION_LINK_RE`: прием, кандидатстване,
+   priem, admission) are always opened ahead of the picker's choices: on 2026-10-14, 27 of
+   the 40 private Sofia schools with no admissions fact never had their admissions page
+   read (172's picker took the pupils' testimonials over /kandidatstvane/).
 2. **Read.** One `pricing`-tier call lists up to 20 facts, each under one fixed topic
    (`app/utils/school_facts.py` `TOPICS`: curriculum, languages, school_day, class_size,
    meals, transport, activities, facilities, support, admissions), in Bulgarian and English,

@@ -5,6 +5,7 @@ The browser, the HTTP client, robots.txt and the link-picking model are stubbed.
 
 from __future__ import annotations
 
+import re
 from types import SimpleNamespace
 
 import pytest
@@ -356,3 +357,19 @@ def test_calls_in_flight_count_against_the_cap():
             with spend.hold(0.05):
                 pass
     assert spend.pending_usd == 0 and spend.allows(0.05)
+
+
+async def test_must_read_links_are_opened_ahead_of_the_picks(monkeypatch):
+    # 172: the picker chose the testimonials over /kandidatstvane/, so its admissions were never read.
+    admission = "https://meridian22.org/kandidatstvane/"
+    others = [f"https://meridian22.org/p{n}/" for n in range(4)]
+    crawler = _Crawler({
+        HOME: [("Начало " + "x" * 300, [(admission, "Kандидатстване"), *[(url, "Страница") for url in others]])],
+        **{url: [("Текст " + "x" * 300, [])] for url in [admission, *others]},
+    })  # fmt: skip
+    monkeypatch.setattr(fees_agent, "_pick", _picks(others))
+    must = re.compile(r"кандидатств|kandidat", re.IGNORECASE)
+    read = await fees_agent.find_pages(crawler, None, _Client(), _school(), Spend(0.05), must_read=must)
+    assert [p.url for p in read] == [HOME, admission, *others]
+    plain = await fees_agent.find_pages(_Crawler(crawler.pages), None, _Client(), _school(), Spend(0.05))
+    assert admission not in [p.url for p in plain]

@@ -90,6 +90,7 @@ DEFAULT_MAX_USD = 0.50
 MAX_HOPS = 3
 MAX_PICKS = 4
 MAX_FETCHES = 12
+MAX_MUST_READ = 2
 MAX_LINKS_SHOWN = 150
 MAX_READ_CHARS = 120_000
 THIN_PAGE_CHARS = 300
@@ -294,11 +295,14 @@ async def find_pages(
     fallback_links: re.Pattern = _FEE_LINK_RE,
     stage: str = STAGE,
     read_pictures: bool = False,
+    must_read: Optional[re.Pattern] = None,
 ) -> list[PageRead]:
     """Up to 3 hops and 12 pages from the home page; robots.txt is respected.
 
     With ``read_pictures``, up to 4 pictures named for fees are read as pages of their own.
-    The school-facts stage passes its own link prompt, fallback keywords and stage name."""
+    The school-facts stage passes its own link prompt, fallback keywords and stage name, and
+    ``must_read``: links whose URL or text it matches are opened ahead of the picker's choices
+    (``MAX_MUST_READ`` in all), since the picker can fill its places with other pages."""
     from crawl4ai.utils import RobotsParser  # type: ignore
 
     robots = RobotsParser()
@@ -310,6 +314,7 @@ async def find_pages(
     queue = [site]
     pictures: list[tuple[str, str, str]] = []
     picture_pages: list[PageRead] = []  # read after the pages, so they take none of the page slots
+    must_left = MAX_MUST_READ
 
     async def allowed(url: str) -> bool:
         return await robots.can_fetch(url, CRAWLER_USER_AGENT)
@@ -396,6 +401,11 @@ async def find_pages(
         this_year = _this_years_pages()
         keyword.sort(key=lambda url: not this_year.search(f"{unquote(url)} {links.get(url, '')}"))
         queue = (queue + keyword)[:MAX_PICKS]
+        if must_read is not None and must_left:
+            # 172's picker took the testimonials over /kandidatstvane/ in two runs of two.
+            must = [url for url, label in unopened if must_read.search(f"{unquote(url)} {label}")][:must_left]
+            must_left -= len(must)
+            queue = must + [url for url in queue if url not in must]
         if not queue:
             break
     # Pictures first: they are short, and the reader's text is cut at its limit from the end.
