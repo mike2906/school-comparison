@@ -56,12 +56,16 @@ internal): a "From the school's website" box on the school page with the key fac
 most, 2 a topic; later key facts show as `more`), a "show more" for the rest, a link to
 each fact's page and the date it was read; and a compare-page section with one row per
 topic any compared school has a key fact for. `minor` facts are not shown. A school with
-none shows nothing.
+none shows nothing. A fact about a summer school, camp or holiday programme is never `key`
+(its hours or meals would read as the school year's), and a fact that reports a pupil's,
+parent's or graduate's remark is not shown at all.
 
 **Labels feed the existing filters and fields** (`publication_attributes`): a shown fact's
 tags join `filter_tags` (so the search filters and the compare page's meals, transport and
 after-school rows see them), its languages join `language_focus`, and its class size is
-used when no curated one exists (before the old extraction's). The response also carries
+used when no curated one exists (before the old extraction's), unless the fact is about one
+grade, intake, profile or course, or a summer programme: the fact still shows, but the
+class-size tile is for the whole school. The response also carries
 `school_facts.at_a_glance` (`at_a_glance` in `app/utils/school_facts.py`): admissions per
 grade or range (a fact naming no grade stays its own row), places (only for 180 days after the read), the highest grade stated, curricula,
 diploma, the first application window not yet closed, instruction languages, language

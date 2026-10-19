@@ -59,10 +59,14 @@ function RoundCell({ round }) {
         <CutoffValue round={round} />
         {round.tie_at_cutoff && <span className="ml-1 text-xs font-normal text-neutral-500">{t('cutoffs.tie')}</span>}
       </div>
-      {/* The source's round names are Bulgarian only and sometimes cut off; the column says which round. */}
+      {/* The source's round names are Bulgarian only and sometimes cut off; the column says which round.
+          The places it ranked show why "Everyone admitted" can follow a full class (333: 1 place in September). */}
       <div className="text-xs text-neutral-500">
-        {[round.round_kind === 'current' ? t('cutoffs.currentRound') : null, formatRankingDay(round.classified_on, i18n.language)]
-          .filter(Boolean).join(' · ')}
+        {[
+          round.round_kind === 'current' ? t('cutoffs.currentRound') : null,
+          round.places > 0 ? t('cutoffs.places', { count: round.places }) : null,
+          formatRankingDay(round.classified_on, i18n.language),
+        ].filter(Boolean).join(' · ')}
       </div>
     </td>
   )
@@ -80,6 +84,8 @@ function CutoffTable({ rows, isCurrentRules = () => null }) {
   // Explain the cells a parent can't read on their own, once each, only when they appear.
   const shown = rows.flatMap(row => [row.first, showLatestRound(row) ? row.latest : null]).filter(Boolean)
   const legend = [
+    // Two rankings side by side read as one result unless it is said they are separate.
+    (rows.some(showLatestRound) || shown.some(round => round.round_kind === 'current')) && 'rounds',
     shown.some(round => round.round_kind === 'current') && 'current',
     shown.some(round => cutoffValue(round)?.kind === 'everyone') && 'everyone',
     shown.some(round => cutoffValue(round)?.kind === 'noPlaces') && 'noPlaces',

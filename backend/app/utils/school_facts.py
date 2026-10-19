@@ -126,7 +126,7 @@ def _labels(fact: Mapping[str, Any]) -> dict[str, Any]:
     return {
         "tags": [tag for tag in dict.fromkeys(_as_list(fact.get("tags"))) if tag in TAG_GROUPS],
         "languages": _languages(fact.get("languages")),
-        "max_class_size": None if _seasonal(fact) else _class_size(fact.get("max_class_size")),
+        "max_class_size": None if _seasonal(fact) or _one_part(fact) else _class_size(fact.get("max_class_size")),
         "instruction_languages": [
             name
             for name in dict.fromkeys(canonical_language(v) for v in _as_list(fact.get("instruction_languages")))
@@ -275,6 +275,32 @@ def _seasonal(fact: Mapping[str, Any]) -> bool:
     return any(isinstance(part, str) and _SEASONAL_RE.search(part) for part in parts)
 
 
+# A class size for one grade, intake, profile or course is not the school's (278: one
+# first-grade class of 18; 333: 24 in grade 1, 26 in grade 5; 517: course groups). The
+# fact still shows with its scope in its words; only the class-size tile leaves it out.
+# Read from the English line the reader writes, which names the scope the same way.
+_ONE_PART_RE = re.compile(r"\b(?:grades?|preparatory|intake|profiles?|tracks?|courses?|parallel)\b", re.IGNORECASE)
+# "In all grades", but not "in each grade 1 class" (204).
+_ALL_GRADES_RE = re.compile(r"\b(?:all|every|each)\s+grades?\b(?!\s*[\dIVX])", re.IGNORECASE)
+# A pupil's or parent's remark quoted on the site is not something the school states
+# (506: "A Grade 12 student says there are 20 students per class").
+_HEARSAY_RE = re.compile(
+    r"\b(?:students?|pupils?|parents?|graduates?|alumn\w*)\b[^.]{0,40}?\b(?:says?|said|writes?|wrote|shares?|recalls?)\b",
+    re.IGNORECASE,
+)
+
+
+def _english(fact: Mapping[str, Any]) -> str:
+    text = fact.get("text_i18n")
+    value = text.get("en") if isinstance(text, Mapping) else None
+    return value if isinstance(value, str) else ""
+
+
+def _one_part(fact: Mapping[str, Any]) -> bool:
+    english = _english(fact)
+    return bool(_ONE_PART_RE.search(english)) and not _ALL_GRADES_RE.search(english)
+
+
 def publishable_school_facts(attributes: Any, website_url: Optional[str]) -> Optional[dict[str, Any]]:
     """``{"read_at", "facts": [...], "at_a_glance": {...}}``, or None when none can show.
 
@@ -306,6 +332,8 @@ def publishable_school_facts(attributes: Any, website_url: Optional[str]) -> Opt
             and all(isinstance(text.get(lang), str) and text[lang].strip() for lang in ("bg", "en"))
         ):
             continue
+        if _HEARSAY_RE.search(_english(fact)):
+            continue
         labels = _labels(fact)
         if labels.get("open_days") and max(labels["open_days"]) < today and not (
             labels.get("applications_close") and labels["applications_close"] >= today
@@ -313,6 +341,10 @@ def publishable_school_facts(attributes: Any, website_url: Optional[str]) -> Opt
             continue  # an open day that has passed ("Open day on 16 April") is not news any more
         topic = fact["topic"]
         rank = fact.get("rank") if fact.get("rank") in RANKS else "key"
+        if rank == "key" and _seasonal(fact):
+            # A summer school's hours or meals under "School day" or "Meals" read as the
+            # school year's (541, 591); they stay behind "show more" and off the compare page.
+            rank = "more"
         if rank == "key":
             if key_per_topic.get(topic, 0) >= MAX_KEY_PER_TOPIC or sum(key_per_topic.values()) >= MAX_KEY_FACTS:
                 rank = "more"

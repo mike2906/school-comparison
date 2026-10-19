@@ -147,6 +147,11 @@ describe('admission from a school page', () => {
     if (school.admission_info.cutoff_summary.some(row => row.first?.round_kind === 'current')) {
       await cutoffs.getByText(t('bg', 'cutoffs.legend.current')).waitFor()
     }
+    // Two rankings in a row (or a later one) come with the line saying each is separate.
+    const twoRounds = row => row.rounds > 1 && row.latest?.round_id !== row.first?.round_id
+    if (school.admission_info.cutoff_summary.some(row => twoRounds(row) || row.first?.round_kind === 'current')) {
+      await cutoffs.getByText(t('bg', 'cutoffs.legend.rounds')).waitFor()
+    }
     await page.getByRole('heading', { name: t('bg', 'admissionArea.districtTitle') }).waitFor()
 
     await cutoffs.getByRole('link', { name: t('bg', 'cutoffs.calculate') }).click()

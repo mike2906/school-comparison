@@ -722,3 +722,59 @@ def test_a_summer_programmes_class_size_is_not_the_schools(overrides, shown):
     }
     out = publishable_school_facts({"school_facts": block}, "https://www.school.example")
     assert out["facts"][0]["max_class_size"] == shown
+
+
+@pytest.mark.parametrize(
+    "english,shown",
+    [
+        ("Classes have up to 18 pupils.", 18),
+        ("For the 2026/2027 intake, the school has approved one first-grade class with 18 pupils.", None),  # 278
+        ("The planned class capacity is 24 pupils in grade 1 and 18 in grade 5.", None),  # 333
+        ("The computer-science courses work in groups of 5 to 18 participants.", None),  # 517
+        ("The foreign-languages profile has one class of 18 pupils.", None),  # 619
+        ("Classes in all grades have at most 18 pupils.", 18),
+        ("There are 23 children in each preparatory group and 18 pupils in each grade 1 class.", None),  # 204
+    ],
+)
+def test_one_grades_class_size_is_not_the_schools(english, shown):
+    block = {
+        "_schema_version": 1,
+        "read_at": "2026-10-13T20:00:00+00:00",
+        "website_url": "https://www.school.example",
+        "facts": [_fact_row(topic="class_size", max_class_size=18, text_i18n={"bg": "До 18.", "en": english})],
+    }
+    out = publishable_school_facts({"school_facts": block}, "https://www.school.example")
+    assert out["facts"][0]["max_class_size"] == shown
+    assert out["facts"][0]["text_i18n"]["en"] == english  # the fact itself still shows, scope and all
+
+
+def test_a_pupils_remark_is_not_a_school_fact():
+    remark = _fact_row(
+        topic="class_size",
+        max_class_size=20,
+        text_i18n={"bg": "Ученик казва...", "en": "A Grade 12 student says there are 20 students per class."},
+    )  # 506
+    block = {
+        "_schema_version": 1,
+        "read_at": "2026-10-13T20:00:00+00:00",
+        "website_url": "https://www.school.example",
+        "facts": [remark, _fact_row()],
+    }
+    out = publishable_school_facts({"school_facts": block}, "https://www.school.example")
+    assert [f["topic"] for f in out["facts"]] == ["meals"]
+
+
+def test_summer_programme_facts_are_never_key():
+    summer = _fact_row(
+        topic="school_day",
+        rank="key",
+        text_i18n={"bg": "Лятната програма е 08:30–18:00.", "en": "The summer programme runs 08:30–18:00."},
+    )  # 541
+    block = {
+        "_schema_version": 1,
+        "read_at": "2026-10-13T20:00:00+00:00",
+        "website_url": "https://www.school.example",
+        "facts": [summer, _fact_row(rank="key")],
+    }
+    out = publishable_school_facts({"school_facts": block}, "https://www.school.example")
+    assert [(f["topic"], f["rank"]) for f in out["facts"]] == [("school_day", "more"), ("meals", "key")]
