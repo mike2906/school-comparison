@@ -41,7 +41,7 @@ if [ -z "${PUBLISH_LOCK_HELD:-}" ]; then
 fi
 
 # Stop a publish that would take away what many schools show now (publish_diff.py), and
-# say so in one rolling issue. When the live list can't be read (exit 2) the publish goes
+# say so in one rolling issue. When the live list can't be read (exit 75) the publish goes
 # ahead, since it may be the fix; any other failure, such as a launch DB the list can't be
 # built from, stops it. PUBLISH_ALLOW_DROPS=1 publishes an intended drop.
 if [ -z "${PUBLISH_ALLOW_DROPS:-}" ]; then
@@ -61,7 +61,7 @@ if [ -z "${PUBLISH_ALLOW_DROPS:-}" ]; then
 			fi
 		fi
 		die "stopped: many schools would lose data they show now (GitHub issue \"$title\")"
-	elif [ "$rc" = 2 ]; then
+	elif [ "$rc" = 75 ]; then
 		echo "publish: the live list could not be read; publishing without the diff" >&2
 	elif [ "$rc" != 0 ]; then
 		die "the publish diff failed (exit $rc); nothing published"

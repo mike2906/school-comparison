@@ -843,7 +843,7 @@ def osm_check_command(city, country, report_path, issue_path):
 def publish_diff_command(city, country, live_api, report_path, issue_path):
     """Before a publish: exit 3 if many schools would lose something they show now (writes nothing).
 
-    Exit 2 when the live list can't be read: nothing to compare with. A launch DB the list
+    Exit 75 when the live list can't be read: nothing to compare with. A launch DB the list
     can't be built from fails like any error, so the publish stops.
     """
     import json
@@ -858,7 +858,7 @@ def publish_diff_command(city, country, live_api, report_path, issue_path):
             live = await publish_diff.read_live_list(live_api, country=country, city=city)
         except (httpx.HTTPError, ValueError) as exc:
             console.print(f"Could not read the live list: {exc}", markup=False)
-            raise SystemExit(2) from exc
+            raise SystemExit(75) from exc
         async with async_session_maker() as db:
             new = await publish_diff.build_new_list(db, country=country, city=city)
         return publish_diff.diff_lists(live, new)
