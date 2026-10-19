@@ -14,7 +14,9 @@
 # dry-runs the catchment match; a change there opens an issue (the match is reviewed by
 # hand) but does not hold the pins back. A stop opens one GitHub issue, "Pin refresh
 # stopped"; a good weekly run also lists schools that disagree with OpenStreetMap in one rolling
-# issue (osm_check below). A stopped run is retried a day later, a failed publish the next hour. Log and reports:
+# issue (osm_check below). The weekly run also withholds accepted websites whose home page
+# names another town (site-city, free), stopping instead when more than SITE_CITY_MAX (3) would
+# be withheld at once. A stopped run is retried a day later, a failed publish the next hour. Log and reports:
 # $state/refresh_pins.log, $state/pins-*.json (kept a month); a pg_dump before each
 # apply (the last 4 kept) in $backups.
 set -euo pipefail
@@ -23,6 +25,7 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 state="${PINS_STATE_DIR:-$HOME/.local/state/schooldecider}"
 max_usd="${PINS_MAX_USD:-0.10}"
 max_placed="${PINS_MAX_PLACED:-10}"
+site_city_max="${SITE_CITY_MAX:-3}"
 city="${PINS_CITY:-sofia}"
 repo="${PUBLISH_REPO:-mike2906/school-comparison}"
 backups="${PINS_BACKUPS:-$HOME/backups}"
@@ -99,6 +102,11 @@ if [ ! -f "$state/pins_unpublished" ]; then
 	dry_agent="$state/pins-agent-dry-$stamp.json"
 	cli website-pins --city "$city" --out "$dry_web" || stop "website-pins dry run failed"
 	cli pin-agent --city "$city" --max-usd "$max_usd" --out "$dry_agent" || stop "pin-agent dry run failed"
+	dry_town="$state/pins-site-city-dry-$stamp.json"
+	cli site-city --city "$city" --out "$dry_town" || stop "site-city dry run failed"
+	towns="$(report "$dry_town" 'len(r["hits"])')"
+	[ "$towns" -le "$site_city_max" ] ||
+		stop "site-city would withhold $towns websites that name another town, over $site_city_max; check $dry_town"
 	# A run cut short, without OSM, or with many errors is not a good run: retry tomorrow.
 	healthy() { report "$1" '(r.get("stopped") or r.get("osm_unavailable") or "") or (r["outcomes"].get("error", 0) * 10 > max(r["locations"], 1) and "too many errors") or ""'; }
 	problem="$(healthy "$dry_web")$(healthy "$dry_agent")"
@@ -109,7 +117,7 @@ if [ ! -f "$state/pins_unpublished" ]; then
 	[ "$website" -le "$max_placed" ] && [ "$agent" -le "$max_placed" ] ||
 		stop "the dry run would place $website (website) and $agent (agent) locations, over $max_placed; check $dry_web and $dry_agent"
 
-	if [ $((website + agent)) -gt 0 ]; then
+	if [ $((website + agent + towns)) -gt 0 ]; then
 		backup="$backups/$database-pre-pins-$stamp.dump"
 		if ! docker exec "$container" pg_dump -U postgres -d "$database" --format=custom > "$backup" || ! [ -s "$backup" ]; then
 			rm -f "$backup"
@@ -125,6 +133,12 @@ if [ ! -f "$state/pins_unpublished" ]; then
 		# shellcheck disable=SC2046
 		[ "$agent" = 0 ] || cli pin-agent --city "$city" --max-usd "$max_usd" --apply $(placed_ids "$dry_agent") --out "$state/pins-agent-$stamp.json" ||
 			stop "pin-agent failed"
+		# A withheld site's data leaves the site with this run's publish; the next
+		# recover-failed-urls looks for the school's real site.
+		# shellcheck disable=SC2046
+		[ "$towns" = 0 ] || cli site-city --city "$city" --apply $(report "$dry_town" '" ".join("--school-id %d" % x["school_id"] for x in r["hits"])') --out "$state/pins-site-city-$stamp.json" ||
+			stop "site-city failed"
+		[ "$towns" = 0 ] || log "site-city: withheld $towns websites that name another town ($dry_town)"
 		# The apply re-runs the model on the same schools; it must not place more than the cap.
 		website="$( [ "$website" = 0 ] && echo 0 || placed "$state/pins-website-$stamp.json")"
 		agent="$( [ "$agent" = 0 ] && echo 0 || placed "$state/pins-agent-$stamp.json")"
