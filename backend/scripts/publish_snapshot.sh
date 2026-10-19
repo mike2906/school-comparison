@@ -52,8 +52,9 @@ translate --plan || rc=$?
 if [ "$rc" = 10 ]; then
 	backups="${TRANSLATE_BACKUPS:-$HOME/backups}"
 	backup="$backups/${BACKUP_DATABASE:-sofia_schools}-pre-translate-$(date -u +%Y%m%dT%H%M%SZ).dump"
-	mkdir -p "$backups"
-	if docker exec "${BACKUP_DB_CONTAINER:-sofia_schools_db}" pg_dump -U postgres -d "${BACKUP_DATABASE:-sofia_schools}" \
+	# Keep the last five; usually a run writes nothing, so there is no dump.
+	ls -1t "$backups"/*-pre-translate-*.dump 2>/dev/null | tail -n +6 | xargs -r rm -f || true
+	if mkdir -p "$backups" && docker exec "${BACKUP_DB_CONTAINER:-sofia_schools_db}" pg_dump -U postgres -d "${BACKUP_DATABASE:-sofia_schools}" \
 		--format=custom > "$backup" && [ -s "$backup" ]; then
 		echo "publish: backup $backup" >&2
 		translate --apply || echo "publish: translate-texts failed; the new text shows as written" >&2

@@ -63,7 +63,8 @@ _CYRILLIC_RE = re.compile(r"[Ѐ-ӿ]")
 # Roman numerals up to the grades and instalments labels number (I to XII), also typed with a
 # Cyrillic І or Х. Not C or M: a lone "М" is mathematics in a class profile ("М и Инф").
 _CYRILLIC_ROMAN = str.maketrans({"І": "I", "Х": "X"})
-_ROMAN_RE = re.compile(r"(?<![\wЀ-ӿ])[IVX]+(?![\wЀ-ӿ])")
+# Not a letter of an abbreviation either ("V.I.P.").
+_ROMAN_RE = re.compile(r"(?<![\wЀ-ӿ.])[IVX]+(?![\wЀ-ӿ]|\.[A-Za-zЀ-ӿ])")
 
 LANGUAGE_NAMES = {"en": "English", "bg": "Bulgarian"}
 
@@ -187,12 +188,24 @@ async def translate(texts: Sequence[str], locale: str, call: Caller, out: dict[s
     texts = list(texts)
     for start in range(0, len(texts), BATCH_SIZE):
         batch = texts[start:start + BATCH_SIZE]
-        try:
-            answers = await call(batch, locale)
-        except BatchMismatch:
-            logger.warning("translate-texts: a %s batch came back mismatched; asked again next run", locale)
-            continue
-        out.update({text: checked(text, answer, locale) for text, answer in zip(batch, answers)})
+        out.update(await _answers(batch, locale, call))
+
+
+async def _answers(batch: list[str], locale: str, call: Caller) -> dict[str, Optional[str]]:
+    """A batch's checked answers. A batch that came back mismatched is asked again text by text,
+    and a single text that still does is stored as null, so a publish does not ask it hourly."""
+    try:
+        answers = await call(batch, locale)
+    except BatchMismatch:
+        if len(batch) == 1:
+            logger.warning("translate-texts: no %s answer that matches %r", locale, batch[0])
+            return {batch[0]: None}
+        logger.warning("translate-texts: a %s batch came back mismatched; asking text by text", locale)
+        out: dict[str, Optional[str]] = {}
+        for text in batch:
+            out.update(await _answers([text], locale, call))
+        return out
+    return {text: checked(text, answer, locale) for text, answer in zip(batch, answers)}
 
 
 def translation_block(translations: dict[str, dict[str, Optional[str]]]) -> dict[str, Any]:
@@ -236,6 +249,8 @@ async def run_text_translations(
     for translations in have.values():
         for locale in LOCALES:
             for text, value in translations[locale].items():
+                if value is not None and checked(text, value, locale) is None:
+                    continue  # stored before a check it now fails: asked again
                 # A usable translation another school has wins over a stored failure.
                 if known[locale].get(text) is None:
                     known[locale][text] = value
@@ -244,12 +259,19 @@ async def run_text_translations(
         for locale in LOCALES
     }
 
+    def wanted(school_id: int) -> dict[str, dict[str, Optional[str]]]:
+        return {
+            locale: {text: known[locale][text] for text in needed[school_id][locale] if text in known[locale]}
+            for locale in LOCALES
+        }
+
     if plan:
         # What an --apply run would change, without asking the model or writing anything.
         pending = sum(
             1
             for school in schools
-            if any(set(needed[school.id][locale]) != set(have[school.id][locale]) for locale in LOCALES)
+            if wanted(school.id) != have[school.id]
+            or any(set(needed[school.id][locale]) & set(asked[locale]) for locale in LOCALES)
         )
         return {"plan": True, "schools": len(schools), "schools_to_change": pending,
                 "asked": {locale: len(asked[locale]) for locale in LOCALES}}
@@ -288,18 +310,15 @@ async def run_text_translations(
     changed = 0
     try:
         for school in schools:
-            wanted = {
-                locale: {text: known[locale][text] for text in needed[school.id][locale] if text in known[locale]}
-                for locale in LOCALES
-            }
-            if wanted == have[school.id]:
+            translations = wanted(school.id)
+            if translations == have[school.id]:
                 continue
             changed += 1
             if apply:
                 await db.refresh(school, attribute_names=["attributes"], with_for_update=True)
                 attributes = dict(school.attributes or {})
-                if any(wanted.values()):
-                    attributes[ATTRIBUTE_KEY] = translation_block(wanted)
+                if any(translations.values()):
+                    attributes[ATTRIBUTE_KEY] = translation_block(translations)
                 else:
                     attributes.pop(ATTRIBUTE_KEY, None)
                 school.attributes = attributes

@@ -179,17 +179,26 @@ async def test_a_mismatched_batch_is_asked_again_and_a_failed_language_does_not_
     school = await _priced_school(db_session)
 
     async def call(texts, locale):
-        if locale == "en":
+        if locale == "en" and (len(texts) > 1 or texts == [FACILITY]):
             raise stage.BatchMismatch("ids shifted")
         return [ANSWERS.get(text) for text in texts]
 
+    # A mismatched batch is asked text by text; a text that still mismatches is stored as null,
+    # so the hourly publish does not ask it (and back up the DB) again and again.
     report = await stage.run_text_translations(db_session, school_ids=[school.id], call=call, apply=True)
-    assert report["translated"] == {"en": 0, "bg": 1} and report["stopped"] is None
-    assert stored(school.attributes)["en"] == {}  # nothing stored, so asked again next run
+    assert report["translated"] == {"en": 2, "bg": 1} and report["stopped"] is None
+    assert stored(school.attributes)["en"] == {
+        INSTALMENT: ANSWERS[INSTALMENT],
+        CLASS_NAME: ANSWERS[CLASS_NAME],
+        FACILITY: None,
+    }
+    assert (await stage.run_text_translations(db_session, school_ids=[school.id], plan=True))["schools_to_change"] == 0
 
     async def broken(texts, locale):
         raise RuntimeError("provider down")
 
+    school.attributes = {**school.attributes, "facilities": ["Нов басейн"]}
+    await db_session.commit()
     report = await stage.run_text_translations(db_session, school_ids=[school.id], call=broken, apply=True)
     assert "en: run stopped: provider down" in report["stopped"]
     # What was stored before stays.
@@ -201,6 +210,34 @@ def test_checked_keeps_roman_numerals():
     assert stage.checked("ХI клас", "Grade XI", "en") == "Grade XI"  # a Cyrillic Х
     # A lone "М" is mathematics, not a numeral.
     assert stage.checked(CLASS_NAME, ANSWERS[CLASS_NAME], "en") == ANSWERS[CLASS_NAME]
+    # Nor are the letters of an abbreviation.
+    assert stage.checked("V.I.P. lunch", "ВИП обяд", "bg") == "ВИП обяд"
+
+
+@pytest.mark.asyncio
+async def test_a_stored_translation_that_fails_the_checks_now_is_asked_again(db_session):
+    school = await _priced_school(db_session)
+    await stage.run_text_translations(db_session, school_ids=[school.id], call=_caller(), apply=True)
+    translations = stored(school.attributes)
+    translations["en"][INSTALMENT] = "Instalment III, by 15.11.26"
+    school.attributes = {**school.attributes, "text_translations": stage.translation_block(translations)}
+    await db_session.commit()
+
+    assert (await stage.run_text_translations(db_session, school_ids=[school.id], plan=True))["schools_to_change"] == 1
+    call = _caller()
+    await stage.run_text_translations(db_session, school_ids=[school.id], call=call, apply=True)
+    assert call.calls == [("en", [INSTALMENT])]
+    assert stored(school.attributes)["en"][INSTALMENT] == ANSWERS[INSTALMENT]
+
+
+@pytest.mark.asyncio
+async def test_plan_sees_a_better_translation_from_another_school(db_session):
+    first = await _priced_school(db_session)
+    await stage.run_text_translations(db_session, school_ids=[first.id], call=_caller(), apply=True)
+    second = await _priced_school(db_session, name_i18n={"bg": "Частно училище Второ"})
+    await stage.run_text_translations(db_session, school_ids=[second.id], call=_caller({}), apply=True)
+    report = await stage.run_text_translations(db_session, plan=True)
+    assert report["schools_to_change"] == 1 and report["asked"] == {"en": 0, "bg": 0}
 
 
 @pytest.mark.asyncio
@@ -235,4 +272,5 @@ async def test_a_fee_row_the_api_withholds_is_not_translated(db_session):
     await db_session.commit()
     call = _caller()
     await stage.run_text_translations(db_session, school_ids=[school.id], call=call)
-    assert all(INSTALMENT not in texts for _, texts in call.calls)
+    asked = [text for _, texts in call.calls for text in texts]
+    assert INSTALMENT not in asked and ENGLISH_PLAN in asked
