@@ -41,8 +41,9 @@ if [ -z "${PUBLISH_LOCK_HELD:-}" ]; then
 fi
 
 # Stop a publish that would take away what many schools show now (publish_diff.py), and
-# say so in one rolling issue. A check that cannot run (the live API is down) does not
-# stop it: the publish may be the fix. PUBLISH_ALLOW_DROPS=1 publishes an intended drop.
+# say so in one rolling issue. When the live list can't be read (exit 2) the publish goes
+# ahead, since it may be the fix; any other failure, such as a launch DB the list can't be
+# built from, stops it. PUBLISH_ALLOW_DROPS=1 publishes an intended drop.
 if [ -z "${PUBLISH_ALLOW_DROPS:-}" ]; then
 	title="Publish stopped: schools would lose data"
 	body="$(dirname "$lock")/publish-diff-issue.md"
@@ -50,8 +51,9 @@ if [ -z "${PUBLISH_ALLOW_DROPS:-}" ]; then
 	rc=0
 	(cd "$repo_root/backend" && uv run python -m app.scrapers.cli publish-diff --issue-body "$body") || rc=$?
 	if [ "$rc" = 3 ]; then
-		# A failed lookup must not open a second issue; the next try raises it.
-		if number="$(gh issue list -R "$repo" --state open --search "in:title \"$title\"" --json number -q '.[0].number')"; then
+		# A failed lookup must not open a second issue; the next try raises it. Not --search:
+		# its index lags, so a stop right after another would open a duplicate.
+		if number="$(gh issue list -R "$repo" --state open --limit 200 --json number,title -q "map(select(.title == \"$title\"))[0].number // empty")"; then
 			if [ -n "$number" ]; then
 				gh issue edit "$number" -R "$repo" --body-file "$body" > /dev/null || true
 			else
@@ -59,8 +61,10 @@ if [ -z "${PUBLISH_ALLOW_DROPS:-}" ]; then
 			fi
 		fi
 		die "stopped: many schools would lose data they show now (GitHub issue \"$title\")"
+	elif [ "$rc" = 2 ]; then
+		echo "publish: the live list could not be read; publishing without the diff" >&2
 	elif [ "$rc" != 0 ]; then
-		echo "publish: the publish diff could not run (exit $rc); publishing without it" >&2
+		die "the publish diff failed (exit $rc); nothing published"
 	fi
 fi
 

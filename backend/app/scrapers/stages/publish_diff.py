@@ -8,7 +8,8 @@ gate that suddenly withholds everything) shows up as many schools losing the sam
 once, which a normal run never does, so the publish is stopped until someone looks.
 
 Only losses count: new data is checked by the stages that write it. No model calls; one
-request to the live API.
+request to the live API. The new list is built by the code checked out here, so run it from
+an up-to-date main: older code that doesn't serve a field main added reads as a loss.
 """
 
 from __future__ import annotations
@@ -25,7 +26,9 @@ from app.config import CRAWLER_USER_AGENT
 logger = logging.getLogger(__name__)
 
 LIVE_API = "https://api.schooldecider.com"
-FEATURES = ("listed", "pin", "fees", "exam_results", "admission", "details")
+# Admission information and details count per field ("details:facilities"): most schools
+# have some field set, so one flag per section would hide a wipe of any single field.
+FEATURES = ("listed", "pin", "fees", "exam_results")
 # More schools than this losing one feature stops the publish: max(fixed, share of the
 # schools that had it). Leaving the list entirely has a fixed, lower bar.
 MIN_LOSSES = {"listed": 5}
@@ -52,10 +55,16 @@ def card_features(school: dict) -> set[str]:
         features.add("fees")
     if school.get("exam_results"):
         features.add("exam_results")
-    if _meaningful(school.get("admission_info")):
-        features.add("admission")
-    if _meaningful(school.get("attributes")) or _meaningful(school.get("attributes_i18n")):
-        features.add("details")
+    for key, value in (school.get("admission_info") or {}).items():
+        if _meaningful(value):
+            features.add(f"admission:{key}")
+    for key, value in (school.get("attributes") or {}).items():
+        if _meaningful(value):
+            features.add(f"details:{key}")
+    for localized in (school.get("attributes_i18n") or {}).values():
+        for key, value in (localized or {}).items():
+            if _meaningful(value):
+                features.add(f"details:{key}")
     return features
 
 
@@ -68,8 +77,9 @@ def diff_lists(live: list[dict], new: list[dict]) -> dict[str, Any]:
     """Schools losing each feature between the live list and the new one, and whether to stop."""
     before = {school["id"]: (school, card_features(school)) for school in live}
     after = {school["id"]: card_features(school) for school in new}
+    seen = set().union(*(have for _, have in before.values())) - set(FEATURES)
     features: dict[str, dict[str, Any]] = {}
-    for feature in FEATURES:
+    for feature in (*FEATURES, *sorted(seen)):
         had = [school_id for school_id, (_, have) in before.items() if feature in have]
         # A school that left the list is counted once, under "listed".
         lost = sorted(
@@ -127,10 +137,15 @@ _LABELS = {
 }
 
 
+def _label(feature: str) -> str:
+    section, _, field = feature.partition(":")
+    return f"{_LABELS[section]} ({field})" if field else _LABELS[section]
+
+
 def summary(report: dict) -> str:
     """One line per feature that loses schools, for the publish log."""
     lines = [
-        f"{_LABELS[feature]}: {len(entry['lost'])} schools lose it ({entry['before']} -> {entry['after']}, limit {entry['limit']})"
+        f"{_label(feature)}: {len(entry['lost'])} schools lose it ({entry['before']} -> {entry['after']}, limit {entry['limit']})"
         + (" STOP" if entry["stop"] else "")
         for feature, entry in report["features"].items()
         if entry["lost"]
@@ -153,7 +168,7 @@ def issue_body(report: dict, site: str = "https://schooldecider.com", max_lines:
         if not entry["stop"]:
             continue
         lines.append(
-            f"## {len(entry['lost'])} schools lose {_LABELS[feature]} ({entry['before']} -> {entry['after']}, limit {entry['limit']})"
+            f"## {len(entry['lost'])} schools lose {_label(feature)} ({entry['before']} -> {entry['after']}, limit {entry['limit']})"
         )
         for lost in entry["lost"][:max_lines]:
             name = lost["name"].replace("`", "'")

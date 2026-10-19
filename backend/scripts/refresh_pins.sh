@@ -61,7 +61,7 @@ osm_check() {
 	digest="$(grep '^- ' "$body" | sha256sum)" || return 1
 	[ "$digest" != "$(cat "$state/osm_issue_digest" 2>/dev/null)" ] || return 0
 	# A failed lookup must not open a second issue: try again next hour.
-	number="$(gh issue list -R "$repo" --state open --search "in:title \"$title\"" --json number -q '.[0].number')" ||
+	number="$(gh issue list -R "$repo" --state open --limit 200 --json number,title -q "map(select(.title == \"$title\"))[0].number // empty")" ||
 		{ log "osm-check: gh issue list failed"; return 1; }
 	# The issue's text is replaced, not commented: it always shows the current list.
 	if [ -n "$number" ]; then

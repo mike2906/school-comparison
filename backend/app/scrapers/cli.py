@@ -841,14 +841,24 @@ def osm_check_command(city, country, report_path, issue_path):
 @click.option("--out", "report_path", type=click.Path(dir_okay=False, path_type=Path), help="Write the JSON report")
 @click.option("--issue-body", "issue_path", type=click.Path(dir_okay=False, path_type=Path), help="Write the GitHub issue text when stopping")
 def publish_diff_command(city, country, live_api, report_path, issue_path):
-    """Before a publish: exit 3 if many schools would lose something they show now (writes nothing)."""
+    """Before a publish: exit 3 if many schools would lose something they show now (writes nothing).
+
+    Exit 2 when the live list can't be read: nothing to compare with. A launch DB the list
+    can't be built from fails like any error, so the publish stops.
+    """
     import json
+
+    import httpx
 
     from app.database import async_session_maker
     from app.scrapers.stages import publish_diff
 
     async def _run():
-        live = await publish_diff.read_live_list(live_api, country=country, city=city)
+        try:
+            live = await publish_diff.read_live_list(live_api, country=country, city=city)
+        except (httpx.HTTPError, ValueError) as exc:
+            console.print(f"Could not read the live list: {exc}", markup=False)
+            raise SystemExit(2) from exc
         async with async_session_maker() as db:
             new = await publish_diff.build_new_list(db, country=country, city=city)
         return publish_diff.diff_lists(live, new)

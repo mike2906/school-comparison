@@ -29,7 +29,26 @@ def test_card_features_ignore_empty_values():
         "admission_info": {"cutoffs": [{"points": 20}]},
         "attributes_i18n": {"bg": {"languages_of_instruction": ["английски"]}},
     }
-    assert stage.card_features(full) == {"listed", "pin", "fees", "exam_results", "admission", "details"}
+    assert stage.card_features(full) == {
+        "listed",
+        "pin",
+        "fees",
+        "exam_results",
+        "admission:cutoffs",
+        "details:languages_of_instruction",
+    }
+
+
+def test_wiping_one_field_stops_although_other_fields_remain():
+    def card(i, facilities):
+        return _card(i) | {
+            "attributes_i18n": {"bg": {"languages_of_instruction": ["английски"], "facilities": ["басейн"] if facilities else []}}
+        }
+
+    report = stage.diff_lists([card(i, True) for i in range(1, 101)], [card(i, False) for i in range(1, 101)])
+    assert report["features"]["details:facilities"]["stop"]
+    assert not report["features"]["details:languages_of_instruction"]["lost"]
+    assert "school details (facilities): 100 schools lose it" in stage.summary(report)
 
 
 def test_a_few_losses_pass_and_many_stop_the_publish():
