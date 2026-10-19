@@ -373,3 +373,20 @@ async def test_must_read_links_are_opened_ahead_of_the_picks(monkeypatch):
     assert [p.url for p in read] == [HOME, admission, *others]
     plain = await fees_agent.find_pages(_Crawler(crawler.pages), None, _Client(), _school(), Spend(0.05))
     assert admission not in [p.url for p in plain]
+
+
+async def test_must_read_takes_this_years_page_and_no_pdf(monkeypatch):
+    old, form, now = (
+        "https://meridian22.org/priem-2023-2024/",
+        "https://meridian22.org/zayavlenie-priem.pdf",
+        "https://meridian22.org/priem-2026-2027/",
+    )
+    crawler = _Crawler({
+        HOME: [("Начало " + "x" * 300, [(old, "Прием"), (form, "Заявление"), (now, "Прием")])],
+        **{url: [("Текст " + "x" * 300, [])] for url in [old, now]},
+    })  # fmt: skip
+    monkeypatch.setattr(fees_agent, "_pick", _picks())
+    monkeypatch.setattr(fees_agent, "current_academic_year", lambda: "2026-2027")
+    must = re.compile(r"priem", re.IGNORECASE)
+    read = await fees_agent.find_pages(crawler, None, _Client(), _school(), Spend(0.05), must_read=must)
+    assert [p.url for p in read][:3] == [HOME, now, old]

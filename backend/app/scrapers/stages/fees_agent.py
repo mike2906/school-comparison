@@ -403,7 +403,12 @@ async def find_pages(
         queue = (queue + keyword)[:MAX_PICKS]
         if must_read is not None and must_left:
             # 172's picker took the testimonials over /kandidatstvane/ in two runs of two.
-            must = [url for url, label in unopened if must_read.search(f"{unquote(url)} {label}")][:must_left]
+            must: list[str] = []
+            for url, label in sorted(unopened, key=lambda link: not this_year.search(f"{unquote(link[0])} {link[1]}")):
+                path = unquote(urlparse(url).path).lower()
+                if len(must) < must_left and must_read.search(f"{unquote(url)} {label}") and not path.endswith(".pdf"):
+                    if page_key(url) not in {page_key(m) for m in must}:
+                        must.append(url)
             must_left -= len(must)
             queue = must + [url for url in queue if url not in must]
         if not queue:

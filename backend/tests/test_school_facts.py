@@ -412,7 +412,13 @@ def test_admission_links_match_both_alphabets_and_k():
         "/admission/",
     ):
         assert ADMISSION_LINK_RE.search(text)
-    assert not ADMISSION_LINK_RE.search("https://www.svetasofia.com/drugite-za-nas/ot-decata От децата")
+    for text in (
+        "https://www.svetasofia.com/drugite-za-nas/ot-decata От децата",
+        "/priemno-vreme/ Приемно време на директора",
+        "/predpriemachestvo/ Предприемачество",
+        "/kandidati-za-rabota/ Кариери",
+    ):
+        assert not ADMISSION_LINK_RE.search(text)
 
 
 @pytest.mark.asyncio

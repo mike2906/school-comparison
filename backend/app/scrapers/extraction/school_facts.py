@@ -49,8 +49,11 @@ most useful first. Skip news, galleries, events, contacts, documents and policie
 testimonials or reviews (отзиви, мнения, "от децата", "от родителите"). Return none if nothing fits."""
 
 # Always opened (up to 2 a site): how admission works is a key fact the picker can pass over.
-# "андидатств" also matches 172's menu, which spells "Кандидатстване" with a Latin K.
-ADMISSION_LINK_RE = re.compile(r"прием|андидатств|kandidat|priem|admission|enrol", re.IGNORECASE)
+# "андидатств" also matches 172's menu, which spells "Кандидатстване" with a Latin K. Not the
+# director's office hours (приемно време), entrepreneurship (предприемачество) or job candidates.
+ADMISSION_LINK_RE = re.compile(
+    r"(?<!пред)прием(?!н)|андидатств|kandidatstv|(?<!pred)priem(?!no)|admission|enrol", re.IGNORECASE
+)
 
 # When the picker returns nothing, follow links whose URL or text names one of these topics.
 FALLBACK_LINK_RE = re.compile(
@@ -80,7 +83,7 @@ Do not list: fees or prices; exam results, rankings or competitions won; mission
 anyone could make ("individual approach", "modern facilities", "caring environment", "excellent conditions");
 news, events, one-off projects; anything dated to a past school year; counts that change every year (pupils,
 classes, teachers, rooms, computers, years since founding). Class size, times of day and the places offered in
-an intake are not such counts. An admissions page whose dates have passed still states how admission works.
+an intake are not such counts. An admissions page whose dates have passed still states how admission works (not its dates or places).
 Rules:
 - Only what the pages state about this institution. If a page covers a sister school or kindergarten,
   leave its facts out unless they plainly apply to this one.
