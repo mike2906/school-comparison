@@ -16,7 +16,10 @@
 # stopped"; a good weekly run also lists schools that disagree with OpenStreetMap in one rolling
 # issue (osm_check below). The weekly run also withholds accepted websites whose home page
 # names another town (site-city, free); more than SITE_CITY_MAX (3) at once withholds none and
-# opens the issue "Website town check stopped" (the pins go ahead either way). A stopped run is retried a day later, a failed publish the next hour. Log and reports:
+# opens the issue "Website town check stopped" (the pins go ahead either way). It also sets
+# grade bands by what a school's own published site data says it teaches (site-grades,
+# free); more than SITE_GRADES_MAX (10) changes at once applies none and opens the issue
+# "Grade band check stopped". A stopped run is retried a day later, a failed publish the next hour. Log and reports:
 # $state/refresh_pins.log, $state/pins-*.json (kept a month); a pg_dump before each
 # apply (the last 4 kept) in $backups.
 set -euo pipefail
@@ -26,6 +29,7 @@ state="${PINS_STATE_DIR:-$HOME/.local/state/schooldecider}"
 max_usd="${PINS_MAX_USD:-0.10}"
 max_placed="${PINS_MAX_PLACED:-10}"
 site_city_max="${SITE_CITY_MAX:-3}"
+site_grades_max="${SITE_GRADES_MAX:-10}"
 city="${PINS_CITY:-sofia}"
 repo="${PUBLISH_REPO:-mike2906/school-comparison}"
 backups="${PINS_BACKUPS:-$HOME/backups}"
@@ -115,6 +119,19 @@ if [ ! -f "$state/pins_unpublished" ]; then
 			towns=0
 		fi
 	fi
+	# Same for grade bands from the school's own site.
+	dry_grades="$state/pins-site-grades-dry-$stamp.json"
+	grades=0
+	if ! cli site-grades --city "$city" --out "$dry_grades"; then
+		log "site-grades dry run failed"
+	else
+		grades="$(report "$dry_grades" 'len(r["changes"])')"
+		if [ "$grades" -gt "$site_grades_max" ]; then
+			log "site-grades would change $grades schools, over $site_grades_max: none changed"
+			issue "Grade band check stopped" "backend/scripts/refresh_pins.sh on $(hostname) at $(date -u +%Y-%m-%dT%H:%M:%SZ): site-grades would change the grade bands of $grades schools, over SITE_GRADES_MAX ($site_grades_max), so it changed none. Check $dry_grades. Close this issue once fixed."
+			grades=0
+		fi
+	fi
 	# A run cut short, without OSM, or with many errors is not a good run: retry tomorrow.
 	healthy() { report "$1" '(r.get("stopped") or r.get("osm_unavailable") or "") or (r["outcomes"].get("error", 0) * 10 > max(r["locations"], 1) and "too many errors") or ""'; }
 	problem="$(healthy "$dry_web")$(healthy "$dry_agent")"
@@ -125,7 +142,7 @@ if [ ! -f "$state/pins_unpublished" ]; then
 	[ "$website" -le "$max_placed" ] && [ "$agent" -le "$max_placed" ] ||
 		stop "the dry run would place $website (website) and $agent (agent) locations, over $max_placed; check $dry_web and $dry_agent"
 
-	if [ $((website + agent + towns)) -gt 0 ]; then
+	if [ $((website + agent + towns + grades)) -gt 0 ]; then
 		backup="$backups/$database-pre-pins-$stamp.dump"
 		if ! docker exec "$container" pg_dump -U postgres -d "$database" --format=custom > "$backup" || ! [ -s "$backup" ]; then
 			rm -f "$backup"
@@ -150,6 +167,15 @@ if [ ! -f "$state/pins_unpublished" ]; then
 				log "site-city: withheld $(report "$town_out" 'len(r["hits"])') of the $towns websites the dry run found naming another town ($dry_town)"
 			else
 				log "site-city apply failed"
+			fi
+		fi
+		if [ "$grades" != 0 ]; then
+			grades_out="$state/pins-site-grades-$stamp.json"
+			# shellcheck disable=SC2046
+			if cli site-grades --city "$city" --apply $(report "$dry_grades" '" ".join("--school-id %d" % x["school_id"] for x in r["changes"])') --out "$grades_out"; then
+				log "site-grades: changed the grade bands of $(report "$grades_out" 'len(r["changes"])') of the $grades schools the dry run found ($dry_grades)"
+			else
+				log "site-grades apply failed"
 			fi
 		fi
 		# The apply re-runs the model on the same schools; it must not place more than the cap.

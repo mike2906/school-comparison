@@ -130,6 +130,15 @@ run's publish and `recover-failed-urls` looks for the real site. More than `SITE
 ahead either way. URL validation applies the same rule to new sites
 (`app/scrapers/site_city.py`).
 
+It also runs `site-grades` (free, no model): a school's grade bands come from the register's
+school type, which guesses (treaty schools default to 8-12, private "СУ" licences run higher
+than what is taught). Grades the school's own published fees or facts name are added, and a
+register band above the highest grade its facts state, that nothing names, is hidden (never
+every band). The bands carry `age_group_source=site_grades:` / `age_group_hidden=site_grades:`
+tags, so the ministry import keeps them and a withheld website takes them back
+(`app/scrapers/stages/site_grades.py`). More than `SITE_GRADES_MAX` (10) changes at once
+applies none and opens the issue "Grade band check stopped".
+
 A new city needs its write bounds and its local name in `website_pins.CITY_NAMES`, then
 one supervised run before the cron takes it (`PINS_CITY`).
 
