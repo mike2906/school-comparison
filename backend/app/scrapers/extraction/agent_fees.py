@@ -15,6 +15,7 @@ from typing import Literal, Optional
 from pydantic import BaseModel, Field, field_validator
 
 from app.models.pricing import PriceCategory, PricePeriod
+from app.utils.display_gating import names_no_fee
 
 PUBLISH_CONFIDENCE = 0.9
 HELD_CONFIDENCE = 0.5  # under the 0.7 publish floor (display_gating.PRICING_CONFIDENCE_FLOOR)
@@ -131,6 +132,7 @@ Rules:
 - If the site prints no price for paying in one go, the entry's amount is the total it prints for one plan; with no total printed, list each instalment amount as its own entry with the plan name.
 - A monthly fee that is the school's ordinary price (a kindergarten's monthly fee) is the entry itself, not an option.
 - List the fees of every page, to the end of the last one: a school often has a fee page per stage (kindergarten, primary, secondary), and each one's fees are listed. Include services billed separately (uniforms, transport, food, extended day, clubs), not only tuition.
+- Skip what is not a cost of attending: fines and penalties (глоба, неустойка, a reminder or late-payment charge), duplicates of documents and certificates, transcripts and official notes (дубликат, академична справка, служебна бележка), and replacing lost items (a key, a badge).
 - Skip a payment schedule. Never invent an amount, and never compute a total the site does not print.
 - A discount the school offers (for siblings, for paying early, for paying the whole year at once, any other stated discount) goes in discounts, never in fees, and only when the page states it with a percentage or an amount. One entry per discount ("5% for a second child, 10% for a third" is two). text_i18n says in bg and en only what the evidence says. A discounted price the site prints as an amount stays a fee entry (see above).
 - currency as printed (EUR or BGN); if both are printed, the EUR figure.
@@ -145,7 +147,7 @@ Rules:
 - Never build a range from two different fees (a full-day and a half-day price are two entries). A range only when the site prints one.
 - source_url: the URL of the page the fee is on.
 - evidence: the line of the page the amount is on, copied character for character, and the lines of its payment options. For a table row, also copy the heading line that gives its period, plan or group, as a separate line. If the period is stated in a sentence above the table, copy that sentence too. A PDF's tables are repeated after its text, one row per line with cells split by " | " and a cell's lines by " / ": when the text above splits a table row over several lines, copy the row and its heading row from there instead of joining lines yourself.
-- label: the site's own wording, short. academic_year, age_group and plan_name as the site states them, or null. plan_name names what the fee buys (full day, half day) and any price terms, not a way of paying in parts: a payment plan's name is its option's label.
+- label: the site's own wording, short. academic_year, age_group and plan_name as the site states them, or null. plan_name names what the fee buys (full day, half day) and any price terms, not a way of paying in parts: a payment plan's name is its option's label. It is never taken from a list of what the fee includes.
 - plan_name_en and age_group_en: the same words in plain English, as a parent would read them on the English page ("Half day", "Paid for 6 months at once", "Ages 3 to 6"), adding nothing the Bulgarian does not say; null when the Bulgarian field is null."""
 
 
@@ -405,6 +407,11 @@ def check_fee(fee: AgentFee, page_text: str) -> CheckedFee:
         return _dropped(fee, "dropped: evidence line does not hold the amount")
     if not amount_on_page(fee, page_numbers(page)):
         return _dropped(fee, "dropped: amount is not among the page's numbers")
+    # The fee's own words and the lines holding its amount: a heading or sentence above it
+    # ("при забава се дължи неустойка") speaks of something else.
+    own_lines = [line for line in lines if amount_on_page(fee, page_numbers(line))]
+    if fee.category is not PriceCategory.TUITION and names_no_fee(" ".join([*own_lines, fee.label, fee.plan_name or ""])):
+        return _dropped(fee, "dropped: a fine, duplicate document or lost item, not a cost of attending")
 
     # The period and deposit rules read the fee's own lines: "9 x € 750 monthly" names the
     # period of a payment option, not of the price paid in one go above it.

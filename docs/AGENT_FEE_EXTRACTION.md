@@ -91,6 +91,10 @@ For one school, with its `website_url`:
      still fees of their own. An amount the line gives as "1 x" ahead of "+ N x" is a first
      instalment: its period is cleared. A count of payments ("2 x", "на две вноски") states
      no period.
+   - **Not fees** (2026-10-19): a fine, a late-payment or reminder charge, a duplicate document,
+     a transcript or official note, and replacing a lost key or badge are no cost of attending.
+     The reader skips them, and code drops one whose evidence or name says so (595's
+     administrative price list showed "Глоба за тютюнопушене" as a registration fee).
    - **Withheld** (confidence 0.5, under the 0.7 publish floor):
      - a fee whose line names a deposit (`депозит`, `капаро`, deposit) but whose category is
        not `registration`;

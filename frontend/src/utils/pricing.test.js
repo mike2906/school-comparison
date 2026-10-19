@@ -573,3 +573,16 @@ test('statedTuition: a ПГУ (preschool group at school) fee is not a grades 1�
   assert.equal(statedTuition(rows, { ageGroup: 'preschool', today: new Date('2026-06-01') }).max, 8000)
 })
 
+
+test('statedTuition: a special-needs or returning-pupil rate does not set the headline (171, 594)', () => {
+  const rows = [
+    row({ id: 1, age_group: 'ПК, I-VII клас /целодневно обучение/', plan_name: 'Такса обучение / При записване след 20.02.2026 г.', amount: 7269, period: 'yearly' }),
+    row({ id: 2, age_group: null, plan_name: 'Ученици със СОП / Краен срок за записване до 20.02.2026 г.', amount: 5555, period: 'yearly' }),
+    row({ id: 3, age_group: 'Grade 4', plan_name: 'Full day', amount: 16550, period: 'yearly', pricing_context: { notes: 'For returning students with signed contracts before 30.04.2025.' } }),
+    row({ id: 4, age_group: 'Grade 4', plan_name: 'Full day', amount: 17250, period: 'yearly' }),
+  ]
+  const stated = statedTuition(rows, { ageGroup: 'grade_1_4', today: new Date('2026-06-01') })
+  assert.deepEqual([stated.min, stated.max], [7269, 17250])
+  // Still listed: only the headline leaves them out.
+  assert.equal(groupPricingByAcademicYear(rows, { today: new Date('2026-06-01') })[0].rows.length, 4)
+})

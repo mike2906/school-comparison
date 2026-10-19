@@ -49,6 +49,23 @@ export function pricePeriod(row) {
   return null
 }
 
+// A fee for pupils a new family's child is not: special educational needs (171's "Ученици със
+// СОП"), pupils already at the school (555's returning-children rate), staff's children.
+const CLOSED_GROUP_RE = /(?<![\p{L}])соп(?![\p{L}])|специални образователни потребности|special (?:educational )?needs|(?:returning|existing|current) (?:students|pupils|children)|настоящи ученици|деца на (?:служители|учители|персонала)|(?:staff|employees?)['’]?s? children|children of (?:staff|employees)/iu
+// The English abbreviation only in capitals: "Sen. school" is not one.
+const SEN_RE = /(?<![\p{L}])SEN(?![\p{L}])/u
+// Free-text notes count only when they open by naming the group: 594's "For returning students
+// with signed contracts…", not "Same fee for new and returning students".
+const CLOSED_GROUP_NOTE_RE = /^\s*(?:for |за )?(?:returning|existing|current|настоящи|продължаващи) (?:students|pupils|children|ученици)/iu
+
+/** True when a fee's own words say it is only for a closed group of pupils. */
+export function isClosedGroupFee(row) {
+  const context = row?.pricing_context || {}
+  const words = [row?.plan_name, row?.age_group, context.plan_name_en, context.age_group_en]
+  return words.some(text => CLOSED_GROUP_RE.test(String(text || '')) || SEN_RE.test(String(text || '')))
+    || CLOSED_GROUP_NOTE_RE.test(String(context.notes || ''))
+}
+
 // Registration fees are paid once and uniform items are bought once, so a missing period is no news.
 const ONE_OFF_CATEGORIES = new Set(['registration', 'uniforms'])
 

@@ -1,6 +1,6 @@
 import { intlLocale } from './format.js'
 import { gradeBandLabel, gradeRangeInText, gradesInText, gradesNamedIn, rowGradeBand } from './gradeBand.js'
-import { isOnePayment, pricePeriod, rowAgeGroupKeys, rowsForAgeGroup } from './priceRows.js'
+import { isClosedGroupFee, isOnePayment, pricePeriod, rowAgeGroupKeys, rowsForAgeGroup } from './priceRows.js'
 import { stageLabel, websiteWords } from './priceLabels.js'
 
 /**
@@ -243,10 +243,11 @@ export function toEur(amount, currency) {
 // monthly fee is the figure most schools publish first.
 const HEADLINE_PERIODS = ['monthly', 'quarter', 'term', 'semester', 'yearly']
 
-// The headline's tuition rows: whole fees (not one instalment), for the chosen age group
-// when there is one.
+// The headline's tuition rows: whole fees (not one instalment) that any new pupil pays, for the
+// chosen age group when there is one. A special-needs or returning-pupil rate stays listed.
 function tuitionRows(rows, ageGroup = null) {
-  return rowsForAgeGroup(rows.filter(row => row.category === 'tuition' && !isInstallmentPlan(row)), ageGroup)
+  const whole = rows.filter(row => row.category === 'tuition' && !isInstallmentPlan(row) && !isClosedGroupFee(row))
+  return rowsForAgeGroup(whole, ageGroup)
 }
 
 function rangeOf(rows, convert) {

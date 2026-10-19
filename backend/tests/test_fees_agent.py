@@ -175,6 +175,38 @@ def test_deposit_filed_as_tuition_is_withheld():
     assert any("deposit" in check for check in result.checks)
 
 
+def test_fines_duplicates_and_lost_items_are_not_fees():
+    """595's administrative price list (fines, diploma duplicates, a lost badge) and 529's late-payment charge."""
+    page = "\n".join(
+        [
+            "Глоба за тютюнопушене на територията на гимназията | 50 €",
+            "Дубликат на диплома за средно образование | 20 €",
+            "Академична справка - изискваща допълнителни реквизити | 10 €",
+            "Възстановяване на изгубен бадж | 25 €",
+            "Неустойка за забава | 15 €",
+            "Такса при второ предупреждение | 40 €",
+            "Fine for eating in classrooms | 30 €",
+            "Годишна такса за обучение в глобална програма | 8 900 €",
+            "Fine arts club | 60 €",
+        ]
+    )
+    lines = page.split("\n")
+    for line, amount in zip(lines[:7], (50, 20, 10, 25, 15, 40, 30)):
+        result = check_fee(fee(PriceCategory.REGISTRATION, line, amount=amount, label=line.split(" | ")[0]), page)
+        assert not result.kept, line
+        assert "not a cost of attending" in result.checks[0]
+    assert published(check_fee(fee(PriceCategory.TUITION, lines[7], amount=8900), page))
+    assert published(check_fee(fee(PriceCategory.EXTRACURRICULAR, lines[8], amount=60, label="Fine arts club"), page))
+    for label in ("Fine art club", "Fine-arts studio", "Fine motor skills workshop"):
+        line = f"{label} | 60 €"
+        assert published(check_fee(fee(PriceCategory.EXTRACURRICULAR, line, amount=60, label=label), line)), label
+    # A sentence above the fee about late payment does not make the fee a fine.
+    sentence = "При забава се дължи неустойка 10%."
+    registration = "Такса регистрация | 490 €"
+    both = f"{sentence}\n{registration}"
+    assert published(check_fee(fee(PriceCategory.REGISTRATION, both, amount=490, label="Такса регистрация"), both))
+
+
 def test_range_built_from_two_fees_is_not_published():
     """547's 550 to 600 'registration' range, built from the full-day and half-day fees."""
     only_one_line = fee(
