@@ -49,7 +49,8 @@ some picks were trivia, yearly counts go stale, the paragraph only restated the 
    areas by district, special-needs support, and open-day dates with a sign-up link (kept only
    when code finds that link on a page read).
 3. **Check.** Code keeps a fact only if its quote is on a page read (markup, quote marks and
-   emoji ignored: WordPress shows emoji as pictures). A second call on the same tier confirms
+   decorative emoji ignored; WordPress's emoji pictures read as their emoji; ticks and
+   crosses kept, since "✘ транспорт" says no). A second call on the same tier confirms
    each quote states the whole fact and its labels, seeing the 3 page lines above the quote
    for which class or grade it is about (172's "ще приемем 70 деца" sits under "Кандидатстване
    за ПУК"), and grades it: `key` (what parents choose on: programme, languages, hours,
@@ -66,7 +67,8 @@ internal): a "From the school's website" box on the school page with the key fac
 most, 2 a topic; later key facts show as `more`), a "show more" for the rest, a link to
 each fact's page and the date it was read; and a compare-page section with one row per
 topic any compared school has a key fact for. `minor` facts are not shown. A school with
-none shows nothing. A fact about a summer school, camp or holiday programme is never `key`
+none shows nothing. An admissions fact naming only school years before the one in progress
+("14 places for 2025/2026") is not shown. A fact about a summer school, camp or holiday programme is never `key`
 (its hours or meals would read as the school year's), and a fact that reports a pupil's,
 parent's or graduate's remark is not shown at all.
 
