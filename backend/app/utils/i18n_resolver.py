@@ -347,6 +347,15 @@ def resolve_display_name_i18n(attributes: Mapping[str, Any] | None = None) -> di
     )
 
 
+# "СДЯ" (самостоятелна детска ясла) is the register's abbreviation; few parents know it,
+# while "ДГ" is everyday usage and stays.
+_NURSERY_ABBREVIATION_RE = re.compile(r"^СДЯ(?=\s|№|$)")
+
+
+def _expand_nursery_abbreviation(name: str) -> str:
+    return _NURSERY_ABBREVIATION_RE.sub("Детска ясла", name)
+
+
 def resolve_name_i18n(
     name_i18n: Mapping[str, Any] | None,
     attributes: Mapping[str, Any] | None = None,
@@ -364,7 +373,7 @@ def resolve_name_i18n(
     if bg_name:
         # Display-only cleanup of register formatting (UF37); stored names are untouched.
         caps_source = raw_primary_name if bg_name != display.get("bg") else None
-        resolved["bg"] = tidy_bg_name(bg_name, source=caps_source) or bg_name
+        resolved["bg"] = _expand_nursery_abbreviation(tidy_bg_name(bg_name, source=caps_source) or bg_name)
 
     en_name = _prefer_display_english(display)
     if not en_name and not display:

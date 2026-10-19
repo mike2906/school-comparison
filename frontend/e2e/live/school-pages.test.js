@@ -4,8 +4,9 @@
  * from its website (with open days), its Facebook and Instagram links, fees with their
  * payment plans, last year's fees left out once this year lists them again, fees for the
  * searched age first with the other ages folded away, comparing fees
- * side by side, the exam heading naming the years its chart plots, and no pin for a school whose location is
- * only approximate (the page says the address is not on the map yet).
+ * side by side, the exam heading naming the years its chart plots, no pin for a school
+ * whose location is only approximate (the page says the address is not on the map yet),
+ * and a nursery called a nursery with an address that names its district.
  */
 import assert from 'node:assert/strict'
 import { describe, test } from 'node:test'
@@ -238,5 +239,17 @@ describe('a school page', () => {
     assert.equal(await page.locator('a[href*="google.com/maps/dir"]').count(), 0, 'no directions to a guessed point')
     await page.getByText(t('bg', 'schoolDetail.notOnMap')).first().waitFor()
     await page.getByText(address(listed.locations.find(location => address(location, 'bg')), 'bg')).first().waitFor()
+  })
+
+  test('a nursery is called a nursery, and its address names its district', async () => {
+    const nursery = (await allSchools()).find(s => s.admission_info?.admin_district && (s.locations || []).length > 0 &&
+      s.locations.every(location => (location.age_groups || []).every(group => group === 'nursery')))
+    assert.ok(nursery, 'a nursery with a district')
+    await open('en', `/schools/${nursery.id}`)
+    await page.getByText(t('en', 'educationLevels.nursery'), { exact: true }).first().waitFor()
+    assert.equal(await page.getByText(t('en', 'educationLevels.kindergarten'), { exact: true }).count(), 0, 'not labelled a kindergarten')
+    const shown = address(nursery.locations[0], 'en')
+    assert.match(shown, / district$|district,/, 'the address names a district')
+    await page.getByText(shown).first().waitFor()
   })
 })

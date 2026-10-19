@@ -64,7 +64,7 @@ from app.utils.i18n_resolver import register_core_names, resolve_address_i18n, r
         (
             'Втора английска езикова гимназия  "Томас Джеферсън"',
             "Втора английска езикова гимназия „Томас Джеферсън“",
-            'Second English Language High School "Tomas Dzhefersan"',
+            'Second English Language High School "Thomas Jefferson"',
         ),
         (
             'Професионална гимназия  по туризъм "Алеко Константинов"',
@@ -79,7 +79,7 @@ from app.utils.i18n_resolver import register_core_names, resolve_address_i18n, r
         (
             '9 Френска езикова гимназия  "Алфонс дьо Ламартин"',
             "9 Френска езикова гимназия „Алфонс дьо Ламартин“",
-            '9th French Language High School "Alfons dyo Lamartin"',
+            '9th French Language High School "Alphonse de Lamartine"',
         ),
         (
             "ДГ №31 Люлин (с яслени групи)",
@@ -271,3 +271,23 @@ def test_a_sibling_school_still_matches_a_kindergarten_brand_by_its_bare_name():
 def test_register_names_lowercase_abbreviation_and_single_apostrophe():
     assert resolve_name_i18n({"bg": 'чдг "СЛЪНЦЕ" ЕООД'})["bg"] == "ЧДГ „Слънце“"
     assert resolve_name_i18n({"bg": '"Частна детска градина Д\'Артанян" ЕООД'})["bg"] == "Частна детска градина „Д'Артанян“"
+
+
+def test_nursery_abbreviation_is_spelled_out_in_bulgarian():
+    assert resolve_name_i18n({"bg": "СДЯ №1"}) == {"bg": "Детска ясла №1", "en": "Nursery No. 1"}
+    # "ДГ" is everyday usage and stays.
+    assert resolve_name_i18n({"bg": "ДГ №16 „Приказен свят“"})["bg"] == "ДГ №16 „Приказен свят“"
+
+
+@pytest.mark.parametrize(
+    ("stored_bg", "expected_en"),
+    [
+        ('СУ "Хосе Марти"', 'Secondary School "José Martí"'),
+        ('СДЯ №45 "Майор Франк Томпсън"', 'Nursery No. 45 "Major Frank Thompson"'),
+        ('74 СУ "ГЕН. ХОСЕ ДЕ САН МАРТИН"', '74th Secondary School "Gen. José de San Martín"'),
+        ('ДГ №10 "Братя Грим"', 'Kindergarten No. 10 "Brothers Grimm"'),
+        ('133 СУ "А. С. Пушкин"', '133rd Secondary School "A. S. Pushkin"'),
+    ],
+)
+def test_foreign_patrons_keep_their_own_spelling(stored_bg, expected_en):
+    assert resolve_name_i18n({"bg": stored_bg})["en"] == expected_en

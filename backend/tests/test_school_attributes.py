@@ -590,10 +590,38 @@ class TestLocalizedProjection:
         assert localized["facilities"] == ["Library"]
 
     def test_string_language_focus_splits_on_colon(self):
-        localized = build_localized_attributes({"language_focus": ["English:Early Foreign"]}, "bg")
+        localized = build_localized_attributes({"language_focus": ["English:Intensive"]}, "bg")
         assert localized["language_focus"] == [
-            {"language": "English", "level": "early_foreign"}
+            {"language": "English", "level": "intensive"}
         ]
+
+    def test_language_levels_outside_the_vocabulary_are_dropped(self):
+        localized = build_localized_attributes(
+            {"language_focus": ["German:Early Foreign", {"language": "French", "level": "интензивно изучаване"}]},
+            "bg",
+        )
+        assert localized["language_focus"] == [
+            {"language": "German", "level": None},
+            {"language": "French", "level": "intensive"},
+        ]
+
+    def test_language_focus_is_the_same_on_both_pages_without_plain_bulgarian(self):
+        attrs = {
+            "extracted_i18n": {
+                "bg": {"languages": ["английски"]},
+                "en": {"languages": ["English", "Bulgarian", "German"]},
+            },
+            "language_focus": [{"language": "English", "level": "enrichment"}],
+        }
+        for locale in ("bg", "en"):
+            localized = build_localized_attributes(attrs, locale, "private")
+            assert localized["language_focus"] == [
+                {"language": "English", "level": "enrichment"},
+                {"language": "German", "level": None},
+            ]
+        # An international school teaching Bulgarian as a subject keeps it.
+        languages = {e["language"] for e in build_localized_attributes(attrs, "en", "international")["language_focus"]}
+        assert "Bulgarian" in languages
 
     def test_rejects_stringified_objects(self):
         localized = build_localized_attributes(
@@ -815,7 +843,7 @@ class TestFilterableProjection:
         school.attributes = {
             "language_focus": [
                 {"language": "English", "level": "Mother tongue"},
-                "German:Early Foreign",
+                "German:Intensive",
             ]
         }
         await seeded_db.commit()
@@ -823,12 +851,13 @@ class TestFilterableProjection:
         service = SchoolService(seeded_db)
 
         filters = await service.get_available_filters()
-        assert "English:mother_tongue" in filters["language_focus_pairs"]
-        assert "German:early_foreign" in filters["language_focus_pairs"]
-        assert "Mother tongue" not in filters["language_focus_levels"]
-        assert "German:Early Foreign" not in filters["language_focus_pairs"]
+        assert "German:intensive" in filters["language_focus_pairs"]
+        # A level outside the vocabulary is not offered as a filter option.
+        assert "English:mother_tongue" not in filters["language_focus_pairs"]
+        assert not {"Mother tongue", "mother_tongue"} & set(filters["language_focus_levels"])
+        assert "German:Intensive" not in filters["language_focus_pairs"]
 
-        for language_focus in ("English:mother_tongue", "German:early_foreign"):
+        for language_focus in ("German:intensive",):
             schools = await service.list_schools_filtered(language_focus=[language_focus])
             assert school.id in {matched.id for matched in schools}
 

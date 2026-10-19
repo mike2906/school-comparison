@@ -30,6 +30,7 @@ from app.utils.display_gating import (
     blocked_display_fields,
 )
 from app.utils.display_lists import (
+    INSTRUCTION_LANGUAGE_STATE,
     canonical_language,
     instruction_languages,
     is_list_noise,
@@ -41,7 +42,7 @@ from app.utils.facility_vocabulary import (
     canonical_tags,
 )
 from app.utils.list_translations import translate_items
-from app.utils.school_facts import PUBLISHED_KEY, TAG_GROUPS
+from app.utils.school_facts import LANGUAGE_LEVELS, PUBLISHED_KEY, TAG_GROUPS
 
 DISPLAY_LOCALES: tuple[str, ...] = ("bg", "en")
 
@@ -159,11 +160,25 @@ def publishable_display_i18n(value: Any) -> dict[str, str]:
     return published
 
 
+# Levels the page and the filter name; a free-text one ("2_times_a_week",
+# "интензивно_изучаване") would reach parents as a raw code, so others map here or go.
+DISPLAY_LANGUAGE_LEVELS = frozenset({*LANGUAGE_LEVELS, "intensive", "language_school"})
+_LANGUAGE_LEVEL_ALIASES = {
+    "интензивно": "intensive",
+    "интензивно_изучаване": "intensive",
+    "интензивно_обучение": "intensive",
+    "двуезично": "bilingual",
+    "двуезично_обучение": "bilingual",
+}
+
+
 def _normalize_language_level(value: Any) -> Optional[str]:
     text = _normalize_text(value)
     if not text:
         return None
-    return re.sub(r"[\s-]+", "_", text.lower())
+    level = re.sub(r"[\s-]+", "_", text.lower())
+    level = _LANGUAGE_LEVEL_ALIASES.get(level, level)
+    return level if level in DISPLAY_LANGUAGE_LEVELS else None
 
 
 def _extract_named_value(value: Any) -> Optional[str]:
@@ -386,20 +401,30 @@ def build_localized_attributes(
     instruction = instruction_languages(
         _as_list(attrs.get("languages_of_instruction")), school_type
     )
+    # A plain "Bulgarian" at a school taught in Bulgarian says nothing, and every school
+    # here but an international one is; a focus with a level ("English: immersion" at a
+    # bilingual school) is kept.
+    plain_dropped = set(instruction) | ({INSTRUCTION_LANGUAGE_STATE} if school_type != "international" else set())
     focus = _normalize_focus_entries([
         {**entry, "language": language}
         for entry in _normalize_focus_entries(
             _normalize_focus_entries(attrs.get("language_focus"))
-            + _normalize_focus_entries(extracted.get("languages"))
+            # Both locales' readings: the language list is a fact, the same on either page.
+            + _normalize_focus_entries([
+                item
+                for other in DISPLAY_LOCALES
+                for item in _as_list(_localized_extracted(attrs, other).get("languages"))
+            ])
             + _normalize_focus_entries(
                 [item for fact in _published_facts(attrs) for item in _as_list(fact.get("languages"))]
             )
         )
-        # A plain "Bulgarian" at a school taught in Bulgarian says nothing; a focus with a
-        # level ("English: immersion" at a bilingual school) is kept.
         if (language := canonical_language(entry["language"]))
-        and (entry.get("level") or language not in instruction)
+        and (entry.get("level") or language not in plain_dropped)
     ])
+    # "English" beside "English (enrichment)" is the same language listed twice.
+    with_level = {entry["language"] for entry in focus if entry.get("level")}
+    focus = [entry for entry in focus if entry.get("level") or entry["language"] not in with_level]
 
     def admission_values(field_name: str) -> list[str]:
         return [
