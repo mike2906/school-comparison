@@ -164,6 +164,9 @@ test('isClosedGroupFee: special needs, returning pupils and staff children only'
     { plan_name: 'Такса обучение / При записване след 20.02.2026 г.' },
     { plan_name: 'Сопрано и пиано' },
     { plan_name: 'Senior school' },
+    { age_group_en: 'Sen. school' },
+    { plan_name: 'Tuition', pricing_context: { notes: 'Same fee for new and returning students' } },
+    { plan_name: 'Tuition', pricing_context: { notes: '5% for siblings of current pupils' } },
   ]) {
     assert.equal(isClosedGroupFee(row), false, JSON.stringify(row))
   }

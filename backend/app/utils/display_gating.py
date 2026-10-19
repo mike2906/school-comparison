@@ -354,7 +354,7 @@ def _linked_evidence_is_valid(row: Any) -> bool:
 _NOT_A_FEE_RE = re.compile(
     r"\bглоб(?:а|и|ата|ите)\b|неустойк|дубликат|академична справка|служебн[аи] бележк|второ предупреждение|документ на бланка"
     r"|(?:изгубен|загубен)\w* (?:ключ|бадж|карт)"
-    r"|\bfines?\b(?! arts)|\bpenalt|\blate[- ]payment\b|\bduplicate\b|\blost (?:key|badge|card)",
+    r"|\bfines\b|\bfine (?:for|of)\b|\bpenalt|\blate[- ]payment\b|\bduplicate\b|\blost (?:key|badge|card)",
     re.IGNORECASE,
 )
 

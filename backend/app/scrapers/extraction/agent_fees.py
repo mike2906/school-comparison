@@ -407,7 +407,10 @@ def check_fee(fee: AgentFee, page_text: str) -> CheckedFee:
         return _dropped(fee, "dropped: evidence line does not hold the amount")
     if not amount_on_page(fee, page_numbers(page)):
         return _dropped(fee, "dropped: amount is not among the page's numbers")
-    if fee.category is not PriceCategory.TUITION and names_no_fee(f"{evidence} {fee.label} {fee.plan_name or ''}"):
+    # The fee's own words and the lines holding its amount: a heading or sentence above it
+    # ("при забава се дължи неустойка") speaks of something else.
+    own_lines = [line for line in lines if amount_on_page(fee, page_numbers(line))]
+    if fee.category is not PriceCategory.TUITION and names_no_fee(" ".join([*own_lines, fee.label, fee.plan_name or ""])):
         return _dropped(fee, "dropped: a fine, duplicate document or lost item, not a cost of attending")
 
     # The period and deposit rules read the fee's own lines: "9 x € 750 monthly" names the

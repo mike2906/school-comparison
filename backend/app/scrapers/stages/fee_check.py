@@ -44,6 +44,8 @@ Rules:
 - One read fee may cover several groups at the same price: that is not a miss.
 - A printed price range ("from 200 to 550") is one fee with amount_min and amount_max.
 - Discounts, instalments of a fee and payment plans are not separate fees.
+- Fines, penalties, late-payment charges, duplicate documents, transcripts and replacing lost
+  items are not fees: never list them as missed.
 - Fees of another school or kindergarten named on the pages (another legal entity, another
   building with its own name) are out of scope.
 - Copy a short line from the page as evidence for each finding.

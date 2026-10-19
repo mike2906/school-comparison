@@ -197,6 +197,14 @@ def test_fines_duplicates_and_lost_items_are_not_fees():
         assert "not a cost of attending" in result.checks[0]
     assert published(check_fee(fee(PriceCategory.TUITION, lines[7], amount=8900), page))
     assert published(check_fee(fee(PriceCategory.EXTRACURRICULAR, lines[8], amount=60, label="Fine arts club"), page))
+    for label in ("Fine art club", "Fine-arts studio", "Fine motor skills workshop"):
+        line = f"{label} | 60 €"
+        assert published(check_fee(fee(PriceCategory.EXTRACURRICULAR, line, amount=60, label=label), line)), label
+    # A sentence above the fee about late payment does not make the fee a fine.
+    sentence = "При забава се дължи неустойка 10%."
+    registration = "Такса регистрация | 490 €"
+    both = f"{sentence}\n{registration}"
+    assert published(check_fee(fee(PriceCategory.REGISTRATION, both, amount=490, label="Такса регистрация"), both))
 
 
 def test_range_built_from_two_fees_is_not_published():
