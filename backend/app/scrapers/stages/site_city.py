@@ -6,11 +6,13 @@ re-reads the home page of every accepted site and applies the same rule, so a si
 accepted before the rule, or one that changed hands since, is caught too: a hit takes
 the validation failure path (website-derived data withheld, ``failed_validate``), and
 the next ``recover-failed-urls`` searches for the school's real site. No model calls.
-The default is a dry run that writes nothing.
+The default is a dry run that writes nothing. A home page the plain fetch cannot read (a
+bot wall, a script-built page) is counted as not read and left as it is.
 """
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections.abc import Sequence
 from typing import Any, Optional
@@ -21,20 +23,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import School
 from app.scrapers.fee_pages import fee_http_client
-from app.scrapers.site_city import other_town_named
+from app.scrapers.site_city import identity_texts, other_town_named
 from app.scrapers.stages.social_links import Fetch, _http_fetch
 from app.utils.school_facts import SITE_ACCEPTED_STATUSES
 
 logger = logging.getLogger(__name__)
 
-
-def identity_texts(html: str) -> list[str]:
-    """A home page's title, first two main headings and site name."""
-    soup = BeautifulSoup(html, "html.parser")
-    texts = [soup.title.get_text(" ", strip=True) if soup.title else ""]
-    texts += [tag.get_text(" ", strip=True) for tag in soup.find_all("h1")[:2]]
-    texts += [str(tag.get("content") or "") for tag in soup.find_all("meta", attrs={"property": "og:site_name"})]
-    return [text for text in texts if text]
+# Home pages read at once: a slow or dead site waits out its timeout without holding up the rest.
+CONCURRENCY = 8
 
 
 async def run_site_city(
@@ -60,24 +56,24 @@ async def run_site_city(
     rows = (await db.execute(query.order_by(School.id).limit(limit))).all()
 
     async def check_all(fetch: Fetch) -> tuple[list[dict[str, Any]], int]:
-        hits = []
-        unread = 0
-        for school_id, website_url, school_city, name_i18n in rows:
-            page = await fetch(website_url)
+        semaphore = asyncio.Semaphore(CONCURRENCY)
+
+        async def check(row) -> Optional[dict[str, Any]]:
+            school_id, website_url, school_city, name_i18n = row
+            async with semaphore:
+                page = await fetch(website_url)
             if page is None:
-                unread += 1
-                continue
-            town = other_town_named(identity_texts(page[1]), school_city)
-            if town:
-                hits.append(
-                    {
-                        "school_id": school_id,
-                        "name_bg": (name_i18n or {}).get("bg"),
-                        "website": website_url,
-                        "town": town,
-                    }
-                )
-        return hits, unread
+                return None
+            town = other_town_named(identity_texts(BeautifulSoup(page[1], "html.parser")), school_city)
+            return {
+                "school_id": school_id,
+                "name_bg": (name_i18n or {}).get("bg"),
+                "website": website_url,
+                "town": town,
+            }
+
+        checked = await asyncio.gather(*(check(row) for row in rows))
+        return [item for item in checked if item and item["town"]], sum(item is None for item in checked)
 
     if fetch is not None:
         hits, unread = await check_all(fetch)

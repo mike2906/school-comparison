@@ -138,7 +138,7 @@ if [ ! -f "$state/pins_unpublished" ]; then
 		# shellcheck disable=SC2046
 		[ "$towns" = 0 ] || cli site-city --city "$city" --apply $(report "$dry_town" '" ".join("--school-id %d" % x["school_id"] for x in r["hits"])') --out "$state/pins-site-city-$stamp.json" ||
 			stop "site-city failed"
-		[ "$towns" = 0 ] || log "site-city: withheld $towns websites that name another town ($dry_town)"
+		[ "$towns" = 0 ] || log "site-city: withheld $(report "$state/pins-site-city-$stamp.json" 'len(r["hits"])') of $towns websites the dry run found naming another town ($dry_town)"
 		# The apply re-runs the model on the same schools; it must not place more than the cap.
 		website="$( [ "$website" = 0 ] && echo 0 || placed "$state/pins-website-$stamp.json")"
 		agent="$( [ "$agent" = 0 ] && echo 0 || placed "$state/pins-agent-$stamp.json")"

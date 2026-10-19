@@ -21,6 +21,7 @@ from pydantic import BaseModel
 from app.ai.client import calculate_cost, create_agent, extract_provider_cost_usd, get_model, get_usage
 from app.config import get_settings
 from app.scrapers.school_tokens import extract_school_name_tokens
+from app.scrapers.site_city import identity_texts as site_identity_texts
 from app.scrapers.site_city import other_town_named
 from app.services.provider_costs import execute_billable_request
 from app.utils.transliteration import transliterate_bulgarian
@@ -490,8 +491,10 @@ class URLValidator:
             min_name_token_hits = 1
         directory_signals = self._count_directory_signals(final_url, text_content, soup)
         identity_mismatch = self._find_identity_mismatch(page_identity_labels, expected_names)
-        # The title and main heading only: a site's other labels are its menu and links.
-        other_town = other_town_named([title_text, h1_text, *page_identity_labels[:1]], self.school_city)
+        # The title, main headings and site name only: a site's other labels are its menu and
+        # links. A page read by the browser has its first heading only.
+        town_texts = site_identity_texts(soup) if soup is not None else page_identity_labels[:1]
+        other_town = other_town_named(town_texts, self.school_city)
         if other_town:
             return ValidationResult.INVALID, None, f"Website names another town: {other_town}"
 

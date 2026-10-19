@@ -3,10 +3,11 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from bs4 import BeautifulSoup
 
 from app.models import School
-from app.scrapers.site_city import other_town_named
-from app.scrapers.stages.site_city import identity_texts, run_site_city
+from app.scrapers.site_city import identity_texts, other_town_named
+from app.scrapers.stages.site_city import run_site_city
 from app.scrapers.url_validator import URLValidator, ValidationResult
 
 
@@ -25,8 +26,13 @@ from app.scrapers.url_validator import URLValidator, ValidationResult
         (["ДГ 11 Мики Маус - София, кв. Младост 1"], None),
         # Its own town named beside another (a branch, a partner): not another school's site.
         (["СУ гр. София", "Филиал гр. Пловдив"], None),
-        # "град" inside a word, or a lowercase word after it, is not a town.
+        # All capitals, or "Град" capitalised.
+        (["ОУ СВ. СВ. КИРИЛ И МЕТОДИЙ ГР.ВАРНА"], "Варна"),
+        (["ОУ Град Варна"], "Варна"),
+        # "град" inside a word, "гр." for "група", "Детски град" as a name: no known town.
         (["Детска градина Слънце", "градски парк"], None),
+        (["ДГ №12 Детски град Пинокио"], None),
+        (["ДГ 5 - Яслена гр. Калинка"], None),
         # A town word that is not a whole part of the title.
         (["Русенски лъв - ДГ 12"], None),
         ([], None),
@@ -44,9 +50,9 @@ def test_a_city_without_its_towns_listed_is_not_checked():
 def test_identity_texts_reads_title_headings_and_site_name():
     html = (
         "<html><head><title>Начало</title><meta property='og:site_name' content='ОУ гр.Варна'></head>"
-        "<body><h1>Добре дошли</h1><p>Състезание в гр. Пловдив</p></body></html>"
+        "<body><h1>Добре дошли</h1><h1>Варна</h1><h2>Състезание в гр. Пловдив</h2></body></html>"
     )
-    assert identity_texts(html) == ["Начало", "Добре дошли", "ОУ гр.Варна"]
+    assert identity_texts(BeautifulSoup(html, "html.parser")) == ["Начало", "Добре дошли", "Варна", "ОУ гр.Варна"]
 
 
 async def test_validator_rejects_a_site_titled_with_another_town():
@@ -97,3 +103,19 @@ async def test_site_city_stage_withholds_only_on_apply(db_session):
         varna.id, "https://varna-school.bg/", ValidationResult.INVALID, None, "Website names another town: Варна"
     )
     assert report["hits"][0]["withheld"] is True
+
+
+async def test_validator_reads_the_same_texts_as_the_stage():
+    # A site name the title does not repeat: validation and the weekly stage must agree.
+    html = """<html><head><title>48 ОУ</title><meta property="og:site_name" content="ОУ гр.Варна"></head>
+        <body><h1>48 ОУ</h1><p>училище ученици учители прием клас</p></body></html>"""
+    response = MagicMock(status_code=200, url="https://48ou.bg/", text=html)
+    with patch("httpx.AsyncClient") as client_class:
+        client = AsyncMock()
+        client.__aenter__.return_value = client
+        client.get.return_value = response
+        client_class.return_value = client
+        result, _, reason = await URLValidator("bg", school_city="sofia").validate_url(
+            "https://48ou.bg", use_llm_fallback=False, school_name="48 основно училище"
+        )
+    assert (result, reason) == (ValidationResult.INVALID, "Website names another town: Варна")
