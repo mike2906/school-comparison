@@ -99,3 +99,13 @@ export function fetchExamAverages({ countryCode = 'bg', city = 'sofia' } = {}) {
 export function peekSchool(id) {
   return peekCachedJson(`${API_BASE}/schools/${id}`)
 }
+
+// Counts a name search that found no school (backend search_misses.py says what is kept).
+export function reportSearchMiss(query) {
+  return fetch(`${API_BASE}/search-misses`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ q: query }),
+    keepalive: true,
+  }).catch(() => {})
+}

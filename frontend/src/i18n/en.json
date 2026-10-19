@@ -692,6 +692,7 @@
       "account": "You do not need an account, and the site sets no cookies.",
       "browser": "If you set a starting location, it is saved in your browser together with a few display choices, so they are still there on your next visit. They are not sent to us.",
       "lookups": "When you type an address or pick a point on the map, the address or coordinates are sent to OpenStreetMap’s Nominatim service to look them up. Map images are loaded from CARTO. Both see your IP address, as any website you visit does.",
+      "searches": "When a school name you search for finds nothing, we count the words you typed, so we can add the names parents use. We keep only the words and how often they came up each day, nothing about who searched, and we leave out anything that looks like an email, a phone number or a web address.",
       "hosting": "The site is served through Cloudflare, and our server keeps standard request logs that include IP addresses, for security and troubleshooting. We count visits with Cloudflare Web Analytics, which uses no cookies and does not follow you across sites.",
       "contact": "If you email us, we use your address only to reply. Questions about privacy: {{email}}.",
       "calculator": "The admission calculator works entirely in your browser: your answers are never sent to us. If you press \"Save on this device\", they are kept in your browser (with the address you checked) so the school list can compare every school; you can forget them at any time."

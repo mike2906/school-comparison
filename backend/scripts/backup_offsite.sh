@@ -51,7 +51,7 @@ stamp="$(date -u +%Y%m%d-%H%M%S)"
 dump="$work/$database-$stamp.dump"
 reports="$work/reports-$stamp.tar.gz"
 
-docker exec "$container" pg_dump -U postgres -d "$database" --format=custom > "$dump" \
+docker exec "$container" pg_dump -U postgres -d "$database" --format=custom --exclude-schema=telemetry > "$dump" \
 	|| die "pg_dump of $database failed"
 [ -s "$dump" ] && docker exec -i "$container" pg_restore --list < "$dump" > /dev/null \
 	|| die "the dump is empty or unreadable"

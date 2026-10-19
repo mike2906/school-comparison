@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import get_settings
 from app.database import get_db
 from app.models.school import School
-from app.routers import compare, countries, schools
+from app.routers import compare, countries, schools, search_misses
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -48,6 +48,7 @@ app.add_middleware(GZipMiddleware, minimum_size=1024)
 app.include_router(countries.router, prefix="/countries", tags=["countries"])
 app.include_router(schools.router, prefix="/schools", tags=["schools"])
 app.include_router(compare.router, prefix="/compare", tags=["compare"])
+app.include_router(search_misses.router, prefix="/search-misses", tags=["search-misses"])
 
 
 @app.get("/health")
