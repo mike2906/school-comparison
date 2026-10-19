@@ -91,7 +91,11 @@ def with_place(
     if out.get("en"):
         # A stored English address may already name a part the Bulgarian one leaves out.
         parts = [english_address(part) or part for part in suffix.split(", ")]
-        missing = [part for part in parts if part.split(" district")[0].casefold() not in out["en"].casefold()]
+        missing = [
+            part
+            for part in parts
+            if not re.search(rf"\b{re.escape(part.split(' district')[0])}\b", out["en"], flags=re.IGNORECASE)
+        ]
         if missing:
             out["en"] = f"{out['en']}, {', '.join(missing)}"
     return out

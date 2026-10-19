@@ -79,3 +79,8 @@ def test_a_stored_english_address_is_not_given_a_place_twice():
     assert with_place(resolved, town="Горни Богров", district="Кремиковци")["en"] == (
         "ul. H 5, Gorni Bogrov, Kremikovtsi district"
     )
+
+
+def test_a_longer_english_word_does_not_count_as_the_place():
+    resolved = {"bg": "ул. Изгревска 3", "en": "ul. Izgrevska 3"}
+    assert with_place(resolved, town=None, district="Изгрев")["en"] == "ul. Izgrevska 3, Izgrev district"
