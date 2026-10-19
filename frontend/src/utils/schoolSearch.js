@@ -102,8 +102,14 @@ function prepareName(value) {
   const norm = normalizeSearchText(value)
   const latin = transliterate(norm)
   const loose = looseLatin(latin)
-  const words = [...norm.split(' '), ...latin.split(' '), ...loose.split(' ')]
-  return { norm, latin, loose, words, hasSaint: norm.split(' ').some(word => SAINT_WORDS.includes(word)) }
+  const [normWords, latinWords, looseWords] = [norm, latin, loose].map(text => text.split(' '))
+  return {
+    norm, latin, loose,
+    words: [...normWords, ...latinWords, ...looseWords],
+    hasSaint: normWords.some(word => SAINT_WORDS.includes(word)),
+    // Each word as [source, transliterated, loose]; the three line up.
+    rows: normWords.map((word, i) => [word, latinWords[i], looseWords[i]]),
+  }
 }
 
 function looseLatin(latin) {
@@ -139,23 +145,64 @@ function tokensMatch(tokens, names) {
   return names.some(name => name.norm && tokens.every(token => tokenIn(token, name)))
 }
 
+function wordStarts(token, [norm, latinWord, looseWord]) {
+  const latin = transliterate(token)
+  if (SAINT_WORDS.includes(latin) && SAINT_WORDS.includes(norm)) return true
+  if (/^\d+$/.test(token)) return norm === token
+  return norm.startsWith(token) || latinWord.startsWith(latin) || looseForms(latin).some(form => looseWord.startsWith(form))
+}
+
+// Like tokenIn, but plain words must start a word of the name.
+function tokenStartsWord(token, name) {
+  const latin = transliterate(token)
+  if (latin.length > 3 && SAINT_WORDS.includes(latin) && name.hasSaint) return true
+  if (/^\d+$/.test(token) || TYPE_LATIN.has(latin)) return tokenIn(token, name)
+  const starts = [token, latin, ...looseForms(latin)]
+  return name.words.some(word => starts.some(start => word.startsWith(start)))
+}
+
+// The query's words, in order, start consecutive words of the name.
+function isPhrase(tokens, name) {
+  for (let start = 0; start + tokens.length <= name.rows.length; start++) {
+    if (tokens.every((token, i) => wordStarts(token, name.rows[start + i]))) return true
+  }
+  return false
+}
+
+// How well the query fits, lower is better; mirrors rank_school in the backend.
+export const MATCH_RANK = { alias: 0, number: 1, phrase: 2, prefix: 3, contains: 4, none: 5 }
+
+function tokensRank(tokens, names) {
+  const firstNumber = tokens.find(token => /^\d+$/.test(token))
+  let best = MATCH_RANK.none
+  for (const name of names) {
+    if (!name.norm || !tokens.every(token => tokenIn(token, name))) continue
+    let rank = MATCH_RANK.contains
+    if (firstNumber && name.norm.match(/\d+/)?.[0] === firstNumber) rank = MATCH_RANK.number
+    else if (isPhrase(tokens, name)) rank = MATCH_RANK.phrase
+    else if (tokens.every(token => tokenStartsWord(token, name))) rank = MATCH_RANK.prefix
+    best = Math.min(best, rank)
+  }
+  return best
+}
+
 /**
- * True when the query matches one of the school's names in any language ("119 СУ",
- * "СУ 119", "№119", "СМГ", "sofiyska"). An empty query matches everything.
+ * How well the query matches one of the school's names in any language ("119 СУ",
+ * "СУ 119", "№119", "СМГ", "sofiyska"): a MATCH_RANK value, MATCH_RANK.none when it
+ * does not match. An empty query matches everything.
  */
-export function schoolMatchesQuery(school, query) {
+export function schoolMatchRank(school, query) {
   const normalized = normalizeSearchText(query)
-  if (!normalized) return true
+  if (!normalized) return MATCH_RANK.contains
   const tokens = normalized.split(' ')
   const names = [
     ...Object.values(school?.resolved_name_i18n || {}),
     ...Object.values(school?.name_i18n || {}),
   ].map(prepareName)
-  if (tokensMatch(tokens, names)) return true
 
   const registry = normalizeSearchText(school?.name_i18n?.bg)
   const latinTokens = tokens.map(transliterate)
-  return ALIASES_LATIN.some(([aliasTokens, target]) => {
+  const aliased = ALIASES_LATIN.some(([aliasTokens, target]) => {
     if (!registry.includes(target)) return false
     for (let start = 0; start + aliasTokens.length <= tokens.length; start++) {
       if (aliasTokens.every((t, i) => latinTokens[start + i] === t)) {
@@ -165,6 +212,12 @@ export function schoolMatchesQuery(school, query) {
     }
     return false
   })
+  return aliased ? MATCH_RANK.alias : tokensRank(tokens, names)
+}
+
+/** True when the query matches one of the school's names. An empty query matches everything. */
+export function schoolMatchesQuery(school, query) {
+  return schoolMatchRank(school, query) < MATCH_RANK.none
 }
 
 /**
@@ -175,4 +228,10 @@ export function schoolMatchesQuery(school, query) {
 export function filterByName(schools, query, hits) {
   const matched = schools.filter(school => schoolMatchesQuery(school, query))
   return matched.length || !hits.size ? matched : schools.filter(school => hits.has(school.id))
+}
+
+/** Schools ordered by how well their names fit the query; `compareTies` orders equal fits. */
+export function sortByNameMatch(schools, query, compareTies) {
+  const ranks = new Map(schools.map(school => [school.id, schoolMatchRank(school, query)]))
+  return [...schools].sort((a, b) => ranks.get(a.id) - ranks.get(b.id) || compareTies(a, b))
 }

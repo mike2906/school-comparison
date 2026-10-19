@@ -12,6 +12,7 @@ from app.utils.school_search import (
     RANK_ALIAS,
     RANK_CONTAINS,
     RANK_NUMBER,
+    RANK_PHRASE,
     RANK_PREFIX,
     SAINT_WORDS,
     SCHOOL_NAME_ALIASES,
@@ -101,8 +102,9 @@ def test_alias_does_not_leak_to_other_schools():
 
 
 def test_latin_query_matches_cyrillic_name_by_transliteration():
-    assert _rank("sofiyska matematicheska", SMG) == RANK_PREFIX
-    assert _rank("matemat", SMG) == RANK_PREFIX
+    assert _rank("sofiyska matematicheska", SMG) == RANK_PHRASE
+    assert _rank("matemat", SMG) == RANK_PHRASE
+    assert _rank("matemat sofiyska", SMG) == RANK_PREFIX
     assert _rank("atematich", SMG) == RANK_CONTAINS
 
 
@@ -165,6 +167,13 @@ def test_loose_spellings_do_not_match_everything():
 
 def test_plural_saints_match():
     assert _rank("Saints Kiril", 'СУ "Св. св. Кирил и Методий"') is not None
+
+
+def test_saint_and_name_in_a_row_rank_above_scattered_words():
+    seminary = 'Sofia Theological Seminary "St. Ivan Rilski"'
+    assert _rank("Saint Sofia", SV_SOFIA) == RANK_PHRASE
+    assert _rank("Saint Sofia", seminary) == RANK_PREFIX
+    assert _rank("St Sofia", SV_SOFIA_EN) == RANK_PHRASE
 
 
 def test_saint_word_needs_a_saint_in_the_name():

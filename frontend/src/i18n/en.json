@@ -71,6 +71,7 @@
   },
   "sorting": {
     "sortBy": "Sort by",
+    "bestMatch": "Best match",
     "distance": "Distance",
     "driveTime": "Drive time",
     "name": "Name",

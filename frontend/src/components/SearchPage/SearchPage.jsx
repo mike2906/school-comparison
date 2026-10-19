@@ -23,6 +23,7 @@ import { useHiddenBelow } from '../../hooks/useSavedAdmission'
 import { useSearchHits } from '../../hooks/useSearchHits'
 import { useReportSearchMiss } from '../../hooks/useReportSearchMiss'
 import SchoolCard from '../SchoolCard/SchoolCard'
+import { useQuerySort } from '../../hooks/useQuerySort'
 import SchoolCardSkeleton from '../SchoolCard/SchoolCardSkeleton'
 import SchoolDetailPanel from './SchoolDetailPanel'
 import AgePicker from './AgePicker'
@@ -35,7 +36,7 @@ import { useFilterData, useUrlFilters } from './useSearchFilters'
 import { useSchools } from '../../hooks/useSchools'
 import { calculateDistance } from '../../utils/distance'
 import { compareSchoolNames, getSchoolName, schoolMatchesQuery } from '../../utils/i18n'
-import { filterByName } from '../../utils/schoolSearch'
+import { filterByName, sortByNameMatch } from '../../utils/schoolSearch'
 import { foldSamePlace } from '../../utils/samePlace'
 import { useCompare } from '../../context/CompareContext'
 import { useCountry } from '../../context/CountryContext'
@@ -146,6 +147,7 @@ function SearchPage() {
   const [sortBy, setSortBy] = useState(() => (
     searchParams.has('sort') || !userLocation ? initialView.sort : 'distance'
   ))
+  const { hasNameQuery, activeSort, setActiveSort, dropQuerySort } = useQuerySort(nameQuery, sortBy, setSortBy)
   const [searchInBounds, setSearchInBounds] = useState(false)
   const [mapBounds, setMapBounds] = useState(null)
   const [openLocationsId, setOpenLocationsId] = useState(null)
@@ -348,6 +350,7 @@ function SearchPage() {
     if (!userLocation && (sortBy === 'distance' || sortBy === 'drive')) {
       setSortBy('name')
     }
+    if (!userLocation) dropQuerySort(['distance', 'drive'])
     previousLocationRef.current = userLocation
   }, [userLocation, sortBy])
 
@@ -688,7 +691,12 @@ function SearchPage() {
     const list = [...boundedSchools]
     if (list.length === 0) return list
 
-    switch (sortBy) {
+    switch (activeSort) {
+      case 'match':
+        // Equally good matches: nearest first when there is a location, else by name.
+        return sortByNameMatch(list, nameQuery, userLocation
+          ? (a, b) => (a.distance ?? Number.POSITIVE_INFINITY) - (b.distance ?? Number.POSITIVE_INFINITY)
+          : (a, b) => compareSchoolNames(getSchoolName(a, i18n.language), getSchoolName(b, i18n.language), i18n.language))
       case 'distance':
         list.sort((a, b) => (a.distance ?? Number.POSITIVE_INFINITY) - (b.distance ?? Number.POSITIVE_INFINITY))
         break
@@ -738,7 +746,7 @@ function SearchPage() {
     }
 
     return list
-  }, [boundedSchools, sortBy, i18n.language, filters.ageGroup])
+  }, [boundedSchools, activeSort, nameQuery, userLocation, i18n.language, filters.ageGroup])
 
   // A kindergarten and its school next door share one card.
   const { cards: listCards, hostById: samePlaceHostById } = useMemo(() => foldSamePlace(sortedSchools), [sortedSchools])
@@ -853,7 +861,7 @@ function SearchPage() {
   }, [selectedSchoolId, listCards, samePlaceHostById, visibleStart, visibleCount, mobileTab, viewMode])
 
   // New results start at the top with the first page (not on map panning).
-  const listKey = JSON.stringify([filters, sortBy, nameQuery, distanceFilter])
+  const listKey = JSON.stringify([filters, activeSort, nameQuery, distanceFilter])
   const lastListKeyRef = useRef(listKey)
   useEffect(() => {
     if (lastListKeyRef.current === listKey) return
@@ -1011,12 +1019,14 @@ function SearchPage() {
         { value: 'type', label: t('sorting.type') },
         { value: 'price', label: t('sorting.pricePrivate') },
       ]
-  const sortOptions = kindergartensOnly
-    ? allSortOptions.filter(option => option.value !== 'nvo')
-    : allSortOptions
+  const sortOptions = [
+    ...(hasNameQuery ? [{ value: 'match', label: t('sorting.bestMatch') }] : []),
+    ...(kindergartensOnly ? allSortOptions.filter(option => option.value !== 'nvo') : allSortOptions),
+  ]
 
   useEffect(() => {
     if (kindergartensOnly && sortBy === 'nvo') setSortBy('name')
+    if (kindergartensOnly) dropQuerySort(['nvo'])
   }, [kindergartensOnly, sortBy])
 
   const renderMapBoundsFilter = () => (
@@ -1260,8 +1270,8 @@ function SearchPage() {
                     </label>
                     <select
                       id="results-sort"
-                      value={sortBy}
-                      onChange={(e) => setSortBy(e.target.value)}
+                      value={activeSort}
+                      onChange={(e) => setActiveSort(e.target.value)}
                       className="h-11 md:h-auto max-w-[44vw] md:max-w-none border border-neutral-300 rounded-lg px-2 md:px-3 md:py-1.5 text-sm bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-shadow"
                     >
                       {sortOptions.map(option => (
@@ -1391,7 +1401,7 @@ function SearchPage() {
                     onHoverEnd={handleSchoolHoverEnd}
                     ageGroupOrder={ageGroupOrder}
                     activeAgeGroup={filters.ageGroup}
-                    nvoExamType={sortBy === 'nvo' ? nvoSortExamType : null}
+                    nvoExamType={activeSort === 'nvo' ? nvoSortExamType : null}
                     isLocationsOpen={openLocationsId === school.id}
                     locationOverlay={locationOverlay}
                     onToggleLocations={handleToggleLocationsPanel}
