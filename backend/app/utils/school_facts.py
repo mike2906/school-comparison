@@ -13,6 +13,7 @@ from collections.abc import Mapping
 from typing import Any, Optional
 from urllib.parse import urlparse
 
+from app.utils.academic_year import current_academic_year
 from app.utils.display_lists import canonical_language
 from app.utils.facility_vocabulary import APPROACH_VOCAB, FACILITY_VOCAB, PROGRAM_VOCAB
 from app.utils.website_data import (  # noqa: F401 (SITE_ACCEPTED_STATUSES is imported from here)
@@ -294,6 +295,22 @@ _HEARSAY_RE = re.compile(
 )
 # A fact about a summer school or camp, as its English line names it (541: "The 2026 summer
 # programme runs..."); a school-year fact whose quote only mentions summer stays key.
+_SCHOOL_YEAR_RE = re.compile(r"\b(20\d\d)\s*[/–-]\s*(?:20)?(\d\d)\b")
+
+
+def _past_school_years_only(text: str, today: str) -> bool:
+    """Whether ``text`` names school years and all of them are before the one in progress.
+
+    An admissions fact names the year its places or exam dates are for (the reader is told
+    to); a page left up from an earlier campaign then stops showing when the next school
+    year begins, while this year's intake still shows, with its year named."""
+    years = [int(first) for first, _ in _SCHOOL_YEAR_RE.findall(text)]
+    if not years:
+        return False
+    current = int(current_academic_year(datetime.date.fromisoformat(today))[:4])
+    return max(years) < current
+
+
 _SEASONAL_EN_RE = re.compile(r"\bsummer\b|\bcamps?\b", re.IGNORECASE)
 
 
@@ -341,6 +358,8 @@ def publishable_school_facts(attributes: Any, website_url: Optional[str]) -> Opt
             continue
         if _HEARSAY_RE.search(_english(fact)):
             continue
+        if fact.get("topic") == "admissions" and _past_school_years_only(_english(fact), today):
+            continue  # "14 places for 2025/2026" is a past campaign's
         labels = _labels(fact)
         if labels.get("open_days") and max(labels["open_days"]) < today and not (
             labels.get("applications_close") and labels["applications_close"] >= today

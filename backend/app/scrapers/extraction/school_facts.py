@@ -238,14 +238,24 @@ class Graded(BaseModel):
         return next((rank for rank in RANKS if n in getattr(self, rank)), None)
 
 
-_EMOJI_RE = re.compile("[\u2190-\u21ff\u2300-\u23ff\u2460-\u27bf\u2b00-\u2bff\U0001f000-\U0001faff\ufe0f\u200d]")
+_TICK_RE = re.compile("[\u2713\u2714\u2705\u2611\U0001f5f8]\ufe0f?")
+_CROSS_RE = re.compile("[\u2717\u2718\u274c\u274e\u2612]\ufe0f?")
+# Pictographs, dingbats and arrows; not circled numbers (①) or the ticks and crosses above.
+_EMOJI_RE = re.compile(
+    "[\u2190-\u21ff\u2300-\u23ff\u2600-\u2712\u2719-\u274b\u274f-\u27bf\u2b00-\u2bff"
+    "\U0001f000-\U0001f5f7\U0001f5f9-\U0001faff\ufe0f\u200d]"
+)
 
 
 @lru_cache(maxsize=512)  # each page is matched against every quote part
 def _normalise(text: str) -> str:
+    # WordPress serves emoji as pictures (609's "![✅](.../2705.svg) Заявления"): keep the emoji.
+    text = re.sub(r"!\[([^\]]{1,8})\]\([^)]*/emoji/[^)]*\)", r" \1 ", text)
     text = re.sub(r"!\[[^\]]*\]\([^)]*\)", " ", text)  # markdown images
-    # WordPress serves emoji as pictures, which the line above drops, while the reader quotes
-    # the emoji itself (609's "✅ Заявления се приемат..."): neither side keeps them.
+    # A tick or cross says yes or no ("✘ Училищен транспорт"), so all ticks read as one mark and
+    # all crosses as another; other pictographs (👉 📝 ⏳) are decoration either side may leave out.
+    text = _TICK_RE.sub(" ✓ ", text)
+    text = _CROSS_RE.sub(" ✗ ", text)
     text = _EMOJI_RE.sub(" ", text)
     text = re.sub(r"\[([^\]]*)\]\([^)]*\)", r"\1", text)  # markdown links keep their text
     text = re.sub(r"[*_#>|`\\\[\]]+", " ", text)  # also a link's text quoted without its address
@@ -386,7 +396,10 @@ def quote_context(quote: str, text: str) -> list[str]:
     if not first:
         return []
     lines = [line for line in (_strip(_normalise(raw)) for raw in text.splitlines()) if line]
-    at = next((i for i, line in enumerate(lines) if first in line), None)
+    # The whole line first: "Изпит по математика" is not the line "Не се изисква изпит по математика".
+    at = next((i for i, line in enumerate(lines) if line == first), None)
+    if at is None:
+        at = next((i for i, line in enumerate(lines) if first in line), None)
     if at is None:  # the quote's first line runs on past a page line
         at = next((i for i, line in enumerate(lines) if len(line) >= 12 and first.startswith(line)), None)
     if at is None:
