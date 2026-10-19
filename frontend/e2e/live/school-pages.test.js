@@ -4,7 +4,8 @@
  * from its website (with open days), its Facebook and Instagram links, fees with their
  * payment plans, last year's fees left out once this year lists them again, fees for the
  * searched age first with the other ages folded away, comparing fees
- * side by side, the exam heading naming the years its chart plots, and no pin for a school whose location is
+ * side by side, the exam heading naming the years its chart plots, exam results with a decimal
+ * comma on the Bulgarian page, and no pin for a school whose location is
  * only approximate (the page says the address is not on the map yet).
  */
 import assert from 'node:assert/strict'
@@ -227,6 +228,15 @@ describe('a school page', () => {
     await card(t('bg', 'schools.academicPerformance'))
       .getByText(t('bg', 'academicPerformance.basedOnYears', { start: years[0], end: years[years.length - 1] }))
       .waitFor()
+  })
+
+  test('the Bulgarian page writes exam results with a decimal comma', async () => {
+    // Results always show one decimal ("56,0 т."), so any school with NVO results will do.
+    const school = await findSchool('with NVO results', s => getAvailableExamTypes(s.exam_results || []).length > 0)
+    await open('bg', `/schools/${school.id}`)
+    const section = card(t('bg', 'schools.academicPerformance'))
+    await section.getByText(/\d,\d т\./).first().waitFor()
+    assert.equal(await section.getByText(/\d\.\d т\./).count(), 0, 'no decimal point on the Bulgarian page')
   })
 
   test('a school with only an approximate location has no pin but keeps its address', async () => {

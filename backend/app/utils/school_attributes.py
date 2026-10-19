@@ -41,6 +41,7 @@ from app.utils.facility_vocabulary import (
     canonical_tags,
 )
 from app.utils.list_translations import translate_items
+from app.utils.school_facts import LANGUAGE_LEVELS as FACT_LANGUAGE_LEVELS
 from app.utils.school_facts import PUBLISHED_KEY, TAG_GROUPS
 
 DISPLAY_LOCALES: tuple[str, ...] = ("bg", "en")
@@ -159,11 +160,27 @@ def publishable_display_i18n(value: Any) -> dict[str, str]:
     return published
 
 
+# The language-focus levels the site labels: the facts reader's three, which the search filter
+# offers, and "language_school". The old extraction wrote free text ("intensive", "mother
+# tongue", "2 times a week"), which reached the page untranslated (parent trial 2026-10-19):
+# intensive or extended study is "enrichment", as the facts reader writes it, and any other
+# text is no level.
+LANGUAGE_LEVELS = (*FACT_LANGUAGE_LEVELS, "language_school")
+_LEVEL_SYNONYMS = (
+    (re.compile(r"^(intensive|extended|advanced|интензивн|разширен)"), "enrichment"),
+    (re.compile(r"^(bilingual|двуезич)"), "bilingual"),
+    (re.compile(r"^(immersion|immersive|потапян)"), "immersion"),
+)
+
+
 def _normalize_language_level(value: Any) -> Optional[str]:
     text = _normalize_text(value)
     if not text:
         return None
-    return re.sub(r"[\s-]+", "_", text.lower())
+    level = re.sub(r"[\s-]+", "_", text.lower())
+    if level in LANGUAGE_LEVELS:
+        return level
+    return next((canonical for pattern, canonical in _LEVEL_SYNONYMS if pattern.match(level)), None)
 
 
 def _extract_named_value(value: Any) -> Optional[str]:
