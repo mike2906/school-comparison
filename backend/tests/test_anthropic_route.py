@@ -293,6 +293,20 @@ async def test_the_fee_reader_schema_goes_out_as_json_schema_output(monkeypatch)
     sent = _mock_anthropic(monkeypatch, _json_answer(fees_agent.AgentFees().model_dump_json()))
     await fees_agent.reader_agent().run("page text")
     assert sent and sent[0]["output_config"]["format"]["type"] == "json_schema"
+
+    def objects(node):
+        if isinstance(node, dict):
+            if node.get("type") == "object":
+                yield node
+            for value in node.values():
+                yield from objects(value)
+        elif isinstance(node, list):
+            for value in node:
+                yield from objects(value)
+
+    # Anthropic refuses an object schema without "additionalProperties": false (2026-10-19).
+    schema_objects = list(objects(sent[0]["output_config"]["format"]["schema"]))
+    assert schema_objects and all(node.get("additionalProperties") is False for node in schema_objects)
     assert sent[0]["max_tokens"] == ai_client.ANTHROPIC_MAX_OUTPUT_TOKENS
 
 

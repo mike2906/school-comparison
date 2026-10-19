@@ -12,7 +12,9 @@ from dataclasses import replace
 from math import isfinite
 from typing import Any, Literal
 
+from anthropic import transform_schema
 from pydantic_ai import Agent
+from pydantic_ai._json_schema import JsonSchemaTransformer
 from pydantic_ai.exceptions import ModelHTTPError, UnexpectedModelBehavior
 from pydantic_ai.messages import ModelResponse
 from pydantic_ai.models.anthropic import AnthropicModel
@@ -273,15 +275,30 @@ def get_anthropic_model(tier: ModelTier) -> PricedAnthropicModel:
         raise ValueError(f"tier {tier!r} is set to {get_model(tier)!r} but ANTHROPIC_API_KEY is empty")
     provider = AnthropicProvider(api_key=settings.anthropic_api_key)
     name = _anthropic_model_name(tier)
-    return PricedAnthropicModel(name, provider=provider, profile=_anthropic_profile(name))
+    return PricedAnthropicModel(
+        name, provider=provider, profile=_anthropic_profile(name, json_output=bool(_anthropic_thinking_effort()))
+    )
 
 
 ANTHROPIC_THINKING_EFFORTS = ("low", "medium", "high")
 
 
-def _anthropic_profile(model_name: str) -> AnthropicModelProfile:
+class _AnthropicOutputSchema(JsonSchemaTransformer):
+    """Anthropic's JSON-schema output wants "additionalProperties": false on every object and
+    no numeric or length constraints; the SDK's transform_schema makes that change (the
+    constraints move into descriptions, and pydantic still checks them on the answer)."""
+
+    def transform(self, schema):
+        return schema
+
+    def walk(self):
+        return transform_schema(super().walk())
+
+
+def _anthropic_profile(model_name: str, *, json_output: bool) -> AnthropicModelProfile:
     """pydantic-ai 1.107's profile predates Haiku 5.5. Haiku 5.5 takes adaptive thinking,
-    an effort level and JSON-schema output, and rejects non-default sampling settings."""
+    an effort level and JSON-schema output, and rejects non-default sampling settings. The
+    schema rewrite applies only with thinking on, so forced tool calls keep their schema."""
     base = anthropic_model_profile(model_name) or AnthropicModelProfile()
     return replace(
         AnthropicModelProfile.from_profile(base),
@@ -289,6 +306,7 @@ def _anthropic_profile(model_name: str) -> AnthropicModelProfile:
         anthropic_supports_adaptive_thinking=True,
         anthropic_supports_effort=True,
         anthropic_disallows_sampling_settings=True,
+        json_schema_transformer=_AnthropicOutputSchema if json_output else base.json_schema_transformer,
     )
 
 
