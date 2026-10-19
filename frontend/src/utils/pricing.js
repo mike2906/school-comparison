@@ -1,7 +1,7 @@
 import { intlLocale } from './format.js'
 import { gradeBandLabel, gradeRangeInText, gradesInText, gradesNamedIn, rowGradeBand } from './gradeBand.js'
-import { isClosedGroupFee, isOnePayment, pricePeriod, rowAgeGroupKeys, rowsForAgeGroup } from './priceRows.js'
-import { stageLabel, websiteWords } from './priceLabels.js'
+import { isClosedGroupFee, isOnePayment, pricePeriod, priceTerms, rowAgeGroupKeys, rowsForAgeGroup } from './priceRows.js'
+import { planNameLabel, stageLabel, websiteWords } from './priceLabels.js'
 
 /**
  * Academic-year cohort helpers for pricing display.
@@ -262,7 +262,25 @@ function tuitionRows(rows, ageGroup = null) {
   const forGroup = rowsForAgeGroup(whole, ageGroup)
   // A total that names no age group covers every group.
   const totalled = new Set(forGroup.filter(isStatedTotal).map(row => row.age_group || ''))
-  return forGroup.filter(row => isStatedTotal(row) || !(totalled.has('') || totalled.has(row.age_group || '')))
+  const shown = forGroup.filter(row => isStatedTotal(row) || !(totalled.has('') || totalled.has(row.age_group || '')))
+  // A price on other terms (a promotion, a discount, prepaid, paid in parts or at once) is
+  // not the group's regular price: 625's 3-month promotion set its "from", 568's price for
+  // paying in parts its "to". It counts only for a group with no regular price.
+  // A regular price naming no group covers every group; a price on other terms naming none
+  // gives way to any regular price.
+  const group = row => row.age_group?.trim() || ''
+  const regular = new Set(shown.filter(row => !priceTerms(row)).map(group))
+  const hasRegular = row => regular.has('') || regular.has(group(row)) || (group(row) === '' && regular.size > 0)
+  return shown.filter(row => !priceTerms(row) || !hasRegular(row))
+}
+
+// The rows a range runs from and to, so it can say what each end is; null for one price
+// (to the euro: 454 EUR and 888 BGN show as one price).
+function rangeEnds(rows, convert, range) {
+  if (Math.round(range.min) === Math.round(range.max)) return null
+  const low = rows.filter(row => convert(row.amount_min ?? row.amount ?? row.amount_max, row) === range.min)
+  const high = rows.filter(row => convert(row.amount_max ?? row.amount ?? row.amount_min, row) === range.max)
+  return low.length > 0 && high.length > 0 ? { low, high } : null
 }
 
 function rangeOf(rows, convert) {
@@ -410,8 +428,11 @@ export function groupRowsByAgeGroup(rows = [], t, language) {
  * it is, never mixed.
  * When the headline is next year's fee (`YEAR_STATUS.NEXT`), `currentYear` carries the
  * current year's tuition the same way, or null when there is none.
- * `total` is true when the figure is the school's printed total of several fees.
- * Returns `{ min, max, currency, period, academicYear, yearStatus, total, currentYear? }` or null.
+ * `total` is true when the figure is the school's printed total of several fees, and
+ * `optionalIncluded` lists the optional fees that total is known to add up.
+ * `ends` holds the rows the range runs from and to (`rangeEndLabels`), null for one price.
+ * Returns `{ min, max, currency, period, ends, academicYear, yearStatus, total,
+ * optionalIncluded, currentYear? }` or null.
  */
 export function statedTuition(pricing = [], { ageGroup = null, intake = true, today = new Date() } = {}) {
   const cohort = selectPricingCohort(pricing, { ageGroup, intake, today })
@@ -436,17 +457,99 @@ export function statedTuition(pricing = [], { ageGroup = null, intake = true, to
 
     // Totals say so on the page: a parent reads "Total fees", not "Tuition".
     meta.total = periodRows.every(isStatedTotal)
-    const euro = rangeOf(periodRows, (value, row) => toEur(value, row.currency))
-    if (euro) return { ...euro, currency: 'EUR', period, ...meta }
+    meta.optionalIncluded = meta.total ? optionalInTotal(periodRows, cohort.rows) : []
+    const toEuro = (value, row) => toEur(value, row.currency)
+    const euro = rangeOf(periodRows, toEuro)
+    if (euro) return { ...euro, currency: 'EUR', period, ends: rangeEnds(periodRows, toEuro, euro), ...meta }
 
     // No euro rate: the currency of the cheapest row, never mixed with another.
     const priced = periodRows.filter(row => row.currency && priceBase(row) != null)
     if (priced.length === 0) continue
     const cheapest = priced.reduce((best, row) => (priceBase(row) < priceBase(best) ? row : best))
-    const own = rangeOf(priced.filter(row => row.currency === cheapest.currency), value => value)
-    if (own) return { ...own, currency: cheapest.currency, period, ...meta }
+    const same = priced.filter(row => row.currency === cheapest.currency)
+    const own = rangeOf(same, value => value)
+    if (own) return { ...own, currency: cheapest.currency, period, ends: rangeEnds(same, value => value, own), ...meta }
   }
   return null
+}
+
+// A fee the school marks as optional: 633's "Дарение за развитие ФОТ (препоръчително)".
+const OPTIONAL_RE = /препоръч|по желание|доброволн|незадължит|дарени|optional|recommended|voluntary|donation/iu
+
+// True for a row whose own name says paying it is optional.
+function isOptionalFee(row) {
+  return [row?.plan_name, row?.pricing_context?.plan_name_en].some(text => text && OPTIONAL_RE.test(text))
+}
+
+// The optional fees a printed total adds up, so the headline can say so: 633's 7,850 €
+// is tuition, activities and a recommended 785 € donation. Only when the school's total is
+// one figure that is the sum, in euro, of the other whole regular fees of its period, so
+// the fees are known to be in it; otherwise none.
+function optionalInTotal(totals, rows) {
+  if (totals.length !== 1) return []
+  const [total] = totals
+  const totalEur = toEur(total.amount, total.currency)
+  if (totalEur == null) return []
+  const parts = rows.filter(row => row !== total && !isStatedTotal(row) && row.amount != null &&
+    !isInstallmentPlan(row) && !priceTerms(row) && !isClosedGroupFee(row) &&
+    pricePeriod(row) === pricePeriod(total) &&
+    (!row.age_group || !total.age_group || row.age_group === total.age_group))
+  const sum = parts.reduce((value, row) => value + (toEur(row.amount, row.currency) ?? NaN), 0)
+  return Math.abs(sum - totalEur) < 1 ? parts.filter(isOptionalFee) : []
+}
+
+// Longer names (a whole sentence copied as the age group) would crowd the fact.
+const RANGE_END_LABEL_MAX = 40
+
+/**
+ * What each end of a headline range is, so "8,064–9,141" says half day and full day:
+ * `{ low, high }` naming the age groups when the two ends differ in it, else the fee names.
+ * An end several rows share names them all (568's preparatory group and grades 1–7).
+ * Null for one price, or when the ends have no short names that tell them apart.
+ */
+export function rangeEndLabels(fee, t, language) {
+  const { low, high } = fee?.ends || {}
+  if (!low?.length || !high?.length) return null
+  const names = (rows, name) => {
+    const labels = rows.map(row => name(row, t, language))
+    return labels.every(Boolean) ? [...new Set(labels)] : null
+  }
+  for (const name of [ageGroupName, planNameLabel]) {
+    const [from, to] = [names(low, name), names(high, name)]
+    if (!from || !to) continue
+    const lower = new Set(from.map(label => label.toLocaleLowerCase()))
+    if (to.some(label => lower.has(label.toLocaleLowerCase()))) continue
+    const [lowLabel, highLabel] = [from.join(', '), to.join(', ')]
+    if (lowLabel.length > RANGE_END_LABEL_MAX || highLabel.length > RANGE_END_LABEL_MAX) return null
+    return { low: lowLabel, high: highLabel }
+  }
+  return null
+}
+
+/**
+ * The lines under a headline fee: what each end of the range is ("Half day: 8,064 EUR",
+ * "Full day: 9,141 EUR") and the optional fees a printed total adds up ("Includes an
+ * optional fee: …"). `formatPrice(value, currency)` writes a price as the headline does.
+ */
+export function feeRangeNotes(fee, t, language, formatPrice) {
+  if (!fee) return []
+  const ends = rangeEndLabels(fee, t, language)
+  const optional = (fee.optionalIncluded || []).map(row => {
+    const shown = displayPrice(row.amount, row.currency)
+    return t('pricing.includesOptional', {
+      name: planNameLabel(row, t, language) || t(`pricing.${row.category}`),
+      price: formatPrice(shown.value, shown.currency),
+    })
+  })
+  return [
+    ends ? t('pricing.rangeEnds', {
+      low: ends.low,
+      lowPrice: formatPrice(fee.min, fee.currency),
+      high: ends.high,
+      highPrice: formatPrice(fee.max, fee.currency),
+    }) : null,
+    ...optional,
+  ].filter(Boolean)
 }
 
 /**

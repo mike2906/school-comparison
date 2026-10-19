@@ -16,6 +16,8 @@ import {
   groupRowsByAgeGroup,
   sortByCategory,
   intakeYearStart,
+  rangeEndLabels,
+  feeRangeNotes,
 } from './pricing.js'
 
 const row = (overrides = {}) => ({
@@ -614,4 +616,98 @@ test('statedTuition: a special-needs or returning-pupil rate does not set the he
   assert.deepEqual([stated.min, stated.max], [7269, 17250])
   // Still listed: only the headline leaves them out.
   assert.equal(groupPricingByAcademicYear(rows, { today: new Date('2026-06-01') })[0].rows.length, 4)
+})
+
+test('statedTuition: a price on other terms does not set the range when the group has a regular one (625, 568, 505)', () => {
+  // 625: the 3-month promotion and the prepaid prices sit among the half-day and full-day fees.
+  const kindergarten = [
+    row({ id: 1, amount: 454, period: 'monthly', plan_name: 'половин ден' }),
+    row({ id: 2, amount: 680, period: 'monthly', plan_name: 'целодневно гледане' }),
+    row({ id: 3, amount: 646, period: 'monthly', plan_name: 'Еднократно плащане за 6 месеца' }),
+    row({ id: 4, amount: 550, currency: 'BGN', period: 'monthly', plan_name: 'промоционална такса за първите 3 месеца' }),
+  ]
+  assert.deepEqual([statedTuition(kindergarten).min, statedTuition(kindergarten).max], [454, 680])
+  // 568: paying in parts costs more; the range is the regular price of each group.
+  const school = [
+    current({ id: 1, amount: 8950, age_group: 'ПГ' }),
+    current({ id: 2, amount: 9300, age_group: 'ПГ', plan_name: 'при разсрочено плащане' }),
+    current({ id: 3, amount: 6700, age_group: 'VIII - XII клас' }),
+    current({ id: 4, amount: 7050, age_group: 'VIII - XII клас', plan_name: 'при разсрочено плащане' }),
+  ]
+  assert.deepEqual([statedTuition(school).min, statedTuition(school).max], [6700, 8950])
+  assert.equal(tuitionSortValue(school), 6700 / 12)
+  // 505: sibling discounts and company surcharges beside the first child's fee.
+  const siblings = [
+    row({ id: 1, amount: 6531, age_group: 'Elementary', plan_name: 'Total tuition fees (year) — 1st child' }),
+    row({ id: 2, amount: 4898, age_group: 'Elementary', plan_name: 'Total tuition fees (year) — 4th child (-25%)' }),
+    row({ id: 3, amount: 7184, age_group: 'Elementary', plan_name: 'Company ≥ 50 employees (+10%)' }),
+  ]
+  assert.deepEqual([statedTuition(siblings).min, statedTuition(siblings).max], [6531, 6531])
+  // A group whose only price is on other terms keeps it (610's "Плащане на 1 вноска").
+  const onePayment = [
+    current({ id: 1, amount: 7400, age_group: 'Подготвителен клас', plan_name: 'Подготвителен клас / ПУК 1 / Плащане на 1 вноска' }),
+    current({ id: 2, amount: 7800, age_group: 'Grades 11 – 12' }),
+  ]
+  assert.deepEqual([statedTuition(onePayment).min, statedTuition(onePayment).max], [7400, 7800])
+  // Only other-terms prices: they are what there is.
+  const onlyPromo = [row({ amount: 400, period: 'monthly', plan_name: 'Промоционална цена' })]
+  assert.equal(statedTuition(onlyPromo).min, 400)
+})
+
+const NOTES_EN = {
+  ...EN,
+  'pricing.rangeEnds': '{{low}}: {{lowPrice}} · {{high}}: {{highPrice}}',
+  'pricing.includesOptional': 'Includes an optional fee: {{name}}, {{price}}',
+  'pricing.activities': 'Activities',
+}
+const price = (value, currency) => `${value} ${currency}`
+const tNotes = (key, vars = {}) =>
+  key in NOTES_EN ? NOTES_EN[key].replace(/\{\{(\w+)\}\}/g, (_, name) => String(vars[name])) : key
+
+test('rangeEndLabels: each end of a range says what it is (541, 568, 506)', () => {
+  const halfFull = statedTuition([
+    row({ id: 1, amount: 9141, period: null, plan_name: 'целодневна база', pricing_context: { plan_name_en: 'Full day' } }),
+    row({ id: 2, amount: 8064, period: null, plan_name: 'полудневна база', pricing_context: { plan_name_en: 'Half day' } }),
+  ])
+  assert.deepEqual(rangeEndLabels(halfFull, tNotes, 'en'), { low: 'Half day', high: 'Full day' })
+  assert.deepEqual(feeRangeNotes(halfFull, tNotes, 'en', price), ['Half day: 8064 EUR · Full day: 9141 EUR'])
+  // Age groups when the ends differ in them; an end two groups share names both.
+  const grades = statedTuition([
+    current({ id: 1, amount: 8950, age_group: 'ПГ' }),
+    current({ id: 2, amount: 8950, age_group: 'I - VIІ клас', plan_name: 'целодневно обучение' }),
+    current({ id: 3, amount: 6700, age_group: 'VIII - XII клас' }),
+  ])
+  assert.deepEqual(rangeEndLabels(grades, tNotes, 'en'), { low: 'Grades 8–12', high: 'Preschool, Grades 1–7' })
+  // One price, ends with the same name, or a name too long to show: nothing.
+  assert.equal(rangeEndLabels(statedTuition([row({ amount: 500 })]), tNotes, 'en'), null)
+  const sameInLev = statedTuition([row({ id: 1, amount: 454, plan_name: 'А' }), row({ id: 2, amount: 888, currency: 'BGN', plan_name: 'Б' })])
+  assert.equal(rangeEndLabels(sameInLev, tNotes, 'en'), null)
+  const sameName = statedTuition([row({ id: 1, amount: 500, plan_name: 'Такса' }), row({ id: 2, amount: 600, plan_name: 'Такса' })])
+  assert.equal(rangeEndLabels(sameName, tNotes, 'en'), null)
+  const long = statedTuition([
+    row({ id: 1, amount: 500, age_group: 'ПГУ от 15. 09.2026 г. до 31.05.2027 г. за деца родени 2020' }),
+    row({ id: 2, amount: 600, age_group: '1-4 клас' }),
+  ])
+  assert.equal(rangeEndLabels(long, tNotes, 'en'), null)
+})
+
+test('feeRangeNotes: a printed total says which optional fee it adds up (633)', () => {
+  const rows = [
+    current({ id: 1, amount: 3140 }),
+    current({ id: 2, amount: 7850, plan_name: 'Общо' }),
+    current({ id: 3, category: 'extracurricular', amount: 3140 }),
+    current({ id: 4, category: 'activities', amount: 785, plan_name: 'Въвеждащи и завършващи дейности' }),
+    current({ id: 5, category: 'activities', amount: 785, plan_name: 'Дарение за развитие ФОТ (препоръчително)', pricing_context: { plan_name_en: 'Development donation (recommended)' } }),
+    current({ id: 6, category: 'registration', amount: 140, period: 'one_time' }),
+  ]
+  const total = statedTuition(rows)
+  assert.deepEqual(total.optionalIncluded.map(fee => fee.id), [5])
+  assert.deepEqual(feeRangeNotes(total, tNotes, 'en', price), ['Includes an optional fee: Development donation (recommended), 785 EUR'])
+  // An instalment or a part in lev still adds up.
+  const withInstalment = statedTuition([...rows, current({ id: 7, amount: 1570, plan_name: 'първа вноска' })]
+    .map(fee => (fee.id === 3 ? { ...fee, amount: 6141.31, currency: 'BGN' } : fee)))
+  assert.deepEqual(withInstalment.optionalIncluded.map(fee => fee.id), [5])
+  // When the fees do not add up to the total, it is not known to include the donation.
+  const unknown = statedTuition(rows.filter(fee => fee.id !== 3))
+  assert.deepEqual(unknown.optionalIncluded, [])
 })

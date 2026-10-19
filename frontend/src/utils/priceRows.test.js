@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { isClosedGroupFee, periodFromLabel, periodUnknown, pricePeriod, rowAgeGroupKeys, rowsForAgeGroup, splitRowsForAgeGroup } from './priceRows.js'
+import { isClosedGroupFee, periodFromLabel, priceTerms, periodUnknown, pricePeriod, rowAgeGroupKeys, rowsForAgeGroup, splitRowsForAgeGroup } from './priceRows.js'
 
 test('periodFromLabel: the period a fee name states', () => {
   const cases = {
@@ -169,5 +169,33 @@ test('isClosedGroupFee: special needs, returning pupils and staff children only'
     { plan_name: 'Tuition', pricing_context: { notes: '5% for siblings of current pupils' } },
   ]) {
     assert.equal(isClosedGroupFee(row), false, JSON.stringify(row))
+  }
+})
+
+test('priceTerms: the terms a fee name puts a price on, null for the regular price', () => {
+  const cases = {
+    'промоционална такса за първите 3 месеца': 'promotion',
+    'Коледна отстъпка за първите 5 сключени договора за обучение': 'promotion',
+    'Total tuition fees (year) — 2nd child (-9%)': 'discount',
+    'за второ дете от семейството с отстъпка': 'discount',
+    'Company < 50 employees (+5%)': 'discount',
+    'Еднократно плащане за 6 месеца': 'prepaid',
+    'Еднократно плащане за цяла година': 'prepaid',
+    'Целодневно обучение, при предплащане на таксата за 12 месеца': 'prepaid',
+    'при разсрочено плащане': 'instalments',
+    'На две равни вноски': 'instalments',
+    'Целодневно обучение; абонамент на 2 вноски': 'instalments',
+    'Еднократно плащане': 'one_payment',
+    'Целодневно обучение; абонамент на 1 вноска': 'one_payment',
+    'Подготвителен клас / ПУК 1 / Плащане на 1 вноска': 'one_payment',
+  }
+  for (const [name, terms] of Object.entries(cases)) assert.equal(priceTerms({ plan_name: name }), terms, name)
+  // The English name counts too.
+  assert.equal(priceTerms({ plan_name: 'x', pricing_context: { plan_name_en: 'Paid for a whole year at once' } }), 'prepaid')
+  for (const name of [null, 'целодневно гледане', 'Цял ден, при месечно плащане', 'annual subscription',
+    'monthly enrollment', 'Total tuition fees (year) — 1st child', 'Total Fee for New Students', 'Пълен ден',
+    'Месечна такса, платима авансово', 'Намалена програма (до 13:00)', 'Reduced hours (8:00-13:00)',
+    'Целодневна група (първите 2 месеца адаптация)']) {
+    assert.equal(priceTerms({ plan_name: name }), null, String(name))
   }
 })

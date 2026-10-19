@@ -2053,6 +2053,17 @@ the session scratchpad only.
       Registration fees with no period no longer get "Period not stated". Search-card phones
       are normalised as on the school page. The NVO badge names the year when the year before
       is missing. Age groups are listed youngest first, in the country config's order.
+- [x] **UF52 The headline fee range mixes in prices that are not the regular fee
+      (parent's-eye trial 2026-10-19).** 625 read "281–680 EUR / month" with 281 a 3-month
+      promotion; 568's top was the price for paying in parts; 541's and 506's ranges did not
+      say which end was half day or pre-K; 633's total hid a recommended donation. The fees
+      reader names a promotional, prepaid or discounted price by its terms by design, so the
+      headline now reads them (`priceTerms` in `src/utils/priceRows.js`): a price on other
+      terms counts only for a group with no regular price. A range names its two ends under
+      the figure ("Half day: 8,064 EUR · Full day: 9,141 EUR"), and a printed total that is
+      the sum of the listed fees says which optional fee it includes. Grade lists ("7, 8, …,
+      12 клас"), ПУК and a Cyrillic "І" in Roman numerals now read as grades. The fee list
+      itself is unchanged: every price stays listed under its own name.
 
 ## Phase 3 — Go live
 

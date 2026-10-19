@@ -32,6 +32,7 @@ import {
   getTrendTooltip,
 } from '../../utils/nvoDisplay'
 import {
+  feeRangeNotes,
   formatCurrency,
   formatPriceLabel,
   groupPricingByAcademicYear,
@@ -157,6 +158,9 @@ export function buildCompareSections({
                     pricingRange.yearStatus === YEAR_STATUS.NEXT ? t('pricing.nextYear') : null,
                   ].filter(Boolean).join(' · ')}
                 </div>
+                {feeRangeNotes(pricingRange, t, language, (value, currency) => formatCurrency(value, language, currency)).map((line, index) => (
+                  <div key={index} className="text-xs text-neutral-500">{line}</div>
+                ))}
                 {current && (
                   <div className="text-xs text-neutral-500">
                     {t('pricing.yearPrice', { year: current.academicYear, price: formatted(current) })}

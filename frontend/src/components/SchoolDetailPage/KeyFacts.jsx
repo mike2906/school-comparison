@@ -8,7 +8,7 @@ import {
 } from '../../utils/keyFacts'
 import { calculateDistance } from '../../utils/distance'
 import { formatAmount, formatKm, intlLocale } from '../../utils/format'
-import { statedTuition, YEAR_STATUS } from '../../utils/pricing'
+import { feeRangeNotes, statedTuition, YEAR_STATUS } from '../../utils/pricing'
 import { getLastAdmittedPoints, getMinNvoScore, hasKindergartenCutoffs } from '../../utils/admission'
 import {
   getLanguageLabel,
@@ -109,13 +109,16 @@ function KeyFacts({ school, examAverages, nvoExamType, ageGroup = null }) {
           tuition.currentYear.period ? null : t('pricing.periodNotStated'),
         ].filter(Boolean).join(' · ')
       : null
+    // What each end of the range is, and any optional fee a printed total adds up.
+    const formatPrice = (value, currency) => t('pricing.priceOnly', { price: formatNumber(value), currency })
+    const notes = [...feeRangeNotes(tuition, t, i18n.language, formatPrice), currentYear].filter(Boolean)
     facts.tuition = (
       <Fact
         key="tuition"
         label={t(tuition.total ? 'pricing.totalFees' : 'pricing.tuition')}
         value={priceText(tuition)}
         detail={[tuition.period ? null : t('pricing.periodNotStated'), yearDetail].filter(Boolean).join(' · ')}
-        note={currentYear}
+        note={notes.length > 0 ? notes.map((line, index) => <div key={index}>{line}</div>) : null}
       />
     )
   }

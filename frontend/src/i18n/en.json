@@ -285,6 +285,8 @@
     },
     "pricePerPeriod": "{{price}} {{currency}} / {{period}}",
     "priceOnly": "{{price}} {{currency}}",
+    "rangeEnds": "{{low}}: {{lowPrice}} · {{high}}: {{highPrice}}",
+    "includesOptional": "Includes an optional fee: {{name}}, {{price}}",
     "other": "Other fees",
     "sourceLink": "Source: {{site}}",
     "sourceLinkLabel": "See these prices on {{site}} (opens in a new window)",

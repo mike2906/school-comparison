@@ -3,7 +3,8 @@
  * spellings and a brand in the web address too), the facts read
  * from its website (with open days), its Facebook and Instagram links, fees with their
  * payment plans, last year's fees left out once this year lists them again, fees for the
- * searched age first with the other ages folded away, comparing fees
+ * searched age first with the other ages folded away, a headline fee range that says what
+ * each end is, comparing fees
  * side by side, the exam heading naming the years its chart plots, exam results with a decimal
  * comma on the Bulgarian page, no pin for a school whose location is
  * only approximate (the page says the address is not on the map yet), and a nursery
@@ -15,7 +16,7 @@ import { describe, test } from 'node:test'
 import { planNameLabel } from '../../src/utils/priceLabels.js'
 import { rowAgeGroupKeys, splitRowsForAgeGroup } from '../../src/utils/priceRows.js'
 import { getAvailableExamTypes, prepareNvoTimelineData } from '../../src/utils/nvo.js'
-import { groupPricingByAcademicYear } from '../../src/utils/pricing.js'
+import { groupPricingByAcademicYear, rangeEndLabels, statedTuition } from '../../src/utils/pricing.js'
 import { upcomingOpenDays } from '../../src/utils/schoolFacts.js'
 import { NoSchoolError, PHONE, address, allSchools, findSchool, open, page, schoolName, t, liveBrowser } from './live.js'
 
@@ -206,6 +207,20 @@ describe('a school page', () => {
     assert.equal(await folded.getAttribute('open'), null, 'other ages start folded')
     await folded.locator('summary', { hasText: t('bg', 'pricing.otherAges', { count: otherCount }) }).click()
     assert.notEqual(await folded.getAttribute('open'), null, 'other ages open on a tap')
+  })
+
+  test('the headline fee range says what each end is', async () => {
+    // 541's "8064–9141 EUR" did not say half day and full day; 625's started at a promotion.
+    const pageT = (key, vars = {}) => {
+      try { return t('bg', key, vars) } catch { return key }
+    }
+    const ends = school => rangeEndLabels(statedTuition(school.pricing), pageT, 'bg')
+    const listed = (await allSchools()).find(s => isPrivate(s) && ends(s))
+    assert.ok(listed, 'a private school whose headline fee is a range')
+    const { low, high } = ends(listed)
+    await open('bg', `/schools/${listed.id}`)
+    const escape = text => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    await page.getByText(new RegExp(`^${escape(low)}: .+ · ${escape(high)}: `)).first().waitFor()
   })
 
   test('two private schools with fees compare side by side', async () => {
