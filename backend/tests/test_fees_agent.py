@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import dataclasses
 import json
+import subprocess
 from decimal import Decimal
 
 import httpx
@@ -2043,3 +2044,60 @@ async def test_a_refused_checker_account_stops_the_run(db_session, pages, frozen
     check = _checker(error=ProviderCreditsExhausted("credit balance is too low"))
     with pytest.raises(ProviderCreditsExhausted):
         await fees_agent.run_school(db_session, school, find=_find(pages), read=_read(FEES_STAGE), check=check)
+
+
+async def test_a_school_whose_pages_have_not_changed_is_not_checked_again(db_session, pages, frozen_today):
+    school = await _school(db_session)
+    await db_session.commit()
+    check = _checker(_check())
+    await fees_agent.run_school(db_session, school, find=_find(pages), read=_read(FEES_STAGE), check=check)
+    assert ((school.attributes or {}).get("fee_check")) is None  # a dry run stores nothing
+    await fees_agent.run_school(db_session, school, find=_find(pages), read=_read(FEES_STAGE), apply=True, check=check)
+    assert school.attributes["fee_check"]["pages_hash"]
+    report = await fees_agent.run_school(
+        db_session, school, find=_find(pages), read=_read(FEES_STAGE), apply=True, check=check
+    )
+    assert report["check"] == {"skipped": "pages unchanged since the last check"}
+    assert len(check.seen) == 2
+    changed = [pages[0], dataclasses.replace(pages[1], text=pages[1].text + "\nТранспорт: 60 евро месечно")]
+    await fees_agent.run_school(db_session, school, find=_find(changed), read=_read(FEES_STAGE), check=check)
+    assert len(check.seen) == 3
+
+
+def test_wrong_fees_go_to_one_github_issue(monkeypatch):
+    results = [
+        {"school_id": 564, "check": {"wrong": [
+            {"fee": 3, "category": "transport", "amounts": ["2518"], "problem": "a discount", "evidence": "2-ро дете"}
+        ]}},
+        {"school_id": 596, "check": {"missed": [], "wrong": []}},
+        {"school_id": 609, "check": {"skipped": "pages unchanged since the last check"}},
+    ]  # fmt: skip
+    body = fee_check.wrong_fees_body(results)
+    assert "School 564: transport 2518 (read fee 3). a discount\n  > 2-ро дете" in body
+    assert "596" not in body and "609" not in body
+    assert fee_check.wrong_fees_body(results[1:]) is None
+
+    calls = []
+
+    def run(args, **kwargs):
+        calls.append(args[:3])
+        return subprocess.CompletedProcess(args, 0, stdout=open_issue)
+
+    monkeypatch.setattr(fee_check.subprocess, "run", run)
+    open_issue = ""
+    assert fee_check.open_wrong_fees_issue(results) == "opened an issue"
+    assert calls[-1] == ["gh", "issue", "create"]
+    open_issue = "41\n"
+    assert fee_check.open_wrong_fees_issue(results) == "commented on issue 41"
+    assert calls[-1] == ["gh", "issue", "comment"]
+    calls.clear()
+    assert fee_check.open_wrong_fees_issue(results[1:]) is None and not calls
+
+
+def test_no_gh_leaves_the_run_alone(monkeypatch):
+    def run(args, **kwargs):
+        raise FileNotFoundError("gh")
+
+    monkeypatch.setattr(fee_check.subprocess, "run", run)
+    results = [{"school_id": 1, "check": {"wrong": [{"fee": 0, "problem": "p", "evidence": "e"}]}}]
+    assert fee_check.open_wrong_fees_issue(results).startswith("not reported")

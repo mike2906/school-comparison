@@ -15,6 +15,11 @@ read, so its cost follows how often fee pages change, not the number of schools.
 
 from __future__ import annotations
 
+import datetime
+import hashlib
+import logging
+import os
+import subprocess
 from decimal import Decimal
 from typing import Any, Optional, Protocol
 
@@ -24,7 +29,12 @@ from app.ai.client import create_agent, extract_provider_cost_usd, get_model, ge
 from app.scrapers.extraction.agent_fees import AgentFee, fee_amounts, page_numbers, read_amounts
 from app.services.provider_costs import execute_billable_request
 
+logger = logging.getLogger(__name__)
+
 TIER = "fee_check"
+# schools.attributes key: the hash of the pages the last check read (internal, never published).
+ATTRIBUTE = "fee_check"
+ISSUE_TITLE = "Fee check: fees that look wrong"
 # Thinking counts as output. A school's check wrote about 3K tokens in the trial; 16K leaves
 # room for a long fee table and stays under the non-streaming request limit.
 CHECK_MAX_OUTPUT_TOKENS = 16_000
@@ -171,3 +181,75 @@ def check_report(check: FeeCheck, fees: list[AgentFee]) -> dict[str, Any]:
             }
         )
     return {"missed": [finding.model_dump() for finding in check.missed], "wrong": wrong}
+
+
+def pages_hash(pages_text: str) -> str:
+    return hashlib.sha256(pages_text.encode()).hexdigest()
+
+
+def already_checked(attributes: Optional[dict], digest: str) -> bool:
+    """True when the last check read these same pages: checking them again would find the same.
+
+    The check costs about ten times the read, and most schools' fee pages change once a year.
+    """
+    return ((attributes or {}).get(ATTRIBUTE) or {}).get("pages_hash") == digest
+
+
+def checked(attributes: Optional[dict], digest: str) -> dict[str, Any]:
+    """``attributes`` with this check's pages recorded."""
+    block = {"pages_hash": digest, "checked_on": datetime.date.today().isoformat()}
+    return {**(attributes or {}), ATTRIBUTE: block}
+
+
+def wrong_fees_body(results: list[dict[str, Any]]) -> Optional[str]:
+    """The issue text listing every fee the run's checks thought wrong; None when there are none."""
+    lines = []
+    for result in results:
+        for finding in (result.get("check") or {}).get("wrong") or []:
+            amounts = "/".join(finding.get("amounts") or []) or "?"
+            lines.append(
+                f"- School {result['school_id']}: {finding.get('category') or 'fee'} {amounts} "
+                f"(read fee {finding['fee']}). {finding['problem']}\n  > {finding['evidence']}"
+            )
+    if not lines:
+        return None
+    return (
+        "The fee check (backend/app/scrapers/stages/fee_check.py) thinks these fees, as read and "
+        "possibly published, do not match the school's pages. It does not change them. A school is "
+        "checked again only when its fee pages change.\n\n" + "\n".join(lines)
+    )
+
+
+def open_wrong_fees_issue(results: list[dict[str, Any]], *, run_id: Any = None) -> Optional[str]:
+    """Report the run's wrong-looking fees on GitHub: a new issue, or a comment on the open one.
+
+    Best effort with the gh CLI, like the PC's other jobs; returns what it did, for the report.
+    """
+    body = wrong_fees_body(results)
+    if body is None:
+        return None
+    if run_id is not None:
+        body = f"fees-agent run {run_id}, {datetime.date.today().isoformat()}.\n\n{body}"
+    repo = os.environ.get("PUBLISH_REPO", "mike2906/school-comparison")
+    try:
+        found = subprocess.run(
+            ["gh", "issue", "list", "-R", repo, "--state", "open", "--search", f'in:title "{ISSUE_TITLE}"',
+             "--json", "number", "-q", ".[0].number"],
+            capture_output=True, text=True, timeout=60, check=True,
+        ).stdout.strip()  # fmt: skip
+        if found:
+            subprocess.run(
+                ["gh", "issue", "comment", found, "-R", repo, "--body", body],
+                capture_output=True,
+                timeout=60,
+                check=True,
+            )
+            return f"commented on issue {found}"
+        subprocess.run(
+            ["gh", "issue", "create", "-R", repo, "--title", ISSUE_TITLE, "--body", body],
+            capture_output=True, timeout=60, check=True,
+        )  # fmt: skip
+        return "opened an issue"
+    except (OSError, subprocess.SubprocessError) as exc:
+        logger.warning("fees-agent could not report wrong fees on GitHub: %s", exc)
+        return f"not reported: {str(exc)[:200]}"

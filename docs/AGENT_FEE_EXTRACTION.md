@@ -117,10 +117,16 @@ For one school, with its `website_url`:
    failed or capped check leaves the read as it was. Why: parents' problems kept being found
    by Mike on the site (Maple Bear's extras, ranges, periods); in a trial on 15 keyed schools
    Sonnet flagged all 9 with real problems and 1 of 4 clean ones (Haiku was too noisy), but
-   found only ~40% of missed fees, so it steers a re-read rather than scoring fees. It runs
-   per school read, so its cost follows how often fee pages change, not a monthly sweep over
-   every school. `fees-agent --no-check` turns it off; with no `ANTHROPIC_API_KEY` it is off
-   with a warning.
+   found only ~40% of missed fees, so it steers a re-read rather than scoring fees.
+   `fees-agent --no-check` turns it off; with no `ANTHROPIC_API_KEY` it is off with a warning.
+   - **Cost.** A first dry run (4 schools, 2026-10-19) cost about $0.047 a check, ten times the
+     read. So a school is checked only when the pages it read differ from the last check's
+     (`attributes.fee_check.pages_hash`, stored by a run with `--apply`): its cost follows how
+     often fee pages change, not how many schools a run reads.
+   - **Wrong fees reach a person.** A run with `--apply` lists every wrong-looking fee in one
+     GitHub issue, "Fee check: fees that look wrong" (a comment when it is already open), with
+     the gh CLI like the PC's other jobs. A school is not flagged again until its pages change,
+     so the issue is the record.
 
 The publish boundary does not change: rows go through `pricing_row_is_publishable`, the
 validation stage's evidence check (`price_evidence.py`, which stays) and the

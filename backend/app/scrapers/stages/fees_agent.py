@@ -1213,7 +1213,10 @@ async def run_school(
     proofs = await _stored_proofs(db, school)
     passing = [fee for fee in fees if (page := _page_for(fee, priced)) and _checked(fee, page, proofs).kept]
     missed = await _missed_amounts(db, school, priced, passing)
-    if check is not None:
+    digest = fee_check.pages_hash(reader_text(priced))
+    if check is not None and fee_check.already_checked(school.attributes, digest):
+        report["check"] = {"skipped": "pages unchanged since the last check"}
+    elif check is not None:
         try:
             found = await check(school, priced, passing)
         except ProviderCreditsExhausted:  # the checker's account refuses: stop, or every school pays a read for it
@@ -1230,6 +1233,10 @@ async def run_school(
             extra = fee_check.amounts_to_reread(found, reader_text(priced), passing)
             report["check"]["reread"] = [format(amount, "f") for amount in extra]
             missed = sorted(set(missed) | set(extra))
+            if apply:  # saved now: the check is paid for whatever the rest of the read does
+                await _lock_attributes(db, school)
+                school.attributes = fee_check.checked(school.attributes, digest)
+                await db.commit()
     if missed:
         report["reread"] = {"missed": [format(amount, "f") for amount in missed], "added": 0}
         try:
@@ -1529,9 +1536,12 @@ async def run_fees_agent(
     )
     # The ledger also holds a call billed just before the cap stopped the run.
     spent = max(spend.spent_usd, float(run.total_llm_cost_usd or 0))
+    # A dry run is a trial: only a run that writes reports its wrong-looking fees.
+    reported = fee_check.open_wrong_fees_issue(results, run_id=run_id) if apply and check else None
     return {
         "apply": apply,
         "check": check,
+        "wrong_fees": reported,
         "pipeline_run_id": run_id,
         "schools": len(results),
         "spent_usd": round(spent, 6),
