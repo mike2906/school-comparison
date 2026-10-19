@@ -279,15 +279,22 @@ def _seasonal(fact: Mapping[str, Any]) -> bool:
 # first-grade class of 18; 333: 24 in grade 1, 26 in grade 5; 517: course groups). The
 # fact still shows with its scope in its words; only the class-size tile leaves it out.
 # Read from the English line the reader writes, which names the scope the same way.
-_ONE_PART_RE = re.compile(r"\b(?:grades?|preparatory|intake|profiles?|tracks?|courses?|parallel)\b", re.IGNORECASE)
-# "In all grades", but not "in each grade 1 class" (204).
-_ALL_GRADES_RE = re.compile(r"\b(?:all|every|each)\s+grades?\b(?!\s*[\dIVX])", re.IGNORECASE)
+_ONE_PART_RE = re.compile(r"\b(?:grades?|preparatory|intake|profiles?|tracks?|(?<!of )courses?)\b", re.IGNORECASE)
+# "In all grades" or "grades 1 to 12", but not "in each grade 1 class" (204).
+_ALL_GRADES_RE = re.compile(
+    r"\b(?:all|every|each)\s+grades?\b(?!\s*(?:\d|(?-i:[IVX]+)\b))|\bgrades?\s+(?:1|I)\s*(?:to|-|–)\s*(?:12|XII)\b",
+    re.IGNORECASE,
+)
 # A pupil's or parent's remark quoted on the site is not something the school states
 # (506: "A Grade 12 student says there are 20 students per class").
 _HEARSAY_RE = re.compile(
-    r"\b(?:students?|pupils?|parents?|graduates?|alumn\w*)\b[^.]{0,40}?\b(?:says?|said|writes?|wrote|shares?|recalls?)\b",
+    r"\b(?:students?|pupils?|parents?|graduates?|alumn\w*)\b[^.]{0,40}?\b(?:says|said|recalls|recalled)\b"
+    r"|\baccording to (?:an?|one)\s+(?:[\w-]+\s+){0,3}?(?:student|pupil|parent|graduate|alumn\w*)",
     re.IGNORECASE,
 )
+# A fact about a summer school or camp, as its English line names it (541: "The 2026 summer
+# programme runs..."); a school-year fact whose quote only mentions summer stays key.
+_SEASONAL_EN_RE = re.compile(r"\bsummer\b|\bcamps?\b", re.IGNORECASE)
 
 
 def _english(fact: Mapping[str, Any]) -> str:
@@ -341,7 +348,7 @@ def publishable_school_facts(attributes: Any, website_url: Optional[str]) -> Opt
             continue  # an open day that has passed ("Open day on 16 April") is not news any more
         topic = fact["topic"]
         rank = fact.get("rank") if fact.get("rank") in RANKS else "key"
-        if rank == "key" and _seasonal(fact):
+        if rank == "key" and _SEASONAL_EN_RE.search(_english(fact)):
             # A summer school's hours or meals under "School day" or "Meals" read as the
             # school year's (541, 591); they stay behind "show more" and off the compare page.
             rank = "more"

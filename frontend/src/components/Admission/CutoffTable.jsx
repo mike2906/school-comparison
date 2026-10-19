@@ -85,7 +85,7 @@ function CutoffTable({ rows, isCurrentRules = () => null }) {
   const shown = rows.flatMap(row => [row.first, showLatestRound(row) ? row.latest : null]).filter(Boolean)
   const legend = [
     // Two rankings side by side read as one result unless it is said they are separate.
-    (rows.some(showLatestRound) || shown.some(round => round.round_kind === 'current')) && 'rounds',
+    rows.some(showLatestRound) && 'rounds',
     shown.some(round => round.round_kind === 'current') && 'current',
     shown.some(round => cutoffValue(round)?.kind === 'everyone') && 'everyone',
     shown.some(round => cutoffValue(round)?.kind === 'noPlaces') && 'noPlaces',

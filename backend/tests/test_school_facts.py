@@ -734,6 +734,10 @@ def test_a_summer_programmes_class_size_is_not_the_schools(overrides, shown):
         ("The foreign-languages profile has one class of 18 pupils.", None),  # 619
         ("Classes in all grades have at most 18 pupils.", 18),
         ("There are 23 children in each preparatory group and 18 pupils in each grade 1 class.", None),  # 204
+        ("Each grade is limited to 18 pupils.", 18),
+        ("Classes in all grades include at most 18 pupils.", 18),
+        ("Classes from grade 1 to 12 have at most 18 pupils.", 18),
+        ("Of course, classes have at most 18 pupils.", 18),
     ],
 )
 def test_one_grades_class_size_is_not_the_schools(english, shown):
@@ -746,6 +750,21 @@ def test_one_grades_class_size_is_not_the_schools(english, shown):
     out = publishable_school_facts({"school_facts": block}, "https://www.school.example")
     assert out["facts"][0]["max_class_size"] == shown
     assert out["facts"][0]["text_i18n"]["en"] == english  # the fact itself still shows, scope and all
+
+
+@pytest.mark.parametrize(
+    "english,hidden",
+    [
+        ("A Grade 12 student says there are 20 students per class.", True),  # 506
+        ("According to a Grade 12 student, classes have 20 pupils.", True),
+        ("Pupils write an entrance test in maths and Bulgarian.", False),
+        ("Parents can share feedback with the head teacher.", False),
+    ],
+)
+def test_which_remarks_are_hearsay(english, hidden):
+    from app.utils.school_facts import _HEARSAY_RE
+
+    assert bool(_HEARSAY_RE.search(english)) is hidden
 
 
 def test_a_pupils_remark_is_not_a_school_fact():
@@ -778,3 +797,15 @@ def test_summer_programme_facts_are_never_key():
     }
     out = publishable_school_facts({"school_facts": block}, "https://www.school.example")
     assert [(f["topic"], f["rank"]) for f in out["facts"]] == [("school_day", "more"), ("meals", "key")]
+
+
+def test_a_school_year_fact_that_mentions_summer_stays_key():
+    lunch = _fact_row(rank="key", quote="Обядът се сервира всеки ден, включително през лятото.")
+    block = {
+        "_schema_version": 1,
+        "read_at": "2026-10-13T20:00:00+00:00",
+        "website_url": "https://www.school.example",
+        "facts": [lunch],
+    }
+    out = publishable_school_facts({"school_facts": block}, "https://www.school.example")
+    assert out["facts"][0]["rank"] == "key"
