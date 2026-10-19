@@ -20,6 +20,7 @@ import LanguageToggle from '../LanguageToggle/LanguageToggle'
 import SchoolMap from '../Map/SchoolMap'
 import { SavedAdmissionBanner } from '../Admission/SavedVerdict'
 import { useHiddenBelow } from '../../hooks/useSavedAdmission'
+import { useSearchHits } from '../../hooks/useSearchHits'
 import SchoolCard from '../SchoolCard/SchoolCard'
 import SchoolCardSkeleton from '../SchoolCard/SchoolCardSkeleton'
 import SchoolDetailPanel from './SchoolDetailPanel'
@@ -33,6 +34,7 @@ import { useFilterData, useUrlFilters } from './useSearchFilters'
 import { useSchools } from '../../hooks/useSchools'
 import { calculateDistance } from '../../utils/distance'
 import { compareSchoolNames, getSchoolName, schoolMatchesQuery } from '../../utils/i18n'
+import { filterByName } from '../../utils/schoolSearch'
 import { foldSamePlace } from '../../utils/samePlace'
 import { useCompare } from '../../context/CompareContext'
 import { useCountry } from '../../context/CountryContext'
@@ -616,12 +618,16 @@ function SearchPage() {
   const hiddenBelow = useHiddenBelow(schools, filters.ageGroup)
   const distanceLimit = userLocation && distanceFilter !== 'any' ? parseFloat(distanceFilter) : null
 
+  const nameMatchesHere = useMemo(
+    () => !nameQuery.trim() || schoolsWithDrive.some(school => schoolMatchesQuery(school, nameQuery)),
+    [schoolsWithDrive, nameQuery]
+  )
+  const searchHits = useSearchHits(nameQuery, !nameMatchesHere)
   const matchingSchools = useMemo(() => {
-    return schoolsWithDrive.filter(school => (
-      (!distanceLimit || (typeof school.distance === 'number' && school.distance <= distanceLimit)) &&
-      schoolMatchesQuery(school, nameQuery)
+    return filterByName(schoolsWithDrive, nameQuery, searchHits).filter(school => (
+      !distanceLimit || (typeof school.distance === 'number' && school.distance <= distanceLimit)
     ))
-  }, [schoolsWithDrive, distanceLimit, nameQuery])
+  }, [schoolsWithDrive, distanceLimit, nameQuery, searchHits])
   const filteredSchools = useMemo(
     () => (hiddenBelow.size ? matchingSchools.filter(school => !hiddenBelow.has(school.id)) : matchingSchools),
     [matchingSchools, hiddenBelow]
