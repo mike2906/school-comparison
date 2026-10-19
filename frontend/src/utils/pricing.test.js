@@ -251,6 +251,35 @@ test('statedTuition converts BGN, skips instalments, and falls back to a yearly 
   assert.deepEqual([Math.round(tuition.min), tuition.period, tuition.currency], [1000, 'yearly', 'EUR'])
 })
 
+test('statedTuition shows the total a school prints instead of one line of it', () => {
+  // 633: tuition 3,140 is one line of a 7,850 €/year "Общо".
+  const rows = [
+    row({ id: 1, amount: 3140, year_status: 'current' }),
+    row({ id: 2, amount: 7850, plan_name: 'Общо', pricing_context: { plan_name_en: 'Total' }, year_status: 'current' }),
+  ]
+  const tuition = statedTuition(rows)
+  assert.deepEqual([tuition.min, tuition.max, tuition.total], [7850, 7850, true])
+  assert.equal(tuitionSortValue(rows), 7850 / 12)
+  // A total for one age group leaves another group's tuition alone.
+  const grouped = statedTuition([
+    row({ id: 1, amount: 3140, age_group: '1-4', year_status: 'current' }),
+    row({ id: 2, amount: 7850, age_group: '1-4', plan_name: 'Общо', year_status: 'current' }),
+    row({ id: 3, amount: 4000, age_group: '5-7', year_status: 'current' }),
+  ])
+  assert.deepEqual([grouped.min, grouped.max, grouped.total], [4000, 7850, false])
+  // A total that names no group covers each group's tuition.
+  const ungrouped = statedTuition([
+    row({ id: 1, amount: 3140, age_group: '1-4', year_status: 'current' }),
+    row({ id: 2, amount: 7850, plan_name: 'Общо', year_status: 'current' }),
+  ], { ageGroup: '1-4' })
+  assert.deepEqual([ungrouped.min, ungrouped.max, ungrouped.total], [7850, 7850, true])
+  // A whole fee's own name is not a total, and keeps the group's other rates.
+  for (const name of ['Пълен ден', 'Обща такса за обучение', 'Total annual fee']) {
+    assert.equal(statedTuition([row({ plan_name: name, year_status: 'current' })]).total, false, name)
+  }
+  assert.equal(statedTuition([row({ plan_name: 'Total Fee for New Students', year_status: 'current' })]).total, true)
+})
+
 test('statedTuition keeps a currency without a euro rate and reports an unstated period', () => {
   const usd = statedTuition([row({ currency: 'USD', period: 'monthly', amount: 1000 })])
   assert.deepEqual([usd.min, usd.period, usd.currency], [1000, 'monthly', 'USD'])

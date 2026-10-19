@@ -701,3 +701,24 @@ def test_at_a_glance_lists_upcoming_open_days_only():
         {"date": "2026-11-12", "register_url": None, "source_url": ABOUT},
         {"date": "2026-12-03", "register_url": "https://f.example/x", "source_url": HOME},
     ]
+
+
+@pytest.mark.parametrize(
+    "overrides,shown",
+    [
+        ({}, 18),
+        ({"quote": "Лятна академия: групи до 18 деца"}, None),  # 541: a summer school's group size
+        ({"text_i18n": {"bg": "Лагер до 18 деца.", "en": "Camp groups of up to 18."}}, None),
+        ({"source_url": "https://www.school.example/summer-school"}, None),
+        ({"source_url": "https://www.school.example/campus", "quote": "Up to 18 pupils on our campus"}, 18),
+    ],
+)
+def test_a_summer_programmes_class_size_is_not_the_schools(overrides, shown):
+    block = {
+        "_schema_version": 1,
+        "read_at": "2026-10-13T20:00:00+00:00",
+        "website_url": "https://www.school.example",
+        "facts": [_fact_row(topic="class_size", max_class_size=18, source_url="https://www.school.example/about") | overrides],
+    }
+    out = publishable_school_facts({"school_facts": block}, "https://www.school.example")
+    assert out["facts"][0]["max_class_size"] == shown

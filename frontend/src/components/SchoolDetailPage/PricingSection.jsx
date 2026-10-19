@@ -152,6 +152,10 @@ function PricingSection({ pricing, discounts, ageGroup = null }) {
         <h2 className="text-2xl font-bold text-neutral-900">{t('pricing.title')}</h2>
       </div>
 
+      {/* Extras with no main fee beside them read as the fee itself (532's swimming lessons). */}
+      {pricing.length > 0 && !pricing.some(row => row.category === 'tuition') && (
+        <p className="mb-6 text-sm text-amber-700">{t('pricing.noMainFee')}</p>
+      )}
       {groupName && (
         <p className="mb-6 text-sm text-neutral-600">
           {t(namesGroup ? 'pricing.forAgeGroup' : 'pricing.noneForAgeGroup', { group: groupName })}

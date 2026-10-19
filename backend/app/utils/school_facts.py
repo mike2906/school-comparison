@@ -8,6 +8,7 @@ never serialises the stored block itself.
 from __future__ import annotations
 
 import datetime
+import re
 from collections.abc import Mapping
 from typing import Any, Optional
 from urllib.parse import urlparse
@@ -125,7 +126,7 @@ def _labels(fact: Mapping[str, Any]) -> dict[str, Any]:
     return {
         "tags": [tag for tag in dict.fromkeys(_as_list(fact.get("tags"))) if tag in TAG_GROUPS],
         "languages": _languages(fact.get("languages")),
-        "max_class_size": _class_size(fact.get("max_class_size")),
+        "max_class_size": None if _seasonal(fact) else _class_size(fact.get("max_class_size")),
         "instruction_languages": [
             name
             for name in dict.fromkeys(canonical_language(v) for v in _as_list(fact.get("instruction_languages")))
@@ -260,6 +261,18 @@ def at_a_glance(
 
 def _class_size(value: Any) -> Optional[int]:
     return _int_in(value, 1, 60)
+
+
+# A summer school, camp or holiday programme: its group size is not the school year's (541).
+# Whole words for English: "campus" is not a camp. Not "holidays": "care during the
+# holidays" beside the school year's class size is no summer school.
+_SEASONAL_RE = re.compile(r"лят(?:н|о)|лагер|\bsummer\b|\bcamps?\b", re.IGNORECASE)
+
+
+def _seasonal(fact: Mapping[str, Any]) -> bool:
+    text = fact.get("text_i18n") if isinstance(fact.get("text_i18n"), Mapping) else {}
+    parts = [*text.values(), fact.get("quote"), fact.get("source_url")]
+    return any(isinstance(part, str) and _SEASONAL_RE.search(part) for part in parts)
 
 
 def publishable_school_facts(attributes: Any, website_url: Optional[str]) -> Optional[dict[str, Any]]:

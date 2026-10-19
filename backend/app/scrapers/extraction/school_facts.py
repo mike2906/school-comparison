@@ -102,7 +102,8 @@ Rules:
     (intensive or extended study of it); no level otherwise. Write the language's English name.
     For a language the quote gives weekly hours for, add hours_per_week.
   - instruction_languages: the languages most lessons are taught in, when the quote says.
-  - max_class_size: the most pupils in a class or group, as a number, only when the quote gives it.
+  - max_class_size: the most pupils in a class or group of the school year, as a number, only when the quote gives
+    it; never a summer school's, camp's or holiday programme's.
   - admission: how children are admitted, only as the quote states it: any of entrance_exam, interview,
     trial_day, open_entry (the quote says there is no test or interview); admission_grade: the grade it is
     for (0 for kindergarten or preschool), when stated; for a range of grades (grades 2 to 4), admission_grade

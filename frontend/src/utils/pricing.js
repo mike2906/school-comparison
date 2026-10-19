@@ -243,11 +243,26 @@ export function toEur(amount, currency) {
 // monthly fee is the figure most schools publish first.
 const HEADLINE_PERIODS = ['monthly', 'quarter', 'term', 'semester', 'yearly']
 
+// A total the school prints of several fees: "Общо" under tuition, activities and a
+// development fee (633), "Total Fee for New Students" (506). Not a whole fee's own name
+// ("Обща такса за обучение", "Total annual fee"), nor a total paid in instalments.
+const STATED_TOTAL_RE = /^\s*(?:общо|обща\s+сума)(?![\p{L}])|^\s*total(?:\s+(?:fees?|cost))?\s*(?:$|[:(,–-]|for\b|per\b)/iu
+
+/** True for a row that is the school's own total of several fees. */
+export function isStatedTotal(row) {
+  return [row?.plan_name, row?.pricing_context?.plan_name_en].some(text => text && STATED_TOTAL_RE.test(text))
+}
+
 // The headline's tuition rows: whole fees (not one instalment) that any new pupil pays, for the
 // chosen age group when there is one. A special-needs or returning-pupil rate stays listed.
+// Where the school prints a total of its fees for an age group, the total is what that group
+// pays: tuition alone would show one line of it (633's 3,140 of 7,850 €).
 function tuitionRows(rows, ageGroup = null) {
   const whole = rows.filter(row => row.category === 'tuition' && !isInstallmentPlan(row) && !isClosedGroupFee(row))
-  return rowsForAgeGroup(whole, ageGroup)
+  const forGroup = rowsForAgeGroup(whole, ageGroup)
+  // A total that names no age group covers every group.
+  const totalled = new Set(forGroup.filter(isStatedTotal).map(row => row.age_group || ''))
+  return forGroup.filter(row => isStatedTotal(row) || !(totalled.has('') || totalled.has(row.age_group || '')))
 }
 
 function rangeOf(rows, convert) {
@@ -395,7 +410,8 @@ export function groupRowsByAgeGroup(rows = [], t, language) {
  * it is, never mixed.
  * When the headline is next year's fee (`YEAR_STATUS.NEXT`), `currentYear` carries the
  * current year's tuition the same way, or null when there is none.
- * Returns `{ min, max, currency, period, academicYear, yearStatus, currentYear? }` or null.
+ * `total` is true when the figure is the school's printed total of several fees.
+ * Returns `{ min, max, currency, period, academicYear, yearStatus, total, currentYear? }` or null.
  */
 export function statedTuition(pricing = [], { ageGroup = null, intake = true, today = new Date() } = {}) {
   const cohort = selectPricingCohort(pricing, { ageGroup, intake, today })
@@ -418,6 +434,8 @@ export function statedTuition(pricing = [], { ageGroup = null, intake = true, to
     const periodRows = rows.filter(row => pricePeriod(row) === period)
     if (periodRows.length === 0) continue
 
+    // Totals say so on the page: a parent reads "Total fees", not "Tuition".
+    meta.total = periodRows.every(isStatedTotal)
     const euro = rangeOf(periodRows, (value, row) => toEur(value, row.currency))
     if (euro) return { ...euro, currency: 'EUR', period, ...meta }
 

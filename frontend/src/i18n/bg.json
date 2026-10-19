@@ -237,6 +237,8 @@
   "pricing": {
     "title": "Цени",
     "tuition": "Такса обучение",
+    "totalFees": "Общо такси",
+    "noMainFee": "Сайтът не посочва основната такса. Таксите по-долу са само допълнителни.",
     "food": "Храна",
     "transport": "Транспорт",
     "activities": "Допълнителни дейности",
@@ -761,7 +763,9 @@
     "nvoBulgarian": "български език {{value}}",
     "nvoMath": "математика {{value}}",
     "tuitionOne": "Такса за обучение: €{{min}} на {{period}}",
-    "tuitionRange": "Такса за обучение: €{{min}}–€{{max}} на {{period}}"
+    "tuitionRange": "Такса за обучение: €{{min}}–€{{max}} на {{period}}",
+    "totalOne": "Общо такси: €{{min}} на {{period}}",
+    "totalRange": "Общо такси: €{{min}}–€{{max}} на {{period}}"
   },
   "dzi": {
     "title": "Държавни зрелостни изпити (ДЗИ), 12 клас",
