@@ -159,11 +159,25 @@ def publishable_display_i18n(value: Any) -> dict[str, str]:
     return published
 
 
+# The language-focus levels the site has a label and a filter for. The old extraction wrote
+# free text ("intensive", "mother tongue", "2 times a week"), which reached the page untranslated
+# (parent trial 2026-10-19): intensive or extended study is "enrichment", as the facts reader
+# writes it, and any other text is no level.
+LANGUAGE_LEVELS = ("immersion", "bilingual", "enrichment", "language_school")
+_ENRICHMENT_LEVELS = frozenset({
+    "intensive", "extended", "advanced", "интензивно", "интензивно_изучаване", "разширено",
+    "разширено_изучаване",
+})
+
+
 def _normalize_language_level(value: Any) -> Optional[str]:
     text = _normalize_text(value)
     if not text:
         return None
-    return re.sub(r"[\s-]+", "_", text.lower())
+    level = re.sub(r"[\s-]+", "_", text.lower())
+    if level in _ENRICHMENT_LEVELS:
+        return "enrichment"
+    return level if level in LANGUAGE_LEVELS else None
 
 
 def _extract_named_value(value: Any) -> Optional[str]:

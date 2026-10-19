@@ -4,6 +4,7 @@
  * Pure builders; the file and network work lives in `scripts/prerender.js`.
  */
 import { getAddress, getSchoolName } from '../utils/i18n.js'
+import { formatPercent } from '../utils/nvoDisplay.js'
 import { URL_LANGUAGES, alternateLinks, canonicalUrl, languagePath } from '../utils/languageUrl.js'
 import { schoolLevelLabel, schoolTypeLabel } from '../utils/levelLabel.js'
 import {
@@ -77,10 +78,10 @@ function latestNvoResults(school) {
   })
 }
 
-function nvoLine(result, t) {
+function nvoLine(result, t, language) {
   const scores = [
-    result.scores.bulgarian != null && t('seo.nvoBulgarian', { value: result.scores.bulgarian.toFixed(1) }),
-    result.scores.math != null && t('seo.nvoMath', { value: result.scores.math.toFixed(1) }),
+    result.scores.bulgarian != null && t('seo.nvoBulgarian', { value: formatPercent(result.scores.bulgarian, 1, language) }),
+    result.scores.math != null && t('seo.nvoMath', { value: formatPercent(result.scores.math, 1, language) }),
   ].filter(Boolean)
   return t('seo.nvoLine', {
     exam: getExamTypeLabel(result.examType, t),
@@ -244,14 +245,14 @@ export function schoolPage(school, t, language, { listed = true } = {}) {
   const levelExam = getExamTypeForEducationLevel(school.education_level)
   const headlineNvo = nvo.find((result) => result.examType === levelExam) || nvo[nvo.length - 1]
   const about = `${[facts, addresses[0]].filter(Boolean).join(', ')}.`
-  const nvoSentence = headlineNvo ? `${nvoLine(headlineNvo, t)}.` : ''
+  const nvoSentence = headlineNvo ? `${nvoLine(headlineNvo, t, language)}.` : ''
   const description = (leadWithNvo ? [nvoSentence, about] : [about, nvoSentence, summary || tuition])
     .filter(Boolean)
     .join(' ')
 
   const nvoSection = nvo.length > 0
     ? `<section><h2 class="font-semibold">${escapeHtml(t('seo.nvoHeading'))}</h2><ul>${nvo
-      .map((result) => `<li>${escapeHtml(nvoLine(result, t))}</li>`)
+      .map((result) => `<li>${escapeHtml(nvoLine(result, t, language))}</li>`)
       .join('')}</ul></section>`
     : ''
   const aboutParts = [paragraph(facts), ...addresses.map(paragraph)]

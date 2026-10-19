@@ -1,6 +1,7 @@
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip } from 'recharts'
 import { useTranslation } from 'react-i18next'
 import { prepareNvoTimelineData } from '../../utils/nvo'
+import { formatPercent } from '../../utils/nvoDisplay'
 
 /**
  * NVO Exam Results Timeline Chart Component
@@ -253,7 +254,7 @@ function BenchmarkDelta({ benchmarkInfo }) {
     <span
       className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-medium ${benchmarkInfo.badgeClass}`}
     >
-      {benchmarkInfo.label} · {sign}{benchmarkInfo.diff.toFixed(1)} {benchmarkInfo.pointsLabel}
+      {benchmarkInfo.label} · {sign}{formatPercent(benchmarkInfo.diff, 1)} {benchmarkInfo.pointsLabel}
     </span>
   )
 }
@@ -289,18 +290,18 @@ function CustomTooltip({ active, payload, label }) {
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-sm font-semibold text-neutral-900">
-                  {t('academicPerformance.pointsValue', { value: value.toFixed(1) })}
+                  {t('academicPerformance.pointsValue', { value: formatPercent(value, 1) })}
                 </span>
                 {change != null && (
                   <span className={`text-xs font-medium ${getChangeColor(change)}`}>
-                    {change > 0 ? '+' : ''}{change.toFixed(1)} {t('academicPerformance.pointsShort')} {getChangeArrow(change)}
+                    {change > 0 ? '+' : ''}{formatPercent(change, 1)} {t('academicPerformance.pointsShort')} {getChangeArrow(change)}
                   </span>
                 )}
               </div>
             </div>
             {benchmarkInfo && (
               <div className="ml-5 mt-1 text-xs text-neutral-500">
-                {t('academicPerformance.nationalBenchmarkValue', { value: benchmarkInfo.benchmarkValue.toFixed(1) })} ·{' '}
+                {t('academicPerformance.nationalBenchmarkValue', { value: formatPercent(benchmarkInfo.benchmarkValue, 1) })} ·{' '}
                 <span className={benchmarkInfo.textClass}>
                   {benchmarkInfo.label}
                 </span>
@@ -348,17 +349,17 @@ function YearOverYearBadge({ subject, data, dataKey, color }) {
       </div>
       <div className="flex items-baseline gap-2">
         <span className={`text-2xl font-bold ${benchmarkInfo?.textClass || 'text-neutral-900'}`}>
-          {t('academicPerformance.pointsValue', { value: currentValue.toFixed(1) })}
+          {t('academicPerformance.pointsValue', { value: formatPercent(currentValue, 1) })}
         </span>
         <span className={`text-sm font-semibold ${changeColorClass}`}>
-          {change > 0 ? '+' : ''}{change.toFixed(1)} {t('academicPerformance.pointsShort')} {arrow}
+          {change > 0 ? '+' : ''}{formatPercent(change, 1)} {t('academicPerformance.pointsShort')} {arrow}
         </span>
       </div>
       <p className="text-xs text-neutral-500 mt-1">
         {/* The previous result can be two or more years back when a year is missing. */}
-        {previous.year === latest.year - 1 ? t('academicPerformance.vsLastYear') : t('academicPerformance.inYear', { year: previous.year })}: {t('academicPerformance.pointsValue', { value: previousValue.toFixed(1) })}
+        {previous.year === latest.year - 1 ? t('academicPerformance.vsLastYear') : t('academicPerformance.inYear', { year: previous.year })}: {t('academicPerformance.pointsValue', { value: formatPercent(previousValue, 1) })}
         {benchmarkInfo && (
-          <> • {t('academicPerformance.nationalBenchmarkValue', { value: benchmarkInfo.benchmarkValue.toFixed(1) })}</>
+          <> • {t('academicPerformance.nationalBenchmarkValue', { value: formatPercent(benchmarkInfo.benchmarkValue, 1) })}</>
         )}
       </p>
     </div>

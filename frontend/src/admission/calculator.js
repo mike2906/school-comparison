@@ -5,7 +5,9 @@
  */
 import { selectRuleSet, statusEventsOn } from './core.js'
 import { schoolCatchmentIds } from './catchments.js'
+import i18next from 'i18next'
 import { usesSofiaKindergartenSystem } from '../utils/admission.js'
+import { formatAmount } from '../utils/format.js'
 
 /** Calculator tabs: the rule-file stage and the cut-off stages read with it. */
 export const STAGES = [
@@ -103,8 +105,8 @@ export function ruleSetFor(ruleSets, stage, startYear, today) {
   return { ...selected, campaign, events: statusEventsOn(selected.ruleSet, today) }
 }
 
-/** `5`, or `3–8` for a range. */
-export function formatRange(value, format = n => String(n)) {
+/** `5`, or `3–8` for a range, in the page language's style ("412,5" on the Bulgarian page). */
+export function formatRange(value, format = n => formatAmount(n, i18next.language, 2)) {
   if (!value) return ''
   return value.min === value.max ? format(value.min) : `${format(value.min)}–${format(value.max)}`
 }

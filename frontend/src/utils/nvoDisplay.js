@@ -1,11 +1,20 @@
+import i18next from 'i18next'
+import { intlLocale } from './format.js'
 import { getBenchmarkComparison, getBenchmarkToneClasses } from './nvo.js'
 
 // How NVO results are coloured and explained on the card, the compare page and the detail
 // page. Kept in one place so the three agree.
 
-export function formatPercent(value, decimals = 1) {
-  if (value == null || Number.isNaN(value)) return null
-  return Number(value).toFixed(decimals)
+/**
+ * A result with a fixed number of decimals in the page language's style ("56,4" on the
+ * Bulgarian page, "56.4" on the English one); null for no value.
+ */
+export function formatPercent(value, decimals = 1, language = i18next.language) {
+  if (value == null || Number.isNaN(Number(value))) return null
+  return new Intl.NumberFormat(intlLocale(language), {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  }).format(Number(value))
 }
 
 export function getPerformanceStyle(value) {
@@ -54,7 +63,7 @@ export function getBenchmarkTooltip(value, benchmark, t) {
   const key = BENCHMARK_TOOLTIP_KEYS[benchmark.tone] || 'academicPerformance.tooltipBenchmarkNear'
   return t(key, {
     value: formatPercent(value, 1),
-    diff: Math.abs(benchmark.diff).toFixed(1),
+    diff: formatPercent(Math.abs(benchmark.diff), 1),
     benchmark: formatPercent(benchmark.benchmarkValue, 1),
   })
 }
@@ -71,7 +80,7 @@ export function getTrendTooltip(latest, average, trend, t) {
   return t(key, {
     latest: formatPercent(latest, 1),
     average: formatPercent(average, 1),
-    diff: Math.abs(trend.diff).toFixed(1),
+    diff: formatPercent(Math.abs(trend.diff), 1),
   })
 }
 

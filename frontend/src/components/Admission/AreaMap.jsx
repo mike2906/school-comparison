@@ -72,7 +72,7 @@ function AreaMap({ primary = [], secondary = [], point = null, pin = null, label
         attributionControl
       >
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> | &copy; <a href="https://carto.com/">CARTO</a> | Столична община'
+          attribution={`&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> | &copy; <a href="https://carto.com/">CARTO</a> | ${t('admissionArea.mapCredit')}`}
           url={TILE_URL}
           subdomains="abcd"
           maxZoom={20}
