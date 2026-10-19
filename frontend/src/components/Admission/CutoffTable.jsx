@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import { cutoffValue, formatRankingDay, shortCampaign } from '../../admission/calculator'
+import { formatAmount } from '../../utils/format'
 
 export function rowLabel(row, t) {
   // An 8th-grade class by its name; the ministry's code only when it has none.
@@ -16,16 +17,17 @@ export function rowLabel(row, t) {
 }
 
 export function CutoffValue({ round }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const value = cutoffValue(round)
+  const number = n => (n == null ? '—' : formatAmount(n, i18n.language, 2))
   if (!value) return <span className="text-neutral-400">—</span>
   if (value.kind === 'everyone') return <span>{t('cutoffs.everyone')}</span>
   if (value.kind === 'noPlaces') return <span>{t('cutoffs.noPlaces')}</span>
-  if (value.kind === 'score') return <span className="tabular-nums">{t('cutoffs.score', { score: value.score })}</span>
+  if (value.kind === 'score') return <span className="tabular-nums">{t('cutoffs.score', { score: number(value.score) })}</span>
   if (value.kind === 'quota') {
     return (
       <span className="tabular-nums">
-        {t('cutoffs.quotaScores', { boys: value.boys ?? '—', girls: value.girls ?? '—' })}
+        {t('cutoffs.quotaScores', { boys: number(value.boys), girls: number(value.girls) })}
       </span>
     )
   }
@@ -36,11 +38,11 @@ export function CutoffValue({ round }) {
           ? t('cutoffs.groupOnly', { group: value.group })
           : value.points === 0
             ? t('cutoffs.groupNoPoints', { group: value.group })
-            : t('cutoffs.groupAndPoints', { group: value.group, points: value.points })}
+            : t('cutoffs.groupAndPoints', { group: value.group, points: number(value.points) })}
       </span>
     )
   }
-  return <span className="tabular-nums">{t('cutoffs.points', { points: value.points })}</span>
+  return <span className="tabular-nums">{t('cutoffs.points', { points: number(value.points) })}</span>
 }
 
 function RoundCell({ round }) {

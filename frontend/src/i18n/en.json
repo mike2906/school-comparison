@@ -458,7 +458,6 @@
       "immersion": "Immersion",
       "bilingual": "Bilingual",
       "enrichment": "Enrichment",
-      "intensive": "Intensive",
       "language_school": "Language school"
     },
     "options": {
@@ -890,6 +889,7 @@
       "neighbouringOf": "This address is in {{school}}'s catchment area, which neighbours this school's: it gets 5 extra points if the child is ranked in the last group (outside the catchment).",
       "outsideOf": "This address is in {{school}}'s catchment area, outside this school's catchment area and its neighbouring areas."
     },
+    "mapCredit": "Sofia Municipality",
     "catchmentSource": "Official Sofia Municipality catchment areas for the {{campaign}} campaign. Always confirm on the municipality map,",
     "districtIntro": "Municipal kindergartens in Sofia have no catchment area. Children whose address is in the same district ({{district}}) get 3 extra points.",
     "districtSource": "District boundaries from Sofia Municipality. Points are confirmed in the official system,",

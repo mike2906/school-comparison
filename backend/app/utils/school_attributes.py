@@ -42,7 +42,8 @@ from app.utils.facility_vocabulary import (
     canonical_tags,
 )
 from app.utils.list_translations import translate_items
-from app.utils.school_facts import LANGUAGE_LEVELS, PUBLISHED_KEY, TAG_GROUPS
+from app.utils.school_facts import LANGUAGE_LEVELS as FACT_LANGUAGE_LEVELS
+from app.utils.school_facts import PUBLISHED_KEY, TAG_GROUPS
 
 DISPLAY_LOCALES: tuple[str, ...] = ("bg", "en")
 
@@ -160,16 +161,17 @@ def publishable_display_i18n(value: Any) -> dict[str, str]:
     return published
 
 
-# Levels the page and the filter name; a free-text one ("2_times_a_week",
-# "интензивно_изучаване") would reach parents as a raw code, so others map here or go.
-DISPLAY_LANGUAGE_LEVELS = frozenset({*LANGUAGE_LEVELS, "intensive", "language_school"})
-_LANGUAGE_LEVEL_ALIASES = {
-    "интензивно": "intensive",
-    "интензивно_изучаване": "intensive",
-    "интензивно_обучение": "intensive",
-    "двуезично": "bilingual",
-    "двуезично_обучение": "bilingual",
-}
+# The language-focus levels the site labels: the facts reader's three, which the search filter
+# offers, and "language_school". The old extraction wrote free text ("intensive", "mother
+# tongue", "2 times a week"), which reached the page untranslated (parent trial 2026-10-19):
+# intensive or extended study is "enrichment", as the facts reader writes it, and any other
+# text is no level.
+LANGUAGE_LEVELS = (*FACT_LANGUAGE_LEVELS, "language_school")
+_LEVEL_SYNONYMS = (
+    (re.compile(r"^(intensive|extended|advanced|интензивн|разширен)"), "enrichment"),
+    (re.compile(r"^(bilingual|двуезич)"), "bilingual"),
+    (re.compile(r"^(immersion|immersive|потапян)"), "immersion"),
+)
 
 
 def _normalize_language_level(value: Any) -> Optional[str]:
@@ -177,8 +179,9 @@ def _normalize_language_level(value: Any) -> Optional[str]:
     if not text:
         return None
     level = re.sub(r"[\s-]+", "_", text.lower())
-    level = _LANGUAGE_LEVEL_ALIASES.get(level, level)
-    return level if level in DISPLAY_LANGUAGE_LEVELS else None
+    if level in LANGUAGE_LEVELS:
+        return level
+    return next((canonical for pattern, canonical in _LEVEL_SYNONYMS if pattern.match(level)), None)
 
 
 def _extract_named_value(value: Any) -> Optional[str]:

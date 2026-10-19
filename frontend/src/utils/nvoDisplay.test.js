@@ -23,6 +23,9 @@ test('formatPercent rounds to one decimal and passes missing values through as n
   assert.equal(formatPercent(72.456, 0), '72')
   assert.equal(formatPercent(null), null)
   assert.equal(formatPercent(Number.NaN), null)
+  // The Bulgarian page writes a decimal comma, like every other number on it.
+  assert.equal(formatPercent(56.44, 1, 'bg'), '56,4')
+  assert.equal(formatPercent(56.44, 1, 'en'), '56.4')
 })
 
 test('performance bands: 75 and up green, 60 and up amber, below red, missing neutral', () => {

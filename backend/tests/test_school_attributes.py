@@ -428,7 +428,7 @@ class TestLocalizedProjection:
         assert localized["facilities"] == ["Library"]
         assert localized["special_programs"] == []
         assert localized["language_focus"] == [
-            {"language": "English", "level": "intensive"}
+            {"language": "English", "level": "enrichment"}
         ]
         assert localized["daily_schedule"] == [
             "Учебни занятия до 15:00",
@@ -473,7 +473,7 @@ class TestLocalizedProjection:
 
     def test_language_focus_is_structured(self):
         localized = build_localized_attributes(INTERNAL_ATTRIBUTES, "en")
-        assert localized["language_focus"] == [{"language": "English", "level": "intensive"}]
+        assert localized["language_focus"] == [{"language": "English", "level": "enrichment"}]
         # A taught language is not the language of instruction.
         assert localized["languages_of_instruction"] == []
 
@@ -492,7 +492,7 @@ class TestLocalizedProjection:
         assert localized["languages_of_instruction"] == ["Bulgarian"]
         assert localized["language_focus"] == [
             {"language": "English", "level": None},
-            {"language": "German", "level": "intensive"},
+            {"language": "German", "level": "enrichment"},
         ]
 
     def test_private_school_uses_curated_instruction_languages_only(self):
@@ -590,9 +590,9 @@ class TestLocalizedProjection:
         assert localized["facilities"] == ["Library"]
 
     def test_string_language_focus_splits_on_colon(self):
-        localized = build_localized_attributes({"language_focus": ["English:Intensive"]}, "bg")
+        localized = build_localized_attributes({"language_focus": ["English:Bilingual"]}, "bg")
         assert localized["language_focus"] == [
-            {"language": "English", "level": "intensive"}
+            {"language": "English", "level": "bilingual"}
         ]
 
     def test_language_levels_outside_the_vocabulary_are_dropped(self):
@@ -602,7 +602,7 @@ class TestLocalizedProjection:
         )
         assert localized["language_focus"] == [
             {"language": "German", "level": None},
-            {"language": "French", "level": "intensive"},
+            {"language": "French", "level": "enrichment"},
         ]
 
     def test_language_focus_is_the_same_on_both_pages_without_plain_bulgarian(self):
@@ -842,8 +842,10 @@ class TestFilterableProjection:
         school = (await seeded_db.execute(select(School))).scalars().first()
         school.attributes = {
             "language_focus": [
-                {"language": "English", "level": "Mother tongue"},
-                "German:Intensive",
+                {"language": "English", "level": "Intensive"},
+                "German:Bilingual",
+                # Free text the site has no label for is no level (parent trial 2026-10-19).
+                {"language": "French", "level": "Mother tongue"},
             ]
         }
         await seeded_db.commit()
@@ -851,13 +853,12 @@ class TestFilterableProjection:
         service = SchoolService(seeded_db)
 
         filters = await service.get_available_filters()
-        assert "German:intensive" in filters["language_focus_pairs"]
-        # A level outside the vocabulary is not offered as a filter option.
-        assert "English:mother_tongue" not in filters["language_focus_pairs"]
-        assert not {"Mother tongue", "mother_tongue"} & set(filters["language_focus_levels"])
-        assert "German:Intensive" not in filters["language_focus_pairs"]
+        assert "English:enrichment" in filters["language_focus_pairs"]
+        assert "German:bilingual" in filters["language_focus_pairs"]
+        assert not any("mother" in level for level in filters["language_focus_levels"])
+        assert "German:Bilingual" not in filters["language_focus_pairs"]
 
-        for language_focus in ("German:intensive",):
+        for language_focus in ("English:enrichment", "German:bilingual"):
             schools = await service.list_schools_filtered(language_focus=[language_focus])
             assert school.id in {matched.id for matched in schools}
 
