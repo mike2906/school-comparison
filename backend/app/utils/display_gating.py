@@ -349,6 +349,35 @@ def _linked_evidence_is_valid(row: Any) -> bool:
     return _pricing_row_value(source_page, "is_valid") is True
 
 
+# Not a cost of attending: a fine, a charge for paying late, a duplicate document or a lost
+# item (595's "Глоба за тютюнопушене", "Дубликат на диплома"; 529's "Неустойка за забава").
+_NOT_A_FEE_RE = re.compile(
+    r"\bглоб(?:а|и|ата|ите)\b|неустойк|дубликат|академична справка|служебн[аи] бележк|второ предупреждение|документ на бланка"
+    r"|(?:изгубен|загубен)\w* (?:ключ|бадж|карт)"
+    r"|\bfines?\b(?! arts)|\bpenalt|\blate[- ]payment\b|\bduplicate\b|\blost (?:key|badge|card)",
+    re.IGNORECASE,
+)
+
+
+def names_no_fee(text: str | None) -> bool:
+    """True when a fee's words name a fine, a duplicate document or a lost item."""
+    return bool(_NOT_A_FEE_RE.search(str(text or "")))
+
+
+def _names_no_fee(row: Any) -> bool:
+    """A non-tuition row whose own name is a fine, a duplicate document or a lost item.
+
+    Its name only: notes may mention a late-payment penalty beside a real fee. Tuition is
+    never one, so a tuition row is left alone.
+    """
+    category = _pricing_row_value(row, "category")
+    if str(getattr(category, "value", category) or "").lower() == "tuition":
+        return False
+    context = _pricing_row_value(row, "pricing_context")
+    english = context.get("plan_name_en") if isinstance(context, Mapping) else None
+    return names_no_fee(f"{_pricing_row_value(row, 'plan_name') or ''} {english or ''}")
+
+
 # Set on a row's ``pricing_context`` by validation when the page offers its price only
 # until a date (an early-enrolment tier); the row is withheld from the day after.
 OFFER_ENDS_KEY = "offer_ends_on"
@@ -393,7 +422,8 @@ def pricing_row_is_publishable(row: Any) -> bool:
     Trust comes from evidence, not from a human sign-off: the row must still be backed by
     a valid source page, and any academic year it carries must be a real one. A year that
     does not normalize is withheld rather than guessed at. An offer that ends on a date
-    stops being published the day after, without waiting for the next validation run.
+    stops being published the day after, without waiting for the next validation run. A
+    fine, a duplicate document or a lost item is no fee (:func:`names_no_fee`).
     """
     source_url = _pricing_row_value(row, "source_url")
     pricing_context = _pricing_row_value(row, "pricing_context")
@@ -404,6 +434,7 @@ def pricing_row_is_publishable(row: Any) -> bool:
     return (
         passes_pricing_gate(source_url, pricing_context)
         and not offer_has_ended(pricing_context)
+        and not _names_no_fee(row)
         and _linked_evidence_is_valid(row)
         and academic_year_is_resolvable(_pricing_row_value(row, "academic_year"))
         and _valid_price_shape(row)

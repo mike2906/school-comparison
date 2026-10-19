@@ -563,3 +563,32 @@ def test_plausible_tuition_spread_publishes_in_full():
 def test_exam_result_needs_enough_pupils_to_be_published(pupil_count, expected):
     assert NVO_MIN_PUPILS > 1
     assert exam_result_is_publishable(pupil_count) is expected
+
+
+def test_launch_pricing_gate_withholds_fines_duplicates_and_lost_items():
+    """595's administrative price list and 529's late-payment charge are no fees."""
+    for name in (
+        "Глоба за тютюнопушене на територията на гимназията",
+        "Дубликат на диплома за средно образование",
+        "Академична справка - изискваща допълнителни реквизити / извън стандартната",
+        "Попълване на документ на бланка от университет/институция",
+        "Възстановяване на изгубен бадж",
+        "Неустойка за забава",
+    ):
+        assert pricing_row_is_publishable(_curated_pricing_row(category="registration", plan_name=name)) is False, name
+    english = _curated_pricing_row(
+        category="materials", plan_name="x", pricing_context={"confidence": 0.9, "plan_name_en": "Lost key replacement"}
+    )
+    assert pricing_row_is_publishable(english) is False
+    # Only the name counts, and tuition is never one.
+    for row in (
+        _curated_pricing_row(category="registration", plan_name="Такса регистрация"),
+        _curated_pricing_row(category="extracurricular", plan_name="Fine arts club"),
+        _curated_pricing_row(category="tuition", plan_name="Глобална програма"),
+        _curated_pricing_row(
+            category="registration",
+            plan_name="Такса регистрация",
+            pricing_context={"confidence": 0.9, "notes": "Неустойка при забава 5%"},
+        ),
+    ):
+        assert pricing_row_is_publishable(row) is True, row["plan_name"]

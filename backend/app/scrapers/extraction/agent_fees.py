@@ -15,6 +15,7 @@ from typing import Literal, Optional
 from pydantic import BaseModel, Field, field_validator
 
 from app.models.pricing import PriceCategory, PricePeriod
+from app.utils.display_gating import names_no_fee
 
 PUBLISH_CONFIDENCE = 0.9
 HELD_CONFIDENCE = 0.5  # under the 0.7 publish floor (display_gating.PRICING_CONFIDENCE_FLOOR)
@@ -242,13 +243,6 @@ _HOW_OFTEN_RE = re.compile(
     r"|седмичн\w*\s+(?:програм|разпис|график)|weekly (?:schedule|timetable)"
 )
 _DEPOSIT_RE = re.compile(r"депозит|капаро|deposit")
-# Not a cost of attending: a fine, a charge for paying late, a duplicate document or a lost
-# item (595's "Глоба за тютюнопушене", "Дубликат на диплома"; 529's "Неустойка за забава").
-_NOT_A_FEE_RE = re.compile(
-    r"\bглоб(?:а|и|ата|ите)\b|неустойк|дубликат|академична справка|служебн[аи] бележк|второ предупреждение"
-    r"|(?:изгубен|загубен)\w* (?:ключ|бадж|карт)"
-    r"|\bfines?\b(?! arts)|\bpenalt|\blate[- ]payment\b|\bduplicate\b|\blost (?:key|badge|card)"
-)
 # An age, not a period: "6-годишни деца", "5 годишни", "6-месечни бебета" (564's "такса за
 # обследване" for 5-year-olds lost its one-off period to the "годиш" of the age). Like Stage 6's
 # (price_evidence._AGE_RE), but spaced only before a child word: "€ 3000 годишно" and
@@ -413,7 +407,7 @@ def check_fee(fee: AgentFee, page_text: str) -> CheckedFee:
         return _dropped(fee, "dropped: evidence line does not hold the amount")
     if not amount_on_page(fee, page_numbers(page)):
         return _dropped(fee, "dropped: amount is not among the page's numbers")
-    if _NOT_A_FEE_RE.search(_normalized(f"{evidence} {fee.label} {fee.plan_name or ''}")):
+    if fee.category is not PriceCategory.TUITION and names_no_fee(f"{evidence} {fee.label} {fee.plan_name or ''}"):
         return _dropped(fee, "dropped: a fine, duplicate document or lost item, not a cost of attending")
 
     # The period and deposit rules read the fee's own lines: "9 x € 750 monthly" names the
