@@ -51,21 +51,24 @@ placed() { report "$1" 'r["outcomes"].get("placed", 0)'; }
 placed_ids() { report "$1" '" ".join(f"--school-id {i}" for i in sorted({x["school_id"] for x in r["results"] if x["outcome"] == "placed"}))'; }
 
 # Published pins, numbers and websites that disagree with OSM go to one rolling issue, updated
-# only when the list of schools changes. Free (one Overpass query); a failure is logged only.
+# only when its text changes. Free (one Overpass query); a failure is logged only. Runs once
+# the week's pins are published, so it compares what the site shows.
 osm_check() {
-	local out="$state/pins-osm-$1.json" body="$state/osm-issue.md" title="Schools that disagree with OpenStreetMap"
+	local out="$state/pins-osm-$(date -u +%Y%m%dT%H%M%SZ).json" body="$state/osm-issue.md" title="Schools that disagree with OpenStreetMap"
+	local number digest
 	cli osm-check --city "$city" --out "$out" --issue-body "$body" || { log "osm-check failed"; return 0; }
-	local ids number
-	ids="$(report "$out" '" ".join(str(x["school_id"]) for x in r["results"])')"
-	[ "$ids" != "$(cat "$state/osm_flagged" 2>/dev/null)" ] || return 0
-	number="$(gh issue list -R "$repo" --state open --search "in:title \"$title\"" --json number -q '.[0].number' 2>/dev/null || true)"
+	digest="$(sha256sum < "$body")" || return 0
+	[ "$digest" != "$(cat "$state/osm_issue_digest" 2>/dev/null)" ] || return 0
+	# A failed lookup must not open a second issue: try again next week.
+	number="$(gh issue list -R "$repo" --state open --search "in:title \"$title\"" --json number -q '.[0].number')" ||
+		{ log "osm-check: gh issue list failed"; return 0; }
 	if [ -n "$number" ]; then
 		gh issue comment "$number" -R "$repo" --body-file "$body" > /dev/null || return 0
-	elif [ -n "$ids" ]; then
+	elif report "$out" 'r["results"] and 1 or ""' | grep -q 1; then
 		gh issue create -R "$repo" --title "$title" --body-file "$body" > /dev/null || return 0
 	fi
-	echo "$ids" > "$state/osm_flagged"
-	log "osm-check: flagged ${ids:-none}"
+	echo "$digest" > "$state/osm_issue_digest"
+	log "osm-check: $(head -n 1 "$body")"
 }
 
 # One run at a time; a run still going when cron fires again is left to finish.
@@ -124,7 +127,7 @@ if [ ! -f "$state/pins_unpublished" ]; then
 			stop "the apply placed $website (website) and $agent (agent), over $max_placed: NOT published by this script, but the next publish by any script ships them. Check $state/pins-*-$stamp.json; restore $backup if wrong"
 		fi
 	fi
-	osm_check "$stamp"
+	touch "$state/osm_due"
 	find "$state" -name 'pins-*.json' -mtime +30 -delete
 	date -u +%s > "$state/pins_last_ok"
 fi
@@ -147,4 +150,9 @@ Review it, apply with \`--apply\` and publish. The pins themselves are published
 	"$repo_root/backend/scripts/publish_snapshot.sh" || stop "publish failed (pins stored, not published; the next run retries)"
 	rm -f "$state/pins_unpublished"
 	log "published"
+fi
+
+if [ -f "$state/osm_due" ] && [ ! -f "$state/pins_unpublished" ]; then
+	osm_check
+	rm -f "$state/osm_due"
 fi

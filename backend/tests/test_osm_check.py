@@ -112,4 +112,20 @@ def test_issue_body_lists_each_school_with_a_link_and_credits_osm():
     }
     body = stage.issue_body(report)
     assert "- [7](https://schooldecider.com/schools/7) ДГ №97: pin 900 m from OSM's" in body
+    stranger = {"flag": "number_differs", "osm_names": ["ДГ №79 @someone [x](https://evil)"]}
+    body = stage.issue_body({"checked": 1, "results": [{"school_id": 7, "name": "ДГ №97", "flags": [stranger]}]})
+    assert "`ДГ №79 @someone [x](https://evil)`" in body
     assert "© OpenStreetMap contributors" in body
+
+
+def test_website_tags_with_several_values_subdomains_or_typos_are_not_false_alarms():
+    assert stage.site_hosts("https://ou115.com;https://facebook.com/ou115") == {"ou115.com", "facebook.com"}
+    assert stage.site_hosts("http://[school.bg") == set()
+    assert (
+        stage.check_school(
+            "115 ОУ", "https://ou115.com", [PIN], [_feature(website="https://ou115.com;https://facebook.com/x")]
+        )
+        == []
+    )
+    assert stage.check_school("73 СУ", "https://sou73.bg", [PIN], [_feature(website="https://school.sou73.bg")]) == []
+    assert stage.check_school("73 СУ", "https://sou73.bg", [PIN], [_feature(website="http://[sou73.bg")]) == []

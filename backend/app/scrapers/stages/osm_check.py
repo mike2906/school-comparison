@@ -18,13 +18,14 @@ import logging
 import re
 from collections.abc import Sequence
 from typing import Any, Optional
-from urllib.parse import urlparse
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import School, SchoolLocation
-from app.scrapers.stages.website_pins import _distance_m, needs_pin
+from app.scrapers.extraction.text_values import _canonical_host
+from app.scrapers.stages.website_pins import needs_pin
+from app.services.geocoding.bg.sofia_address_register import distance_m
 from app.services.geocoding.bounds import get_city_bounds
 
 logger = logging.getLogger(__name__)
@@ -48,12 +49,18 @@ def name_numbers(name: Optional[str]) -> set[str]:
     return {match.lstrip("0") for match in _NUMBER_RE.findall((name or "").strip()) if match.strip("0")}
 
 
-def site_host(url: Optional[str]) -> Optional[str]:
-    if not url:
-        return None
-    host = urlparse(url if "://" in url else f"https://{url}").netloc.casefold().split(":")[0]
-    host = host.removeprefix("www.")
-    return host or None
+def site_hosts(url: Optional[str]) -> set[str]:
+    """Hosts of a website tag or URL; OSM may list several, ``;``-separated."""
+    hosts = set()
+    for part in str(url or "").split(";"):
+        part = part.strip()
+        if part and (host := _canonical_host(part if "://" in part else f"https://{part}")):
+            hosts.add(host)
+    return hosts
+
+
+def _same_site(a: str, b: str) -> bool:
+    return a == b or a.endswith("." + b) or b.endswith("." + a)
 
 
 def _is_shared(host: str) -> bool:
@@ -74,7 +81,7 @@ def check_school(
         if (c := f.get("center") or f).get("lat") is not None and c.get("lon") is not None
     ]
     if points and osm_points:
-        nearest = min(_distance_m(p, o) for p in points for o in osm_points)
+        nearest = min(distance_m(p, o) for p in points for o in osm_points)
         if nearest > FAR_M:
             flags.append({"flag": "pin_far", "metres": round(nearest), "osm_points": osm_points[:5]})
     ours = name_numbers(school_name)
@@ -84,15 +91,16 @@ def check_school(
     theirs = set().union(*(name_numbers(n) for n in osm_names)) if osm_names else set()
     if ours and theirs and not ours & theirs:
         flags.append({"flag": "number_differs", "osm_names": sorted(osm_names)})
-    our_host = site_host(website_url)
+    ours_hosts = {h for h in site_hosts(website_url) if not _is_shared(h)}
     osm_hosts = {
         h
         for f in features
         for t in [f.get("tags") or {}]
         for k in ("website", "contact:website")
-        if (h := site_host(t.get(k))) and not _is_shared(h)
+        for h in site_hosts(t.get(k))
+        if not _is_shared(h)
     }
-    if our_host and not _is_shared(our_host) and osm_hosts and our_host not in osm_hosts:
+    if ours_hosts and osm_hosts and not any(_same_site(a, b) for a in ours_hosts for b in osm_hosts):
         flags.append({"flag": "website_differs", "osm_websites": sorted(osm_hosts)})
     return flags
 
@@ -139,7 +147,10 @@ async def run_osm_check(
         .all()
     )
     pins: dict[int, list[tuple[float, float]]] = {}
-    for location in (await db.execute(select(SchoolLocation).where(SchoolLocation.lat.is_not(None)))).scalars():
+    locations = select(SchoolLocation).where(
+        SchoolLocation.lat.is_not(None), SchoolLocation.school_id.in_([school.id for school in schools])
+    )
+    for location in (await db.execute(locations)).scalars():
         if not needs_pin(location):  # an approximate point is hidden, so not worth checking
             pins.setdefault(location.school_id, []).append((location.lat, location.lng))
     results, checked = [], 0
@@ -168,9 +179,14 @@ async def run_osm_check(
 
 _FLAG_WORDS = {
     "pin_far": lambda f: f"pin {f['metres']} m from OSM's",
-    "number_differs": lambda f: f"number differs from OSM's {', '.join(f['osm_names'])}",
-    "website_differs": lambda f: f"website differs from OSM's {', '.join(f['osm_websites'])}",
+    "number_differs": lambda f: f"number differs from OSM's {', '.join(map(_plain, f['osm_names']))}",
+    "website_differs": lambda f: f"website differs from OSM's {', '.join(map(_plain, f['osm_websites']))}",
 }
+
+
+def _plain(text: str) -> str:
+    """OSM text as an inline code span: no links, mentions or formatting from a stranger's edit."""
+    return "`" + str(text).replace("`", "'").replace("\n", " ")[:120] + "`"
 
 
 def issue_body(report: dict[str, Any], site: str = "https://schooldecider.com") -> str:
