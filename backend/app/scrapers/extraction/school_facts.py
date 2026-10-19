@@ -52,7 +52,7 @@ testimonials or reviews (отзиви, мнения, "от децата", "от 
 # "андидатств" also matches 172's menu, which spells "Кандидатстване" with a Latin K. Not the
 # director's office hours (приемно време), entrepreneurship (предприемачество) or job candidates.
 ADMISSION_LINK_RE = re.compile(
-    r"(?<!пред)прием(?!н)|андидатств|kandidatstv|(?<!pred)priem(?!no)|admission|enrol", re.IGNORECASE
+    r"(?<!пред)прием(?!н[оа])|андидатств|kandidatstv|(?<!pred)priem(?!n[oa])|admission|enrol", re.IGNORECASE
 )
 
 # When the picker returns nothing, follow links whose URL or text names one of these topics.
@@ -382,6 +382,11 @@ def judge_message(quoted: Sequence[tuple[Fact, str]], pages: Sequence[tuple[str,
     )
 
 
+@lru_cache(maxsize=32)  # one page serves every quote on it
+def _page_lines(text: str) -> tuple[str, ...]:
+    return tuple(line for line in (_strip(_normalise(raw)) for raw in text.splitlines()) if line)
+
+
 CONTEXT_LINES = 3
 CONTEXT_LINE_CHARS = 160
 
@@ -395,7 +400,7 @@ def quote_context(quote: str, text: str) -> list[str]:
     first = next((_strip(_normalise(line)) for line in quote.splitlines() if _strip(_normalise(line))), "")
     if not first:
         return []
-    lines = [line for line in (_strip(_normalise(raw)) for raw in text.splitlines()) if line]
+    lines = _page_lines(text)
     # The whole line first: "Изпит по математика" is not the line "Не се изисква изпит по математика".
     at = next((i for i, line in enumerate(lines) if line == first), None)
     if at is None:

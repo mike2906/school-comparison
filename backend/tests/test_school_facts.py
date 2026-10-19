@@ -464,6 +464,8 @@ def test_context_comes_from_the_whole_line_match():
         ("For 2027/28 the preparatory class takes 70 children.", "2026-10-19", False),
         ("For 2026-2027 the school takes 14 pupils.", "2027-09-01", True),
         ("Grade 8 has an entrance exam in maths.", "2030-01-01", False),
+        ("Children born 2019-2020 are admitted to the preparatory group.", "2026-10-19", False),
+        ("The exam is on 2025-06-10.", "2026-10-19", False),
     ],
 )
 def test_admissions_facts_for_a_past_school_year_are_hidden(text, today, past):
@@ -480,6 +482,7 @@ def test_admission_links_match_both_alphabets_and_k():
         "/priem-v-parvi-klas/",
         "Прием",
         "/admission/",
+        "Приемни изпити",
     ):
         assert ADMISSION_LINK_RE.search(text)
     for text in (

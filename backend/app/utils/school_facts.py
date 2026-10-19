@@ -293,9 +293,9 @@ _HEARSAY_RE = re.compile(
     r"|\baccording to (?:an?|one)\s+(?:[\w-]+\s+){0,3}?(?:student|pupil|parent|graduate|alumn\w*)",
     re.IGNORECASE,
 )
-# A fact about a summer school or camp, as its English line names it (541: "The 2026 summer
-# programme runs..."); a school-year fact whose quote only mentions summer stays key.
-_SCHOOL_YEAR_RE = re.compile(r"\b(20\d\d)\s*[/–-]\s*(?:20)?(\d\d)\b")
+# A school year ("2026/2027", "2027/28", "2026-2027"): the second year follows the first.
+# Not a date ("2025-06-10") or birth years ("born 2019-2020").
+_SCHOOL_YEAR_RE = re.compile(r"(born\s+(?:in\s+)?)?\b(20\d\d)\s*[/–-]\s*(?:20)?(\d\d)\b", re.IGNORECASE)
 
 
 def _past_school_years_only(text: str, today: str) -> bool:
@@ -304,13 +304,19 @@ def _past_school_years_only(text: str, today: str) -> bool:
     An admissions fact names the year its places or exam dates are for (the reader is told
     to); a page left up from an earlier campaign then stops showing when the next school
     year begins, while this year's intake still shows, with its year named."""
-    years = [int(first) for first, _ in _SCHOOL_YEAR_RE.findall(text)]
+    years = [
+        int(first)
+        for born, first, second in _SCHOOL_YEAR_RE.findall(text)
+        if not born and (int(first) + 1) % 100 == int(second)
+    ]
     if not years:
         return False
     current = int(current_academic_year(datetime.date.fromisoformat(today))[:4])
     return max(years) < current
 
 
+# A fact about a summer school or camp, as its English line names it (541: "The 2026 summer
+# programme runs..."); a school-year fact whose quote only mentions summer stays key.
 _SEASONAL_EN_RE = re.compile(r"\bsummer\b|\bcamps?\b", re.IGNORECASE)
 
 

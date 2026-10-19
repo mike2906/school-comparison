@@ -91,6 +91,15 @@ def _site_chrome(pages: list[PageRead]) -> set[str]:
     return {line for line, count in counts.items() if count >= 3 and count * 2 >= len(pages)}
 
 
+def _without_chrome(pages: list[PageRead]) -> list[tuple[str, str]]:
+    """(url, text) of each page without the menu and footer, so a quote's context lines are
+    the page's own heading, not the menu entry of the same name."""
+    chrome = _site_chrome([page for page in pages if page.text.strip()])
+    return [
+        (page.url, "\n".join(line for line in page.text.splitlines() if line.strip() not in chrome)) for page in pages
+    ]
+
+
 def page_text(pages: list[PageRead]) -> str:
     """The pages the reader sees, without the menu and footer every page repeats, each cut
     to ``MAX_PAGE_CHARS``, in the format the fees reader uses."""
@@ -143,7 +152,7 @@ async def read_school(school: School, pages: list[PageRead], call: Caller) -> di
     grades: dict[int, str] = {}
     if quoted:
         verdict: Graded = await call(
-            facts_rules.JUDGE_PROMPT, Graded, facts_rules.judge_message(quoted, readable), school.id
+            facts_rules.JUDGE_PROMPT, Graded, facts_rules.judge_message(quoted, _without_chrome(pages)), school.id
         )
         grades = {n: rank for n in range(1, len(quoted) + 1) if (rank := verdict.rank(n))}
     passed = [(fact, url, grades[n]) for n, (fact, url) in enumerate(quoted, 1) if n in grades]

@@ -315,7 +315,16 @@ async def find_pages(
     read: list[PageRead] = []
     seen: set[tuple] = set()
     links: dict[str, str] = {}
-    first = list(dict.fromkeys(url for url in first_urls if url and _same_site(url, site)))[:MAX_FIRST_URLS]
+    first = list(
+        dict.fromkeys(
+            url
+            for url in first_urls
+            if url
+            and _same_site(url, site)
+            and page_key(url) != page_key(site)
+            and not unquote(urlparse(url).path).lower().endswith(_SKIPPED)  # a fee picture's address
+        )
+    )[:MAX_FIRST_URLS]
     queue = [site, *first]
     pictures: list[tuple[str, str, str]] = []
     picture_pages: list[PageRead] = []  # read after the pages, so they take none of the page slots
