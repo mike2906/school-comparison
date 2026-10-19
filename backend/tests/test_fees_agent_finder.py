@@ -5,6 +5,7 @@ The browser, the HTTP client, robots.txt and the link-picking model are stubbed.
 
 from __future__ import annotations
 
+import re
 from types import SimpleNamespace
 
 import pytest
@@ -356,3 +357,74 @@ def test_calls_in_flight_count_against_the_cap():
             with spend.hold(0.05):
                 pass
     assert spend.pending_usd == 0 and spend.allows(0.05)
+
+
+async def test_must_read_links_are_opened_ahead_of_the_picks(monkeypatch):
+    # 172: the picker chose the testimonials over /kandidatstvane/, so its admissions were never read.
+    admission = "https://meridian22.org/kandidatstvane/"
+    others = [f"https://meridian22.org/p{n}/" for n in range(4)]
+    crawler = _Crawler({
+        HOME: [("Начало " + "x" * 300, [(admission, "Kандидатстване"), *[(url, "Страница") for url in others]])],
+        **{url: [("Текст " + "x" * 300, [])] for url in [admission, *others]},
+    })  # fmt: skip
+    monkeypatch.setattr(fees_agent, "_pick", _picks(others))
+    must = re.compile(r"кандидатств|kandidat", re.IGNORECASE)
+    read = await fees_agent.find_pages(crawler, None, _Client(), _school(), Spend(0.05), must_read=must)
+    assert [p.url for p in read] == [HOME, admission, *others]
+    plain = await fees_agent.find_pages(_Crawler(crawler.pages), None, _Client(), _school(), Spend(0.05))
+    assert admission not in [p.url for p in plain]
+
+
+async def test_must_read_takes_this_years_page_and_no_pdf(monkeypatch):
+    old, form, now = (
+        "https://meridian22.org/priem-2023-2024/",
+        "https://meridian22.org/zayavlenie-priem.pdf",
+        "https://meridian22.org/priem-2026-2027/",
+    )
+    crawler = _Crawler({
+        HOME: [("Начало " + "x" * 300, [(old, "Прием"), (form, "Заявление"), (now, "Прием")])],
+        **{url: [("Текст " + "x" * 300, [])] for url in [old, now]},
+    })  # fmt: skip
+    monkeypatch.setattr(fees_agent, "_pick", _picks())
+    monkeypatch.setattr(fees_agent, "current_academic_year", lambda: "2026-2027")
+    must = re.compile(r"priem", re.IGNORECASE)
+    read = await fees_agent.find_pages(crawler, None, _Client(), _school(), Spend(0.05), must_read=must)
+    assert [p.url for p in read][:3] == [HOME, now, old]
+
+
+async def test_must_read_pages_come_on_top_of_the_fetch_cap(monkeypatch):
+    # 514: the admissions pages took the places of the page its stored facts came from.
+    admission = "https://meridian22.org/priem/"
+    others = [f"https://meridian22.org/p{n}/" for n in range(20)]
+    crawler = _Crawler({
+        HOME: [("Начало " + "x" * 300, [(admission, "Прием"), *[(url, "Страница") for url in others]])],
+        **{url: [("Текст " + "x" * 300, [(u, "Страница") for u in others])] for url in [admission, *others]},
+    })  # fmt: skip
+
+    async def pick(school, read, links, spend, *args):
+        return [url for url, _ in links if url != admission][:4]
+
+    monkeypatch.setattr(fees_agent, "_pick", pick)
+    must = re.compile(r"priem", re.IGNORECASE)
+    read = await fees_agent.find_pages(crawler, None, _Client(), _school(), Spend(0.05), must_read=must)
+    assert admission in [p.url for p in read]
+    assert len(read) == fees_agent.MAX_FETCHES + 1
+
+
+async def test_first_urls_are_read_after_home_on_top_of_the_cap(monkeypatch):
+    arts = "https://meridian22.org/school-of-arts/"
+    others = [f"https://meridian22.org/p{n}/" for n in range(20)]
+    crawler = _Crawler({
+        HOME: [("Начало " + "x" * 300, [(url, "Страница") for url in others])],
+        **{url: [("Текст " + "x" * 300, [(u, "Страница") for u in others])] for url in [arts, *others]},
+    })  # fmt: skip
+
+    async def pick(school, read, links, spend, *args):
+        return [url for url, _ in links][:4]
+
+    monkeypatch.setattr(fees_agent, "_pick", pick)
+    read = await fees_agent.find_pages(
+        crawler, None, _Client(), _school(), Spend(0.05), first_urls=[arts, arts, "https://other.example/x"]
+    )
+    assert [p.url for p in read][:2] == [HOME, arts]
+    assert len(read) == fees_agent.MAX_FETCHES + 1

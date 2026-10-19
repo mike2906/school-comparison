@@ -90,6 +90,8 @@ DEFAULT_MAX_USD = 0.50
 MAX_HOPS = 3
 MAX_PICKS = 4
 MAX_FETCHES = 12
+MAX_MUST_READ = 2
+MAX_FIRST_URLS = 4
 MAX_LINKS_SHOWN = 150
 MAX_READ_CHARS = 120_000
 THIN_PAGE_CHARS = 300
@@ -294,11 +296,17 @@ async def find_pages(
     fallback_links: re.Pattern = _FEE_LINK_RE,
     stage: str = STAGE,
     read_pictures: bool = False,
+    must_read: Optional[re.Pattern] = None,
+    first_urls: Sequence[str] = (),
 ) -> list[PageRead]:
     """Up to 3 hops and 12 pages from the home page; robots.txt is respected.
 
     With ``read_pictures``, up to 4 pictures named for fees are read as pages of their own.
-    The school-facts stage passes its own link prompt, fallback keywords and stage name."""
+    The school-facts stage passes its own link prompt, fallback keywords and stage name, and
+    ``must_read``: links whose URL or text it matches are opened ahead of the picker's choices
+    and on top of ``MAX_FETCHES`` (``MAX_MUST_READ`` in all), since the picker can fill its
+    places with other pages; and ``first_urls``, same-site pages read right after the home page,
+    also on top (``MAX_FIRST_URLS`` at most): the pages its stored facts came from."""
     from crawl4ai.utils import RobotsParser  # type: ignore
 
     robots = RobotsParser()
@@ -307,9 +315,21 @@ async def find_pages(
     read: list[PageRead] = []
     seen: set[tuple] = set()
     links: dict[str, str] = {}
-    queue = [site]
+    first = list(
+        dict.fromkeys(
+            url
+            for url in first_urls
+            if url
+            and _same_site(url, site)
+            and page_key(url) != page_key(site)
+            and not unquote(urlparse(url).path).lower().endswith(_SKIPPED)  # a fee picture's address
+        )
+    )[:MAX_FIRST_URLS]
+    queue = [site, *first]
     pictures: list[tuple[str, str, str]] = []
     picture_pages: list[PageRead] = []  # read after the pages, so they take none of the page slots
+    must_left = MAX_MUST_READ
+    must_taken = len(first)  # these come on top of MAX_FETCHES (514 lost its stored facts' page)
 
     async def allowed(url: str) -> bool:
         return await robots.can_fetch(url, CRAWLER_USER_AGENT)
@@ -319,7 +339,7 @@ async def find_pages(
 
     for hop in range(MAX_HOPS + 1):
         for url in queue:
-            if page_key(url) in seen or len(read) >= MAX_FETCHES:
+            if page_key(url) in seen or len(read) >= MAX_FETCHES + must_taken:
                 continue
             seen.add(page_key(url))
             if not await robots.can_fetch(url, CRAWLER_USER_AGENT):
@@ -373,7 +393,7 @@ async def find_pages(
                 href = urldefrag(href)[0]
                 if _same_site(href, site) and not unquote(href).lower().endswith(_SKIPPED):
                     links.setdefault(href, label)
-        if hop == MAX_HOPS or len(read) >= MAX_FETCHES:
+        if hop == MAX_HOPS or len(read) >= MAX_FETCHES + must_taken:
             break
         unopened = [(url, label) for url, label in links.items() if page_key(url) not in seen]
         if not unopened:
@@ -396,6 +416,17 @@ async def find_pages(
         this_year = _this_years_pages()
         keyword.sort(key=lambda url: not this_year.search(f"{unquote(url)} {links.get(url, '')}"))
         queue = (queue + keyword)[:MAX_PICKS]
+        if must_read is not None and must_left:
+            # 172's picker took the testimonials over /kandidatstvane/ in two runs of two.
+            must: list[str] = []
+            for url, label in sorted(unopened, key=lambda link: not this_year.search(f"{unquote(link[0])} {link[1]}")):
+                path = unquote(urlparse(url).path).lower()
+                if len(must) < must_left and must_read.search(f"{unquote(url)} {label}") and not path.endswith(".pdf"):
+                    if page_key(url) not in {page_key(m) for m in must}:
+                        must.append(url)
+            must_left -= len(must)
+            must_taken += len(must)
+            queue = must + [url for url in queue if url not in must]
         if not queue:
             break
     # Pictures first: they are short, and the reader's text is cut at its limit from the end.

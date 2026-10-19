@@ -45,8 +45,15 @@ and a parent: about the school, curriculum or programme, subjects and languages 
 daily schedule and after-school care, admissions, clubs and activities, transport, meals, facilities,
 support for children with special needs. You get the institution's name, the pages read so far, and the
 same-site links not yet opened, as "URL | link text". Return up to 4 URLs, copied exactly from the list,
-most useful first. Skip news, galleries, events, contacts, documents and policies, and fee pages.
-Return none if nothing fits."""
+most useful first. Skip news, galleries, events, contacts, documents and policies, fee pages, and
+testimonials or reviews (отзиви, мнения, "от децата", "от родителите"). Return none if nothing fits."""
+
+# Always opened (up to 2 a site): how admission works is a key fact the picker can pass over.
+# "андидатств" also matches 172's menu, which spells "Кандидатстване" with a Latin K. Not the
+# director's office hours (приемно време), entrepreneurship (предприемачество) or job candidates.
+ADMISSION_LINK_RE = re.compile(
+    r"(?<!пред)прием(?!н[оа])|андидатств|kandidatstv|(?<!pred)priem(?!n[oa])|admission|enrol", re.IGNORECASE
+)
 
 # When the picker returns nothing, follow links whose URL or text names one of these topics.
 FALLBACK_LINK_RE = re.compile(
@@ -68,11 +75,15 @@ a parent comparing schools would use. File each fact under one topic:
 - activities: named sports, clubs, teams and arts on offer
 - facilities: notable rooms and grounds (pool, sports hall, labs, library)
 - support: psychologist, speech therapist, resource teacher, support for special educational needs
-- admissions: how admission works (test, interview, ranking) when stated as the current process
+- admissions: how admission works for each grade or age as the page describes it now: an entrance exam or
+  test and its subjects or rounds, an interview or talk with a psychologist, trial days, year-round admission
+  while places are free, which ages or birth years are taken; and, for the current or coming school year (name
+  it), the places offered and the exam dates
 Do not list: fees or prices; exam results, rankings or competitions won; mission statements, values or claims
 anyone could make ("individual approach", "modern facilities", "caring environment", "excellent conditions");
 news, events, one-off projects; anything dated to a past school year; counts that change every year (pupils,
-classes, teachers, rooms, computers, years since founding). Class size and times of day are not such counts.
+classes, teachers, rooms, computers, years since founding). Class size, times of day and the places offered in
+an intake are not such counts. An admissions page whose dates have passed still states how admission works (not its dates or places).
 Rules:
 - Only what the pages state about this institution. If a page covers a sister school or kindergarten,
   leave its facts out unless they plainly apply to this one.
@@ -110,7 +121,8 @@ Rules:
     holiday programme's.
   - admission: how children are admitted, only as the quote states it: any of entrance_exam, interview,
     trial_day, open_entry (the quote says there is no test or interview); admission_grade: the grade it is
-    for (0 for kindergarten or preschool), when stated; for a range of grades (grades 2 to 4), admission_grade
+    for (0 for kindergarten or preschool), only when the quote names the grade or the kindergarten or
+    preschool class; for a range of grades (grades 2 to 4), admission_grade
     is the first and admission_grade_to the last; exam_subjects: the subjects of an entrance exam, each as {"bg", "en"}.
   - places: full or waiting_list when the quote says a class or grade has no places or a waiting list for the
     current or coming school year (admission_grade for which grade).
@@ -135,7 +147,9 @@ on), and a quote
 (usually Bulgarian). Pass an item when the quote states what the fact and every label say; translation and plain
 rewording are fine. A heading, list item or link title that names
 a specialty, subject, club, sport or room is enough for a fact that only says the school offers or has it.
-The page's address can supply context the quote leaves out (a quote on /anglijski-ezik/ is about English).
+The page's address and the lines above the quote can supply context the quote leaves out (a quote on
+/anglijski-ezik/ is about English; "70 деца" under a heading "Кандидатстване за ПУК" is about the
+preparatory class), but the fact itself must still be in the quote.
 Fail an item when the fact adds something neither says (a number, a grade, a scope, a claim), when the quote
 describes a plan for something that does not exist yet (a menu or timetable set for the current or coming
 school year is not a plan), or
@@ -224,9 +238,25 @@ class Graded(BaseModel):
         return next((rank for rank in RANKS if n in getattr(self, rank)), None)
 
 
+_TICK_RE = re.compile("[\u2713\u2714\u2705\u2611\U0001f5f8]\ufe0f?")
+_CROSS_RE = re.compile("[\u2717\u2718\u274c\u274e\u2612]\ufe0f?")
+# Pictographs, dingbats and arrows; not circled numbers (①) or the ticks and crosses above.
+_EMOJI_RE = re.compile(
+    "[\u2190-\u21ff\u2300-\u23ff\u2600-\u2712\u2719-\u274b\u274f-\u27bf\u2b00-\u2bff"
+    "\U0001f000-\U0001f5f7\U0001f5f9-\U0001faff\ufe0f\u200d]"
+)
+
+
 @lru_cache(maxsize=512)  # each page is matched against every quote part
 def _normalise(text: str) -> str:
+    # WordPress serves emoji as pictures (609's "![✅](.../2705.svg) Заявления"): keep the emoji.
+    text = re.sub(r"!\[([^\]]{1,8})\]\([^)]*/emoji/[^)]*\)", r" \1 ", text)
     text = re.sub(r"!\[[^\]]*\]\([^)]*\)", " ", text)  # markdown images
+    # A tick or cross says yes or no ("✘ Училищен транспорт"), so all ticks read as one mark and
+    # all crosses as another; other pictographs (👉 📝 ⏳) are decoration either side may leave out.
+    text = _TICK_RE.sub(" ✓ ", text)
+    text = _CROSS_RE.sub(" ✗ ", text)
+    text = _EMOJI_RE.sub(" ", text)
     text = re.sub(r"\[([^\]]*)\]\([^)]*\)", r"\1", text)  # markdown links keep their text
     text = re.sub(r"[*_#>|`\\\[\]]+", " ", text)  # also a link's text quoted without its address
     text = text.replace("“", '"').replace("”", '"').replace("„", '"').replace("’", "'")
@@ -320,6 +350,8 @@ def _labels(fact: Fact) -> str:
             continue
         if isinstance(value, list):
             value = ", ".join(_label_text(item) for item in value)
+        elif key in ("admission_grade", "admission_grade_to") and value == 0:
+            value = "0 (kindergarten or preschool class)"  # a bare 0 reads as a grade the quote never names
         lines.append(f"\n{key.replace('_', ' ').capitalize()}: {value}")
     return "".join(lines)
 
@@ -335,12 +367,49 @@ def _label_text(item: object) -> str:
     return str(item)
 
 
-def judge_message(quoted: Sequence[tuple[Fact, str]]) -> str:
-    """The numbered items for the judge: each fact, its labels, its quote, and the page the quote is on."""
+def judge_message(quoted: Sequence[tuple[Fact, str]], pages: Sequence[tuple[str, str]] = ()) -> str:
+    """The numbered items for the judge: each fact, its labels, the page the quote is on, the
+    lines just above the quote on that page (``pages``, when given), and the quote."""
+    texts = dict(pages)
+
+    def above(fact: Fact, url: str) -> str:
+        lines = quote_context(fact.quote, texts.get(url, ""))
+        return "\nAbove the quote: " + " / ".join(lines) if lines else ""
+
     return "\n\n".join(
-        f"{n}. Fact: {fact.fact_en}{_labels(fact)}\nPage: {url}\nQuote: {fact.quote}"
+        f"{n}. Fact: {fact.fact_en}{_labels(fact)}\nPage: {url}{above(fact, url)}\nQuote: {fact.quote}"
         for n, (fact, url) in enumerate(quoted, 1)
     )
+
+
+@lru_cache(maxsize=32)  # one page serves every quote on it
+def _page_lines(text: str) -> tuple[str, ...]:
+    return tuple(line for line in (_strip(_normalise(raw)) for raw in text.splitlines()) if line)
+
+
+CONTEXT_LINES = 3
+CONTEXT_LINE_CHARS = 160
+
+
+def quote_context(quote: str, text: str) -> list[str]:
+    """Up to ``CONTEXT_LINES`` page lines above the quote's first line, nearest last.
+
+    A quote such as "ще приемем 70 деца" (172) or "II кръг ... изпит по английски език" names
+    neither the class nor the grades; the heading above it does, and the judge failed the facts
+    for lacking it."""
+    first = next((_strip(_normalise(line)) for line in quote.splitlines() if _strip(_normalise(line))), "")
+    if not first:
+        return []
+    lines = _page_lines(text)
+    # The whole line first: "Изпит по математика" is not the line "Не се изисква изпит по математика".
+    at = next((i for i, line in enumerate(lines) if line == first), None)
+    if at is None:
+        at = next((i for i, line in enumerate(lines) if first in line), None)
+    if at is None:  # the quote's first line runs on past a page line
+        at = next((i for i, line in enumerate(lines) if len(line) >= 12 and first.startswith(line)), None)
+    if at is None:
+        return []
+    return [line[:CONTEXT_LINE_CHARS] for line in lines[max(0, at - CONTEXT_LINES) : at]]
 
 
 def stored_fact(fact: Fact, url: str, rank: str) -> dict:

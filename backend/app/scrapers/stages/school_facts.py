@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import datetime
 import logging
+from collections import Counter
 from collections.abc import Awaitable, Callable, Sequence
 from typing import Any, Optional
 
@@ -90,6 +91,15 @@ def _site_chrome(pages: list[PageRead]) -> set[str]:
     return {line for line, count in counts.items() if count >= 3 and count * 2 >= len(pages)}
 
 
+def _without_chrome(pages: list[PageRead]) -> list[tuple[str, str]]:
+    """(url, text) of each page without the menu and footer, so a quote's context lines are
+    the page's own heading, not the menu entry of the same name."""
+    chrome = _site_chrome([page for page in pages if page.text.strip()])
+    return [
+        (page.url, "\n".join(line for line in page.text.splitlines() if line.strip() not in chrome)) for page in pages
+    ]
+
+
 def page_text(pages: list[PageRead]) -> str:
     """The pages the reader sees, without the menu and footer every page repeats, each cut
     to ``MAX_PAGE_CHARS``, in the format the fees reader uses."""
@@ -141,7 +151,9 @@ async def read_school(school: School, pages: list[PageRead], call: Caller) -> di
     quoted = [(fact, url) for fact, url in quoted if all(fact is not repeat for repeat in repeats)]
     grades: dict[int, str] = {}
     if quoted:
-        verdict: Graded = await call(facts_rules.JUDGE_PROMPT, Graded, facts_rules.judge_message(quoted), school.id)
+        verdict: Graded = await call(
+            facts_rules.JUDGE_PROMPT, Graded, facts_rules.judge_message(quoted, _without_chrome(pages)), school.id
+        )
         grades = {n: rank for n in range(1, len(quoted) + 1) if (rank := verdict.rank(n))}
     passed = [(fact, url, grades[n]) for n, (fact, url) in enumerate(quoted, 1) if n in grades]
     kept = _ordered(passed)
@@ -172,6 +184,17 @@ async def read_school(school: School, pages: list[PageRead], call: Caller) -> di
     report["store"] = [facts_rules.stored_fact(fact, url, rank) for fact, url, rank in store]
     outcome = f"{len(kept)} of {len(read.facts)} kept"
     return report | {"outcome": outcome + (f", {len(report['carried'])} carried" if report["carried"] else "")}
+
+
+def stored_fact_pages(school: School) -> list[str]:
+    """The pages the stored key facts came from, then the others', most facts first.
+
+    Read every time, so a stored fact is carried over (or dropped) on its own page's current
+    text rather than lost because the picker chose other pages this run (514's /school-of-arts/)."""
+    stored = ((school.attributes or {}).get(ATTRIBUTE_KEY) or {}).get("facts") or []
+    rows = [row for row in stored if isinstance(row, dict) and row.get("source_url")]
+    counts = Counter((row.get("rank") != "key", row["source_url"]) for row in rows)
+    return list(dict.fromkeys(url for (_, url), _ in sorted(counts.items(), key=lambda item: (item[0][0], -item[1]))))
 
 
 def _carried(school: School, readable: list[tuple[str, str]], kept: list[Ranked]) -> list[Ranked]:
@@ -309,6 +332,8 @@ async def run_school_facts(
                         pick_prompt=facts_rules.PICK_PROMPT,
                         fallback_links=facts_rules.FALLBACK_LINK_RE,
                         stage=STAGE,
+                        must_read=facts_rules.ADMISSION_LINK_RE,
+                        first_urls=stored_fact_pages(school),
                     )
 
                 async def one(school_db: AsyncSession, current_id: int) -> dict[str, Any]:

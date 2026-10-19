@@ -395,6 +395,105 @@ def test_the_judge_sees_the_page_of_each_quote():
     assert "Page: https://school.example/anglijski-ezik/" in message
 
 
+def test_the_judge_reads_admission_grade_0_as_kindergarten():
+    # 545, 616: "accepts children aged 2 to 7" failed against a bare "Admission grade: 0".
+    fact = _fact("admissions", "ЧДГ приема деца на възраст от 2 до 7 год.")
+    fact.admission_grade = 0
+    assert "Admission grade: 0 (kindergarten or preschool class)" in judge_message([(fact, HOME)])
+
+
+def test_emoji_pictures_and_emoji_in_quotes_match():
+    # 609: WordPress shows emoji as pictures; the reader quotes the emoji itself.
+    page = [
+        (HOME, "![✅](https://s.w.org/images/core/emoji/17.0.2/svg/2705.svg) Заявления се приемат от 02.02.2026 г.")
+    ]
+    assert quote_on_page(_fact("admissions", "✅ Заявления се приемат от 02.02.2026 г."), page) == HOME
+
+
+def test_the_judge_sees_the_heading_above_the_quote():
+    page = (
+        "Меню\n\n## Kандидатстване\n\nКандидатстване за II-VII клас за учебната 2027/2028 г.\n\n"
+        "Дати изпит I кръг: очаквайте през месец февруари\n\n"
+        "При успешно преминаване на I кръг следва покана за II кръг. Той е индивидуален и се състои от изпит "
+        "по английски език и разговор с психолог."
+    )
+    quote = "При успешно преминаване на I кръг следва покана за II кръг."
+    message = judge_message([(_fact("admissions", quote), HOME)], [(HOME, page)])
+    assert "Above the quote: kандидатстване / кандидатстване за ii-vii клас" in message
+    assert "дати изпит i кръг" in message
+    assert "Above the quote" not in judge_message([(_fact("admissions", "Няма го"), HOME)], [(HOME, page)])
+
+
+def test_stored_fact_pages_put_key_pages_first():
+    from app.scrapers.stages.school_facts import stored_fact_pages
+
+    facts = [
+        {"source_url": "https://s.example/a", "rank": "more"},
+        {"source_url": "https://s.example/a", "rank": "more"},
+        {"source_url": "https://s.example/b", "rank": "key"},
+        {"source_url": "https://s.example/c", "rank": "key"},
+        {"source_url": "https://s.example/c", "rank": "key"},
+        {"rank": "key"},
+    ]
+    school = School(id=1, name_i18n={}, country_code="bg", attributes={"school_facts": {"facts": facts}})
+    assert stored_fact_pages(school) == ["https://s.example/c", "https://s.example/b", "https://s.example/a"]
+    assert stored_fact_pages(School(id=2, name_i18n={}, country_code="bg")) == []
+
+
+def test_ticks_crosses_and_circled_numbers_keep_their_meaning():
+    from app.scrapers.extraction.school_facts import _normalise
+
+    assert _normalise("✘ Училищен транспорт") != _normalise("✔ Училищен транспорт")
+    assert _normalise("✔ Училищен транспорт") == _normalise("✅ Училищен транспорт")
+    assert _normalise("Група ①") != _normalise("Група ②")
+    assert _normalise("👉 Дата на провеждане") == _normalise("Дата на провеждане")
+
+
+def test_context_comes_from_the_whole_line_match():
+    from app.scrapers.extraction.school_facts import quote_context
+
+    page = "Прием в I клас\nНе се изисква изпит по математика.\nПрием в V клас\nИзпит по математика"
+    assert quote_context("Изпит по математика", page)[-1] == "прием в v клас"
+
+
+@pytest.mark.parametrize(
+    ("text", "today", "past"),
+    [
+        ("For 2025/2026 the school takes 14 pupils into grade 1.", "2026-10-19", True),
+        ("For 2026/2027 the school takes 14 pupils into grade 1.", "2026-10-19", False),
+        ("For 2027/28 the preparatory class takes 70 children.", "2026-10-19", False),
+        ("For 2026-2027 the school takes 14 pupils.", "2027-09-01", True),
+        ("Grade 8 has an entrance exam in maths.", "2030-01-01", False),
+        ("Children born 2019-2020 are admitted to the preparatory group.", "2026-10-19", False),
+        ("The exam is on 2025-06-10.", "2026-10-19", False),
+    ],
+)
+def test_admissions_facts_for_a_past_school_year_are_hidden(text, today, past):
+    from app.utils.school_facts import _past_school_years_only
+
+    assert _past_school_years_only(text, today) is past
+
+
+def test_admission_links_match_both_alphabets_and_k():
+    from app.scrapers.extraction.school_facts import ADMISSION_LINK_RE
+
+    for text in (
+        "https://www.svetasofia.com/kandidatstvane/ Kандидатстване",
+        "/priem-v-parvi-klas/",
+        "Прием",
+        "/admission/",
+        "Приемни изпити",
+    ):
+        assert ADMISSION_LINK_RE.search(text)
+    for text in (
+        "https://www.svetasofia.com/drugite-za-nas/ot-decata От децата",
+        "/priemno-vreme/ Приемно време на директора",
+        "/predpriemachestvo/ Предприемачество",
+        "/kandidati-za-rabota/ Кариери",
+    ):
+        assert not ADMISSION_LINK_RE.search(text)
+
+
 @pytest.mark.asyncio
 async def test_a_full_read_with_no_fact_kept_replaces_the_stored_facts():
     old = {"_schema_version": 1, "facts": [{"topic": "meals"}]}

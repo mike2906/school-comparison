@@ -25,7 +25,15 @@ some picks were trivia, yearly counts go stale, the paragraph only restated the 
 ## How it works (`school-facts` stage, not part of `all`)
 
 1. **Find.** The fees agent's finder (`find_pages`) with its own link prompt: about,
-   curriculum, school day, admissions, clubs, transport, meals, support pages.
+   curriculum, school day, admissions, clubs, transport, meals, support pages; testimonials
+   are skipped. Up to 2 admissions links (`ADMISSION_LINK_RE`: прием, кандидатстване,
+   priem, admission, enrol; not приемно време), this school year's first and no PDFs, are
+   always opened ahead of the picker's choices and on top of the 12-page limit, and so are
+   the pages the stored facts came from (4 at most, key facts' first), so a refresh checks
+   each stored fact on its own page instead of losing it when the picker chooses other pages
+   (514 lost 3 key facts from /school-of-arts/ that way): on 2026-10-14, 27 of
+   the 40 private Sofia schools with no admissions fact never had their admissions page
+   read (172's picker took the pupils' testimonials over /kandidatstvane/).
 2. **Read.** One `pricing`-tier call lists up to 20 facts, each under one fixed topic
    (`app/utils/school_facts.py` `TOPICS`: curriculum, languages, school_day, class_size,
    meals, transport, activities, facilities, support, admissions), in Bulgarian and English,
@@ -40,9 +48,12 @@ some picks were trivia, yearly counts go stale, the paragraph only restated the 
    (`CURRICULA`) and whether the diploma is recognised, application open/close dates, bus
    areas by district, special-needs support, and open-day dates with a sign-up link (kept only
    when code finds that link on a page read).
-3. **Check.** Code keeps a fact only if its quote is on a page read (markup and quote marks
-   ignored). A second call on the same tier confirms each quote states the whole fact and
-   its labels, and grades it: `key` (what parents choose on: programme, languages, hours,
+3. **Check.** Code keeps a fact only if its quote is on a page read (markup, quote marks and
+   decorative emoji ignored; WordPress's emoji pictures read as their emoji; ticks and
+   crosses kept, since "✘ транспорт" says no). A second call on the same tier confirms
+   each quote states the whole fact and its labels, seeing the 3 page lines above the quote
+   for which class or grade it is about (172's "ще приемем 70 деца" sits under "Кандидатстване
+   за ПУК"), and grades it: `key` (what parents choose on: programme, languages, hours,
    bus, meals, class size, support, admissions), `more` (concrete but secondary) or `minor`.
 4. **Store** (`--apply` only): `attributes["school_facts"]` =
    `{_schema_version, read_at, website_url, model, facts: [{topic, text_i18n, source_url, quote, rank, <labels>}]}`,
@@ -56,7 +67,8 @@ internal): a "From the school's website" box on the school page with the key fac
 most, 2 a topic; later key facts show as `more`), a "show more" for the rest, a link to
 each fact's page and the date it was read; and a compare-page section with one row per
 topic any compared school has a key fact for. `minor` facts are not shown. A school with
-none shows nothing. A fact about a summer school, camp or holiday programme is never `key`
+none shows nothing. An admissions fact naming only school years before the one in progress
+("14 places for 2025/2026") is not shown. A fact about a summer school, camp or holiday programme is never `key`
 (its hours or meals would read as the school year's), and a fact that reports a pupil's,
 parent's or graduate's remark is not shown at all.
 

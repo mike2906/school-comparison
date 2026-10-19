@@ -13,6 +13,7 @@ from collections.abc import Mapping
 from typing import Any, Optional
 from urllib.parse import urlparse
 
+from app.utils.academic_year import current_academic_year
 from app.utils.display_lists import canonical_language
 from app.utils.facility_vocabulary import APPROACH_VOCAB, FACILITY_VOCAB, PROGRAM_VOCAB
 from app.utils.website_data import (  # noqa: F401 (SITE_ACCEPTED_STATUSES is imported from here)
@@ -292,6 +293,28 @@ _HEARSAY_RE = re.compile(
     r"|\baccording to (?:an?|one)\s+(?:[\w-]+\s+){0,3}?(?:student|pupil|parent|graduate|alumn\w*)",
     re.IGNORECASE,
 )
+# A school year ("2026/2027", "2027/28", "2026-2027"): the second year follows the first.
+# Not a date ("2025-06-10") or birth years ("born 2019-2020").
+_SCHOOL_YEAR_RE = re.compile(r"(born\s+(?:in\s+)?)?\b(20\d\d)\s*[/–-]\s*(?:20)?(\d\d)\b", re.IGNORECASE)
+
+
+def _past_school_years_only(text: str, today: str) -> bool:
+    """Whether ``text`` names school years and all of them are before the one in progress.
+
+    An admissions fact names the year its places or exam dates are for (the reader is told
+    to); a page left up from an earlier campaign then stops showing when the next school
+    year begins, while this year's intake still shows, with its year named."""
+    years = [
+        int(first)
+        for born, first, second in _SCHOOL_YEAR_RE.findall(text)
+        if not born and (int(first) + 1) % 100 == int(second)
+    ]
+    if not years:
+        return False
+    current = int(current_academic_year(datetime.date.fromisoformat(today))[:4])
+    return max(years) < current
+
+
 # A fact about a summer school or camp, as its English line names it (541: "The 2026 summer
 # programme runs..."); a school-year fact whose quote only mentions summer stays key.
 _SEASONAL_EN_RE = re.compile(r"\bsummer\b|\bcamps?\b", re.IGNORECASE)
@@ -341,6 +364,8 @@ def publishable_school_facts(attributes: Any, website_url: Optional[str]) -> Opt
             continue
         if _HEARSAY_RE.search(_english(fact)):
             continue
+        if fact.get("topic") == "admissions" and _past_school_years_only(_english(fact), today):
+            continue  # "14 places for 2025/2026" is a past campaign's
         labels = _labels(fact)
         if labels.get("open_days") and max(labels["open_days"]) < today and not (
             labels.get("applications_close") and labels["applications_close"] >= today
