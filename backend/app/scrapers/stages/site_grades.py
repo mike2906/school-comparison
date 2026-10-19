@@ -28,7 +28,13 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import School, SchoolLocationAgeGroupShift
-from app.scrapers.campus_sync import SITE_GRADES_ADDED_PREFIX, SITE_GRADES_HIDDEN_PREFIX
+from app.scrapers.campus_sync import (
+    SITE_GRADES_ADDED_PREFIX,
+    SITE_GRADES_HIDDEN_PREFIX,
+    site_hidden_band,
+    site_hidden_bands,
+    site_hidden_tag,
+)
 from app.scrapers.price_evidence import PRESCHOOL_GRADE, label_grades
 from app.utils.school_facts import SITE_ACCEPTED_STATUSES
 
@@ -144,13 +150,13 @@ async def run_site_grades(
             location
             for location in school.locations
             if {link.age_group for link in location.age_group_shifts} & set(BANDS)
-            or _tagged(location.location_tags or [], SITE_GRADES_HIDDEN_PREFIX)
+            or site_hidden_bands(location.location_tags)
         ]
         if len(locations) != 1:
             continue
         location = locations[0]
         tags = list(location.location_tags or [])
-        added, hidden = _tagged(tags, SITE_GRADES_ADDED_PREFIX), _tagged(tags, SITE_GRADES_HIDDEN_PREFIX)
+        added, hidden = _tagged(tags, SITE_GRADES_ADDED_PREFIX), set(site_hidden_bands(tags))
         current = {link.age_group for link in location.age_group_shifts}
         register_bands = ((current - added) | hidden) & set(BANDS)
         published = SchoolDetailResponse.model_validate(school)
@@ -173,16 +179,20 @@ async def run_site_grades(
         if not apply:
             continue
         desired = (register_bands | add) - hide
+        # A band hidden before keeps its mark; one hidden now records its shift and groups.
+        hidden_tags = [tag for tag in tags if site_hidden_band(tag) in hide]
+        hidden_tags += [site_hidden_tag(link) for link in location.age_group_shifts if link.age_group in hide - hidden]
         for link in list(location.age_group_shifts):
             if link.age_group in BANDS and link.age_group not in desired:
                 await db.delete(link)
+        was_hidden = site_hidden_bands(tags)
         for band in sorted(desired - current):
-            db.add(SchoolLocationAgeGroupShift(location_id=location.id, age_group=band))
+            db.add(SchoolLocationAgeGroupShift(location_id=location.id, age_group=band, **was_hidden.get(band, {})))
         kept = [tag for tag in tags if not tag.startswith((SITE_GRADES_ADDED_PREFIX, SITE_GRADES_HIDDEN_PREFIX))]
         location.location_tags = (
             kept
             + [SITE_GRADES_ADDED_PREFIX + band for band in sorted(add)]
-            + [SITE_GRADES_HIDDEN_PREFIX + band for band in sorted(hide)]
+            + sorted(hidden_tags)
         )
         await db.commit()
         change["applied"] = True

@@ -53,6 +53,35 @@ AGE_GROUP_TAG_PREFIX = "age_group_source=website:"
 SITE_GRADES_ADDED_PREFIX = "age_group_source=site_grades:"
 SITE_GRADES_HIDDEN_PREFIX = "age_group_hidden=site_grades:"
 
+
+def site_hidden_tag(link) -> str:
+    """The hidden mark for a register band, keeping its shift and organised-groups flag so
+    the band comes back as it was ("age_group_hidden=site_grades:grade_8_12|shift=afternoon")."""
+    parts = [SITE_GRADES_HIDDEN_PREFIX + link.age_group]
+    if link.shift:
+        parts.append(f"shift={link.shift}")
+    if link.has_organised_groups is not None:
+        parts.append(f"groups={int(link.has_organised_groups)}")
+    return "|".join(parts)
+
+
+def site_hidden_band(tag: str):
+    """The band a hidden mark is for, or None for any other tag."""
+    return tag[len(SITE_GRADES_HIDDEN_PREFIX):].split("|")[0] if tag.startswith(SITE_GRADES_HIDDEN_PREFIX) else None
+
+
+def site_hidden_bands(tags) -> dict[str, dict]:
+    """``{band: {"shift", "has_organised_groups"}}`` from a location's hidden marks."""
+    out = {}
+    for tag in tags or []:
+        if not tag.startswith(SITE_GRADES_HIDDEN_PREFIX):
+            continue
+        band, *fields = tag[len(SITE_GRADES_HIDDEN_PREFIX):].split("|")
+        values = dict(field.split("=", 1) for field in fields if "=" in field)
+        groups = values.get("groups")
+        out[band] = {"shift": values.get("shift"), "has_organised_groups": None if groups is None else groups == "1"}
+    return out
+
 _CONTACT_PATH_RE = re.compile(r"contact|kontakt|контакт", re.IGNORECASE)
 # Addresses that belong to someone else or to administration, not a campus.
 _NOT_CAMPUS_RE = re.compile(
@@ -606,19 +635,19 @@ async def remove_website_campus_data(db, school_id: int, *, preview: bool = Fals
             t.split(":", 1)[1] for t in tags if t.startswith((AGE_GROUP_TAG_PREFIX, SITE_GRADES_ADDED_PREFIX))
         ]
         # A register band the site's grades hid comes back with the site withheld.
-        hidden = [t[len(SITE_GRADES_HIDDEN_PREFIX):] for t in tags if t.startswith(SITE_GRADES_HIDDEN_PREFIX)]
+        hidden = site_hidden_bands(tags)
         if not added and not hidden:
             continue
         changes.append({"location_id": location.id, "action": "remove_website_age_groups", "age_groups": added,
-                        "restored": hidden})
+                        "restored": sorted(hidden)})
         if not preview:
             for link in list(location.age_group_shifts):
                 if link.age_group in added:
                     await db.delete(link)
             present = {link.age_group for link in location.age_group_shifts}
-            for key in hidden:
+            for key, kept in hidden.items():
                 if key not in present:
-                    location.age_group_shifts.append(SchoolLocationAgeGroupShift(age_group=key))
+                    location.age_group_shifts.append(SchoolLocationAgeGroupShift(age_group=key, **kept))
             location.location_tags = [
                 t
                 for t in tags

@@ -533,7 +533,8 @@ class BaseSourceAdapter(ABC):
         from app.scrapers.campus_sync import (
             AGE_GROUP_TAG_PREFIX,
             SITE_GRADES_ADDED_PREFIX,
-            SITE_GRADES_HIDDEN_PREFIX,
+            site_hidden_band,
+            site_hidden_bands,
         )
 
         # The school's own site says which grades it teaches (site-grades stage): the bands
@@ -541,12 +542,18 @@ class BaseSourceAdapter(ABC):
         # from the register's bands on its next run.
         tags = row.location_tags or []
         site_added = {t[len(SITE_GRADES_ADDED_PREFIX):] for t in tags if t.startswith(SITE_GRADES_ADDED_PREFIX)}
-        site_hidden = {t[len(SITE_GRADES_HIDDEN_PREFIX):] for t in tags if t.startswith(SITE_GRADES_HIDDEN_PREFIX)}
+        site_hidden = set(site_hidden_bands(tags))
         # The registry now states these age groups itself: they are no longer only the
-        # website's claim, so a later website withhold must not delete them (UF42b).
+        # website's claim, so a later website withhold must not delete them (UF42b). The
+        # same for a band the site added, and a band the register no longer states has
+        # nothing left to hide.
         confirmed = {AGE_GROUP_TAG_PREFIX + age_group for age_group in wanted}
-        if confirmed & set(row.location_tags or []):
-            row.location_tags = [tag for tag in row.location_tags if tag not in confirmed]
+        confirmed |= {SITE_GRADES_ADDED_PREFIX + age_group for age_group in wanted & site_added}
+        gone = site_hidden - wanted
+        cleaned = [tag for tag in tags if tag not in confirmed and site_hidden_band(tag) not in gone]
+        if cleaned != tags:
+            row.location_tags = cleaned
+        site_added -= wanted
         wanted = (wanted | site_added) - site_hidden
         existing = {shift.age_group: shift for shift in shifts}
         for age_group, shift in existing.items():

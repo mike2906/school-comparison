@@ -81,8 +81,8 @@ async def test_stage_adds_hides_and_undoes(db_session):
     )
     location = SchoolLocation(school=school, address_i18n={"bg": "ул. Градина 23"}, location_tags=[])
     location.age_group_shifts = [
-        SchoolLocationAgeGroupShift(age_group=band) for band in ("grade_1_4", "grade_5_7", "grade_8_12")
-    ]
+        SchoolLocationAgeGroupShift(age_group=band) for band in ("grade_1_4", "grade_5_7")
+    ] + [SchoolLocationAgeGroupShift(age_group="grade_8_12", shift="afternoon", has_organised_groups=True)]
     db_session.add(school)
     await db_session.commit()
     school_id = school.id
@@ -95,7 +95,7 @@ async def test_stage_adds_hides_and_undoes(db_session):
         await stage.run_site_grades(db_session, apply=True)
         assert await _bands(db_session, school_id) == (
             ["grade_1_4", "grade_5_7", "preschool"],
-            [SITE_GRADES_HIDDEN_PREFIX + "grade_8_12", SITE_GRADES_ADDED_PREFIX + "preschool"],
+            [SITE_GRADES_HIDDEN_PREFIX + "grade_8_12|shift=afternoon|groups=1", SITE_GRADES_ADDED_PREFIX + "preschool"],
         )
         # A second run has nothing to do.
         assert (await stage.run_site_grades(db_session, apply=True))["changes"] == []
@@ -104,6 +104,12 @@ async def test_stage_adds_hides_and_undoes(db_session):
     with patch.object(stage, "site_grades", return_value=(set(), None)):
         await stage.run_site_grades(db_session, apply=True)
     assert await _bands(db_session, school_id) == (["grade_1_4", "grade_5_7", "grade_8_12"], [])
+    restored = (
+        await db_session.execute(
+            select(SchoolLocationAgeGroupShift).where(SchoolLocationAgeGroupShift.age_group == "grade_8_12")
+        )
+    ).scalar_one()
+    assert (restored.shift, restored.has_organised_groups) == ("afternoon", True)  # as the register had it
 
 
 async def test_register_import_and_withholding_respect_the_site_bands(db_session):
@@ -133,7 +139,13 @@ async def test_register_import_and_withholding_respect_the_site_bands(db_session
     await db_session.commit()
     assert (await _bands(db_session, school_id))[0] == ["grade_1_4", "grade_8_12"]
 
+    # The register now states 1-4 itself: no longer the site's band, so a withhold keeps it.
+    incoming = DiscoveredLocation(address_i18n={"bg": "Панчарево"}, age_groups=["preschool", "grade_1_4", "grade_8_12"])
+    await RegistryAdapter(db=db_session)._sync_source_location(location, incoming)
+    await db_session.commit()
+    assert await _bands(db_session, school_id) == (["grade_1_4", "grade_8_12"], [SITE_GRADES_HIDDEN_PREFIX + "preschool"])
+
     # The website is withheld: its band goes, the hidden register band comes back.
     await remove_website_campus_data(db_session, school_id)
     await db_session.commit()
-    assert await _bands(db_session, school_id) == (["grade_8_12", "preschool"], [])
+    assert await _bands(db_session, school_id) == (["grade_1_4", "grade_8_12", "preschool"], [])
