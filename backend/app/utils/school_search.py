@@ -99,9 +99,10 @@ _LOOSE_RES = [(re.compile(pattern), repl) for pattern, repl in LOOSE_SPELLINGS]
 # Rank tiers (lower is better).
 RANK_ALIAS = 0
 RANK_NUMBER = 1
-RANK_PREFIX = 2
-RANK_CONTAINS = 3
-RANK_ADDRESS = 4
+RANK_PHRASE = 2  # the query's words in a row in the name: "Saint Sofia" = „Св. София“
+RANK_PREFIX = 3
+RANK_CONTAINS = 4
+RANK_ADDRESS = 5
 
 _NO_MARKER_RE = re.compile(r"(?<![a-z])no\.(?=\s*\d)")
 _NON_WORD_RE = re.compile(r"[\W_]+")
@@ -136,7 +137,7 @@ _ALIASES_LATIN = [
 
 
 class _Name:
-    __slots__ = ("norm", "latin", "loose", "words", "has_saint")
+    __slots__ = ("norm", "latin", "loose", "words", "has_saint", "word_rows")
 
     def __init__(self, value: object, *, saints: bool = True):
         self.norm = normalize(value)
@@ -144,6 +145,8 @@ class _Name:
         self.loose = _loose(self.latin)
         self.words = self.norm.split(" ") + self.latin.split(" ") + self.loose.split(" ")
         self.has_saint = saints and not SAINT_WORDS.isdisjoint(self.norm.split(" "))
+        # Each word as (Cyrillic or source, transliterated, loose); the three line up.
+        self.word_rows = list(zip(self.norm.split(" "), self.latin.split(" "), self.loose.split(" ")))
 
 
 def _loose(latin: str) -> str:
@@ -176,6 +179,25 @@ def _token_in(token: str, name: _Name, *, prefix: bool = False) -> bool:
     return token in name.norm or latin in name.latin or any(form in name.loose for form in looses)
 
 
+def _word_starts(token: str, row: tuple[str, str, str]) -> bool:
+    norm, latin_word, loose_word = row
+    latin = transliterate(token)
+    if latin in SAINT_WORDS:
+        return norm in SAINT_WORDS
+    if token.isdigit():
+        return norm == token
+    return norm.startswith(token) or latin_word.startswith(latin) or loose_word.startswith(_loose_forms(latin))
+
+
+def _is_phrase(tokens: list[str], name: _Name) -> bool:
+    """The query's words, in order, start consecutive words of the name."""
+    rows = name.word_rows
+    return any(
+        all(_word_starts(token, rows[start + i]) for i, token in enumerate(tokens))
+        for start in range(len(rows) - len(tokens) + 1)
+    )
+
+
 def _tokens_rank(tokens: list[str], names: list[_Name]) -> Optional[int]:
     best: Optional[int] = None
     first_number = next((token for token in tokens if token.isdigit()), None)
@@ -185,6 +207,8 @@ def _tokens_rank(tokens: list[str], names: list[_Name]) -> Optional[int]:
         name_number = _FIRST_NUMBER_RE.search(name.norm)
         if first_number is not None and name_number and name_number.group() == first_number:
             rank = RANK_NUMBER
+        elif _is_phrase(tokens, name):
+            rank = RANK_PHRASE
         elif all(_token_in(token, name, prefix=True) for token in tokens):
             rank = RANK_PREFIX
         else:

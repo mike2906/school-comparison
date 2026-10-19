@@ -78,6 +78,24 @@ describe('finding a school', () => {
     await page.locator(`a[href="/schools/${school.id}"]`).first().waitFor()
   })
 
+  test('a typed name sorts by best match first, and clearing it brings the old sort back', async () => {
+    // "Saint Sofia" once listed a seminary named after another saint first, sorted by distance.
+    const phrase = /(^|[\s„"])Свет[аи] София/i
+    const best = new Set((await allSchools()).filter(s => phrase.test(schoolName(s, 'bg'))).map(s => s.id))
+    assert.ok(best.size > 0, 'a school named „Света София“')
+    await open('bg', '/search?sort=type')
+    const sort = page.locator('#results-sort')
+    const box = page.getByPlaceholder(t('bg', 'nameSearch.placeholderShort')).filter({ visible: true }).first()
+    await box.fill('Saint Sofia')
+    await page.waitForURL(url => url.searchParams.get('q') === 'Saint Sofia')
+    await page.waitForFunction(() => document.querySelector('#results-sort')?.value === 'match')
+    const firstHref = await page.locator('a[href^="/schools/"]').first().getAttribute('href')
+    assert.ok(best.has(Number(firstHref.split('/').pop())), `first result ${firstHref} is a „Света София“`)
+    await box.fill('')
+    await page.waitForFunction(() => document.querySelector('#results-sort')?.value === 'type')
+    assert.equal(await sort.inputValue(), 'type')
+  })
+
   test("a private kindergarten's name keeps its type, as the school writes it", async () => {
     // '"Частна детска градина СОФИЯ" ЕООД' once showed as a bare "Sofia", which reads as
     // the city. A name the school's own website gives (a brand) may still drop the type.

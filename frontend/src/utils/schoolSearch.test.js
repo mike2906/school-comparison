@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { filterByName, schoolMatchesQuery } from './schoolSearch.js'
+import { MATCH_RANK, filterByName, schoolMatchRank, schoolMatchesQuery, sortByNameMatch } from './schoolSearch.js'
 
 const svetaSofia = {
   name_i18n: { bg: '"Частно основно училище Света София" ЕООД' },
@@ -36,4 +36,13 @@ test('a name no school matches here falls back to the schools the API found', ()
   assert.deepEqual(filterByName(schools, 'tatkovagradina', new Set()), [])
   // A name that matches here keeps the browser's own list.
   assert.deepEqual(filterByName(schools, 'ДГ №7', new Set([149])).map(s => s.id), [7])
+})
+
+test('"Saint Sofia" ranks „Света София“ above a saint school that only mentions Sofia', () => {
+  const seminary = { id: 1, name_i18n: { bg: 'Софийска духовна семинария „Св. Иван Рилски“' }, resolved_name_i18n: { en: 'Sofia Theological Seminary "St. Ivan Rilski"' } }
+  const school = { id: 2, ...svetaSofia }
+  assert.equal(schoolMatchRank(school, 'Saint Sofia'), MATCH_RANK.phrase)
+  assert.equal(schoolMatchRank(seminary, 'Saint Sofia'), MATCH_RANK.prefix)
+  // The seminary is "nearer" as a tie-break, but the better match still wins.
+  assert.deepEqual(sortByNameMatch([seminary, school], 'Saint Sofia', (a, b) => a.id - b.id).map(s => s.id), [2, 1])
 })
