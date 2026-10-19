@@ -210,6 +210,21 @@ describe('admission from a school page', () => {
     assert.ok(await cutoffs.locator('tbody tr').count() >= 1, `${classes.length} classes in the API`)
   })
 
+  test('the English page shows eighth-grade classes in English', async () => {
+    // Class names come from the RUO lists in Bulgarian; the translate step before each publish
+    // gives them English names (class_name_en).
+    const school = await findSchool(
+      'with translated 8th-grade classes',
+      () => true,
+      s => (s.admission_info?.cutoff_summary || []).some(row => row.stage === 'grade_8' && row.class_name_en),
+    )
+    await open('en', `/schools/${school.id}`)
+    const cutoffs = page.locator('section').filter({ has: page.getByRole('heading', { name: t('en', 'cutoffs.title') }) })
+    const row = school.admission_info.cutoff_summary.find(r => r.stage === 'grade_8' && r.class_name_en)
+    await cutoffs.getByText(row.class_name_en).first().waitFor()
+    assert.equal(await cutoffs.getByText(row.class_name, { exact: true }).count(), 0, 'not the Bulgarian class name')
+  })
+
   test('a first-grade catchment check names the right area for a real address', async () => {
     const school = await findSchool('with a first-grade catchment', () => true, s => schoolCatchmentIds(s).length > 0)
     const address = await addressIn(schoolCatchmentIds(school))

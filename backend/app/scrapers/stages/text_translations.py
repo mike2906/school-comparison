@@ -47,6 +47,7 @@ from app.utils.text_translations import (
     key,
     needs_translation,
     price_texts,
+    roman_numerals,
     stored,
 )
 
@@ -60,11 +61,6 @@ OUTPUT_TOKENS = 6000
 LIST_FIELDS = ("facilities", "special_programs", "activities_offered")
 _DIGITS_RE = re.compile(r"\d+")
 _CYRILLIC_RE = re.compile(r"[Ѐ-ӿ]")
-# Roman numerals up to the grades and instalments labels number (I to XII), also typed with a
-# Cyrillic І or Х. Not C or M: a lone "М" is mathematics in a class profile ("М и Инф").
-_CYRILLIC_ROMAN = str.maketrans({"І": "I", "Х": "X"})
-# Not a letter of an abbreviation either ("V.I.P.").
-_ROMAN_RE = re.compile(r"(?<![\wЀ-ӿ.])[IVX]+(?![\wЀ-ӿ]|\.[A-Za-zЀ-ӿ])")
 
 LANGUAGE_NAMES = {"en": "English", "bg": "Bulgarian"}
 
@@ -123,12 +119,6 @@ def checked(source: str, target: Optional[str], locale: str) -> Optional[str]:
     if sorted(roman_numerals(source)) != sorted(roman_numerals(target)):
         return None
     return target
-
-
-def roman_numerals(text: str) -> list[str]:
-    """The Roman numerals written as words ("вноска II", "ХI клас" with a Cyrillic Х), in Latin."""
-    latin = text.translate(_CYRILLIC_ROMAN)
-    return _ROMAN_RE.findall(latin)
 
 
 def shown_texts(school: School) -> dict[str, set[str]]:
