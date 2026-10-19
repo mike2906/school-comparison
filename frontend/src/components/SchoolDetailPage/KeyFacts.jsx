@@ -16,6 +16,8 @@ import {
 } from './helpers'
 import { normalizeLanguageFocus } from '../../utils/schoolAttributes'
 import { getMappableLocations } from './LocationMap'
+import { orderAgeGroups } from '../../utils/ageGroupOrder'
+import { useCountry } from '../../context/CountryContext'
 import { usesSofiaKindergartenSystem } from '../../utils/admission'
 import { openDayDate, openDaysLink, upcomingOpenDays } from '../../utils/schoolFacts'
 import { useSavedVerdicts } from '../../hooks/useSavedAdmission'
@@ -46,6 +48,7 @@ const listValue = (items) => items.map((item, index) => (
  */
 function KeyFacts({ school, examAverages, nvoExamType, ageGroup = null }) {
   const { t, i18n } = useTranslation()
+  const { config: countryConfig } = useCountry()
   const locale = intlLocale(i18n.language)
   const savedLocation = useMemo(readSavedLocation, [])
 
@@ -130,7 +133,8 @@ function KeyFacts({ school, examAverages, nvoExamType, ageGroup = null }) {
     )
   }
 
-  const ageGroups = getOfferedAgeGroups(locations)
+  // Youngest first, as in the locations list below.
+  const ageGroups = orderAgeGroups(getOfferedAgeGroups(locations), countryConfig)
   if (ageGroups.length > 0) {
     facts.grades = (
       <Fact

@@ -118,7 +118,7 @@ def test_resolve_name_i18n_strips_generic_german_school_prefix_for_english():
 
     assert resolved == {
         "bg": "Немска гимназия Ерих Кестнер",
-        "en": "Erih Kestner",
+        "en": "Erich Kästner",
     }
 
 

@@ -386,6 +386,56 @@ _EN_NAME_REPLACEMENTS = (
     (re.compile(r"\bSvet[ia](?= [A-Z])"), "St."),
     (re.compile(r"\bKiril i Metodiy\b"), "Cyril and Methodius"),
 )
+# Foreign patrons and names that a letter-by-letter transliteration of the Bulgarian
+# spelling mangles ("Хосе Марти" → "Hose Marti"): their own spelling in English.
+_FOREIGN_NAMES = (
+    ("Abraham Linkaln", "Abraham Lincoln"),
+    ("Adam Mitskevich", "Adam Mickiewicz"),
+    ("Albert Aynshtayn", "Albert Einstein"),
+    ("Alfons dyo Lamartin", "Alphonse de Lamartine"),
+    ("Arhimed", "Archimedes"),
+    ("Benito Huares", "Benito Juárez"),
+    ("Bratya Grim", "Brothers Grimm"),
+    ("Dzhani Rodari", "Gianni Rodari"),
+    ("Dzhon Atanasov", "John Atanasoff"),
+    ("Erih Kestner", "Erich Kästner"),
+    ("Frederik Zholio-Kyuri", "Frédéric Joliot-Curie"),
+    ("Graf Ignatiev", "Count Ignatiev"),
+    ("Hans Kristian Andersen", "Hans Christian Andersen"),
+    ("Henri Ford", "Henry Ford"),
+    ("Hose de San Martin", "José de San Martín"),
+    ("Hose Marti", "José Martí"),
+    ("Indira Gandi", "Indira Gandhi"),
+    ("Karlson", "Karlsson"),
+    ("Kristofar Robin", "Christopher Robin"),
+    ("Lui Brayl", "Louis Braille"),
+    ("Lui Pastyor", "Louis Pasteur"),
+    ("Luis Karol", "Lewis Carroll"),
+    ("Makgahan", "MacGahan"),
+    ("Maksim Gorki", "Maxim Gorky"),
+    ("Mayor Frank Tompsan", "Major Frank Thompson"),
+    ("Mihay Eminesku", "Mihai Eminescu"),
+    ("Miki Maus", "Mickey Mouse"),
+    ("Montesori", "Montessori"),
+    ("Pitagor", "Pythagoras"),
+    ("Ryorih", "Roerich"),
+    ("Sankt Peterburg", "Saint Petersburg"),
+    ("Saragosa", "Zaragoza"),
+    ("Sesar Vayeho", "César Vallejo"),
+    ("Sharl Pero", "Charles Perrault"),
+    ("Stiv Dzhobs", "Steve Jobs"),
+    ("Tomas Dzhefersan", "Thomas Jefferson"),
+    ("Tomas Edisan", "Thomas Edison"),
+    ("Uilyam Gladston", "William Gladstone"),
+    ("Uilyam Saroyan", "William Saroyan"),
+    ("Viktor Yugo", "Victor Hugo"),
+    ("Yan Amos Komenski", "Jan Amos Komenský"),
+)
+_FOREIGN_NAME_PATTERNS = tuple(
+    (re.compile(rf"(?<![\w-]){re.escape(translit)}(?![\w-])", flags=re.IGNORECASE), english)
+    for translit, english in _FOREIGN_NAMES
+)
+_EN_NAME_PATTERNS = _EN_NAME_REPLACEMENTS + _FOREIGN_NAME_PATTERNS
 _PHRASE_PATTERNS = tuple(
     (re.compile(rf"(?<![\w-]){re.escape(bg)}(?![\w-])", flags=re.IGNORECASE), en)
     for bg, en in sorted(_BG_TYPE_PHRASES, key=lambda item: -len(item[0]))
@@ -443,7 +493,7 @@ def translate_bg_school_name(name: str | None, *, source: str | None = None) -> 
     if ordinal_match:
         # "82. Основно училище" → "82nd Primary School"; "101 Защо" stays "101 Zashto".
         text = f"{ordinal if starts_with_type else ordinal_match.group(0).strip()} {text}"
-    for pattern, replacement in _EN_NAME_REPLACEMENTS:
+    for pattern, replacement in _EN_NAME_PATTERNS:
         text = pattern.sub(replacement, text)
     text = _english_quotes(text)
     text = re.sub(r"No\.\s+", "No. ", text)

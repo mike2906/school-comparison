@@ -27,6 +27,11 @@ test('schoolLevelLabel describes what is offered, not the stored category', () =
   assert.equal(schoolLevelLabel({ education_level: 'primary', locations: [] }, t), 'educationLevels.primary')
 })
 
+test('schoolLevelLabel calls a nursery-only place a nursery', () => {
+  assert.equal(schoolLevelLabel(school(['nursery'], 'kindergarten'), t), 'educationLevels.nursery')
+  assert.equal(schoolLevelLabel(school(['nursery', 'first'], 'kindergarten'), t), 'educationLevels.kindergarten')
+})
+
 test('schoolLevelLabel uses the country config for groups and grade numbers', () => {
   const config = {
     education_config: {
