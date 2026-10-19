@@ -149,3 +149,64 @@ async def test_register_import_and_withholding_respect_the_site_bands(db_session
     await remove_website_campus_data(db_session, school_id)
     await db_session.commit()
     assert await _bands(db_session, school_id) == (["grade_1_4", "grade_8_12", "preschool"], [])
+
+
+def test_site_grades_reads_the_published_english_age_group():
+    from app.schemas.pricing import PricingContextResponse
+
+    row = SimpleNamespace(
+        category="tuition", age_group="Детска градина", plan_name=None,
+        pricing_context=PricingContextResponse(age_group_en="Grade 9 – Grade 12"),
+    )
+    assert site_grades([row], None)[0] == {9, 10, 11, 12}
+
+
+async def test_a_website_band_is_not_hidden_as_the_registers_and_a_drifted_band_is_fixed(db_session):
+    from app.scrapers.campus_sync import AGE_GROUP_TAG_PREFIX
+
+    school = School(
+        country_code="bg", city="sofia", name_i18n={"bg": "ЕСПА"}, school_type="private",
+        education_level="upper_secondary", website_url="https://espa.bg/", scrape_status="navigated",
+    )
+    location = SchoolLocation(
+        school=school, address_i18n={"bg": "ул. Градина 23"}, location_tags=[AGE_GROUP_TAG_PREFIX + "preschool"]
+    )
+    location.age_group_shifts = [
+        SchoolLocationAgeGroupShift(age_group=band) for band in ("preschool", "grade_1_4", "grade_5_7", "grade_8_12")
+    ]
+    db_session.add(school)
+    await db_session.commit()
+    school_id = school.id
+
+    with patch.object(stage, "site_grades", return_value=({1, 7}, 4)):
+        # Highest grade 4: 5-7 is named, 8-12 is hidden; the website's preschool is not the register's to hide.
+        await stage.run_site_grades(db_session, apply=True)
+        bands, tags = await _bands(db_session, school_id)
+        assert bands == ["grade_1_4", "grade_5_7", "preschool"]
+        assert SITE_GRADES_HIDDEN_PREFIX + "grade_8_12" in tags
+
+        # Something puts 8-12 back while its hidden mark stays: the next run takes it away again.
+        db_session.add(SchoolLocationAgeGroupShift(location_id=location.id, age_group="grade_8_12"))
+        await db_session.commit()
+        db_session.expire_all()  # as a later run in a new process would load it
+        assert (await stage.run_site_grades(db_session, apply=True))["changes"]
+        assert (await _bands(db_session, school_id))[0] == ["grade_1_4", "grade_5_7", "preschool"]
+
+    # Withholding the site: the website's band goes and does not come back as the register's.
+    await remove_website_campus_data(db_session, school_id)
+    await db_session.commit()
+    assert await _bands(db_session, school_id) == (["grade_1_4", "grade_5_7", "grade_8_12"], [])
+
+
+async def test_re_reading_the_site_keeps_site_grades_bands(db_session):
+    school = School(
+        country_code="bg", city="sofia", name_i18n={"bg": "AAS"}, school_type="international",
+        education_level="upper_secondary", website_url="https://aas.bg/", scrape_status="navigated",
+    )
+    location = SchoolLocation(school=school, address_i18n={"bg": "Панчарево"}, location_tags=[SITE_GRADES_ADDED_PREFIX + "grade_1_4"])
+    location.age_group_shifts = [SchoolLocationAgeGroupShift(age_group=b) for b in ("grade_1_4", "grade_8_12")]
+    db_session.add(school)
+    await db_session.commit()
+    await remove_website_campus_data(db_session, school.id, keep_site_grades=True)
+    await db_session.commit()
+    assert await _bands(db_session, school.id) == (["grade_1_4", "grade_8_12"], [SITE_GRADES_ADDED_PREFIX + "grade_1_4"])

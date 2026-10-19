@@ -29,6 +29,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import School, SchoolLocationAgeGroupShift
 from app.scrapers.campus_sync import (
+    AGE_GROUP_TAG_PREFIX,
     SITE_GRADES_ADDED_PREFIX,
     SITE_GRADES_HIDDEN_PREFIX,
     site_hidden_band,
@@ -82,8 +83,9 @@ def site_grades(pricing: Iterable[Any], at_a_glance: Optional[dict[str, Any]]) -
     for row in pricing:
         if str(getattr(row.category, "value", row.category)) != "tuition":
             continue
-        context = row.pricing_context if isinstance(row.pricing_context, dict) else {}
-        for label in (row.age_group, row.plan_name, context.get("age_group_en")):
+        context = row.pricing_context
+        english = context.get("age_group_en") if isinstance(context, dict) else getattr(context, "age_group_en", None)
+        for label in (row.age_group, row.plan_name, english):
             named |= fee_label_grades(label)
     glance = at_a_glance or {}
     for admission in glance.get("admission") or []:
@@ -158,13 +160,17 @@ async def run_site_grades(
         tags = list(location.location_tags or [])
         added, hidden = _tagged(tags, SITE_GRADES_ADDED_PREFIX), set(site_hidden_bands(tags))
         current = {link.age_group for link in location.age_group_shifts}
-        register_bands = ((current - added) | hidden) & set(BANDS)
+        # Bands the website's campus data added are the site's claim, not the register's.
+        website = _tagged(tags, AGE_GROUP_TAG_PREFIX)
+        register_bands = ((current - added - website) | hidden) & set(BANDS)
         published = SchoolDetailResponse.model_validate(school)
         facts = published.school_facts
         glance = facts.at_a_glance.model_dump() if facts and facts.at_a_glance else None
         named, highest = site_grades(published.pricing, glance)
         add, hide = planned_bands(register_bands, named, highest)
-        if add == added and hide == hidden:
+        desired = (register_bands | add | website) - hide
+        # Tags alone can match while a band came back another way (a campus sync, an import).
+        if add == added and hide == hidden and desired == current & set(BANDS):
             continue
         change = {
             "school_id": school_id,
@@ -178,7 +184,6 @@ async def run_site_grades(
         changes.append(change)
         if not apply:
             continue
-        desired = (register_bands | add) - hide
         # A band hidden before keeps its mark; one hidden now records its shift and groups.
         hidden_tags = [tag for tag in tags if site_hidden_band(tag) in hide]
         hidden_tags += [site_hidden_tag(link) for link in location.age_group_shifts if link.age_group in hide - hidden]
