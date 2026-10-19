@@ -277,6 +277,7 @@ async def repair_websites_command(
                 update_db=True,
                 school_name=school_name_value,
                 school_aliases=aliases,
+                school_city=school.city,
             )
             if result.value == "valid":
                 validated_ids.append(target_school_id)

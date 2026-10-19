@@ -21,6 +21,8 @@ from pydantic import BaseModel
 from app.ai.client import calculate_cost, create_agent, extract_provider_cost_usd, get_model, get_usage
 from app.config import get_settings
 from app.scrapers.school_tokens import extract_school_name_tokens
+from app.scrapers.site_city import identity_texts as site_identity_texts
+from app.scrapers.site_city import other_town_named
 from app.services.provider_costs import execute_billable_request
 from app.utils.transliteration import transliterate_bulgarian
 from app.utils.website_data import WEBSITE_DATA_WITHHELD_KEY
@@ -180,15 +182,17 @@ class URLValidator:
         "english",
     }
 
-    def __init__(self, country_code: str = "bg", school_id: int | None = None):
+    def __init__(self, country_code: str = "bg", school_id: int | None = None, school_city: str | None = None):
         """
         Initialize the URL validator.
 
         Args:
             country_code: Country code for locale-specific keywords
+            school_city: The school's city code ("sofia"); a site naming another town fails
         """
         self.country_code = country_code
         self.school_id = school_id
+        self.school_city = school_city
         self.keywords = self._load_keywords(country_code)
         settings = get_settings()
         self.http_timeout = max(1.0, float(settings.url_validation_http_timeout_seconds))
@@ -487,6 +491,12 @@ class URLValidator:
             min_name_token_hits = 1
         directory_signals = self._count_directory_signals(final_url, text_content, soup)
         identity_mismatch = self._find_identity_mismatch(page_identity_labels, expected_names)
+        # The title, main headings and site name only: a site's other labels are its menu and
+        # links. A page read by the browser has none of those apart, so it is not checked
+        # (nor does the weekly site-city stage read it).
+        other_town = other_town_named(site_identity_texts(soup), self.school_city) if soup is not None else None
+        if other_town:
+            return ValidationResult.INVALID, None, f"Website names another town: {other_town}"
 
         if directory_signals >= 1 and name_tokens and name_token_hits < min_name_token_hits:
             if keyword_count >= 2 and name_token_hits > 0 and not identity_mismatch:
@@ -1085,6 +1095,7 @@ def _should_clear_website_derived_data(result: ValidationResult, reason: Optiona
         "website identity mismatch",
         "expected-school mismatch",
         "directory-like listing signals",
+        "website names another town",
     )
     return any(marker in lowered for marker in strong_markers)
 
@@ -1293,6 +1304,7 @@ async def validate_school_url(
     school_name: Optional[str] = None,
     school_aliases: Optional[list[str]] = None,
     usage_out: Optional[dict] = None,
+    school_city: Optional[str] = None,
 ) -> tuple[ValidationResult, Optional[str], Optional[str]]:
     """
     Validate a school's website URL and optionally update the database.
@@ -1305,6 +1317,7 @@ async def validate_school_url(
         country_code: Country code for locale-specific validation
         update_db: Whether to update SourcePage and School in the database
         school_name: Optional expected school name for official-site checks
+        school_city: The school's city code; a site whose title names another town fails
 
     Returns:
         Tuple of (result, final_url, reason)
@@ -1316,7 +1329,7 @@ async def validate_school_url(
         ...     country_code="bg",
         ... )
     """
-    validator = URLValidator(country_code=country_code, school_id=school_id)
+    validator = URLValidator(country_code=country_code, school_id=school_id, school_city=school_city)
     normalized_url = validator.normalize_url(url)
     result, final_url, reason = await validator.validate_url(
         url,

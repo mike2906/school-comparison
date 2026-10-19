@@ -483,6 +483,7 @@ class WebsiteDiscoverer:
                 update_db=True,
                 school_name=school_name,
                 school_aliases=extract_validation_aliases(school.attributes),
+                school_city=school.city,
             )
             await db.refresh(school)
             if validation_result == ValidationResult.VALID:
@@ -520,6 +521,7 @@ class WebsiteDiscoverer:
             update_db=True,
             school_name=school_name,
             school_aliases=extract_validation_aliases(school.attributes),
+            school_city=school.city,
         )
         await db.refresh(school)
 
@@ -567,6 +569,7 @@ class WebsiteDiscoverer:
                     update_db=True,
                     school_name=school_name,
                     school_aliases=extract_validation_aliases(school.attributes),
+                    school_city=school.city,
                 )
                 attempts += 1
                 await db.refresh(school)
