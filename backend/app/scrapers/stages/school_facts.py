@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import datetime
 import logging
+from collections import Counter
 from collections.abc import Awaitable, Callable, Sequence
 from typing import Any, Optional
 
@@ -176,6 +177,17 @@ async def read_school(school: School, pages: list[PageRead], call: Caller) -> di
     return report | {"outcome": outcome + (f", {len(report['carried'])} carried" if report["carried"] else "")}
 
 
+def stored_fact_pages(school: School) -> list[str]:
+    """The pages the stored key facts came from, then the others', most facts first.
+
+    Read every time, so a stored fact is carried over (or dropped) on its own page's current
+    text rather than lost because the picker chose other pages this run (514's /school-of-arts/)."""
+    stored = ((school.attributes or {}).get(ATTRIBUTE_KEY) or {}).get("facts") or []
+    rows = [row for row in stored if isinstance(row, dict) and row.get("source_url")]
+    counts = Counter((row.get("rank") != "key", row["source_url"]) for row in rows)
+    return list(dict.fromkeys(url for (_, url), _ in sorted(counts.items(), key=lambda item: (item[0][0], -item[1]))))
+
+
 def _carried(school: School, readable: list[tuple[str, str]], kept: list[Ranked]) -> list[Ranked]:
     """Stored facts whose quote is still on a page read, and not the quote of a new fact,
     with the grade they were stored with.
@@ -312,6 +324,7 @@ async def run_school_facts(
                         fallback_links=facts_rules.FALLBACK_LINK_RE,
                         stage=STAGE,
                         must_read=facts_rules.ADMISSION_LINK_RE,
+                        first_urls=stored_fact_pages(school),
                     )
 
                 async def one(school_db: AsyncSession, current_id: int) -> dict[str, Any]:

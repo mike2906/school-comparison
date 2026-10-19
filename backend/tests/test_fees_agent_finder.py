@@ -409,3 +409,22 @@ async def test_must_read_pages_come_on_top_of_the_fetch_cap(monkeypatch):
     read = await fees_agent.find_pages(crawler, None, _Client(), _school(), Spend(0.05), must_read=must)
     assert admission in [p.url for p in read]
     assert len(read) == fees_agent.MAX_FETCHES + 1
+
+
+async def test_first_urls_are_read_after_home_on_top_of_the_cap(monkeypatch):
+    arts = "https://meridian22.org/school-of-arts/"
+    others = [f"https://meridian22.org/p{n}/" for n in range(20)]
+    crawler = _Crawler({
+        HOME: [("Начало " + "x" * 300, [(url, "Страница") for url in others])],
+        **{url: [("Текст " + "x" * 300, [(u, "Страница") for u in others])] for url in [arts, *others]},
+    })  # fmt: skip
+
+    async def pick(school, read, links, spend, *args):
+        return [url for url, _ in links][:4]
+
+    monkeypatch.setattr(fees_agent, "_pick", pick)
+    read = await fees_agent.find_pages(
+        crawler, None, _Client(), _school(), Spend(0.05), first_urls=[arts, arts, "https://other.example/x"]
+    )
+    assert [p.url for p in read][:2] == [HOME, arts]
+    assert len(read) == fees_agent.MAX_FETCHES + 1

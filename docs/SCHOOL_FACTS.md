@@ -28,7 +28,10 @@ some picks were trivia, yearly counts go stale, the paragraph only restated the 
    curriculum, school day, admissions, clubs, transport, meals, support pages; testimonials
    are skipped. Up to 2 admissions links (`ADMISSION_LINK_RE`: прием, кандидатстване,
    priem, admission, enrol; not приемно време), this school year's first and no PDFs, are
-   always opened ahead of the picker's choices and on top of the 12-page limit: on 2026-10-14, 27 of
+   always opened ahead of the picker's choices and on top of the 12-page limit, and so are
+   the pages the stored facts came from (4 at most, key facts' first), so a refresh checks
+   each stored fact on its own page instead of losing it when the picker chooses other pages
+   (514 lost 3 key facts from /school-of-arts/ that way): on 2026-10-14, 27 of
    the 40 private Sofia schools with no admissions fact never had their admissions page
    read (172's picker took the pupils' testimonials over /kandidatstvane/).
 2. **Read.** One `pricing`-tier call lists up to 20 facts, each under one fixed topic

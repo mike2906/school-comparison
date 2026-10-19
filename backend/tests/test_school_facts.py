@@ -422,6 +422,22 @@ def test_the_judge_sees_the_heading_above_the_quote():
     assert "Above the quote" not in judge_message([(_fact("admissions", "Няма го"), HOME)], [(HOME, page)])
 
 
+def test_stored_fact_pages_put_key_pages_first():
+    from app.scrapers.stages.school_facts import stored_fact_pages
+
+    facts = [
+        {"source_url": "https://s.example/a", "rank": "more"},
+        {"source_url": "https://s.example/a", "rank": "more"},
+        {"source_url": "https://s.example/b", "rank": "key"},
+        {"source_url": "https://s.example/c", "rank": "key"},
+        {"source_url": "https://s.example/c", "rank": "key"},
+        {"rank": "key"},
+    ]
+    school = School(id=1, name_i18n={}, country_code="bg", attributes={"school_facts": {"facts": facts}})
+    assert stored_fact_pages(school) == ["https://s.example/c", "https://s.example/b", "https://s.example/a"]
+    assert stored_fact_pages(School(id=2, name_i18n={}, country_code="bg")) == []
+
+
 def test_admission_links_match_both_alphabets_and_k():
     from app.scrapers.extraction.school_facts import ADMISSION_LINK_RE
 

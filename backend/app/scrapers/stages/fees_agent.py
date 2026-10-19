@@ -91,6 +91,7 @@ MAX_HOPS = 3
 MAX_PICKS = 4
 MAX_FETCHES = 12
 MAX_MUST_READ = 2
+MAX_FIRST_URLS = 4
 MAX_LINKS_SHOWN = 150
 MAX_READ_CHARS = 120_000
 THIN_PAGE_CHARS = 300
@@ -296,6 +297,7 @@ async def find_pages(
     stage: str = STAGE,
     read_pictures: bool = False,
     must_read: Optional[re.Pattern] = None,
+    first_urls: Sequence[str] = (),
 ) -> list[PageRead]:
     """Up to 3 hops and 12 pages from the home page; robots.txt is respected.
 
@@ -303,7 +305,8 @@ async def find_pages(
     The school-facts stage passes its own link prompt, fallback keywords and stage name, and
     ``must_read``: links whose URL or text it matches are opened ahead of the picker's choices
     and on top of ``MAX_FETCHES`` (``MAX_MUST_READ`` in all), since the picker can fill its
-    places with other pages."""
+    places with other pages; and ``first_urls``, same-site pages read right after the home page,
+    also on top (``MAX_FIRST_URLS`` at most): the pages its stored facts came from."""
     from crawl4ai.utils import RobotsParser  # type: ignore
 
     robots = RobotsParser()
@@ -312,11 +315,12 @@ async def find_pages(
     read: list[PageRead] = []
     seen: set[tuple] = set()
     links: dict[str, str] = {}
-    queue = [site]
+    first = list(dict.fromkeys(url for url in first_urls if url and _same_site(url, site)))[:MAX_FIRST_URLS]
+    queue = [site, *first]
     pictures: list[tuple[str, str, str]] = []
     picture_pages: list[PageRead] = []  # read after the pages, so they take none of the page slots
     must_left = MAX_MUST_READ
-    must_taken = 0  # must-read pages come on top of MAX_FETCHES (514 lost its stored facts' page)
+    must_taken = len(first)  # these come on top of MAX_FETCHES (514 lost its stored facts' page)
 
     async def allowed(url: str) -> bool:
         return await robots.can_fetch(url, CRAWLER_USER_AGENT)
