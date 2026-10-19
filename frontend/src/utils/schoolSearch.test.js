@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { schoolMatchesQuery } from './schoolSearch.js'
+import { filterByName, schoolMatchesQuery } from './schoolSearch.js'
 
 const svetaSofia = {
   name_i18n: { bg: '"Частно основно училище Света София" ЕООД' },
@@ -24,4 +24,16 @@ test('a W in a Latin brand matches В (UWEKIND for Увекинд)', () => {
   const uvekind = { name_i18n: { bg: '"ЧАСТНО СРЕДНО УЧИЛИЩЕ УВЕКИНД" ООД' } }
   assert.equal(schoolMatchesQuery(uvekind, 'Uwekind'), true)
   assert.equal(schoolMatchesQuery({ name_i18n: { bg: 'ПГ гр. Ст. Загора София' } }, 'Saint Sofia'), false)
+})
+
+test('a name no school matches here falls back to the schools the API found', () => {
+  const schools = [
+    { id: 149, name_i18n: { bg: '"ЧАСТНА ДЕТСКА ГРАДИНА ТАТКОВА ГРАДИНА" ЕООД' } },
+    { id: 7, name_i18n: { bg: 'ДГ №7' } },
+  ]
+  // tatkovagradina.eu: the brand is only in the web address, which the API matches.
+  assert.deepEqual(filterByName(schools, 'tatkovagradina', new Set([149])).map(s => s.id), [149])
+  assert.deepEqual(filterByName(schools, 'tatkovagradina', new Set()), [])
+  // A name that matches here keeps the browser's own list.
+  assert.deepEqual(filterByName(schools, 'ДГ №7', new Set([149])).map(s => s.id), [7])
 })

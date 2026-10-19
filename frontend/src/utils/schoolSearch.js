@@ -166,3 +166,13 @@ export function schoolMatchesQuery(school, query) {
     return false
   })
 }
+
+/**
+ * Schools a name query keeps: those whose names match in the browser or, when none does,
+ * those the API's search found (`hits`, a set of ids), which knows more ways to write a
+ * name (a brand only in the web address).
+ */
+export function filterByName(schools, query, hits) {
+  const matched = schools.filter(school => schoolMatchesQuery(school, query))
+  return matched.length || !hits.size ? matched : schools.filter(school => hits.has(school.id))
+}
