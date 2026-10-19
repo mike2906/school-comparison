@@ -91,3 +91,8 @@ def test_a_sofia_city_school_with_only_the_town_code_gets_its_village():
     assert school_town({"moe_region_code": 22, "moe_town_code": 16448}) == "Горни Богров"
     assert school_town({"moe_region_code": 22, "moe_town_code": 68134}) is None
     assert school_town({"moe_region_code": 22, "moe_town_code": 99999}) is None
+    assert school_town({"moe_region_code": 22, "moe_town_name": "", "moe_town_code": 44063}) == "Лозен"
+    # A stored name wins; София-област codes are not Столична's.
+    assert school_town({"moe_region_code": 22, "moe_town_name": "Бистрица", "moe_town_code": 68134}) == "Бистрица"
+    assert school_town({"moe_region_code": 23, "moe_town_code": 16448}) is None
+    assert school_town({"moe_region_code": 22, "moe_town_code": True}) is None

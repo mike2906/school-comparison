@@ -87,13 +87,14 @@ def school_town(attributes: Mapping[str, Any] | None) -> str | None:
         region = int(region)
     except (TypeError, ValueError):
         return None
+    if region not in SOFIA_REGION_CODES:
+        return None
     town = attrs.get("moe_town_name")
-    if not isinstance(town, str) and region == 22:
-        try:
-            town = STOLICHNA_SETTLEMENTS.get(int(attrs.get("moe_town_code")))
-        except (TypeError, ValueError):
-            town = None
-    if region not in SOFIA_REGION_CODES or not isinstance(town, str):
+    if not (isinstance(town, str) and town.strip()):
+        code = attrs.get("moe_town_code")
+        valid_code = isinstance(code, int) and not isinstance(code, bool)
+        town = STOLICHNA_SETTLEMENTS.get(code) if region == 22 and valid_code else None
+    if not isinstance(town, str):
         return None
     town = " ".join(town.split())
     return town if town and town.casefold() != SOFIA.casefold() else None
