@@ -308,6 +308,7 @@
   "academicPerformance": {
     "title": "Academic Performance",
     "basedOnYears": "Data from {{start}} to {{end}}",
+    "basedOnYear": "Data from {{year}}",
     "yearAverage": "{{year}}-year average",
     "trend": "Trend",
     "dataFrom": "Data from",
@@ -1097,10 +1098,10 @@
     "intro": "The last child admitted in each ranking we have, from the official lists. A past result is a guide, not a promise.",
     "none": "We have no published rankings for this school yet.",
     "what": "Group or class",
-    "firstRound": "Earliest ranking",
+    "firstRound": "First ranking we have",
     "latestRound": "Latest ranking",
-    "everyone": "Everyone who applied",
-    "noPlaces": "No places",
+    "everyone": "Everyone admitted",
+    "noPlaces": "No free places",
     "points": "{{points}} points",
     "groupOnly": "Group {{group}}",
     "groupAndPoints": "Group {{group}}, {{points}} points",
@@ -1135,7 +1136,12 @@
     },
     "score": "{{score}} points",
     "groupNoPoints": "Group {{group}}, no extra points",
-    "currentRound": "later ranking for free places"
+    "currentRound": "later ranking for free places",
+    "legend": {
+      "current": "Later ranking for free places: a ranking after the main one, for the places still free. The official site no longer shows some main rankings, so the first ranking we have can be a later one.",
+      "everyone": "Everyone admitted: every child who applied got a place, so there was no cut-off.",
+      "noPlaces": "No free places: the ranking had no places for this group."
+    }
   },
   "driveTime": {
     "minutes": "~{{minutes}} min",
