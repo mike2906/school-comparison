@@ -56,16 +56,18 @@ placed_ids() { report "$1" '" ".join(f"--school-id {i}" for i in sorted({x["scho
 osm_check() {
 	local out="$state/pins-osm-$(date -u +%Y%m%dT%H%M%SZ).json" body="$state/osm-issue.md" title="Schools that disagree with OpenStreetMap"
 	local number digest
-	cli osm-check --city "$city" --out "$out" --issue-body "$body" || { log "osm-check failed"; return 0; }
-	digest="$(sha256sum < "$body")" || return 0
+	cli osm-check --city "$city" --out "$out" --issue-body "$body" || { log "osm-check failed"; return 1; }
+	# The school lines only: a change in how many schools OSM tags is not news.
+	digest="$(grep '^- ' "$body" | sha256sum)" || return 1
 	[ "$digest" != "$(cat "$state/osm_issue_digest" 2>/dev/null)" ] || return 0
-	# A failed lookup must not open a second issue: try again next week.
+	# A failed lookup must not open a second issue: try again next hour.
 	number="$(gh issue list -R "$repo" --state open --search "in:title \"$title\"" --json number -q '.[0].number')" ||
-		{ log "osm-check: gh issue list failed"; return 0; }
+		{ log "osm-check: gh issue list failed"; return 1; }
+	# The issue's text is replaced, not commented: it always shows the current list.
 	if [ -n "$number" ]; then
-		gh issue comment "$number" -R "$repo" --body-file "$body" > /dev/null || return 0
-	elif report "$out" 'r["results"] and 1 or ""' | grep -q 1; then
-		gh issue create -R "$repo" --title "$title" --body-file "$body" > /dev/null || return 0
+		gh issue edit "$number" -R "$repo" --body-file "$body" > /dev/null || { log "osm-check: gh issue edit failed"; return 1; }
+	elif grep -q '^- ' "$body"; then
+		gh issue create -R "$repo" --title "$title" --body-file "$body" > /dev/null || { log "osm-check: gh issue create failed"; return 1; }
 	fi
 	echo "$digest" > "$state/osm_issue_digest"
 	log "osm-check: $(head -n 1 "$body")"
@@ -76,6 +78,11 @@ exec 8>>"$state/refresh_pins.lock"
 flock -n 8 || exit 0
 cd "$repo_root/backend"
 cli() { uv run python -m app.scrapers.cli "$@" > /dev/null; }
+
+# A check due from a good weekly run whose pins are published; a failed one is retried hourly.
+if [ -f "$state/osm_due" ] && [ ! -f "$state/pins_unpublished" ]; then
+	osm_check && rm -f "$state/osm_due"
+fi
 
 # "unpublished" marks a run whose pins were written but not yet published: publish first.
 if [ ! -f "$state/pins_unpublished" ]; then
@@ -153,6 +160,5 @@ Review it, apply with \`--apply\` and publish. The pins themselves are published
 fi
 
 if [ -f "$state/osm_due" ] && [ ! -f "$state/pins_unpublished" ]; then
-	osm_check
-	rm -f "$state/osm_due"
+	osm_check && rm -f "$state/osm_due"
 fi

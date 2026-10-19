@@ -111,7 +111,7 @@ def test_issue_body_lists_each_school_with_a_link_and_credits_osm():
         "results": [{"school_id": 7, "name": "ДГ №97", "flags": [{"flag": "pin_far", "metres": 900}]}],
     }
     body = stage.issue_body(report)
-    assert "- [7](https://schooldecider.com/schools/7) ДГ №97: pin 900 m from OSM's" in body
+    assert "- [7](https://schooldecider.com/schools/7) `ДГ №97`: pin 900 m from OSM's" in body
     stranger = {"flag": "number_differs", "osm_names": ["ДГ №79 @someone [x](https://evil)"]}
     body = stage.issue_body({"checked": 1, "results": [{"school_id": 7, "name": "ДГ №97", "flags": [stranger]}]})
     assert "`ДГ №79 @someone [x](https://evil)`" in body
@@ -129,3 +129,18 @@ def test_website_tags_with_several_values_subdomains_or_typos_are_not_false_alar
     )
     assert stage.check_school("73 СУ", "https://sou73.bg", [PIN], [_feature(website="https://school.sou73.bg")]) == []
     assert stage.check_school("73 СУ", "https://sou73.bg", [PIN], [_feature(website="http://[sou73.bg")]) == []
+
+
+def test_each_pin_is_checked_when_osm_maps_as_many_buildings():
+    campus = (PIN[0] + 0.02, PIN[1])
+    wrong = (PIN[0] - 0.02, PIN[1])
+    both = [_feature(), _feature(lat=campus[0], lon=campus[1])]
+    assert [f["flag"] for f in stage.check_school("ЧСУ", None, [PIN, wrong], both)] == ["pin_far"]
+    assert stage.check_school("ЧСУ", None, [PIN, campus], both) == []
+    # OSM maps only the main building: a branch it lacks is not a wrong pin.
+    assert stage.check_school("ЧСУ", None, [PIN, campus], both[:1]) == []
+
+
+def test_a_shared_building_listing_several_codes_is_not_compared_by_name():
+    shared = _feature(code="2000300;2000301", name="ДГ №79")
+    assert stage.check_school("ДГ №97", None, [PIN], [shared]) == []

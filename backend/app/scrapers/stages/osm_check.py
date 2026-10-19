@@ -27,15 +27,14 @@ from app.scrapers.extraction.text_values import _canonical_host
 from app.scrapers.stages.website_pins import needs_pin
 from app.services.geocoding.bg.sofia_address_register import distance_m
 from app.services.geocoding.bounds import get_city_bounds
+from app.utils.i18n_resolver import resolve_name_i18n
+from app.utils.website_name import _PLATFORM_DOMAINS
 
 logger = logging.getLogger(__name__)
 
 NEISPUO_TAG = "ref:BG:neispuo"
 # Further than this from every OSM feature of the school: a wrong building, not a gate or wing.
 FAR_M = 300
-# Hosts that are not a school's own site: two schools' pages there say nothing about each other.
-_SHARED_HOSTS = ("facebook.com", "instagram.com", "google.com", "sites.google.com", "wixsite.com")
-
 _NUMBER_RE = re.compile(r"(?:^|№\s*)(\d{1,3})(?!\d)")
 
 
@@ -64,7 +63,8 @@ def _same_site(a: str, b: str) -> bool:
 
 
 def _is_shared(host: str) -> bool:
-    return any(host == shared or host.endswith("." + shared) for shared in _SHARED_HOSTS)
+    """A platform host (Facebook, Wix, Blogspot...): two schools' pages there say nothing about each other."""
+    return any(host == shared or host.endswith("." + shared) for shared in _PLATFORM_DOMAINS)
 
 
 def check_school(
@@ -81,9 +81,17 @@ def check_school(
         if (c := f.get("center") or f).get("lat") is not None and c.get("lon") is not None
     ]
     if points and osm_points:
-        nearest = min(distance_m(p, o) for p in points for o in osm_points)
-        if nearest > FAR_M:
-            flags.append({"flag": "pin_far", "metres": round(nearest), "osm_points": osm_points[:5]})
+        far = [min(distance_m(p, o) for o in osm_points) for p in points]
+        # Each of our pins is checked on its own when OSM maps as many buildings as we pin;
+        # with fewer, a branch OSM lacks would look wrong, so only all-far counts.
+        if len(osm_points) >= len(points):
+            far = [d for d in far if d > FAR_M]
+        elif min(far) <= FAR_M:
+            far = []
+        if far:
+            flags.append({"flag": "pin_far", "metres": round(max(far)), "osm_points": osm_points[:5]})
+    # A feature listing several codes (a shared building) names one of them: not compared.
+    features = [f for f in features if len(neispuo_codes(f.get("tags") or {})) == 1]
     ours = name_numbers(school_name)
     osm_names = {
         t.get(k) for f in features for t in [f.get("tags") or {}] for k in ("name", "official_name") if t.get(k)
@@ -116,11 +124,7 @@ async def read_osm(country: str = "bg", city: str = "sofia") -> list[dict]:
     if bounds is None:
         raise ValueError(f"no bounds for {country}/{city}")
     async with httpx.AsyncClient(headers={"User-Agent": CRAWLER_USER_AGENT}) as client:
-        city_osm = CityOsm(client, bounds)
-        elements = await city_osm(0.0, 0.0, radius=None)
-    if city_osm.failed:
-        raise RuntimeError(city_osm.failed)
-    return elements
+        return await CityOsm(client, bounds)._read()
 
 
 async def run_osm_check(
@@ -159,7 +163,7 @@ async def run_osm_check(
         if not features:
             continue
         checked += 1
-        name = (school.name_i18n or {}).get("bg")
+        name = resolve_name_i18n(school.name_i18n, school.attributes).get("bg")
         flags = check_school(name, school.website_url, pins.get(school.id, []), features)
         if flags:
             results.append({"school_id": school.id, "name": name, "flags": flags})
@@ -176,6 +180,9 @@ async def run_osm_check(
         "results": results,
     }
 
+
+# GitHub refuses an issue body over 65,536 characters; a line is up to ~400.
+MAX_LINES = 120
 
 _FLAG_WORDS = {
     "pin_far": lambda f: f"pin {f['metres']} m from OSM's",
@@ -197,8 +204,12 @@ def issue_body(report: dict[str, Any], site: str = "https://schooldecider.com") 
         "and never copy OSM's value as the fix (backend/app/scrapers/stages/osm_check.py).",
         "",
     ]
-    for result in report["results"]:
+    for result in report["results"][:MAX_LINES]:
         words = "; ".join(_FLAG_WORDS[f["flag"]](f) for f in result["flags"])
-        lines.append(f"- [{result['school_id']}]({site}/schools/{result['school_id']}) {result['name']}: {words}")
+        lines.append(
+            f"- [{result['school_id']}]({site}/schools/{result['school_id']}) {_plain(result['name'])}: {words}"
+        )
+    if len(report["results"]) > MAX_LINES:
+        lines.append(f"- ... and {len(report['results']) - MAX_LINES} more in the JSON report on the PC")
     lines += ["", "Map data © OpenStreetMap contributors, ODbL."]
     return "\n".join(lines)
