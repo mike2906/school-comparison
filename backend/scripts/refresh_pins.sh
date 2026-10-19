@@ -13,7 +13,8 @@
 # differ between runs), then publishes with publish_snapshot.sh. Before that publish it
 # dry-runs the catchment match; a change there opens an issue (the match is reviewed by
 # hand) but does not hold the pins back. A stop opens one GitHub issue, "Pin refresh
-# stopped"; a stopped run is retried a day later, a failed publish the next hour. Log and reports:
+# stopped"; a good weekly run also lists schools that disagree with OpenStreetMap in one rolling
+# issue (osm_check below). A stopped run is retried a day later, a failed publish the next hour. Log and reports:
 # $state/refresh_pins.log, $state/pins-*.json (kept a month); a pg_dump before each
 # apply (the last 4 kept) in $backups.
 set -euo pipefail
@@ -48,6 +49,24 @@ report() { python3 -c 'import json, sys; r = json.load(open(sys.argv[1])); print
 placed() { report "$1" 'r["outcomes"].get("placed", 0)'; }
 # --school-id flags for the schools a dry run placed: the apply writes no others.
 placed_ids() { report "$1" '" ".join(f"--school-id {i}" for i in sorted({x["school_id"] for x in r["results"] if x["outcome"] == "placed"}))'; }
+
+# Published pins, numbers and websites that disagree with OSM go to one rolling issue, updated
+# only when the list of schools changes. Free (one Overpass query); a failure is logged only.
+osm_check() {
+	local out="$state/pins-osm-$1.json" body="$state/osm-issue.md" title="Schools that disagree with OpenStreetMap"
+	cli osm-check --city "$city" --out "$out" --issue-body "$body" || { log "osm-check failed"; return 0; }
+	local ids number
+	ids="$(report "$out" '" ".join(str(x["school_id"]) for x in r["results"])')"
+	[ "$ids" != "$(cat "$state/osm_flagged" 2>/dev/null)" ] || return 0
+	number="$(gh issue list -R "$repo" --state open --search "in:title \"$title\"" --json number -q '.[0].number' 2>/dev/null || true)"
+	if [ -n "$number" ]; then
+		gh issue comment "$number" -R "$repo" --body-file "$body" > /dev/null || return 0
+	elif [ -n "$ids" ]; then
+		gh issue create -R "$repo" --title "$title" --body-file "$body" > /dev/null || return 0
+	fi
+	echo "$ids" > "$state/osm_flagged"
+	log "osm-check: flagged ${ids:-none}"
+}
 
 # One run at a time; a run still going when cron fires again is left to finish.
 exec 8>>"$state/refresh_pins.lock"
@@ -105,6 +124,7 @@ if [ ! -f "$state/pins_unpublished" ]; then
 			stop "the apply placed $website (website) and $agent (agent), over $max_placed: NOT published by this script, but the next publish by any script ships them. Check $state/pins-*-$stamp.json; restore $backup if wrong"
 		fi
 	fi
+	osm_check "$stamp"
 	find "$state" -name 'pins-*.json' -mtime +30 -delete
 	date -u +%s > "$state/pins_last_ok"
 fi
