@@ -6,7 +6,7 @@ import { fetchSchool, fetchExamAverages } from '../../api/schools'
 import { getSchoolName, getAddress, getSummary } from '../../utils/i18n'
 import { getOptionLabel, getStatusInfo, normalizeLanguageFocus, normalizeSchool } from '../../utils/schoolAttributes'
 import { getLastSearchUrl } from '../../utils/searchViewState'
-import { examTypeForAgeGroup } from '../../utils/nvo'
+import { examGradeLabel, examTypeForAgeGroup, prepareNvoTimelineData } from '../../utils/nvo'
 import {
   curatedRequirement,
   getAdmissionRequirement,
@@ -655,6 +655,9 @@ function SchoolDetailPage({ schoolId = null, embedded = false, onClose = null })
         {/* Academic Performance (NVO Results) */}
         {hasExamResults && (() => {
           const hasMultipleGrades = availableExamTypes.length > 1
+          // The heading names the exam and years the chart plots, which follow the tab.
+          const chartExamType = activeExamType || getExamTypeForEducationLevel(school.education_level)
+          const chartYears = prepareNvoTimelineData(school.exam_results, chartExamType).map(item => item.year)
 
           return (
             <div className="bg-white rounded-2xl shadow-card border border-neutral-200 p-6 md:p-8 mb-6">
@@ -664,11 +667,11 @@ function SchoolDetailPage({ schoolId = null, embedded = false, onClose = null })
                     {t('schools.academicPerformance')}
                   </h2>
                   <div className="text-sm text-neutral-500">
-                    {nvoDetail.gradeLabel}
-                    {nvoDetail.hasAverage && nvoDetail.minYear && nvoDetail.maxYear && (
+                    {examGradeLabel(chartExamType, t)}
+                    {chartYears.length > 1 && (
                       <> • {t('academicPerformance.basedOnYears', {
-                        start: nvoDetail.minYear,
-                        end: nvoDetail.maxYear
+                        start: chartYears[0],
+                        end: chartYears[chartYears.length - 1]
                       })}</>
                     )}
                   </div>

@@ -143,6 +143,10 @@ describe('admission from a school page', () => {
     const cutoffs = page.locator('section').filter({ has: page.getByRole('heading', { name: t('bg', 'cutoffs.title') }) })
     await cutoffs.locator('table').waitFor()
     assert.ok(await cutoffs.locator('tbody tr').count() > 0, 'a row per age group')
+    // A first column holding a later ranking says why, under the table.
+    if (school.admission_info.cutoff_summary.some(row => row.first?.round_kind === 'current')) {
+      await cutoffs.getByText(t('bg', 'cutoffs.legend.current')).waitFor()
+    }
     await page.getByRole('heading', { name: t('bg', 'admissionArea.districtTitle') }).waitFor()
 
     await cutoffs.getByRole('link', { name: t('bg', 'cutoffs.calculate') }).click()

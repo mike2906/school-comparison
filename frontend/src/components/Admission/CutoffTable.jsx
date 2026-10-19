@@ -70,6 +70,13 @@ function RoundCell({ round }) {
 function CutoffTable({ rows, isCurrentRules = () => null }) {
   const { t } = useTranslation()
   if (!rows || rows.length === 0) return null
+  // Explain the cells a parent can't read on their own, once each, only when they appear.
+  const shown = rows.flatMap(row => [row.first, showLatestRound(row) ? row.latest : null]).filter(Boolean)
+  const legend = [
+    shown.some(round => round.round_kind === 'current') && 'current',
+    shown.some(round => cutoffValue(round)?.kind === 'everyone') && 'everyone',
+    shown.some(round => cutoffValue(round)?.kind === 'noPlaces') && 'noPlaces',
+  ].filter(Boolean)
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-left text-sm">
@@ -83,7 +90,7 @@ function CutoffTable({ rows, isCurrentRules = () => null }) {
         <tbody className="divide-y divide-neutral-100">
           {rows.map(row => {
             const current = isCurrentRules(row)
-            const showLatest = row.rounds > 1 && row.latest?.round_id !== row.first?.round_id
+            const showLatest = showLatestRound(row)
             return (
               <tr key={[row.stage, row.age_group, row.birth_year, row.class_code, row.building].join('|')}>
                 <td className="px-2 py-2 align-top sm:px-3">
@@ -101,8 +108,17 @@ function CutoffTable({ rows, isCurrentRules = () => null }) {
           })}
         </tbody>
       </table>
+      {legend.length > 0 && (
+        <ul className="mt-2 space-y-1 px-2 text-xs text-neutral-500 sm:px-3">
+          {legend.map(key => <li key={key}>{t(`cutoffs.legend.${key}`)}</li>)}
+        </ul>
+      )}
     </div>
   )
+}
+
+function showLatestRound(row) {
+  return row.rounds > 1 && row.latest?.round_id !== row.first?.round_id
 }
 
 export default CutoffTable

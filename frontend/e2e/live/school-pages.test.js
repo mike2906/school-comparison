@@ -4,7 +4,7 @@
  * from its website (with open days), its Facebook and Instagram links, fees with their
  * payment plans, last year's fees left out once this year lists them again, fees for the
  * searched age first with the other ages folded away, comparing fees
- * side by side, and no pin for a school whose location is
+ * side by side, the exam heading naming the years its chart plots, and no pin for a school whose location is
  * only approximate (the page says the address is not on the map yet).
  */
 import assert from 'node:assert/strict'
@@ -12,6 +12,7 @@ import { describe, test } from 'node:test'
 
 import { planNameLabel } from '../../src/utils/priceLabels.js'
 import { rowAgeGroupKeys, splitRowsForAgeGroup } from '../../src/utils/priceRows.js'
+import { getAvailableExamTypes, prepareNvoTimelineData } from '../../src/utils/nvo.js'
 import { groupPricingByAcademicYear } from '../../src/utils/pricing.js'
 import { upcomingOpenDays } from '../../src/utils/schoolFacts.js'
 import { NoSchoolError, PHONE, address, allSchools, findSchool, open, page, schoolName, t, liveBrowser } from './live.js'
@@ -213,6 +214,19 @@ describe('a school page', () => {
     await page.getByRole('heading', { level: 1, name: t('bg', 'compare.title') }).waitFor()
     for (const school of pair) await page.getByText(schoolName(school, 'bg'), { exact: true }).first().waitFor()
     assert.match(await page.locator('body').innerText(), /EUR|€/)
+  })
+
+  test('the exam heading names the years its chart plots', async () => {
+    // One NVO exam, so the chart opens on it, and more years than the five-year average uses.
+    const school = await findSchool('with one NVO exam over six or more years', s => {
+      const types = getAvailableExamTypes(s.exam_results || [])
+      return types.length === 1 && prepareNvoTimelineData(s.exam_results, types[0]).length >= 6
+    })
+    const years = prepareNvoTimelineData(school.exam_results, getAvailableExamTypes(school.exam_results)[0]).map(item => item.year)
+    await open('bg', `/schools/${school.id}`)
+    await card(t('bg', 'schools.academicPerformance'))
+      .getByText(t('bg', 'academicPerformance.basedOnYears', { start: years[0], end: years[years.length - 1] }))
+      .waitFor()
   })
 
   test('a school with only an approximate location has no pin but keeps its address', async () => {
