@@ -89,3 +89,9 @@ test('the English page shows the fees agent English for website words (625: "п�
   const transport = { category: 'transport', plan_name: 'Превоз', pricing_context: { plan_name_en: 'Transport' } }
   assert.equal(planNameLabel(transport, t, 'en'), null)
 })
+
+test('the Bulgarian page shows the API translation of an English-only site\'s words', () => {
+  const fullDay = { category: 'tuition', plan_name: 'Full-day Program', pricing_context: { plan_name_bg: 'Целодневна програма' } }
+  assert.equal(planNameLabel(fullDay, t, 'bg'), 'Целодневна програма')
+  assert.equal(planNameLabel(fullDay, t, 'en'), 'Full-day Program')
+})

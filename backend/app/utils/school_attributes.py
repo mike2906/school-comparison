@@ -44,6 +44,8 @@ from app.utils.facility_vocabulary import (
 from app.utils.list_translations import translate_items
 from app.utils.school_facts import LANGUAGE_LEVELS as FACT_LANGUAGE_LEVELS
 from app.utils.school_facts import PUBLISHED_KEY, TAG_GROUPS
+from app.utils.text_translations import stored as stored_translations
+from app.utils.text_translations import translate_list
 
 DISPLAY_LOCALES: tuple[str, ...] = ("bg", "en")
 
@@ -391,8 +393,9 @@ def build_localized_attributes(
     Fields flagged by the current validation report (P1.7) are emitted empty so a
     validator-rejected value never reaches the browser. ``school_type`` decides the
     language of instruction (see ``app.utils.display_lists``). ``translate`` applies the
-    list glossary (``app.utils.list_translations``); filters read the untranslated items,
-    so a translation never changes a school's filter tags.
+    list glossary (``app.utils.list_translations``), then the school's stored translations
+    (``app.utils.text_translations``); filters read the untranslated items, so a
+    translation never changes a school's filter tags.
     """
     attrs = _as_mapping(attributes)
     extracted = _localized_extracted(attrs, locale)
@@ -484,9 +487,13 @@ def build_localized_attributes(
             for value in values
             if (text := publishable_display_text(value)) is not None
         ]
+    translations = stored_translations(attrs) if translate else None
     for field in ("facilities", "special_programs", "activities_offered"):
         kept = [text for text in resolved[field] if not is_list_noise(text, field)]
-        resolved[field] = _dedupe_strings(translate_items(kept, locale) if translate else kept)
+        if translate:
+            # The curated glossary first, then the translate-texts stage's translations.
+            kept = translate_list(translate_items(kept, locale), locale, translations)
+        resolved[field] = _dedupe_strings(kept)
     return resolved
 
 

@@ -630,6 +630,49 @@ def website_name_command(school_ids, city, country, school_types, limit, max_usd
         console.print(f"Report: {report_path}")
 
 
+@cli.command("translate-texts")
+@click.option("--school-id", "school_ids", type=int, multiple=True, help="Run these schools (repeatable)")
+@click.option("--city", default=None, help="Only schools in this city")
+@click.option("--country", default="bg", show_default=True, help="Country code")
+@click.option("--max-usd", type=float, default=0.20, show_default=True, help="Spend cap for the run")
+@click.option("--apply", "apply_changes", is_flag=True, help="Store translations (default is a dry run that writes nothing)")
+@click.option(
+    "--plan", "plan_only", is_flag=True,
+    help="Only say whether --apply would change anything (exit 10 if so); no model call",
+)
+@click.option("--out", "report_path", type=click.Path(dir_okay=False, path_type=Path), help="Write the JSON report")
+def translate_texts_command(school_ids, city, country, max_usd, apply_changes, plan_only, report_path):
+    """Translate the fee names, class names and list items pages show in the other language."""
+    import json
+
+    from app.database import async_session_maker
+    from app.scrapers.stages import text_translations as text_translations_stage
+
+    async def _run():
+        async with async_session_maker() as db:
+            return await text_translations_stage.run_text_translations(
+                db, country=country, city=city, school_ids=school_ids, max_usd=max_usd, apply=apply_changes,
+                plan=plan_only,
+            )
+
+    report = asyncio.run(_run())
+    if plan_only:
+        console.print(f"Plan: {report['schools_to_change']} schools to change, to ask {report['asked']}")
+        raise SystemExit(10 if report["schools_to_change"] else 0)
+    mode = "Applied" if apply_changes else "Dry run"
+    console.print(
+        f"{mode}: {report['schools']} schools, {report['schools_changed']} changed, asked {report['asked']}, "
+        f"translated {report['translated']}, ${report['spent_usd']:.4f}"
+    )
+    if report_path is not None:
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        report_path.write_text(json.dumps(report, ensure_ascii=False, indent=1, default=str), encoding="utf-8")
+        console.print(f"Report: {report_path}")
+    if report["stopped"]:
+        console.print(f"[yellow]{report['stopped']}[/yellow]")
+        raise SystemExit(1)
+
+
 @cli.command("confirm-pins")
 @click.option("--school-id", "school_ids", type=int, multiple=True, help="Run these schools (repeatable)")
 @click.option("--city", default="sofia", show_default=True, help="City (only Sofia has the bounds and town name yet)")

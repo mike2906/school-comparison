@@ -13,8 +13,9 @@
 #         '<write> && PUBLISH_LOCK_HELD=1 backend/scripts/publish_snapshot.sh'
 #
 # The lock is released only once the deploy run has finished (or after two hours).
-# Before uploading, it compares the school list with the live one and stops if many
-# schools would lose something they show now (cli publish-diff).
+# Before uploading, it translates new website and register text (cli translate-texts) and
+# compares the school list with the live one, stopping if many schools would lose something
+# they show now (cli publish-diff).
 # Prints the dump name, the run URL and its summary; exits non-zero if the run fails.
 # Check the live API afterwards (skills/common-tasks/SKILL.md, Publish data to production).
 set -euo pipefail
@@ -40,6 +41,30 @@ if [ -z "${PUBLISH_LOCK_HELD:-}" ]; then
 	flock -w 3600 9 || die "another publish held the lock for an hour"
 fi
 
+# Translate the website and register text the pages would show in the other language
+# (cli translate-texts: fee names, 8th-grade class names, list items). It calls the model only
+# for text no school has a translation for yet, and writes only when something changes, after
+# a local pg_dump (usually nothing changes: no dump, no call). A failure only leaves that text
+# as written, so the publish goes ahead.
+translate() { (cd "$repo_root/backend" && uv run python -m app.scrapers.cli translate-texts "$@") >&2; }
+rc=0
+translate --plan || rc=$?
+if [ "$rc" = 10 ]; then
+	backups="${TRANSLATE_BACKUPS:-$HOME/backups}"
+	backup="$backups/${BACKUP_DATABASE:-sofia_schools}-pre-translate-$(date -u +%Y%m%dT%H%M%SZ).dump"
+	# Keep the last five; usually a run writes nothing, so there is no dump.
+	ls -1t "$backups"/*-pre-translate-*.dump 2>/dev/null | tail -n +6 | xargs -r rm -f || true
+	if mkdir -p "$backups" && docker exec "${BACKUP_DB_CONTAINER:-sofia_schools_db}" pg_dump -U postgres -d "${BACKUP_DATABASE:-sofia_schools}" \
+		--format=custom > "$backup" && [ -s "$backup" ]; then
+		echo "publish: backup $backup" >&2
+		translate --apply || echo "publish: translate-texts failed; the new text shows as written" >&2
+	else
+		rm -f "$backup"
+		echo "publish: pg_dump failed; translations skipped, the new text shows as written" >&2
+	fi
+elif [ "$rc" != 0 ]; then
+	echo "publish: translate-texts --plan failed (exit $rc); the new text shows as written" >&2
+fi
 # Stop a publish that would take away what many schools show now (publish_diff.py), and
 # say so in one rolling issue. When the live list can't be read (exit 75) the publish goes
 # ahead, since it may be the fix; any other failure, such as a launch DB the list can't be

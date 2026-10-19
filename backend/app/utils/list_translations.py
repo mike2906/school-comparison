@@ -3,9 +3,10 @@
 Most school websites list these in Bulgarian only (a few in English only), so the other
 locale's page fell back to the untranslated items (site review 2026-10-12, H). The
 translations live in ``list_translations.json`` (``bg_to_en`` and ``en_to_bg``, keyed by
-the item as served). An item without an entry is shown as it is, so a re-scrape that
-brings new wording degrades to the old fallback until the file is refreshed with
-``scripts/list_untranslated_items.py``.
+the item as served). An item without an entry goes to the ``translate-texts`` stage, which
+translates it before the next publish (``app.utils.text_translations``); this file stays as
+the curated layer that wins over the stage. ``scripts/list_untranslated_items.py`` lists
+what neither covers.
 """
 
 from __future__ import annotations

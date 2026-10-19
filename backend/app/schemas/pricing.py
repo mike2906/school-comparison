@@ -28,9 +28,12 @@ class PricingContextResponse(BaseModel):
     discounts: list[str] = Field(default_factory=list)
     installments: list[str] = Field(default_factory=list)
     payment_options: list[PaymentOptionResponse] = Field(default_factory=list)
-    # The fees agent's English for the site's plan name and age group (shown on the English page).
+    # The site's plan name and age group in the other language: the fees agent's English, else
+    # the translate-texts stage's (``app.utils.text_translations``); Bulgarian for an English site.
     plan_name_en: Optional[str] = None
     age_group_en: Optional[str] = None
+    plan_name_bg: Optional[str] = None
+    age_group_bg: Optional[str] = None
     includes: list[str] = Field(default_factory=list)
     excludes: list[str] = Field(default_factory=list)
 

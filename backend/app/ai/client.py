@@ -40,6 +40,9 @@ MODEL_TIERS = {
     # schools (2026-10-16) Sonnet flagged all 9 with real problems and 1 of 4 clean ones;
     # Haiku missed 2 and flagged 3 clean ones.
     "fee_check": "anthropic/claude-sonnet-5-5",
+    # Translating the fee names, class names and list items a page shows as the website
+    # wrote them (stages/text_translations.py): short labels, on the Max plan's API credit.
+    "translation": "anthropic/claude-haiku-5-5",
 }
 
 # Cost per 1M tokens (input/output), verified against OpenRouter 2026-07-13.
@@ -49,6 +52,7 @@ MODEL_COSTS = {
     "pricing": (0.10, 0.50),  # OpenRouter, 2026-10-09
     "vision": (2.00, 10.00),  # OpenRouter, 2026-10-09
     "fee_check": (2.00, 10.00),  # Sonnet 5.5, if the tier is pointed at OpenRouter
+    "translation": (0.10, 0.50),  # Haiku 5.5, if the tier is pointed at OpenRouter
 }
 
 # Anthropic's API reports tokens, not a cost, so a tier routed there needs its model's
@@ -89,7 +93,7 @@ ANTHROPIC_THINKING_PROFILES = {
     ),
 }
 
-ModelTier = Literal["cheap", "capable", "pricing", "vision", "fee_check"]
+ModelTier = Literal["cheap", "capable", "pricing", "vision", "fee_check", "translation"]
 
 
 def get_model(tier: ModelTier) -> str:

@@ -1,11 +1,16 @@
+import i18next from 'i18next'
 import { useTranslation } from 'react-i18next'
 import { cutoffValue, formatRankingDay, shortCampaign } from '../../admission/calculator'
 import { formatAmount } from '../../utils/format'
 
-export function rowLabel(row, t) {
+export function rowLabel(row, t, language = i18next.language) {
+  // The ministry's class and building names are Bulgarian; the API adds English ones it has.
+  const english = String(language || '').startsWith('en')
+  const className = (english && row.class_name_en) || row.class_name
+  const building = (english && row.building_en) || row.building
   // An 8th-grade class by its name; the ministry's code only when it has none.
   const what = row.stage === 'grade_8'
-    ? `${t('cutoffs.stage.grade_8')}: ${[row.class_name, row.class_code && (row.class_name ? `(${row.class_code})` : row.class_code)].filter(Boolean).join(' ')}`
+    ? `${t('cutoffs.stage.grade_8')}: ${[className, row.class_code && (className ? `(${row.class_code})` : row.class_code)].filter(Boolean).join(' ')}`
     : row.stage === 'grade_1'
       ? t('cutoffs.stage.grade_1')
       : row.stage === 'preparatory'
@@ -13,7 +18,7 @@ export function rowLabel(row, t) {
         : t(`ageGroups.${row.age_group}`, { defaultValue: row.age_group || '' })
   // A nursery ranks two birth years separately, so each year is its own row.
   const born = row.birth_year && row.stage !== 'grade_8' ? t('cutoffs.bornIn', { year: row.birth_year }) : null
-  return [what, born, row.building].filter(Boolean).join(' · ')
+  return [what, born, building].filter(Boolean).join(' · ')
 }
 
 export function CutoffValue({ round }) {
