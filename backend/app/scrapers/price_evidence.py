@@ -345,9 +345,12 @@ PERIOD_KEYWORDS: dict[str, re.Pattern[str]] = {
 _DEPOSIT_RE = re.compile(r"депозит|\bdeposit")
 # One installment of a fee ("I вноска", "1-ва вноска", "first installment"), not the fee
 # itself. A bare number is not an ordinal: "за 1 вноска" is the fee paid in one go.
+# After the word, a numeral names the installment ("вноска II", "вноска №1", "Installment 2")
+# unless it starts an amount ("вноска 1500 лв").
 _INSTALLMENT_RE = re.compile(
     r"\b(?:[ivx]+|\d+\s*-?(?:ва|ра|ма|та)|първа|втора|трета)\s+вноска\b"
     r"|\b(?:first|second|third|\d+(?:st|nd|rd|th))\s+installment\b"
+    r"|\b(?:вноска|installment)\s*(?:[ivx]+\b|№\s*\d+|\d\b(?![\s\d.,]*\d)(?!\s*(?:лв|eur|€|евро)))"
 )
 # Nursery wording the shared-site vocabulary leaves out ("ясла" alone).
 _NURSERY_RE = re.compile(r"\bясл[аи]\b|яслен")

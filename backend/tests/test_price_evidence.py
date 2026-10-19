@@ -358,6 +358,11 @@ def test_period_conflict_and_the_yearly_one_time_overlap():
         ("First installment: €3,975", None, True),
         ("Стандартна такса: за 1 вноска: €3975", "YEARLY", False),
         ("Плащане I вноска - 3975€", "MONTHLY", False),  # a monthly installment may stand
+        ("Вноска II - 3975€", "YEARLY", True),
+        ("Такса вноска №1: 3975 €", None, True),
+        ("Installment 2: €3,975", "YEARLY", True),
+        ("Годишна такса на вноска 3975 €", "YEARLY", False),  # an amount, not a numbered installment
+        ("Месечна вноска 3975 €", "YEARLY", False),
     ],
 )
 def test_installment_filed_as_tuition(line, period, trips):

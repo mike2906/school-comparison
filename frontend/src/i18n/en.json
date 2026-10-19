@@ -237,6 +237,8 @@
   "pricing": {
     "title": "Pricing",
     "tuition": "Tuition",
+    "totalFees": "Total fees",
+    "noMainFee": "The school's website does not state its main fee. The fees below are extras only.",
     "food": "Food",
     "transport": "Transport",
     "activities": "Activities",

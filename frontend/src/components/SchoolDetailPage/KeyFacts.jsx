@@ -109,7 +109,7 @@ function KeyFacts({ school, examAverages, nvoExamType, ageGroup = null }) {
     facts.tuition = (
       <Fact
         key="tuition"
-        label={t('pricing.tuition')}
+        label={t(tuition.total ? 'pricing.totalFees' : 'pricing.tuition')}
         value={priceText(tuition)}
         detail={[tuition.period ? null : t('pricing.periodNotStated'), yearDetail].filter(Boolean).join(' · ')}
         note={currentYear}
