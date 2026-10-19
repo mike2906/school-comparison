@@ -33,9 +33,11 @@ PRICE_FIELDS = ("plan_name", "age_group")
 CUTOFF_LISTS = ("cutoffs", "cutoff_summary")
 
 _LATIN_RE = re.compile(r"[A-Za-z]")
-_CYRILLIC_RE = re.compile(r"[Ѐ-ӿ]")
-# Roman numerals ("VIII - XII клас") are in no language.
-_ROMAN_WORD_RE = re.compile(r"(?<![\wЀ-ӿ])[IVXІХ]+(?![\wЀ-ӿ])")
+# Roman numerals up to the grades and instalments labels number (I to XII), also typed with a
+# Cyrillic І or Х. Not C or M: a lone "М" is mathematics in a class profile ("М и Инф"). Not a
+# letter of an abbreviation either ("V.I.P.").
+_CYRILLIC_ROMAN = str.maketrans({"І": "I", "Х": "X"})
+_ROMAN_RE = re.compile(r"(?<![\wЀ-ӿ.])[IVX]+(?![\wЀ-ӿ]|\.[A-Za-zЀ-ӿ])")
 
 
 def key(text: Any) -> str:
@@ -43,17 +45,22 @@ def key(text: Any) -> str:
 
 
 def needs_translation(text: Any, locale: str) -> bool:
-    """True when ``text`` is in the other language: any Cyrillic for the English page (a
-    half-translated "foreign language обучение" too), Latin letters and no Cyrillic majority
-    for the Bulgarian one. Roman numerals count as neither."""
-    value = _ROMAN_WORD_RE.sub(" ", key(text))
-    if not value.strip():
+    """True when ``text`` is in the other language: mostly Cyrillic for the English page,
+    Latin letters and no Cyrillic majority for the Bulgarian one. Latin Roman numerals
+    ("VIII - XII клас") are in no language."""
+    value = key(_ROMAN_RE.sub(" ", key(text)))
+    if not value:
         return False
     if locale == "en":
-        return bool(_CYRILLIC_RE.search(value))
+        return is_bulgarian(value)
     if locale == "bg":
         return bool(_LATIN_RE.search(value)) and not is_bulgarian(value)
     return False
+
+
+def roman_numerals(text: str) -> list[str]:
+    """The Roman numerals written as words ("вноска II", "ХI клас" with a Cyrillic Х), in Latin."""
+    return _ROMAN_RE.findall(text.translate(_CYRILLIC_ROMAN))
 
 
 def stored(attributes: Any) -> dict[str, dict[str, Optional[str]]]:

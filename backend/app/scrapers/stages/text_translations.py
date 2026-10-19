@@ -36,7 +36,7 @@ from app.scrapers.stages import common as stage_common
 from app.scrapers.stages.fees_agent import Spend, SpendCapReached
 from app.services.pipeline_runs import finalize_pipeline_run, start_pipeline_run
 from app.services.provider_costs import ProviderCostError, execute_billable_request, provider_cost_scope
-from app.utils.list_translations import translate_items
+from app.utils.list_translations import is_untranslated
 from app.utils.school_attributes import build_localized_attributes
 from app.utils.school_facts import publication_attributes
 from app.utils.text_translations import (
@@ -47,6 +47,7 @@ from app.utils.text_translations import (
     key,
     needs_translation,
     price_texts,
+    roman_numerals,
     stored,
 )
 
@@ -60,11 +61,6 @@ OUTPUT_TOKENS = 6000
 LIST_FIELDS = ("facilities", "special_programs", "activities_offered")
 _DIGITS_RE = re.compile(r"\d+")
 _CYRILLIC_RE = re.compile(r"[Ѐ-ӿ]")
-# Roman numerals up to the grades and instalments labels number (I to XII), also typed with a
-# Cyrillic І or Х. Not C or M: a lone "М" is mathematics in a class profile ("М и Инф").
-_CYRILLIC_ROMAN = str.maketrans({"І": "I", "Х": "X"})
-# Not a letter of an abbreviation either ("V.I.P.").
-_ROMAN_RE = re.compile(r"(?<![\wЀ-ӿ.])[IVX]+(?![\wЀ-ӿ]|\.[A-Za-zЀ-ӿ])")
 
 LANGUAGE_NAMES = {"en": "English", "bg": "Bulgarian"}
 
@@ -125,12 +121,6 @@ def checked(source: str, target: Optional[str], locale: str) -> Optional[str]:
     return target
 
 
-def roman_numerals(text: str) -> list[str]:
-    """The Roman numerals written as words ("вноска II", "ХI клас" with a Cyrillic Х), in Latin."""
-    latin = text.translate(_CYRILLIC_ROMAN)
-    return _ROMAN_RE.findall(latin)
-
-
 def shown_texts(school: School) -> dict[str, set[str]]:
     """The school's shown texts in the other language, by the locale they need."""
     out: dict[str, set[str]] = {locale: set() for locale in LOCALES}
@@ -145,7 +135,7 @@ def shown_texts(school: School) -> dict[str, set[str]]:
             out[locale].update(
                 key(item)
                 for item in localized.get(field) or []
-                if needs_translation(item, locale) and translate_items([item], locale) == [item]
+                if needs_translation(item, locale) and is_untranslated(item, locale)
             )
     return out
 

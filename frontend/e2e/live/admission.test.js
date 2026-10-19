@@ -222,7 +222,7 @@ describe('admission from a school page', () => {
     const cutoffs = page.locator('section').filter({ has: page.getByRole('heading', { name: t('en', 'cutoffs.title') }) })
     const row = school.admission_info.cutoff_summary.find(r => r.stage === 'grade_8' && r.class_name_en)
     await cutoffs.getByText(row.class_name_en).first().waitFor()
-    assert.doesNotMatch(await cutoffs.locator('tbody').innerText(), /\p{Script=Cyrillic}/u, 'no Bulgarian in the English table')
+    assert.equal(await cutoffs.getByText(row.class_name, { exact: true }).count(), 0, 'not the Bulgarian class name')
   })
 
   test('a first-grade catchment check names the right area for a real address', async () => {

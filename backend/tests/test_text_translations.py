@@ -276,8 +276,7 @@ async def test_a_fee_row_the_api_withholds_is_not_translated(db_session):
     assert INSTALMENT not in asked and ENGLISH_PLAN in asked
 
 
-def test_a_half_translated_text_needs_english_and_roman_numerals_are_in_no_language():
-    assert needs_translation("foreign language обучение", "en")
+def test_latin_roman_numerals_are_in_no_language():
     assert not needs_translation("VIII - XII клас", "bg") and needs_translation("VIII - XII клас", "en")
     assert not needs_translation("XII", "en") and not needs_translation("XII", "bg")
-    assert needs_translation("Grade XII", "bg")
+    assert needs_translation("Grade XII", "bg") and needs_translation("ХI клас", "en")
