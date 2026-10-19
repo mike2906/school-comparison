@@ -116,6 +116,12 @@ PATH=/home/mike2906/.local/bin:/usr/local/bin:/usr/bin:/bin
 25 * * * * bash /home/mike2906/sofiaschoolcomparison/backend/scripts/refresh_pins.sh
 ```
 
+Each good weekly run also runs `osm-check` (free, one Overpass query, writes nothing): schools
+OSM tags with their MoE code (`ref:BG:neispuo`, about 3 in 4 in Sofia) whose published pin is
+over 300 m from OSM's, whose school number differs, or whose website differs go to one rolling
+issue "Schools that disagree with OpenStreetMap", after the week's pins are published, with its text replaced only when the list changes. Each is a
+lead: fix from the school's site or an official source, never by copying OSM (ODbL).
+
 A new city needs its write bounds and its local name in `website_pins.CITY_NAMES`, then
 one supervised run before the cron takes it (`PINS_CITY`).
 

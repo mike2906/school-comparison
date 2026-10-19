@@ -13,7 +13,8 @@
 # differ between runs), then publishes with publish_snapshot.sh. Before that publish it
 # dry-runs the catchment match; a change there opens an issue (the match is reviewed by
 # hand) but does not hold the pins back. A stop opens one GitHub issue, "Pin refresh
-# stopped"; a stopped run is retried a day later, a failed publish the next hour. Log and reports:
+# stopped"; a good weekly run also lists schools that disagree with OpenStreetMap in one rolling
+# issue (osm_check below). A stopped run is retried a day later, a failed publish the next hour. Log and reports:
 # $state/refresh_pins.log, $state/pins-*.json (kept a month); a pg_dump before each
 # apply (the last 4 kept) in $backups.
 set -euo pipefail
@@ -49,11 +50,39 @@ placed() { report "$1" 'r["outcomes"].get("placed", 0)'; }
 # --school-id flags for the schools a dry run placed: the apply writes no others.
 placed_ids() { report "$1" '" ".join(f"--school-id {i}" for i in sorted({x["school_id"] for x in r["results"] if x["outcome"] == "placed"}))'; }
 
+# Published pins, numbers and websites that disagree with OSM go to one rolling issue, updated
+# only when its text changes. Free (one Overpass query); a failure is logged only. Runs once
+# the week's pins are published, so it compares what the site shows.
+osm_check() {
+	local out="$state/pins-osm-$(date -u +%Y%m%dT%H%M%SZ).json" body="$state/osm-issue.md" title="Schools that disagree with OpenStreetMap"
+	local number digest
+	cli osm-check --city "$city" --out "$out" --issue-body "$body" || { log "osm-check failed"; return 1; }
+	# The school lines only: a change in how many schools OSM tags is not news.
+	digest="$(grep '^- ' "$body" | sha256sum)" || return 1
+	[ "$digest" != "$(cat "$state/osm_issue_digest" 2>/dev/null)" ] || return 0
+	# A failed lookup must not open a second issue: try again next hour.
+	number="$(gh issue list -R "$repo" --state open --search "in:title \"$title\"" --json number -q '.[0].number')" ||
+		{ log "osm-check: gh issue list failed"; return 1; }
+	# The issue's text is replaced, not commented: it always shows the current list.
+	if [ -n "$number" ]; then
+		gh issue edit "$number" -R "$repo" --body-file "$body" > /dev/null || { log "osm-check: gh issue edit failed"; return 1; }
+	elif grep -q '^- ' "$body"; then
+		gh issue create -R "$repo" --title "$title" --body-file "$body" > /dev/null || { log "osm-check: gh issue create failed"; return 1; }
+	fi
+	echo "$digest" > "$state/osm_issue_digest"
+	log "osm-check: $(head -n 1 "$body")"
+}
+
 # One run at a time; a run still going when cron fires again is left to finish.
 exec 8>>"$state/refresh_pins.lock"
 flock -n 8 || exit 0
 cd "$repo_root/backend"
 cli() { uv run python -m app.scrapers.cli "$@" > /dev/null; }
+
+# A check due from a good weekly run whose pins are published; a failed one is retried hourly.
+if [ -f "$state/osm_due" ] && [ ! -f "$state/pins_unpublished" ]; then
+	osm_check && rm -f "$state/osm_due"
+fi
 
 # "unpublished" marks a run whose pins were written but not yet published: publish first.
 if [ ! -f "$state/pins_unpublished" ]; then
@@ -105,6 +134,7 @@ if [ ! -f "$state/pins_unpublished" ]; then
 			stop "the apply placed $website (website) and $agent (agent), over $max_placed: NOT published by this script, but the next publish by any script ships them. Check $state/pins-*-$stamp.json; restore $backup if wrong"
 		fi
 	fi
+	touch "$state/osm_due"
 	find "$state" -name 'pins-*.json' -mtime +30 -delete
 	date -u +%s > "$state/pins_last_ok"
 fi
@@ -127,4 +157,8 @@ Review it, apply with \`--apply\` and publish. The pins themselves are published
 	"$repo_root/backend/scripts/publish_snapshot.sh" || stop "publish failed (pins stored, not published; the next run retries)"
 	rm -f "$state/pins_unpublished"
 	log "published"
+fi
+
+if [ -f "$state/osm_due" ] && [ ! -f "$state/pins_unpublished" ]; then
+	osm_check && rm -f "$state/osm_due"
 fi

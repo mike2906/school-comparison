@@ -807,6 +807,33 @@ def pin_agent_command(school_ids, city, country, limit, max_usd, apply_changes, 
         console.print(f"Report: {report_path}")
 
 
+@cli.command("osm-check")
+@click.option("--city", default="sofia", show_default=True, help="City (only Sofia has bounds yet)")
+@click.option("--country", default="bg", show_default=True, help="Country code")
+@click.option("--out", "report_path", type=click.Path(dir_okay=False, path_type=Path), help="Write the JSON report")
+@click.option("--issue-body", "issue_path", type=click.Path(dir_okay=False, path_type=Path), help="Write the GitHub issue text")
+def osm_check_command(city, country, report_path, issue_path):
+    """List schools whose pin, number or website disagrees with OpenStreetMap (writes nothing)."""
+    import json
+
+    from app.database import async_session_maker
+    from app.scrapers.stages import osm_check
+
+    async def _run():
+        elements = await osm_check.read_osm(country, city)
+        async with async_session_maker() as db:
+            return await osm_check.run_osm_check(db, elements, country=country, city=city)
+
+    report = asyncio.run(_run())
+    console.print(f"Checked {report['checked']} of {report['schools']} schools against OSM: flags {report['flags']}")
+    if issue_path is not None:
+        issue_path.write_text(osm_check.issue_body(report), encoding="utf-8")
+    if report_path is not None:
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        report_path.write_text(json.dumps(report, ensure_ascii=False, indent=1, default=str), encoding="utf-8")
+        console.print(f"Report: {report_path}")
+
+
 @cli.command("promote-curated-identities")
 @click.option(
     "--school-id",
