@@ -29,6 +29,9 @@ from app.ai.client import create_agent, extract_provider_cost_usd, get_model, ge
 from app.config import get_settings
 from app.models import School
 from app.models.pipeline_run import PipelineRun
+from app.models.pricing import Pricing
+from app.models.source_page import SourcePage
+from app.schemas.school import SchoolPricingMixin
 from app.scrapers.stages import common as stage_common
 from app.scrapers.stages.fees_agent import Spend, SpendCapReached
 from app.services.pipeline_runs import finalize_pipeline_run, start_pipeline_run
@@ -57,6 +60,10 @@ OUTPUT_TOKENS = 6000
 LIST_FIELDS = ("facilities", "special_programs", "activities_offered")
 _DIGITS_RE = re.compile(r"\d+")
 _CYRILLIC_RE = re.compile(r"[Ѐ-ӿ]")
+# Roman numerals up to the grades and instalments labels number (I to XII), also typed with a
+# Cyrillic І or Х. Not C or M: a lone "М" is mathematics in a class profile ("М и Инф").
+_CYRILLIC_ROMAN = str.maketrans({"І": "I", "Х": "X"})
+_ROMAN_RE = re.compile(r"(?<![\wЀ-ӿ])[IVX]+(?![\wЀ-ӿ])")
 
 LANGUAGE_NAMES = {"en": "English", "bg": "Bulgarian"}
 
@@ -112,13 +119,21 @@ def checked(source: str, target: Optional[str], locale: str) -> Optional[str]:
         return None
     if sorted(_DIGITS_RE.findall(source)) != sorted(_DIGITS_RE.findall(target)):
         return None
+    if sorted(roman_numerals(source)) != sorted(roman_numerals(target)):
+        return None
     return target
+
+
+def roman_numerals(text: str) -> list[str]:
+    """The Roman numerals written as words ("вноска II", "ХI клас" with a Cyrillic Х), in Latin."""
+    latin = text.translate(_CYRILLIC_ROMAN)
+    return _ROMAN_RE.findall(latin)
 
 
 def shown_texts(school: School) -> dict[str, set[str]]:
     """The school's shown texts in the other language, by the locale they need."""
     out: dict[str, set[str]] = {locale: set() for locale in LOCALES}
-    for row in school.pricing or []:
+    for row in published_price_rows(school):
         for locale, texts in price_texts(row).items():
             out[locale].update(texts)
     out["en"].update(cutoff_texts(school.admission_info))
@@ -132,6 +147,15 @@ def shown_texts(school: School) -> dict[str, set[str]]:
                 if needs_translation(item, locale) and is_untranslated(item, locale)
             )
     return out
+
+
+def published_price_rows(school: School) -> list[Any]:
+    """The school's fee rows the API publishes, through the response's own gates."""
+    projection = SchoolPricingMixin.model_validate(
+        {"attributes": school.attributes, "scrape_status": school.scrape_status, "pricing": list(school.pricing or [])}
+    )
+    shown = {row.id for row in projection.pricing}
+    return [row for row in school.pricing or [] if row.id in shown]
 
 
 def model_caller(spend: Spend) -> Caller:
@@ -188,6 +212,7 @@ async def run_text_translations(
     school_ids: Sequence[int] = (),
     max_usd: float = DEFAULT_MAX_USD,
     apply: bool = False,
+    plan: bool = False,
     call: Optional[Caller] = None,
 ) -> dict[str, Any]:
     """Translate what the schools' pages show in the other language; returns the report.
@@ -195,7 +220,10 @@ async def run_text_translations(
     Each school keeps exactly the translations its page needs now: new texts are added and
     texts it no longer shows are dropped. Texts the model was asked for and gave nothing
     usable for are stored as null, so they are not asked again."""
-    query = select(School).where(School.country_code == country).options(selectinload(School.pricing))
+    # The fee gate reads the linked page's validity, as the API's query loads it.
+    query = select(School).where(School.country_code == country).options(
+        selectinload(School.pricing).selectinload(Pricing.source_page).load_only(SourcePage.id, SourcePage.is_valid)
+    )
     if school_ids:
         query = query.where(School.id.in_(list(school_ids)))
     if city:
@@ -207,11 +235,24 @@ async def run_text_translations(
     known: dict[str, dict[str, Optional[str]]] = {locale: {} for locale in LOCALES}
     for translations in have.values():
         for locale in LOCALES:
-            known[locale].update(translations[locale])
+            for text, value in translations[locale].items():
+                # A usable translation another school has wins over a stored failure.
+                if known[locale].get(text) is None:
+                    known[locale][text] = value
     asked = {
         locale: sorted({text for texts in needed.values() for text in texts[locale]} - set(known[locale]))
         for locale in LOCALES
     }
+
+    if plan:
+        # What an --apply run would change, without asking the model or writing anything.
+        pending = sum(
+            1
+            for school in schools
+            if any(set(needed[school.id][locale]) != set(have[school.id][locale]) for locale in LOCALES)
+        )
+        return {"plan": True, "schools": len(schools), "schools_to_change": pending,
+                "asked": {locale: len(asked[locale]) for locale in LOCALES}}
 
     spend = Spend(max_usd)
     call = call or model_caller(spend)

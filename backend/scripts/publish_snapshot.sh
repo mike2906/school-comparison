@@ -43,10 +43,27 @@ fi
 
 # Translate the website and register text the pages would show in the other language
 # (cli translate-texts: fee names, 8th-grade class names, list items). It calls the model only
-# for text no school has a translation for yet. A failure only leaves that text as written,
-# so the publish goes ahead.
-(cd "$repo_root/backend" && uv run python -m app.scrapers.cli translate-texts --apply) >&2 \
-	|| echo "publish: translate-texts failed; the new text shows as written" >&2
+# for text no school has a translation for yet, and writes only when something changes, after
+# a local pg_dump (usually nothing changes: no dump, no call). A failure only leaves that text
+# as written, so the publish goes ahead.
+translate() { (cd "$repo_root/backend" && uv run python -m app.scrapers.cli translate-texts "$@") >&2; }
+rc=0
+translate --plan || rc=$?
+if [ "$rc" = 10 ]; then
+	backups="${TRANSLATE_BACKUPS:-$HOME/backups}"
+	backup="$backups/${BACKUP_DATABASE:-sofia_schools}-pre-translate-$(date -u +%Y%m%dT%H%M%SZ).dump"
+	mkdir -p "$backups"
+	if docker exec "${BACKUP_DB_CONTAINER:-sofia_schools_db}" pg_dump -U postgres -d "${BACKUP_DATABASE:-sofia_schools}" \
+		--format=custom > "$backup" && [ -s "$backup" ]; then
+		echo "publish: backup $backup" >&2
+		translate --apply || echo "publish: translate-texts failed; the new text shows as written" >&2
+	else
+		rm -f "$backup"
+		echo "publish: pg_dump failed; translations skipped, the new text shows as written" >&2
+	fi
+elif [ "$rc" != 0 ]; then
+	echo "publish: translate-texts --plan failed (exit $rc); the new text shows as written" >&2
+fi
 # Stop a publish that would take away what many schools show now (publish_diff.py), and
 # say so in one rolling issue. When the live list can't be read (exit 75) the publish goes
 # ahead, since it may be the fix; any other failure, such as a launch DB the list can't be

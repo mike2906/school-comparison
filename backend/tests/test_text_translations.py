@@ -194,3 +194,45 @@ async def test_a_mismatched_batch_is_asked_again_and_a_failed_language_does_not_
     assert "en: run stopped: provider down" in report["stopped"]
     # What was stored before stays.
     assert stored(school.attributes)["bg"] == {ENGLISH_PLAN: "Целодневна програма"}
+
+
+def test_checked_keeps_roman_numerals():
+    assert stage.checked(INSTALMENT, "Instalment III, by 15.11.26", "en") is None
+    assert stage.checked("ХI клас", "Grade XI", "en") == "Grade XI"  # a Cyrillic Х
+    # A lone "М" is mathematics, not a numeral.
+    assert stage.checked(CLASS_NAME, ANSWERS[CLASS_NAME], "en") == ANSWERS[CLASS_NAME]
+
+
+@pytest.mark.asyncio
+async def test_plan_says_what_apply_would_change_without_a_call(db_session):
+    school = await _priced_school(db_session)
+    call = _caller()
+    report = await stage.run_text_translations(db_session, school_ids=[school.id], call=call, plan=True)
+    assert report["schools_to_change"] == 1 and call.calls == []
+    await stage.run_text_translations(db_session, school_ids=[school.id], call=_caller(), apply=True)
+    report = await stage.run_text_translations(db_session, school_ids=[school.id], call=call, plan=True)
+    assert report["schools_to_change"] == 0
+
+
+@pytest.mark.asyncio
+async def test_a_usable_translation_wins_over_another_schools_stored_failure(db_session):
+    first = await _priced_school(db_session)
+    await stage.run_text_translations(db_session, school_ids=[first.id], call=_caller(), apply=True)
+    second = await _priced_school(db_session, name_i18n={"bg": "Частно училище Второ"})
+    await stage.run_text_translations(db_session, school_ids=[second.id], call=_caller({}), apply=True)
+    assert stored(second.attributes)["en"][INSTALMENT] is None
+
+    await stage.run_text_translations(db_session, call=_caller({}), apply=True)
+    assert stored(first.attributes)["en"][INSTALMENT] == "Instalment II, by 15.11.26"
+    assert stored(second.attributes)["en"][INSTALMENT] == "Instalment II, by 15.11.26"
+
+
+@pytest.mark.asyncio
+async def test_a_fee_row_the_api_withholds_is_not_translated(db_session):
+    school = await _priced_school(db_session)
+    hidden = next(row for row in (await db_session.run_sync(lambda _: school.pricing)) if row.plan_name == INSTALMENT)
+    hidden.source_url = None  # the row gate withholds a fee with no source
+    await db_session.commit()
+    call = _caller()
+    await stage.run_text_translations(db_session, school_ids=[school.id], call=call)
+    assert all(INSTALMENT not in texts for _, texts in call.calls)
