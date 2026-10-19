@@ -877,6 +877,22 @@ def osm_check_command(city, country, report_path, issue_path):
         console.print(f"Report: {report_path}")
 
 
+@cli.command("check-website")
+@click.option("--school-id", type=int, required=True, help="School ID")
+@click.option("--url", required=True, help="The site to check, e.g. one search does not find")
+@click.option("--country", default="bg", show_default=True, help="Country code")
+@click.option("--apply", "apply_changes", is_flag=True, help="Store the site if it is valid (default writes nothing)")
+def check_website_command(school_id, url, country, apply_changes):
+    """Validate a given site for a school with the usual checks; with --apply a valid one is stored."""
+    from app.database import async_session_maker
+
+    async def _run():
+        async with async_session_maker() as db:
+            return await website_stage.run_validate_url(db, school_id, country, url=url, apply=apply_changes)
+
+    asyncio.run(_run())
+
+
 @cli.command("site-city")
 @click.option("--school-id", "school_ids", type=int, multiple=True, help="Check these schools (repeatable)")
 @click.option("--city", default="sofia", show_default=True, help="City")

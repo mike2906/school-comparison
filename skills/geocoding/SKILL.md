@@ -125,7 +125,9 @@ lead: fix from the school's site or an official source, never by copying OSM (OD
 The weekly run also runs `site-city` (free, no model): an accepted website whose home page
 title, main heading or site name names another town ("гр.Варна" on a Sofia school's site,
 2026-10-19) takes the URL-validation failure path, so its data leaves the site with that
-run's publish and `recover-failed-urls` looks for the real site. More than `SITE_CITY_MAX`
+run's publish and `recover-failed-urls` looks for the real site. When search does not find it,
+`cli check-website --school-id N --url <site>` runs the same checks on a site you know (dry
+run; `--apply` stores it only if valid). More than `SITE_CITY_MAX`
 (3) at once withholds none and opens the issue "Website town check stopped"; the pins go
 ahead either way. URL validation applies the same rule to new sites
 (`app/scrapers/site_city.py`).

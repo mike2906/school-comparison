@@ -462,12 +462,22 @@ async def run_discover_websites_batch(db, country: str, city: str, limit: Option
     )
 
 
-async def run_validate_url(db, school_id: int, country: str):
-    """Run URL validation for a single school."""
+async def run_validate_url(db, school_id: int, country: str, url: Optional[str] = None, apply: bool = True):
+    """Run URL validation for a single school.
+
+    With ``url``, validate that site instead of the stored one (a school's real site that
+    search does not find, 256's ou115.com): the same checks decide, and only a valid
+    site is stored. ``apply=False`` reports the verdict and writes nothing."""
     from sqlalchemy import select
 
     from app.models import School
-    from app.scrapers.url_validator import extract_validation_aliases, validate_school_url
+    from app.scrapers.url_validator import (
+        URLValidator,
+        ValidationResult,
+        _update_validation_result,
+        extract_validation_aliases,
+        validate_school_url,
+    )
 
     result = await db.execute(select(School).where(School.id == school_id))
     school = result.scalar_one_or_none()
@@ -475,20 +485,35 @@ async def run_validate_url(db, school_id: int, country: str):
     if not school:
         raise ValueError(f"School {school_id} not found")
 
-    if not school.website_url:
+    given = url is not None
+    url = url or school.website_url
+    if not url:
         console.print(f"[yellow]School {school_id} has no website URL[/yellow]")
-        return
+        return None
+    # A site given by hand is for a school with no accepted site (failed validation,
+    # none found): it then starts the pipeline from "validated" like a found one.
+    if given and apply and school.scrape_status not in ("pending", "failed_validate", "no_official_website"):
+        console.print(f"[yellow]School {school_id} already has a site ({school.scrape_status}); not changed[/yellow]")
+        return None
 
-    console.print(f"  Validating: {school.website_url}")
+    console.print(f"  Validating: {url}")
 
+    # A given site is stored only when valid: a wrong guess writes nothing.
     validation_result, final_url, reason = await validate_school_url(
         school_id=school_id,
-        url=school.website_url,
+        url=url,
         country_code=country,
-        update_db=True,
+        update_db=apply and not given,
         school_name=(school.name_i18n or {}).get("bg") or (school.name_i18n or {}).get("en"),
         school_aliases=extract_validation_aliases(school.attributes),
         school_city=school.city,
     )
 
+    stored = apply and given and validation_result is ValidationResult.VALID
+    if stored:
+        source_url = URLValidator(country_code=country).normalize_url(url) or url
+        await _update_validation_result(school_id, source_url, validation_result, final_url or source_url, reason)
     console.print(f"  Result: {validation_result.value} - {reason}")
+    if given:
+        console.print("  Stored." if stored else "  Not stored" + ("." if apply else " (dry run; --apply stores a valid site)."))
+    return validation_result, final_url, reason
