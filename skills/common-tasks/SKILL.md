@@ -113,6 +113,13 @@ A green run alone is not proof: verify the data. Details and the manual fallback
 Who may publish, and what to report, is in `skills/github-process/SKILL.md` → Launch DB and
 publishing. A publish whose diff you cannot explain goes to Mike.
 
+## Searches that found nothing
+
+The search page counts name searches that found no school (text and daily count only, kept
+90 days) in the production database's `telemetry` schema, which publishes keep. Nothing
+reads them back over the API yet: a typed name can be personal, so how to read them is
+Mike's call. `backend/app/services/search_misses.py` says what is kept and why.
+
 ## Data-quality scoreboard
 ```bash
 cd backend

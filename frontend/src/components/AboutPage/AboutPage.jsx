@@ -17,7 +17,7 @@ const SOURCES = [
   { key: 'maps', href: 'https://www.openstreetmap.org/copyright' },
 ]
 
-const PRIVACY = ['account', 'browser', 'calculator', 'lookups', 'hosting', 'contact']
+const PRIVACY = ['account', 'browser', 'calculator', 'lookups', 'searches', 'hosting', 'contact']
 
 /** Where the data comes from and how to read it: the main trust signal for parents. */
 function AboutPage() {

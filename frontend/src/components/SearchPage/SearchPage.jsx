@@ -21,6 +21,7 @@ import SchoolMap from '../Map/SchoolMap'
 import { SavedAdmissionBanner } from '../Admission/SavedVerdict'
 import { useHiddenBelow } from '../../hooks/useSavedAdmission'
 import { useSearchHits } from '../../hooks/useSearchHits'
+import { useReportSearchMiss } from '../../hooks/useReportSearchMiss'
 import SchoolCard from '../SchoolCard/SchoolCard'
 import SchoolCardSkeleton from '../SchoolCard/SchoolCardSkeleton'
 import SchoolDetailPanel from './SchoolDetailPanel'
@@ -623,6 +624,7 @@ function SearchPage() {
     [schoolsWithDrive, nameQuery]
   )
   const searchHits = useSearchHits(nameQuery, !nameMatchesHere)
+  useReportSearchMiss(nameQuery, !nameMatchesHere)
   const matchingSchools = useMemo(() => {
     return filterByName(schoolsWithDrive, nameQuery, searchHits).filter(school => (
       !distanceLimit || (typeof school.distance === 'number' && school.distance <= distanceLimit)
