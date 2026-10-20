@@ -11,7 +11,7 @@ from app.models import School
 from app.scrapers.extraction.school_facts import Fact, Facts, Graded, LanguageLabel, judge_message, quote_on_page
 from app.scrapers.stages import school_facts as stage
 from app.scrapers.stages.fees_agent import PageRead
-from app.utils.school_facts import publishable_school_facts
+from app.utils.school_facts import _labels, publishable_school_facts
 
 HOME = "https://school.example/"
 ABOUT = "https://school.example/about"
@@ -345,6 +345,24 @@ def test_a_read_listing_every_language_replaces_the_old_extractions(languages_re
     attrs = {"extracted": {"languages": ["Russian"]}, PUBLISHED_KEY: published}
     focus = build_localized_attributes(attrs, "en", "private")["language_focus"]
     assert sorted(entry["language"] for entry in focus) == shown
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Russian or another foreign language can also be studied if parents are interested.",
+        "Additional Russian or another foreign language available on parental interest",
+        "Spanish is offered at parents' request",
+    ],
+)
+def test_a_language_offered_only_on_request_is_not_labelled(text):
+    fact = _fact_row(topic="languages", text_i18n={"bg": "x", "en": text}, languages=[{"language": "Russian"}])
+    assert _labels(fact)["languages"] == []
+
+
+def test_a_taught_language_keeps_its_label():
+    fact = _fact_row(topic="languages", text_i18n={"bg": "x", "en": "Russian is taught from grade 5"}, languages=[{"language": "Russian"}])
+    assert [item["language"] for item in _labels(fact)["languages"]] == ["Russian"]
 
 
 def test_a_read_that_kept_no_language_leaves_the_old_extractions():

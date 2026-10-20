@@ -129,7 +129,7 @@ def _labels(fact: Mapping[str, Any]) -> dict[str, Any]:
 
     return {
         "tags": [tag for tag in dict.fromkeys(_as_list(fact.get("tags"))) if tag in TAG_GROUPS],
-        "languages": _languages(fact.get("languages")),
+        "languages": [] if _on_request(fact) else _languages(fact.get("languages")),
         "max_class_size": None if _seasonal(fact) or _one_part(fact) else _class_size(fact.get("max_class_size")),
         "instruction_languages": [
             name
@@ -327,6 +327,19 @@ def _english(fact: Mapping[str, Any]) -> str:
     text = fact.get("text_i18n")
     value = text.get("en") if isinstance(text, Mapping) else None
     return value if isinstance(value, str) else ""
+
+
+# A language offered only if parents ask (527: "Russian ... if parents are interested") is
+# not one the school teaches; the reader is told so but still labels some.
+_ON_REQUEST_RE = re.compile(
+    r"\b(?:on|upon|at)\s+(?:the\s+)?(?:parents?'?\s+|parental\s+)?(?:request|interest|demand)\b"
+    r"|\bif\s+(?:enough\s+)?parents\s+(?:are\s+)?(?:interested|wish|want|ask)",
+    re.IGNORECASE,
+)
+
+
+def _on_request(fact: Mapping[str, Any]) -> bool:
+    return bool(_ON_REQUEST_RE.search(_english(fact)))
 
 
 def _one_part(fact: Mapping[str, Any]) -> bool:
