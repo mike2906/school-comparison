@@ -48,6 +48,7 @@ from app.models.source_page import SourcePage
 from app.schemas.extraction import ExtractedPrice
 from app.scrapers.extraction import llm_results, price_step, text_values
 from app.scrapers.extraction.agent_fees import (
+    _PERIOD_WORDS,
     READER_PROMPT,
     AgentDiscount,
     AgentFee,
@@ -682,7 +683,7 @@ def _ungrouped_elsewhere(entry: tuple, built: list[tuple]) -> bool:
 
 
 # A total the school prints of a group's fees (fees_agent prompt): "Общо", "Total Fee for New
-# Students" (506). As the site's headline total (frontend isStatedTotal).
+# Students" (506). The same words as the headline's total (frontend isStatedTotal); keep the two alike.
 _STATED_TOTAL_RE = re.compile(
     r"^\s*(?:общо|обща\s+сума)(?!\w)|^\s*total(?:\s+(?:fees?|cost))?\s*(?:$|[:(,–-]|for\b|per\b)", re.IGNORECASE
 )
@@ -691,18 +692,27 @@ _STATED_TOTAL_RE = re.compile(
 def _period_of_totals(built: list[tuple]) -> None:
     """A printed total with no period of its own takes the period its group's tuition is read
     with: 506's "Total Fee for New Students" adds up an annual tuition and the yearly or one-off
-    fees beside it, under a heading that names no period. The read's other tuition stands in
-    for a group it gave none. Only when that tuition has one period; the checks note the step."""
+    fees beside it, under a heading that names no period. Only when the total's name states no
+    period ("Общо месечно") and the group's tuition has one period; the checks note the step."""
+
+    def names(fields: dict, english: dict) -> list[str]:
+        return [fields["plan_name"] or "", english.get("plan_name_en") or ""]
+
+    def is_total(fields: dict, english: dict) -> bool:
+        return any(_STATED_TOTAL_RE.match(text) for text in names(fields, english))
+
     tuition = [
-        (fields, result) for result, _, fields, _, _ in built if fields["category"] is PriceCategory.TUITION
+        (fields, result, english)
+        for result, _, fields, _, english in built
+        if fields["category"] is PriceCategory.TUITION
     ]
-    totals = [(fields, result) for fields, result in tuition if _STATED_TOTAL_RE.match(fields["plan_name"] or "")]
-    parts = [(fields, result) for fields, result in tuition if not _STATED_TOTAL_RE.match(fields["plan_name"] or "")]
-    for fields, result in totals:
-        if fields["period"] is not None:
+    parts = [fields for fields, _, english in tuition if not is_total(fields, english)]
+    for fields, result, english in tuition:
+        if fields["period"] is not None or not is_total(fields, english):
             continue
-        group = [part for part, _ in parts if part["age_group"] == fields["age_group"]] or [part for part, _ in parts]
-        periods = {part["period"] for part in group}
+        if any(re.search(words, text.casefold()) for text in names(fields, english) for words in _PERIOD_WORDS.values()):
+            continue
+        periods = {part["period"] for part in parts if part["age_group"] == fields["age_group"]}
         if len(periods) == 1 and None not in periods:
             (period,) = periods
             fields["period"] = period

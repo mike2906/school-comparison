@@ -215,7 +215,7 @@ def amount_on_page(fee: AgentFee, numbers: set[Decimal]) -> bool:
 _PERIOD_WORDS = {  # Bulgarian, English, and the French and German some schools publish in
     # "за 1 месец" (569's transport) is per month; "за 6 месеца" is not.
     PricePeriod.MONTHLY: (
-        r"(?<!три)месеч|(?:на|за|/)\s*месец|(?:на|за)\s+(?:1|един)\s+месец\b"
+        r"(?<!три)месеч|(?:на|за|/)\s*месец|(?<![а-я])(?:на|за)\s+(?:1|един)\s+месец\b"
         r"|\bmonth(?:ly)?\b|mensuel|par mois|monatlich|pro monat"
     ),
     PricePeriod.YEARLY: (
@@ -229,14 +229,14 @@ _PERIOD_WORDS = {  # Bulgarian, English, and the French and German some schools 
     PricePeriod.SEMESTER: r"семест|\bsemester|semestre|halbj[aä]hr",
     PricePeriod.ONE_TIME: r"еднократ|\bonce\b|при записване",
     # Not "целодневна" (a full-day group).
-    # "за присъствен ден" (569's food: per day attended); not "за целия ден" (a full day).
+    # "за присъствен ден" (569's food: per day attended); not "за целия ден" (a full day) nor
+    # "по време на учебен ден" (a programme's hours).
     PricePeriod.DAILY: (
-        r"(?<![а-я])дневн(?![а-я]*\s+(?:форм|режим))|(?:на|за|/)\s*(?:(?:един|1|присъствен|учебен|работен)\s+)?ден\b"
+        r"(?<![а-я])дневн(?![а-я]*\s+(?:форм|режим))|(?:на|за|/)\s*ден\b|(?<![а-я])(?:на|за)\s+(?:един|1|присъствен)\s+ден\b"
         r"|\b(?:daily|per day|a day)\b|par jour|pro tag"
     ),
-    # "1 седмица" in a period column (541's summer school) is per week.
     PricePeriod.WEEKLY: (
-        r"седмичн|(?:на|за|/)\s*(?:една\s+|1\s*)?седмица|(?<![\d.,])1\s*седмица\b"
+        r"седмичн|(?:на|за|/)\s*седмица|(?<![а-я])(?:на|за)\s+(?:една|1)\s+седмица\b"
         r"|\b(?:weekly|per week|a week)\b|par semaine|pro woche"
     ),
     PricePeriod.HOURLY: r"почасов|(?:на|за|/)\s*час\b|\b(?:hourly|per hour|an hour)\b|par heure|pro stunde",
@@ -246,13 +246,21 @@ _PERIOD_WORDS = {  # Bulgarian, English, and the French and German some schools 
 _ONE_TIME_EN_RE = re.compile(r"\bone\s*[-‐‑–—]?\s*time\b")
 # "for the school year" names a period only on the amount's own line: as a heading it often
 # covers fees charged per day or per month too (569's "ДОПЪЛНИТЕЛНИ ТАКСИ ЗА УЧЕБНАТА ГОДИНА").
-# With the year written in: "Таксата за обучение за учебната 2026/2027 г. е 8110 евро" (381).
+# The school year written in after "учебната": "Таксата за обучение за учебната 2026/2027 г. е
+# 8110 евро" (381). Not a bare "за 2026/2027 г.", which a monthly fee's line has too.
 _YEAR_ON_AMOUNT_LINE_RE = re.compile(
-    r"(?:учебн\w*|на|за)\s+(?:\d{4}\s*[/–-]\s*\d{2,4}\s*)?(?:година|г\.)|l'année|for the (?:\d{4}\s*[/–-]\s*\d{2,4} )?school year"
+    r"(?:учебн\w*|(?<![а-я])на|(?<![а-я])за)\s+година|учебн\w*\s+\d{4}\s*[/–-]\s*\d{2,4}\s*(?:година|г\.)"
+    r"|l'année|for the (?:\d{4}\s*[/–-]\s*\d{2,4} )?school year"
 )
-# The length of a school year as a fee's period: 541's "Учебен период: 11 месеца" column. Not an
-# age ("деца от 10 месеца", "на 12 месеца", "10 месеца до 3 години").
-_SCHOOL_YEAR_SPAN_RE = re.compile(r"(?<![\d.,])(?<!от )(?<!на )(?<!над )(?:9|10|11|12)\s*(?:месеца|months)\b(?!\s*(?:до|to)\b)")
+# The length of a school year or a week as a period cell of its own: 541's "Учебен период"
+# column holds "11 месеца" for tuition and "1 седмица" for summer school. Only the whole line
+# or a whole table cell: "10 месеца по 550 евро", "деца на 12 месеца" or "1 седмица преди
+# началото" say something else.
+_SPAN_CELL = r"(?:^|\|)\s*{}\s*(?:$|\|)"
+_SPAN_RES = {
+    PricePeriod.YEARLY: re.compile(_SPAN_CELL.format(r"(?:9|10|11|12)\s*месеца"), re.MULTILINE),
+    PricePeriod.WEEKLY: re.compile(_SPAN_CELL.format(r"1\s*седмица"), re.MULTILINE),
+}
 # How often a class meets, not how often it is paid: "3 пъти седмично", "twice a week",
 # "2 учебни часа седмично", "седмична програма".
 _HOW_OFTEN_RE = re.compile(
@@ -305,13 +313,15 @@ def _names_period(period: PricePeriod, evidence: str, amounts: list[Decimal], ca
         evidence = _HOW_OFTEN_RE.sub(" ", evidence.casefold())
     if re.search(_PERIOD_WORDS[period], evidence):
         return True
+    others = [other for other in _PERIOD_WORDS if other not in (period, PricePeriod.ONE_TIME)]
+    if period in _SPAN_RES and _SPAN_RES[period].search(evidence):
+        return not any(re.search(_PERIOD_WORDS[other], evidence) for other in others)
     if period is not PricePeriod.YEARLY:
         return False
-    if _SCHOOL_YEAR_SPAN_RE.search(evidence) and not any(
-        re.search(_PERIOD_WORDS[other], evidence) for other in (PricePeriod.MONTHLY, PricePeriod.DAILY, PricePeriod.WEEKLY)
-    ):
-        return True
-    return any(_YEAR_ON_AMOUNT_LINE_RE.search(line) for line in amount_lines)
+    return any(
+        _YEAR_ON_AMOUNT_LINE_RE.search(line) and not any(re.search(_PERIOD_WORDS[other], line) for other in others)
+        for line in amount_lines
+    )
 
 
 # A page titled for one period of tuition: 596's PDFs open with "ANNUAL TUITION FEES 2026-2027",
