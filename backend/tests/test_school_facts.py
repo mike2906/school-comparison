@@ -850,6 +850,16 @@ def test_an_entrance_exam_label_needs_the_schools_own_exam_in_the_text(en, kept)
     assert "interview" in labels["admission"]
 
 
+def test_the_nvo_subjects_are_not_the_schools_exam_subjects():
+    fact = {
+        "text_i18n": {"bg": "x", "en": "Grade 8 ranking: NVO in Bulgarian and mathematics"},
+        "admission": ["entrance_exam"],
+        "exam_subjects": [{"bg": "Математика", "en": "Mathematics"}],
+    }
+    labels = _labels(fact)
+    assert labels["admission"] == [] and labels["exam_subjects"] == []
+
+
 def test_a_row_with_an_exam_drops_no_entrance_test_and_repeated_subjects():
     from app.utils.school_facts import at_a_glance
 

@@ -845,6 +845,7 @@
       "support": "Special needs support",
       "grade": "Grade {{grade}}",
       "grades": "Grades {{from}}–{{to}}",
+      "kindergarten": "Kindergarten",
       "preschool": "Preschool",
       "admissionTypes": {
         "entrance_exam": "Entrance exam",

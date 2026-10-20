@@ -139,7 +139,7 @@ def _labels(fact: Mapping[str, Any]) -> dict[str, Any]:
         "admission": _admission_types(fact),
         "admission_grade": _int_in(fact.get("admission_grade"), 0, 12),
         "admission_grade_to": _grade_to(fact),
-        "exam_subjects": _bilingual(fact.get("exam_subjects"), 8),
+        "exam_subjects": _exam_subjects(fact),
         "places": fact.get("places") if fact.get("places") in PLACES else None,
         "highest_grade": _int_in(fact.get("highest_grade"), 1, 12),
         "curricula": listed("curricula", CURRICULA),
@@ -381,6 +381,13 @@ def _admission_types(fact: Mapping[str, Any]) -> list[str]:
     if "entrance_exam" in types and english and (national_only or not _EXAM_WORD_RE.search(english)):
         types.remove("entrance_exam")
     return types
+
+
+def _exam_subjects(fact: Mapping[str, Any]) -> list[dict[str, str]]:
+    english = _english(fact)
+    if english and _NATIONAL_EXAM_RE.search(english) and not _OWN_EXAM_RE.search(english):
+        return []  # the НВО's subjects, not the school's exam's
+    return _bilingual(fact.get("exam_subjects"), 8)
 
 
 def _on_request(fact: Mapping[str, Any]) -> bool:
