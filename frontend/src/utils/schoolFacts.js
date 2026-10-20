@@ -87,12 +87,14 @@ export function openDaysLink(days) {
 export function atAGlanceLines(school, language, t, today = undefined) {
   const glance = school?.school_facts?.at_a_glance
   if (!glance) return []
-  const grade = value => (value === 0 ? t('schoolFacts.glance.kindergarten') : t('schoolFacts.glance.grade', { grade: value }))
+  // Grade 0 at a school is its preparatory group, not a kindergarten (568, 610).
+  const zero = t(school.education_level === 'kindergarten' ? 'schoolFacts.glance.kindergarten' : 'schoolFacts.glance.preschool')
+  const grade = value => (value === 0 ? zero : t('schoolFacts.glance.grade', { grade: value }))
   const grades = row => {
     if (row.grade === null || row.grade === undefined) return ''
     if (!row.grade_to) return grade(row.grade)
     return row.grade === 0
-      ? `${t('schoolFacts.glance.kindergarten')} – ${grade(row.grade_to)}`
+      ? `${zero} – ${grade(row.grade_to)}`
       : t('schoolFacts.glance.grades', { from: row.grade, to: row.grade_to })
   }
   const forGrades = (row, what) => (grades(row) ? `${grades(row)}: ${what}` : what)

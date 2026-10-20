@@ -36,6 +36,13 @@ test('facts keep their rank; keyOnly keeps the key ones, and a fact with no rank
 
 const t = (key, values = {}) => `${key}${Object.keys(values).length ? JSON.stringify(values) : ''}`
 
+test('grade 0 is the preschool group at a school and the kindergarten at a kindergarten', () => {
+  const glance = { admission: [{ grade: 0, types: ['trial_day'], subjects: [] }] }
+  const line = school => atAGlanceLines({ ...school, school_facts: { facts: [], at_a_glance: glance } }, 'en', t)[0].value
+  assert.ok(line({ education_level: 'school' }).startsWith('schoolFacts.glance.preschool:'))
+  assert.ok(line({ education_level: 'kindergarten' }).startsWith('schoolFacts.glance.kindergarten:'))
+})
+
 test('at a glance lines say what the labels add up to, in display order', () => {
   const glance = {
     admission: [{ grade: 5, types: ['entrance_exam'], subjects: [{ bg: 'Математика', en: 'Maths' }] }],

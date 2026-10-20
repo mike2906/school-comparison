@@ -766,7 +766,13 @@ async def test_minor_facts_labels_stay_out_of_the_glance(client, db_session):
 @pytest.mark.asyncio
 async def test_the_detail_response_has_the_labels_at_a_glance(client, db_session):
     rows = [
-        _fact_row(topic="admissions", admission=["entrance_exam"], admission_grade=5, places="bogus"),
+        _fact_row(
+            topic="admissions",
+            text_i18n={"bg": "Приемен изпит за 5 клас.", "en": "Grade 5 entrance exam."},
+            admission=["entrance_exam"],
+            admission_grade=5,
+            places="bogus",
+        ),
         _fact_row(topic="curriculum", highest_grade=4, curricula=["cambridge", "made_up"], rank="more"),
     ]
     body = await _detail(
@@ -802,22 +808,71 @@ def test_a_malformed_stored_list_is_dropped_not_raised():
     assert labels["tags"] == ["cafeteria"] and labels["admission"] == [] and labels["curricula"] == []
 
 
-def test_admission_facts_without_a_grade_are_not_merged_and_ranges_are_kept():
+def test_grade_less_admission_rows_stay_unless_they_contradict_graded_ones():
     from app.utils.school_facts import _labels, at_a_glance
 
+    exam = {"bg": "Изпит.", "en": "Entrance exam."}
     facts = [
-        _labels({"admission": ["entrance_exam"], "admission_grade": 2, "admission_grade_to": 4}),
-        _labels({"admission": ["entrance_exam"], "exam_subjects": [{"bg": "Математика", "en": "Maths"}]}),
+        _labels({"text_i18n": exam, "admission": ["entrance_exam"], "admission_grade": 2, "admission_grade_to": 4}),
+        _labels({"text_i18n": exam, "admission": ["entrance_exam"], "exam_subjects": [{"bg": "Математика", "en": "Maths"}]}),
         _labels({"admission": ["interview"]}),
         _labels({"admission": ["interview"], "admission_grade": 5, "admission_grade_to": 3}),  # bad range
     ]
     rows = at_a_glance(facts)["admission"]
+    # A school-wide rule beside graded ones stays when it doesn't contradict them.
     assert [(r["grade"], r["grade_to"], r["types"]) for r in rows] == [
         (2, 4, ["entrance_exam"]),
         (None, None, ["entrance_exam"]),
         (None, None, ["interview"]),
         (5, None, ["interview"]),
     ]
+    # 329: "8 клас: Приемен изпит; Без приемен изпит" read as a contradiction.
+    clash = [facts[0], _labels({"admission": ["open_entry"]})]
+    assert [(r["grade"], r["types"]) for r in at_a_glance(clash)["admission"]] == [(2, ["entrance_exam"])]
+    # A grade-less exam beside graded "no entrance test" goes, subjects and all.
+    denied = [facts[1], _labels({"admission": ["open_entry"], "admission_grade": 1})]
+    assert [(r["grade"], r["types"], r["subjects"]) for r in at_a_glance(denied)["admission"]] == [(1, ["open_entry"], [])]
+    # Two grade-less facts, one with a test and one without, clash the same way.
+    ungraded = [facts[1], _labels({"admission": ["open_entry"]})]
+    assert [r["types"] for r in at_a_glance(ungraded)["admission"]] == [["entrance_exam"]]
+
+
+@pytest.mark.parametrize(
+    "en,kept",
+    [
+        ("Ranking for VIII grade admission is based on NVO BEL + NVO mathematics + two grades", False),  # 332
+        ("Admission to VIII grade: documents accepted from 18.08; ranking 09.09; enrolment 10.09", False),
+        ("Applicants to grade 8 take an entrance exam in Bulgarian and mathematics", True),
+        ("Pupils sit admission tests in maths and English", True),
+        ("Admission is based on an entrance exam and NVO results", True),
+    ],
+)
+def test_an_entrance_exam_label_needs_the_schools_own_exam_in_the_text(en, kept):
+    labels = _labels({"text_i18n": {"bg": "x", "en": en}, "admission": ["entrance_exam", "interview"]})
+    assert ("entrance_exam" in labels["admission"]) is kept
+    assert "interview" in labels["admission"]
+
+
+def test_the_nvo_subjects_are_not_the_schools_exam_subjects():
+    fact = {
+        "text_i18n": {"bg": "x", "en": "Grade 8 ranking: NVO in Bulgarian and mathematics"},
+        "admission": ["entrance_exam"],
+        "exam_subjects": [{"bg": "Математика", "en": "Mathematics"}],
+    }
+    labels = _labels(fact)
+    assert labels["admission"] == [] and labels["exam_subjects"] == []
+
+
+def test_a_row_with_an_exam_drops_no_entrance_test_and_repeated_subjects():
+    from app.utils.school_facts import at_a_glance
+
+    facts = [
+        {"admission": ["entrance_exam"], "admission_grade": 8, "exam_subjects": [{"bg": "Математика", "en": "Mathematics"}]},
+        {"admission": ["open_entry"], "admission_grade": 8, "exam_subjects": [{"bg": "математика", "en": "mathematics"}]},
+    ]
+    [row] = at_a_glance(facts)["admission"]
+    assert row["types"] == ["entrance_exam"]
+    assert row["subjects"] == [{"bg": "Математика", "en": "Mathematics"}]  # 568, 575
 
 
 def test_a_sign_up_link_must_be_a_link_on_a_page_read():
