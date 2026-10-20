@@ -73,7 +73,7 @@ Added after two independent reviews of `main` on 2026-10-12 (Claude and Codex). 
 - **Self-merge** on green CI once the review findings are sorted. This covers the publish-gate steps in this lane, which `skills/github-process/SKILL.md` would otherwise hold for Mike.
 - **Publishing** follows the usual procedure (backup, then the deploy workflow) and is reported with before/after counts.
 - **R5 and R6 stop for Mike** before anything is built. Bring measurements.
-- **Spend:** under $0.50 a run and $1 a day on provider calls.
+- **Spend:** as `skills/github-process/SKILL.md` → Launch DB and publishing says.
 - One small PR per step; check the step is still open first, and update its "Can start" cell in the same PR.
 
 ### Relation to `docs/GO_LIVE_PLAN.md` Phase 4
