@@ -31,7 +31,7 @@ from app.scrapers.stages import school_pool
 from app.scrapers.stages.fees_agent import PageRead, Spend, SpendCapReached, find_pages
 from app.services.pipeline_runs import finalize_pipeline_run, pipeline_run_heartbeat, start_pipeline_run
 from app.services.provider_costs import ProviderCostError, execute_billable_request, provider_cost_scope
-from app.utils.school_facts import ATTRIBUTE_KEY, SITE_ACCEPTED_STATUSES
+from app.utils.school_facts import ATTRIBUTE_KEY, LANGUAGES_READ_KEY, SITE_ACCEPTED_STATUSES
 
 logger = logging.getLogger(__name__)
 
@@ -225,6 +225,7 @@ def facts_block(facts: list[dict], model: str, website_url: Optional[str]) -> di
         "read_at": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
         "website_url": website_url,
         "model": model,
+        LANGUAGES_READ_KEY: True,
         "facts": facts,
     }
 

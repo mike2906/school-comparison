@@ -29,6 +29,9 @@ ATTRIBUTE_KEY = "school_facts"
 # Where ``publication_attributes`` puts the facts that may show, for the display and filter
 # projections; ``attributes_for_publication`` removes both keys from anything else.
 PUBLISHED_KEY = "school_facts_published"
+# Set on a read whose reader lists every foreign language the school teaches (2026-10-20).
+# Such a read's languages replace the old extraction's unchecked list in the language focus.
+LANGUAGES_READ_KEY = "languages_read"
 
 # Each topic has a row on the compare page and a label in the frontend's i18n
 # (`schoolFacts.topics.<topic>`). Order is display order.
@@ -332,7 +335,7 @@ def _one_part(fact: Mapping[str, Any]) -> bool:
 
 
 def publishable_school_facts(attributes: Any, website_url: Optional[str]) -> Optional[dict[str, Any]]:
-    """``{"read_at", "facts": [...], "at_a_glance": {...}}``, or None when none can show.
+    """``{"read_at", "facts": [...], "at_a_glance": {...}, "languages_read"}``, or None when none can show.
 
     Each fact is ``{"topic", "text_i18n", "source_url", "rank"}`` plus its labels
     (``_labels``), never the quote, in stored order (most useful first). Only the first
@@ -396,7 +399,12 @@ def publishable_school_facts(attributes: Any, website_url: Optional[str]) -> Opt
     read_at = str(block.get("read_at") or "")
     # Minor facts are never shown, so their labels stay out of the summary too.
     shown = [fact for fact in facts if fact["rank"] != "minor"]
-    return {"read_at": read_at, "facts": facts, "at_a_glance": at_a_glance(shown, read_at)}
+    return {
+        "read_at": read_at,
+        "facts": facts,
+        "at_a_glance": at_a_glance(shown, read_at),
+        LANGUAGES_READ_KEY: block.get(LANGUAGES_READ_KEY) is True,
+    }
 
 
 def shown_school_facts(attributes: Any, scrape_status: Any, website_url: Optional[str]) -> Optional[dict[str, Any]]:

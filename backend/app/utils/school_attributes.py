@@ -43,7 +43,7 @@ from app.utils.facility_vocabulary import (
 )
 from app.utils.list_translations import translate_items
 from app.utils.school_facts import LANGUAGE_LEVELS as FACT_LANGUAGE_LEVELS
-from app.utils.school_facts import PUBLISHED_KEY, TAG_GROUPS
+from app.utils.school_facts import LANGUAGES_READ_KEY, PUBLISHED_KEY, TAG_GROUPS
 from app.utils.text_translations import stored as stored_translations
 from app.utils.text_translations import translate_list
 
@@ -411,18 +411,23 @@ def build_localized_attributes(
     # here but an international one is; a focus with a level ("English: immersion" at a
     # bilingual school) is kept.
     plain_dropped = set(instruction) | ({INSTRUCTION_LANGUAGE_STATE} if school_type != "international" else set())
+    # The old extraction's languages are unchecked (625 listed three the site never names);
+    # a facts read that lists every taught language with its quote replaces them.
+    extracted_sources = (
+        ()
+        if _as_mapping(attrs.get(PUBLISHED_KEY)).get(LANGUAGES_READ_KEY) is True
+        else (
+            _as_mapping(attrs.get("extracted")),
+            *(_as_mapping(_as_mapping(attrs.get("extracted_i18n")).get(other)) for other in DISPLAY_LOCALES),
+        )
+    )
     focus = _normalize_focus_entries([
         {**entry, "language": language}
         for entry in _normalize_focus_entries(
             _normalize_focus_entries(attrs.get("language_focus"))
             # Both locales' readings: the language list is a fact, the same on either page.
             + _normalize_focus_entries([
-                item
-                for source in (
-                    _as_mapping(attrs.get("extracted")),
-                    *(_as_mapping(_as_mapping(attrs.get("extracted_i18n")).get(other)) for other in DISPLAY_LOCALES),
-                )
-                for item in _as_list(source.get("languages"))
+                item for source in extracted_sources for item in _as_list(source.get("languages"))
             ])
             + _normalize_focus_entries(
                 [item for fact in _published_facts(attrs) for item in _as_list(fact.get("languages"))]
