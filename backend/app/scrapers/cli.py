@@ -483,15 +483,21 @@ async def _fees_agent_command(
 @click.option("--max-usd", type=float, default=0.50, show_default=True, help="Spend cap for the run")
 @click.option("--apply", "apply_changes", is_flag=True, help="Store facts (default is a dry run that writes nothing)")
 @click.option("--out", "report_path", type=click.Path(dir_okay=False, path_type=Path), help="Write the JSON report")
+@click.option("--after-id", type=int, default=None, help="Start after this school id (carry on a stopped run)")
 @click.option(
     "--workers", type=click.IntRange(1, 16), default=8, show_default=True, help="Schools read at a time (1-16)"
 )
-def school_facts_command(school_ids, city, country, limit, max_usd, apply_changes, report_path, workers):
+def school_facts_command(school_ids, city, country, limit, max_usd, apply_changes, report_path, after_id, workers):
     """Read schools' own pages for concrete facts by topic (experimental, not in `all`)."""
     import json
 
     from app.database import async_session_maker
     from app.scrapers.stages import school_facts as school_facts_stage
+
+    lines_path = None
+    if report_path is not None:  # each school's line is appended as it finishes (never emptied)
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        lines_path = report_path.with_name(f"{report_path.stem}.schools.jsonl")
 
     async def _run():
         async with async_session_maker() as db:
@@ -504,6 +510,8 @@ def school_facts_command(school_ids, city, country, limit, max_usd, apply_change
                 max_usd=max_usd,
                 apply=apply_changes,
                 workers=workers,
+                after_id=after_id,
+                lines_path=lines_path,
             )
 
     report = asyncio.run(_run())

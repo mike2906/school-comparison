@@ -30,6 +30,7 @@ max_usd="${PINS_MAX_USD:-0.10}"
 max_placed="${PINS_MAX_PLACED:-10}"
 site_city_max="${SITE_CITY_MAX:-3}"
 site_grades_max="${SITE_GRADES_MAX:-10}"
+force="${PINS_FORCE:-}"
 city="${PINS_CITY:-sofia}"
 repo="${PUBLISH_REPO:-mike2906/school-comparison}"
 backups="${PINS_BACKUPS:-$HOME/backups}"
@@ -92,13 +93,19 @@ if [ -f "$state/osm_due" ] && [ ! -f "$state/pins_unpublished" ]; then
 fi
 
 # "unpublished" marks a run whose pins were written but not yet published: publish first.
-if [ ! -f "$state/pins_unpublished" ]; then
+# PINS_FORCE=1 (refresh_register.sh, after the monthly register import) runs now, whatever the
+# timers say, and publishes at the end even when no pin is placed: the import wrote too.
+if [ -n "$force" ] || [ ! -f "$state/pins_unpublished" ]; then
 	now="$(date -u +%s)"
-	last="$(cat "$state/pins_last_ok" 2>/dev/null || echo 0)"
-	[ $((now - last)) -ge $((7 * 24 * 3600)) ] || exit 0
-	# A stopped run is retried a day later, not every hour: each try pays for a dry run.
-	tried="$(cat "$state/pins_last_try" 2>/dev/null || echo 0)"
-	[ $((now - tried)) -ge $((20 * 3600)) ] || exit 0
+	if [ -z "$force" ]; then
+		last="$(cat "$state/pins_last_ok" 2>/dev/null || echo 0)"
+		[ $((now - last)) -ge $((7 * 24 * 3600)) ] || exit 0
+		# A stopped run is retried a day later, not every hour: each try pays for a dry run.
+		tried="$(cat "$state/pins_last_try" 2>/dev/null || echo 0)"
+		[ $((now - tried)) -ge $((20 * 3600)) ] || exit 0
+	else
+		touch "$state/pins_unpublished"
+	fi
 	echo "$now" > "$state/pins_last_try"
 
 	stamp="$(date -u +%Y%m%dT%H%M%SZ)"

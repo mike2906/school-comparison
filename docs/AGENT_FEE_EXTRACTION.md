@@ -162,7 +162,9 @@ the publish and report instead:
 What blocks it today: the launch DB lives on Mike's PC, and the off-site backup there needs
 him to run or allow it. So step 6 needs either a scheduled job on that PC that is allowed
 to back up and publish, or the launch DB moved to a host that can. That is Mike's call, and
-it comes after steps 1 to 5 prove the runs are reliable.
+it comes after steps 1 to 5 prove the runs are reliable. Since 2026-10-20 (Mike's approval
+of the schedule) `backend/scripts/refresh_fees.sh` re-reads and publishes the fees monthly from
+cron on the PC, with the fee check and a $1.50 cap (`docs/SCHEDULED_JOBS.md`).
 
 ## Steps (one PR each)
 

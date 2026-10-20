@@ -104,8 +104,9 @@ OSM feature must be the only one named as the school, same kind, private or not 
 an abbreviation like ЧСУ/СУ or "частно" says which; one site mapped twice is one feature). Evidence goes in
 `geocode_meta.evidence`; method `agent_pick`, tag `coords_source=pin_agent`.
 
-**Weekly run.** `backend/scripts/refresh_pins.sh` runs both stages from cron on the machine
-with the launch DB, hourly but only a week after the last good run: dry runs first, a stop
+**Weekly run.** `backend/scripts/refresh_pins.sh` runs both stages. It is not on cron by
+itself: the monthly register refresh (`refresh_register.sh`, `docs/SCHEDULED_JOBS.md`) runs it
+with `PINS_FORCE=1` after the import. On its own cron it would run hourly but only a week after the last good run: dry runs first, a stop
 (GitHub issue "Pin refresh stopped", retried a day later) when either would place more
 than `PINS_MAX_PLACED` (10); else backup, apply to the dry run's schools only, catchment
 dry run (an issue "Catchment match changed" if it would change) and publish. About $0.04 a

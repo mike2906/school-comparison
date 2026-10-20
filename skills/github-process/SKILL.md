@@ -111,8 +111,10 @@ While the site has no users, agents may change the launch DB and publish without
 
 ### Jobs on Mike's PC
 
-Launch-DB runs and publishes happen in a Remote Control session on Mike's PC. A thread
-can only start one from a message Mike typed in that thread (a platform rule). So a job
+Routine refreshes (fees monthly, facts twice a year, the register import and pins monthly,
+open days, cut-offs) run from cron on the PC and need no go: `docs/SCHEDULED_JOBS.md`. To get a
+fix into them, update the PC checkout to main (one go). Other launch-DB runs and publishes
+happen in a Remote Control session on Mike's PC. A thread can only start one from a message Mike typed in that thread (a platform rule). So a job
 needs one message from him, and that message should cover the whole job:
 
 - **One go covers the job.** His go covers every step you described to him: backup, dry

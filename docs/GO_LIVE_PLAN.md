@@ -2301,7 +2301,8 @@ the session scratchpad only.
       - [ ] Temporary pipeline worker: a scheduled workflow creates a larger server with
             Terraform, runs the pipeline against the internal DB, uploads the candidate
             snapshot and its diff to R2, then destroys the server.
-      - [ ] School list refresh (added 2026-10-15): the official import (`discover`: MoE
+      - [x] School list refresh (added 2026-10-15; on cron on the PC since 2026-10-20 as
+            `scripts/refresh_register.sh`, monthly, see `docs/SCHEDULED_JOBS.md`): the official import (`discover`: MoE
             register and kg.sofia.bg; geocodes as it imports) has no schedule. Every Sofia
             school came from manual runs (13 Feb, 26 Feb, 24 Sep 2026). Schedule it (monthly,
             or before each admission season), followed by the pin steps for locations still

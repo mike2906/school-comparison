@@ -98,6 +98,10 @@ to be measured on the trial schools. Nothing reaches the site until an `--apply`
 
 ## Before a Sofia-wide `--apply`
 
+The full Sofia re-read runs from cron twice a year, from 1 February and 25 August, 120 schools
+a night (`backend/scripts/refresh_facts.sh`, `docs/SCHEDULED_JOBS.md`); `--after-id` carries on
+a run that stopped. A re-read after a reader fix still runs by hand.
+
 - Dry run 1 of the stage on the trial schools (2026-10-13): 33 of 41 facts kept, $0.057.
   Fixed after it: the judge dropped facts its quote did state (headings, listed steps),
   one 56,000-character staff page pushed later pages out of the read (now 15,000 a page),

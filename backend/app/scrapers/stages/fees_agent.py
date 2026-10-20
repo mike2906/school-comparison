@@ -1439,14 +1439,6 @@ async def _saved(found: Awaitable[list[PageRead]], school: School, pages_dir: Op
     return pages
 
 
-def _append_line(path: Path, result: dict[str, Any]) -> None:
-    try:  # a failed write loses one line, not the rest of the run
-        with path.open("a", encoding="utf-8") as lines:
-            lines.write(json.dumps(result, ensure_ascii=False, default=str) + "\n")
-    except (OSError, TypeError, ValueError):
-        logger.exception("fees-agent could not write the line for school %s", result.get("school_id"))
-
-
 async def run_fees_agent(
     db: AsyncSession,
     *,
@@ -1561,7 +1553,7 @@ async def run_fees_agent(
                     workers=workers,
                     stop_on=(SpendCapReached, ProviderCostCapExceeded),
                     sites=sites,
-                    on_result=(lambda result: _append_line(lines_path, result)) if lines_path is not None else None,
+                    on_result=(lambda result: school_pool.append_line(lines_path, result)) if lines_path is not None else None,
                 )
     except Exception as exc:
         logger.exception("fees-agent run %s stopped", run_id)
