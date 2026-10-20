@@ -15,6 +15,7 @@ container="${BACKUP_DB_CONTAINER:-sofia_schools_db}"
 database="${BACKUP_DATABASE:-sofia_schools}"
 now="${SCHEDULED_NOW:-$(date -u +%s)}"  # set by the tests only
 # A hung run would hold the lock and quietly stop every later one: end it, as a failed run.
+# `timeout` signals its whole process group, so the run's children end with it.
 run_timeout="${SCHEDULED_RUN_TIMEOUT:-4h}"
 today="$(date -u -d "@$now" +%F)"
 
@@ -39,11 +40,14 @@ take_lock() {
 }
 
 # Cron runs whatever is checked out, so only merged code may run: no local edits to tracked
-# files, and HEAD on main as last fetched. Nothing here pulls main; a thread updates the
+# files, no untracked file under backend/ that git does not ignore (a sitecustomize.py would
+# run with every command), and HEAD on main as last fetched. Nothing here pulls main; a thread updates the
 # checkout with Mike's go.
 check_checkout() {
 	git -C "$repo_root" diff --quiet HEAD -- ||
 		stop "the checkout at $repo_root has local changes; scheduled jobs run merged code only"
+	[ -z "$(git -C "$repo_root" ls-files --others --exclude-standard -- backend)" ] ||
+		stop "the checkout at $repo_root has untracked files under backend/; scheduled jobs run merged code only"
 	git -C "$repo_root" merge-base --is-ancestor HEAD origin/main 2> /dev/null ||
 		stop "the checkout at $repo_root ($(git -C "$repo_root" rev-parse --short HEAD)) is not on main"
 }
@@ -85,7 +89,7 @@ rebook() {
 	sed -i '$d' "$state/${job}_spend"
 	book "$1"
 }
-lt() { python3 -c 'import sys; sys.exit(not float(sys.argv[1]) < float(sys.argv[2]))' "$1" "$2"; }
+lt() { python3 -c 'import sys; sys.exit(not round(float(sys.argv[1]), 4) < round(float(sys.argv[2]), 4))' "$1" "$2"; }
 min() { python3 -c 'import sys; print(f"{min(map(float, sys.argv[1:])):.2f}")' "$@"; }
 field() { python3 -c 'import json, sys; r = json.load(open(sys.argv[1])); print(eval(sys.argv[2], {"r": r}))' "$1" "$2"; }
 
@@ -123,7 +127,7 @@ agent_run() {
 	rm -f "$report"
 	log "run: \$$budget${after:+, after school $after}"
 	rc=0
-	(cd "$repo_root/backend" && timeout "$run_timeout" uv run python -m app.scrapers.cli "$@" --apply --max-usd "$budget" --out "$report" ${after:+--after-id "$after"} > /dev/null) || rc=$?
+	(cd "$repo_root/backend" && timeout -k 5m "$run_timeout" uv run python -m app.scrapers.cli "$@" --apply --max-usd "$budget" --out "$report" ${after:+--after-id "$after"} > /dev/null) || rc=$?
 	# Schools write one at a time: whatever a run wrote is published, even when it failed.
 	[ "$(wc -l < "$lines" 2> /dev/null || echo 0)" = "$before" ] || touch "$state/${job}_unpublished"
 	[ -f "$report" ] || {

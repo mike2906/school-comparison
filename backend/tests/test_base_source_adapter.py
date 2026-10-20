@@ -300,3 +300,31 @@ async def test_a_kept_checked_pin_takes_the_sources_primary_flag(db_session):
         ("ул. Ела 6", True),
         ("ул. Нова 9", False),
     ]
+
+
+async def test_registry_rerun_keeps_the_status_of_an_unchanged_website(db_session):
+    """Only a new website sends a school back to pending; the same one keeps its data shown."""
+    from app.models import School
+
+    kept = School(institutional_id="2200100", name_i18n={"bg": "Старо име"}, country_code="bg",
+                  school_type="state", education_level="primary", city="sofia",
+                  website_url="https://same.example", scrape_status="validated")
+    moved = School(institutional_id="2200101", name_i18n={"bg": "Друго"}, country_code="bg",
+                   school_type="state", education_level="primary", city="sofia",
+                   website_url="https://old.example", scrape_status="validated")
+    db_session.add_all([kept, moved])
+    await db_session.commit()
+
+    def record(institutional_id, website):
+        return DiscoveredSchool(institutional_id=institutional_id, country_code="bg", city="sofia",
+                                name_i18n={"bg": "Ново име"}, school_type="state",
+                                education_level="primary", website_url=website)
+
+    result = await DummyAdapter(db=db_session).upsert_schools(
+        [record("2200100", "https://same.example"), record("2200101", "https://new.example")]
+    )
+    assert result["updated"] == 2
+    await db_session.refresh(kept)
+    await db_session.refresh(moved)
+    assert (kept.scrape_status, kept.name_i18n["bg"]) == ("validated", "Ново име")
+    assert (moved.scrape_status, moved.website_url) == ("pending", "https://new.example")

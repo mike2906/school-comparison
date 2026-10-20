@@ -10,7 +10,7 @@ at the next hour. Each opens one GitHub issue when it stops.
 | `publish_cutoffs.sh` | when the `cutoff-data` branch moves | none (no model) | new rounds | Automatic cut-off publish stopped |
 | `refresh_fees.sh` | monthly, from the 1st | $1.50 a month | what it wrote | Scheduled fees re-read stopped |
 | `refresh_facts.sh` | twice a year, from 1 Feb and 25 Aug, 120 schools a night | $1.70 a night, $5 a cycle | each night | Scheduled facts re-read stopped |
-| `refresh_register.sh` | monthly, from the 5th | ~$0.30 (the pin agent's two passes) | always (via `refresh_pins.sh`) | Scheduled register refresh stopped |
+| `refresh_register.sh` | monthly, from the 5th | $0.30 a month: three tries of two $0.05 pin-agent passes | always (via `refresh_pins.sh`) | Scheduled register refresh stopped |
 
 `refresh_pins.sh` is not on cron by itself: Mike wants pins re-run after each register import,
 not weekly, so `refresh_register.sh` runs it with `PINS_FORCE=1`.
@@ -23,7 +23,8 @@ project files). A new job, a higher cap or a shorter interval goes back to him.
 They share `backend/scripts/lib/scheduled_job.sh`:
 
 - **Merged code only.** Cron runs whatever is checked out. A job stops (with its issue) when the
-  checkout has local edits to tracked files or its HEAD is not on `origin/main` as last
+  checkout has local edits to tracked files, an untracked file under `backend/` that git does
+  not ignore, or its HEAD is not on `origin/main` as last
   fetched. Nothing pulls main by itself: a thread updates the checkout with Mike's go.
 - **Installing starts nothing.** The first run records the current month or cycle as done, so
   the first scheduled run is the next one.
@@ -64,10 +65,12 @@ before their pins, which then show "Not on the map yet" until the chain's publis
 ### The register chain
 
 After the backup: `run --stage discover --city sofia` (the ministry register and kg.sofia.bg; a
-crashed source now exits non-zero), `scripts/import_sofia_municipal_points.py --apply`,
+crashed source now exits non-zero; a school keeps its scrape status unless its website
+changed, so the import never withholds website data it has no stage to re-check), `scripts/import_sofia_municipal_points.py --apply`,
 `register-pins --apply`, `site-address --apply`, `confirm-pins --apply` (all free, hidden
 locations only), then `refresh_pins.sh` with `PINS_FORCE=1`: `website-pins`, `pin-agent`
-(`REGISTER_PINS_USD`, $0.15 a pass), `site-city`, `site-grades` with their own stops, the
+(`REGISTER_PINS_USD`, $0.05 a pass, with a $0.01 reserve per call as in the open-days
+check), `site-city`, `site-grades` with their own stops, the
 catchment dry run (an issue "Catchment match changed" if it would change), the publish and the
 OSM check (`skills/geocoding/SKILL.md`, Weekly run). Any failure stops the chain; the next day
 runs it again from the start, which costs pennies.

@@ -209,11 +209,23 @@ def test_the_register_chain_runs_from_the_fifth_and_ends_with_a_forced_pin_run(p
     pc.run("refresh_register.sh", "2026-11-05T12:50", UV_FAIL="0")
     commands = [c["uv"][4] if c["uv"][1] == "python" and c["uv"][2] == "-m" else c["uv"][2] for c in pc.calls if "uv" in c]
     assert commands == ["run", "scripts/import_sofia_municipal_points.py", "register-pins", "site-address", "confirm-pins"]
-    assert pc.calls[-1] == {"pins": "1 0.15"} and pc.code == 0
+    assert pc.calls[-1] == {"pins": "1 0.05"} and pc.code == 0
     assert (pc.state / "register_cycle").read_text().strip() == "2026-11"
 
 
-def test_a_failed_register_import_stops_before_the_pins(pc):
+def test_a_failed_register_import_stops_before_the_pins_and_tries_three_times_a_month(pc):
     pc.run("refresh_register.sh", "2026-10-20T12:50")
     pc.run("refresh_register.sh", "2026-11-05T12:50", UV_FAIL="1")
     assert pc.code == 1 and len(pc.calls) == 1 and "Scheduled register refresh stopped" in pc.issues
+    for day in ("06", "07"):
+        assert pc.run("refresh_register.sh", f"2026-11-{day}T12:50", UV_FAIL="1").calls != []
+    pc.run("refresh_register.sh", "2026-11-08T12:50", UV_FAIL="1")
+    assert pc.calls == [] and "wait for next month" in pc.log("register")
+    assert (pc.state / "register_cycle").read_text().strip() == "2026-11"
+
+
+def test_an_untracked_file_under_backend_runs_nothing(pc):
+    pc.run("refresh_fees.sh", "2026-10-20T12:20")
+    (pc.checkout / "backend/sitecustomize.py").write_text("print('not merged')\n")
+    pc.run("refresh_fees.sh", "2026-11-01T02:20", [{"schools": [1], "spent": 0.5}])
+    assert pc.code == 1 and pc.calls == [] and "untracked files" in pc.log("fees")
