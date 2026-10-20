@@ -412,10 +412,13 @@ def build_localized_attributes(
     # bilingual school) is kept.
     plain_dropped = set(instruction) | ({INSTRUCTION_LANGUAGE_STATE} if school_type != "international" else set())
     # The old extraction's languages are unchecked (625 listed three the site never names);
-    # a facts read that lists every taught language with its quote replaces them.
+    # a facts read that lists every taught language with its quote replaces them. A read
+    # that kept no language at all is more likely a miss than a school teaching none
+    # (НПМГ, 31 СУЧЕМ), so the old list stays then.
+    facts_languages = [item for fact in _published_facts(attrs) for item in _as_list(fact.get("languages"))]
     extracted_sources = (
         ()
-        if _as_mapping(attrs.get(PUBLISHED_KEY)).get(LANGUAGES_READ_KEY) is True
+        if _as_mapping(attrs.get(PUBLISHED_KEY)).get(LANGUAGES_READ_KEY) is True and facts_languages
         else (
             _as_mapping(attrs.get("extracted")),
             *(_as_mapping(_as_mapping(attrs.get("extracted_i18n")).get(other)) for other in DISPLAY_LOCALES),
@@ -429,9 +432,7 @@ def build_localized_attributes(
             + _normalize_focus_entries([
                 item for source in extracted_sources for item in _as_list(source.get("languages"))
             ])
-            + _normalize_focus_entries(
-                [item for fact in _published_facts(attrs) for item in _as_list(fact.get("languages"))]
-            )
+            + _normalize_focus_entries(facts_languages)
         )
         if (language := canonical_language(entry["language"]))
         and (entry.get("level") or language not in plain_dropped)
