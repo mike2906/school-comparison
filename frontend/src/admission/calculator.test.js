@@ -10,10 +10,12 @@ import {
   campaignEnd,
   comparableRound,
   compareWithCutoff,
+  laterEasierRound,
   defaultStartYear,
   formatRange,
   measuredOnFor,
   pickLanguage,
+  roundsOf,
   rowFitsChild,
   ruleSetFor,
   sameRules,
@@ -21,6 +23,7 @@ import {
   stageById,
   startYearChoices,
   summaryRowsFor,
+  withRoundHistory,
 } from './calculator.js'
 
 function ruleFiles(dir) {
@@ -164,14 +167,56 @@ test('calculatorLinksFor: a school with a preparatory group links to both tabs',
   assert.deepEqual(calculatorLinksFor(null), [])
 })
 
-test('a row is compared on its latest round unless that one had no places', () => {
-  const first = { last_admitted_points: 12 }
+test('a row is read on its main ranking; free-place-only rows on the latest with places', () => {
+  const first = { round_id: 1, round_kind: 'general', last_admitted_points: 12 }
+  const latest = { round_id: 4, round_kind: 'current', last_admitted_points: 9, places: 1 }
   assert.equal(comparableRound({ rounds: 1, first }), first)
-  const latest = { last_admitted_points: 9 }
-  assert.equal(comparableRound({ rounds: 3, first, latest }), latest)
-  assert.equal(comparableRound({ rounds: 3, first, latest: { places: 0 } }), first)
-  const everyone = { undersubscribed: true }
-  assert.equal(comparableRound({ rounds: 2, first, latest: everyone }), everyone, 'everyone got in now: worth saying')
+  // A later ranking only fills places that came free: the main ranking is the reference.
+  assert.equal(comparableRound({ rounds: 3, first, latest }), first)
+  // kg.sofia.bg keeps only free-place rankings: the latest that had places.
+  const freeFirst = { round_id: 443, round_kind: 'current', last_admitted_points: 19, places: 2 }
+  assert.equal(comparableRound({ rounds: 4, first: freeFirst, latest }), latest)
+  const none = { round_id: 446, round_kind: 'current', places: 0 }
+  assert.equal(comparableRound({ rounds: 4, first: freeFirst, latest: none }), freeFirst)
+  assert.equal(comparableRound({ rounds: 4, first: { ...freeFirst, places: 0 }, latest: none }), none)
+  // A main ranking with no places says less than a later one that had some.
+  assert.equal(comparableRound({ rounds: 2, first: { ...first, places: 0 }, latest }), latest)
+})
+
+test('a later ranking is mentioned only when it let in a weaker result', () => {
+  const r = (id, extra) => ({ round_id: id, round_kind: 'general', classified_on: `2026-07-${10 + id}`, ...extra })
+  // 8th grade (270): the 3rd ranking's minimum is higher, so it says nothing more.
+  const higher = { rounds: 3, first: r(1, { min_score: 405 }), latest: r(3, { min_score: 407 }) }
+  assert.equal(laterEasierRound(higher), null)
+  const lower = { ...higher, history: [higher.first, r(2, { min_score: 365 }), higher.latest] }
+  assert.equal(laterEasierRound(lower).round_id, 2)
+  // First grade: a higher group is weaker; points only within a group.
+  const g = { rounds: 2, first: r(1, { last_admitted_group: 3, last_admitted_points: 2 }), latest: r(2, { last_admitted_group: 4, last_admitted_points: 9 }) }
+  assert.equal(laterEasierRound(g).round_id, 2)
+  // Points and a group are not comparable.
+  assert.equal(laterEasierRound({ rounds: 2, first: r(1, { last_admitted_points: 12 }), latest: r(2, { last_admitted_group: 3, last_admitted_points: 5 }) }), null)
+  // No places later (241), or no main ranking at all: nothing to add.
+  assert.equal(laterEasierRound({ rounds: 2, first: r(1, { last_admitted_points: 5, last_admitted_group: 4 }), latest: r(2, { places: 0 }) }), null)
+  assert.equal(laterEasierRound({ rounds: 2, first: { round_id: 443, round_kind: 'current', last_admitted_points: 19 }, latest: { round_id: 446, round_kind: 'current', last_admitted_points: 3 } }), null)
+})
+
+test('the school page adds every general ranking of the row to its summary', () => {
+  const row = { stage: 'kindergarten', campaign: '2026/2027', age_group: 'first', birth_year: 2023, building: 'ДГ 1', rounds: 2 }
+  const cutoff = extra => ({ stage: 'kindergarten', campaign: '2026/2027', age_group: 'first', birth_year: 2023, building: 'ДГ 1', queue: 'general', ...extra })
+  const info = {
+    cutoff_summary: [row],
+    cutoffs: [
+      cutoff({ round_id: 446, classified_on: '2026-10-16' }),
+      cutoff({ round_id: 443, classified_on: '2026-09-04' }),
+      cutoff({ round_id: 443, classified_on: '2026-09-04', queue: 'social' }),
+      cutoff({ round_id: 443, classified_on: '2026-09-04', building: 'ДГ 1 - сграда 2' }),
+    ],
+  }
+  const [withHistory] = withRoundHistory(info)
+  assert.deepEqual(withHistory.history.map(round => round.round_id), [443, 446])
+  assert.deepEqual(roundsOf(withHistory).map(round => round.round_id), [443, 446])
+  // A list response has no `cutoffs`: the summary stays as it is.
+  assert.equal(withRoundHistory({ cutoff_summary: [row] })[0], row)
 })
 
 test('a kindergarten row fits a child by age at the start, not by birth year', () => {

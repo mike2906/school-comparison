@@ -141,15 +141,19 @@ describe('admission from a school page', () => {
     )
     await open('bg', `/schools/${school.id}`)
     const cutoffs = page.locator('section').filter({ has: page.getByRole('heading', { name: t('bg', 'cutoffs.title') }) })
-    await cutoffs.locator('table').waitFor()
-    assert.ok(await cutoffs.locator('tbody tr').count() > 0, 'a row per age group')
-    // A first column holding a later ranking says why, under the table.
+    const rows = cutoffs.getByRole('list', { name: t('bg', 'cutoffs.listLabel') }).locator(':scope > li')
+    await rows.first().waitFor()
+    assert.ok(await rows.count() > 0, 'a row per age group')
+    // kg.sofia.bg keeps only the free-place rankings: the page says the main one is missing.
     if (school.admission_info.cutoff_summary.some(row => row.first?.round_kind === 'current')) {
-      await cutoffs.getByText(t('bg', 'cutoffs.legend.current')).waitFor()
+      await cutoffs.getByText(t('bg', 'cutoffs.legend.mainMissing')).waitFor()
     }
-    // Two rankings side by side come with the line saying each is separate (CutoffTable's showLatestRound).
-    if (school.admission_info.cutoff_summary.some(row => row.rounds > 1 && row.latest?.round_id !== row.first?.round_id)) {
-      await cutoffs.getByText(t('bg', 'cutoffs.legend.rounds')).waitFor()
+    // Rankings are never side by side: every ranking of a row is one line under "All rankings".
+    const several = school.admission_info.cutoff_summary.findIndex(row => row.rounds > 1)
+    if (several >= 0) {
+      const row = rows.nth(several)
+      await row.locator('summary').click()
+      assert.ok(await row.locator('ol > li').count() >= 2, 'one line per ranking')
     }
     await page.getByRole('heading', { name: t('bg', 'admissionArea.districtTitle') }).waitFor()
 
@@ -209,9 +213,16 @@ describe('admission from a school page', () => {
     )
     await open('bg', `/schools/${school.id}`)
     const cutoffs = page.locator('section').filter({ has: page.getByRole('heading', { name: t('bg', 'cutoffs.title') }) })
-    await cutoffs.locator('table').waitFor()
+    const rows = cutoffs.getByRole('list', { name: t('bg', 'cutoffs.listLabel') }).locator(':scope > li')
+    await rows.first().waitFor()
     const classes = school.admission_info.cutoff_summary.filter(row => row.stage === 'grade_8')
-    assert.ok(await cutoffs.locator('tbody tr').count() >= 1, `${classes.length} classes in the API`)
+    assert.ok(await rows.count() >= 1, `${classes.length} classes in the API`)
+    // The first ranking is the headline; a later ranking that let in a lower score gets its own line.
+    await cutoffs.getByText(t('bg', 'cutoffs.ref.main', { date: '' }).replace(/[,\s]+$/, '')).first().waitFor()
+    // laterEasierRound: same kind of result (no gender quota) after a main ranking with places.
+    if (classes.some(row => !row.quota && row.first?.places !== 0 && row.latest?.min_score < row.first?.min_score)) {
+      await cutoffs.getByText(t('bg', 'cutoffs.later', { date: '' }).split('(')[0].trim()).first().waitFor()
+    }
   })
 
   test('the English page shows eighth-grade classes in English', async () => {

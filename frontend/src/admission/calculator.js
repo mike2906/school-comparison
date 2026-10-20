@@ -196,13 +196,95 @@ export function rankingWhen(row, round, language) {
 }
 
 /**
- * The round a row is compared on: its latest, unless that round had no places to fill
- * (later rounds share out what remains), when the first ranking says more.
+ * A summary row's rankings in date order. On a school page the summary rows carry
+ * `history` (every general-queue ranking, see `withRoundHistory`); the list response has
+ * only the first and the latest.
+ */
+export function roundsOf(row) {
+  if (row?.history?.length) return row.history
+  const rounds = [row?.first, row?.rounds > 1 ? row?.latest : null].filter(Boolean)
+  return rounds.length === 2 && rounds[0].round_id === rounds[1].round_id ? [rounds[0]] : rounds
+}
+
+/**
+ * The ranking a row is read and compared on, the same on a list card and a school page:
+ * the campaign's main (first) ranking when we have it, since most places go there and
+ * later rankings only fill places that came free. kg.sofia.bg keeps only the later
+ * free-place rankings, so for those rows (and a main ranking with no places) it is the
+ * latest one that had places, else the first that had, else the latest (no place came
+ * free).
  */
 export function comparableRound(row) {
-  const latest = row.rounds > 1 && row.latest ? row.latest : null
-  if (latest && cutoffValue(latest)?.kind !== 'noPlaces') return latest
-  return cutoffValue(row.first) ? row.first : latest || row.first
+  const first = row?.first
+  const latest = row?.rounds > 1 && row?.latest ? row.latest : null
+  if (!first || !latest) return first || latest
+  // A main ranking with places to fill; one without says nothing a later ranking can't.
+  if (first.round_kind !== 'current' && first.places !== 0) return first
+  if (latest.places !== 0) return latest
+  return first.places !== 0 ? first : latest
+}
+
+/** Lower is easier: a higher group, then fewer points or a lower score. */
+function easeKey(value) {
+  if (value.kind === 'group') return [-value.group, value.points ?? 0]
+  if (value.kind === 'score') return [value.score, 0]
+  if (value.kind === 'points') return [value.points, 0]
+  return null
+}
+
+function easier(a, b) {
+  return a[0] < b[0] || (a[0] === b[0] && a[1] < b[1])
+}
+
+/**
+ * A ranking after the main one that admitted a child with a weaker result than the main
+ * ranking's last admitted (a place that came free), or that admitted everyone: worth one
+ * line under the headline. Null when there is none, or the row has no main ranking.
+ * Reads `history` where the page has it; a list's summary has only the latest.
+ */
+export function laterEasierRound(row) {
+  const main = comparableRound(row)
+  if (!main || main !== row.first || main.round_kind === 'current') return null
+  const mainValue = cutoffValue(main)
+  const mainKey = mainValue && easeKey(mainValue)
+  if (!mainKey) return null
+  let best = null
+  let bestKey = mainKey
+  for (const round of roundsOf(row).slice(1)) {
+    const value = cutoffValue(round)
+    if (value?.kind === 'everyone' && round.admitted_count > 0) return round
+    // Points, a group or a score: only a result of the same kind can be weaker.
+    const key = value?.kind === mainValue.kind ? easeKey(value) : null
+    if (key && easier(key, bestKey)) {
+      best = round
+      bestKey = key
+    }
+  }
+  return best
+}
+
+/**
+ * The summary rows with `history`: every general-queue ranking of the row's campaign,
+ * oldest first, from `admission_info.cutoffs` (the school page has it; lists don't).
+ */
+export function withRoundHistory(admissionInfo) {
+  const summary = admissionInfo?.cutoff_summary || []
+  const all = admissionInfo?.cutoffs || []
+  if (all.length === 0) return summary
+  const key = row => [row.stage, row.campaign, row.age_group, row.birth_year, row.class_code, row.building].map(v => v ?? '').join('|')
+  const byKey = new Map()
+  for (const round of all) {
+    if (round.queue !== 'general') continue
+    const k = key(round)
+    if (!byKey.has(k)) byKey.set(k, [])
+    byKey.get(k).push(round)
+  }
+  return summary.map(row => {
+    const history = (byKey.get(key(row)) || [])
+      .slice()
+      .sort((a, b) => String(a.classified_on || '').localeCompare(String(b.classified_on || '')) || a.round_id - b.round_id)
+    return history.length > 0 ? { ...row, history } : row
+  })
 }
 
 /** 1 when a range is wholly above `value`, -1 wholly below, 0 when exactly it, else null. */

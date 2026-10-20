@@ -14,6 +14,7 @@ import {
   STAGES,
   startYearChoices,
   summaryRowsFor,
+  withRoundHistory,
 } from '../../admission/calculator'
 import { schoolCatchmentIds } from '../../admission/catchments'
 import { kindergartenDistrictFeature } from '../../admission/schoolVerdict'
@@ -105,6 +106,8 @@ function AdmissionPage() {
       districtCode: district?.properties.code ?? null,
       districtName: district?.properties.name ?? null,
       cutoffSummary: info.cutoff_summary || [],
+      // Every ranking of each row, for the list under the calculator.
+      cutoffHistory: withRoundHistory(info),
     }
   }, [school, districts, i18n.language])
 
@@ -219,7 +222,7 @@ function AdmissionPage() {
             <p className="mt-1 text-sm text-neutral-600">{t('cutoffs.intro')}</p>
             <div className="mt-4">
               {cutoffRows.length > 0
-                ? <CutoffTable rows={cutoffRows} isCurrentRules={row => sameRules(row.rule_set, selected?.ruleSet)} />
+                ? <CutoffTable rows={summaryRowsFor(schoolContext.cutoffHistory, stage)} isCurrentRules={row => sameRules(row.rule_set, selected?.ruleSet)} />
                 : <p className="text-sm text-neutral-600">{t('cutoffs.none')}</p>}
             </div>
           </section>
