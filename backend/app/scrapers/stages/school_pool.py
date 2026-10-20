@@ -11,9 +11,11 @@ Plan: ``docs/SITE_AGENT_RUNS.md``.
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any, Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -24,6 +26,16 @@ from app.scrapers.shared_site_check import registrable_domain, site_id
 logger = logging.getLogger(__name__)
 
 Work = Callable[[AsyncSession, int], Awaitable[dict[str, Any]]]
+
+
+def append_line(path: Path, result: dict[str, Any]) -> None:
+    """Append one school's result to a run's lines file (an ``on_result`` for ``run_schools``),
+    so a killed run keeps what it read and a resume can start after the last line."""
+    try:  # a failed write loses one line, not the rest of the run
+        with path.open("a", encoding="utf-8") as lines:
+            lines.write(json.dumps(result, ensure_ascii=False, default=str) + "\n")
+    except (OSError, TypeError, ValueError):
+        logger.exception("could not write the line for school %s", result.get("school_id"))
 
 
 def site_key(url: Optional[str]) -> Optional[str]:

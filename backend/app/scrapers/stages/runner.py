@@ -245,6 +245,9 @@ async def run_sync(
                             stage_summaries.append(
                                 await website_stage.run_discover_batch(db, country, city, limit, sample_ratio)
                             )
+                            # A crashed adapter is counted, not raised; scheduled imports need the exit code.
+                            if stage_summaries[-1].get("failed"):
+                                raise RuntimeError(f"{stage_summaries[-1]['failed']} discovery adapter(s) failed")
                         elif stage == "discover-websites":
                             stage_summaries.append(await website_stage.run_discover_websites_batch(db, country, city, limit))
                         elif stage == "recover-failed-urls":

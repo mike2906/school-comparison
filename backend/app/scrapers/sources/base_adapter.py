@@ -243,6 +243,7 @@ class BaseSourceAdapter(ABC):
                     existing_admission_info = existing_school.admission_info or {}
 
                     # Update existing
+                    old_website = existing_school.website_url
                     if self.ENRICHMENT_ONLY:
                         # Enrichment adapters (e.g., kg.sofia) must not overwrite core
                         # identity/classification fields from authoritative registries.
@@ -270,10 +271,11 @@ class BaseSourceAdapter(ABC):
 
                     existing_school.attributes = {**existing_attributes, **incoming_attributes}
                     existing_school.admission_info = {**existing_admission_info, **(disc.admission_info or {})}
-                    if not self.ENRICHMENT_ONLY:
-                        # Reset to pending for re-scraping. Enrichment adapters only add
-                        # their own attributes, which never need a website re-scrape (and a
-                        # pending status would withhold the school's published website data).
+                    if existing_school.website_url != old_website:
+                        # A new website is re-checked from the start. The same one keeps its
+                        # status: pending would withhold the school's published website data
+                        # (facts, fees, names) until the pipeline ran again, and the monthly
+                        # import (scripts/refresh_register.sh) runs no website stage.
                         existing_school.scrape_status = "pending"
 
                     school_id = existing_school.id

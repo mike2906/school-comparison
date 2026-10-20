@@ -13,6 +13,7 @@ import datetime
 import logging
 from collections import Counter
 from collections.abc import Awaitable, Callable, Sequence
+from pathlib import Path
 from typing import Any, Optional
 
 from sqlalchemy import func, select
@@ -270,9 +271,15 @@ async def run_school_facts(
     max_usd: float = DEFAULT_MAX_USD,
     apply: bool = False,
     workers: int = 1,
+    after_id: Optional[int] = None,
+    lines_path: Optional[Path] = None,
 ) -> dict[str, Any]:
     """Run over schools with an accepted website (all types, or the given ids), ``workers``
-    schools at a time; returns the report."""
+    schools at a time; returns the report.
+
+    ``after_id`` starts after that school, to carry on a run that stopped or was split over
+    several nights; ``lines_path`` gets each school's report as one JSON line, in id order,
+    so ``after_id`` with the last line's id skips no school."""
     from crawl4ai import AsyncWebCrawler, BrowserConfig, CacheMode, CrawlerRunConfig  # type: ignore
 
     # Only websites URL validation accepted: facts from an unchecked URL would not be shown.
@@ -285,6 +292,8 @@ async def run_school_facts(
         query = query.where(School.id.in_(list(school_ids)))
     if city:
         query = query.where(func.lower(School.city) == city.lower())
+    if after_id is not None:
+        query = query.where(School.id > after_id)
     rows = (await db.execute(query.add_columns(School.website_url).order_by(School.id).limit(limit))).all()
     ids = [row.id for row in rows]
     sites = {row.id: row.website_url for row in rows}
@@ -346,7 +355,13 @@ async def run_school_facts(
                     return await run_school(school_db, school, find=find, call=call, apply=apply)
 
                 results, error = await school_pool.run_schools(
-                    db, ids, one, workers=workers, stop_on=(SpendCapReached, ProviderCostError), sites=sites
+                    db,
+                    ids,
+                    one,
+                    workers=workers,
+                    stop_on=(SpendCapReached, ProviderCostError),
+                    sites=sites,
+                    on_result=(lambda result: school_pool.append_line(lines_path, result)) if lines_path else None,
                 )
     except Exception as exc:
         logger.exception("school-facts run %s stopped", run_id)

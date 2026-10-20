@@ -978,3 +978,30 @@ def test_a_school_year_fact_that_mentions_summer_stays_key():
     }
     out = publishable_school_facts({"school_facts": block}, "https://www.school.example")
     assert out["facts"][0]["rank"] == "key"
+
+
+def test_school_facts_cli_carries_on_after_an_id_and_writes_lines_next_to_the_report(tmp_path):
+    # The scheduled re-read (backend/scripts/refresh_facts.sh) resumes from the last line.
+    from unittest.mock import AsyncMock, patch
+
+    from click.testing import CliRunner
+
+    from app.scrapers import cli as scraper_cli
+
+    report = {"schools": 0, "spent_usd": 0.0, "results": [], "stopped": None}
+    with patch.object(stage, "run_school_facts", new=AsyncMock(return_value=report)) as run:
+        result = CliRunner().invoke(
+            scraper_cli.cli, ["school-facts", "--after-id", "41", "--out", str(tmp_path / "facts.json")]
+        )
+    assert result.exit_code == 0, result.output
+    assert run.await_args.kwargs["after_id"] == 41
+    assert run.await_args.kwargs["lines_path"] == tmp_path / "facts.schools.jsonl"
+
+
+def test_append_line_writes_one_json_line_per_school(tmp_path):
+    from app.scrapers.stages.school_pool import append_line
+
+    path = tmp_path / "run.schools.jsonl"
+    append_line(path, {"school_id": 1, "outcome": "Ünï"})
+    append_line(path, {"school_id": 2, "outcome": "error"})
+    assert [line.split('"school_id": ')[1][0] for line in path.read_text(encoding="utf-8").splitlines()] == ["1", "2"]

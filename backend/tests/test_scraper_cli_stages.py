@@ -1150,3 +1150,36 @@ def test_run_always_executes_in_process(extra_args):
     assert result.exit_code == 0, result.output
     run_sync.assert_awaited_once()
     assert run_sync.await_args.args[2] == "nvo"
+
+
+@pytest.mark.asyncio
+async def test_batch_discover_with_a_crashed_adapter_exits_non_zero(db_session):
+    # The monthly register import runs from cron, which only sees the exit code.
+    class SessionContext:
+        async def __aenter__(self):
+            return db_session
+
+        async def __aexit__(self, *_args):
+            return False
+
+    summary = {"processed": 1, "succeeded": 0, "failed": 1, "skipped": 0}
+    with (
+        patch("app.database.async_session_maker", side_effect=lambda: SessionContext()),
+        patch.object(website_stage, "run_discover_batch", new=AsyncMock(return_value=summary)),
+        pytest.raises(RuntimeError, match="1 discovery adapter"),
+    ):
+        await stage_runner.run_sync(
+            school_name=None,
+            school_id=None,
+            stage="discover",
+            city="sofia",
+            country="bg",
+            limit=None,
+            year=None,
+            history_years=5,
+            exam_types=[],
+            sample_ratio=0.0,
+            include_navigated=False,
+            include_extracted=False,
+            force_validate=False,
+        )
