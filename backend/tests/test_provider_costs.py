@@ -784,3 +784,62 @@ async def test_a_scope_passes_model_reserves_to_each_reservation(db_session, mon
         with pytest.raises(TimeoutError):
             await execute_billable_request(_call, model="m", school_id=None)
     assert seen == [{"m": Decimal("0.05000000")}]
+
+
+async def _run_failing_priced_call(monkeypatch, requests_back: int, requests_started: int):
+    import app.database as database
+    import app.services.provider_costs as provider_costs
+
+    class _Session:
+        async def __aenter__(self):
+            return object()
+
+        async def __aexit__(self, *_args):
+            return None
+
+    marked, attributed = [], []
+
+    async def _mark(_db, *, client_request_id, reason):
+        marked.append(client_request_id)
+
+    async def _attribute(_db, *, reservation_client_request_id, attributions):
+        attributed.append([row["provider_cost_usd"] for row in attributions])
+
+    async def _reserve(*_args, **_kwargs):
+        return SimpleNamespace(client_request_id="client")
+
+    monkeypatch.setattr(database, "async_session_maker", lambda: _Session())
+    monkeypatch.setattr(provider_costs, "reserve_provider_request", _reserve)
+    monkeypatch.setattr(provider_costs, "mark_provider_request_uncertain", _mark)
+    monkeypatch.setattr(provider_costs, "attribute_provider_responses", _attribute)
+
+    async def _call():
+        for n in range(requests_started):
+            provider_costs.note_priced_request_started()
+            if n < requests_back:
+                provider_costs.note_priced_response(
+                    SimpleNamespace(
+                        provider_response_id=f"msg-{n}",
+                        provider_details={"cost": 0.002},
+                        usage=SimpleNamespace(input_tokens=10_000, output_tokens=2_000),
+                    )
+                )
+        raise RuntimeError("Exceeded maximum output retries")
+
+    with provider_cost_scope(pipeline_run_id="run-1", stage="school_facts", cap_usd=1.0, request_reserve_usd=0.1):
+        with pytest.raises(RuntimeError):
+            await execute_billable_request(_call, model="anthropic/claude-haiku-5-5", school_id=1)
+    return marked, attributed
+
+
+async def test_a_failed_call_whose_requests_all_came_back_is_booked_at_its_cost(monkeypatch):
+    # 220/390: Haiku's output failed its check twice; both answers were priced.
+    marked, attributed = await _run_failing_priced_call(monkeypatch, requests_back=2, requests_started=2)
+    assert marked == []
+    assert attributed == [[Decimal("0.002"), Decimal("0.002")]]
+
+
+async def test_a_failed_call_with_a_request_still_out_keeps_the_reserve(monkeypatch):
+    marked, attributed = await _run_failing_priced_call(monkeypatch, requests_back=1, requests_started=2)
+    assert marked == ["client"]
+    assert attributed == []

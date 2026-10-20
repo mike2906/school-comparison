@@ -66,6 +66,40 @@ _SCOPE: contextvars.ContextVar[ProviderCostScope | None] = contextvars.ContextVa
 )
 
 
+@dataclass
+class _PricedCall:
+    """The requests a self-pricing model (the Anthropic route) made inside one billable call.
+    A call that fails after every request came back (invalid output twice, a cut-off answer)
+    is then booked at its exact cost, not at the request reserve."""
+
+    started: int = 0
+    responses: list[Any] = field(default_factory=list)
+
+
+_PRICED_CALL: contextvars.ContextVar[_PricedCall | None] = contextvars.ContextVar("priced_call", default=None)
+
+
+def note_priced_request_started() -> None:
+    if (call := _PRICED_CALL.get()) is not None:
+        call.started += 1
+
+
+def note_priced_response(response: Any) -> None:
+    if (call := _PRICED_CALL.get()) is not None:
+        call.responses.append(response)
+
+
+def _failed_call_attributions(call: _PricedCall) -> Optional[list[dict[str, Any]]]:
+    """Exact attributions of a failed call whose requests all came back; None when one was
+    still in flight (a timeout) or the route does not price its responses."""
+    if not call.started or len(call.responses) != call.started:
+        return None
+    try:
+        return _attributions(call.responses)
+    except ProviderAttributionUncertain:
+        return None
+
+
 def _usd(value: Any, *, field: str) -> Decimal:
     try:
         parsed = Decimal(str(value))
@@ -320,8 +354,12 @@ def _usage_counts(usage: Any) -> tuple[Any, Any]:
 
 def extract_exact_provider_attributions(result: Any) -> list[dict[str, Any]]:
     """Extract exact identity, usage, cost, and time for every provider response."""
+    return _attributions(_provider_responses(result))
+
+
+def _attributions(responses: list[Any]) -> list[dict[str, Any]]:
     attributions: list[dict[str, Any]] = []
-    for response in _provider_responses(result):
+    for response in responses:
         details = getattr(response, "provider_details", None)
         details = details if isinstance(details, dict) else {}
         request_id = getattr(response, "provider_response_id", None) or next(
@@ -514,9 +552,26 @@ async def _execute_tracked_billable_request(
             request_reserve_usd=scope.request_reserve_usd,
             model_reserves=scope.model_reserves,
         )
+    priced = _PricedCall()
+    token = _PRICED_CALL.set(priced)
     try:
         result = await _bounded(call, timeout_seconds)
     except BaseException as exc:
+        attributions = _failed_call_attributions(priced)
+        booked = False
+        if attributions:
+            try:
+                async with async_session_maker() as ledger_db:
+                    await attribute_provider_responses(
+                        ledger_db,
+                        reservation_client_request_id=reservation.client_request_id,
+                        attributions=attributions,
+                    )
+                booked = True
+            except ProviderAttributionUncertain:
+                pass
+        if booked:
+            raise
         async with async_session_maker() as ledger_db:
             await mark_provider_request_uncertain(
                 ledger_db,
@@ -524,6 +579,8 @@ async def _execute_tracked_billable_request(
                 reason=f"provider dispatch ended without exact attribution: {type(exc).__name__}",
             )
         raise
+    finally:
+        _PRICED_CALL.reset(token)
 
     try:
         attributions = extract_exact_provider_attributions(result)

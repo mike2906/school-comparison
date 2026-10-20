@@ -21,7 +21,11 @@ from pydantic_ai.providers.anthropic import AnthropicProvider
 from pydantic_ai.providers.openrouter import OpenRouterProvider
 
 from app.config import get_settings
-from app.services.provider_costs import ProviderCreditsExhausted
+from app.services.provider_costs import (
+    ProviderCreditsExhausted,
+    note_priced_request_started,
+    note_priced_response,
+)
 
 # Model tier definitions
 # See: https://openrouter.ai/models for pricing and capabilities
@@ -248,19 +252,13 @@ class PricedAnthropicModel(AnthropicModel):
     # Only request() is priced: no stage streams. A streamed call would come back without
     # a cost, and the ledger would reject it as unattributed rather than undercount it.
     async def request(self, messages, model_settings, model_request_parameters) -> ModelResponse:
+        note_priced_request_started()
         try:
             response = await super().request(messages, model_settings, model_request_parameters)
         except ModelHTTPError as exc:
             if _is_account_error(exc):
                 raise ProviderCreditsExhausted(f"Anthropic refused the request: {exc}") from exc
             raise
-        if response.finish_reason == "length":
-            # A structured answer cut off at max_tokens parses as an empty or partial
-            # result; fail the call so the school counts as not read, not as "no fees".
-            # The provider-cost guard counts a failed call at the request reserve.
-            raise UnexpectedModelBehavior(
-                f"Anthropic answer cut off at {response.usage.output_tokens} output tokens"
-            )
         usage = response.usage
         cost = anthropic_cost_usd(self.model_name, usage.input_tokens, usage.output_tokens)
         # "cost" is what the ledger and caps read; cost_source records that it was computed
@@ -270,6 +268,13 @@ class PricedAnthropicModel(AnthropicModel):
             "cost": cost,
             "cost_source": "computed_from_usage",
         }
+        # The provider-cost guard books a call that then fails (invalid output twice, the
+        # cut-off below) at these costs; one still in flight keeps the request reserve.
+        note_priced_response(response)
+        if response.finish_reason == "length":
+            # A structured answer cut off at max_tokens parses as an empty or partial
+            # result; fail the call so the school counts as not read, not as "no fees".
+            raise UnexpectedModelBehavior(f"Anthropic answer cut off at {usage.output_tokens} output tokens")
         return response
 
 
