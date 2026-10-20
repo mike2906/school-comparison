@@ -257,10 +257,10 @@ def test_valid_fees_keep_their_period():
         assert result.checks == []
 
 
-def test_a_row_alone_does_not_name_the_yearly_period():
-    """Without a heading line naming the year, 515's 11400 publishes with a blank period."""
+def test_a_row_giving_the_school_years_length_names_the_yearly_period():
+    """515's row alone: its "9 месеца" period cell is the school year, so 11400 is yearly (as its key)."""
     result = check_fee(fee(PriceCategory.TUITION, ROWS_515["first"], amount=11400, period=PricePeriod.YEARLY), PAGE_515)
-    assert published(result) and result.fee.period is None
+    assert published(result) and result.fee.period is PricePeriod.YEARLY
 
 
 def test_deposit_filed_as_registration_publishes():
@@ -2122,3 +2122,74 @@ def test_no_gh_leaves_the_run_alone(monkeypatch):
     monkeypatch.setattr(fee_check.subprocess, "run", run)
     results = [{"school_id": 1, "check": {"wrong": [{"fee": 0, "problem": "p", "evidence": "e"}]}}]
     assert fee_check.open_wrong_fees_issue(results).startswith("not reported")
+
+
+@pytest.mark.parametrize(
+    ("category", "evidence", "amount", "period"),
+    [
+        # Trial 3 (2026-10-20): periods the school states in words the checks did not know.
+        (PriceCategory.TUITION, "Таксата за обучение за учебната 2026/2027 г. е 8110 евро. Таксата може да бъде платена на 1, 2 или 3 вноски.", 8110, PricePeriod.YEARLY),  # 381
+        (PriceCategory.TUITION, "## Учебен\nпериод\nТакса обучение на полудневна база\n11\nмесеца\n8064\n4Х 2016", 8064, PricePeriod.YEARLY),  # 541
+        (PriceCategory.CAMP, "1 седмица\n170", 170, PricePeriod.WEEKLY),  # 541's summer school
+        (PriceCategory.FOOD, "Храна – 8 Евро за присъствен ден", 8, PricePeriod.DAILY),  # 569
+        (PriceCategory.TRANSPORT, "Транспорт в посока – 179 Евро за 1 месец", 179, PricePeriod.MONTHLY),  # 569
+    ],
+)  # fmt: skip
+def test_periods_stated_with_a_school_year_or_a_count_of_one_are_kept(category, evidence, amount, period):
+    result = check_fee(fee(category, evidence, amount=amount, period=period), evidence)
+    assert published(result) and result.fee.period is period, result.checks
+
+
+@pytest.mark.parametrize(
+    ("evidence", "period"),
+    [
+        ("Деца от 10 месеца до 3 години: 550 евро", PricePeriod.YEARLY),  # an age
+        ("Бебета на 12 месеца: 550 евро", PricePeriod.YEARLY),
+        ("11 месеца\n550 евро на месец", PricePeriod.YEARLY),  # the column's length, the fee monthly
+        ("Такса за целия ден 550 евро", PricePeriod.DAILY),  # a full day
+        ("Еднократно плащане за 6 месеца 550 евро", PricePeriod.MONTHLY),  # prepaid for six months
+        ("Лагер 2 седмици 550 евро", PricePeriod.WEEKLY),
+        ("Таксата за 2026 г. е 550 евро", PricePeriod.YEARLY),
+    ],
+)
+def test_lengths_and_ages_name_no_period(evidence, period):
+    result = check_fee(fee(PriceCategory.TUITION, evidence, amount=550, period=period), evidence)
+    assert result.fee.period is None, result.checks
+
+
+def test_a_printed_total_takes_the_period_of_its_groups_tuition():
+    """506: "Total Fee for New Students" under a heading naming no period; its tuition is annual."""
+    school = School(id=1, name_i18n={}, country_code="bg", school_type="private", education_level="primary")
+    page = SourcePage(id=-1, school_id=1, scrape_type=ScrapeType.WEBSITE, source_url=URL)
+    text = "Annual Tuition Fee 2026-2027\nPre-Kindergarten\n€12,008\nGrade 9 – Grade 12\n€25,619\nTotal Fee for New Students\n€18,219\n€31,830\nTOTAL €5,000\nTotal monthly €900"
+
+    def read(amount, evidence, **kw):
+        return check_fee(fee(PriceCategory.TUITION, evidence, amount=amount, **kw), text)
+
+    rows, sources = fees_agent._build_rows(
+        school,
+        [
+            (read(12008, "Annual Tuition Fee 2026-2027\n€12,008", period=PricePeriod.YEARLY, age_group="Pre-Kindergarten"), page),
+            (read(18219, "Total Fee for New Students\n€18,219", plan_name="Total Fee for New Students", age_group="Pre-Kindergarten"), page),
+            # A group the read gave no tuition for: the read's other tuition, all yearly, stands in.
+            (read(31830, "Total Fee for New Students\n€31,830", plan_name="Total Fee for New Students", age_group="Grade 9 – Grade 12"), page),
+        ],
+    )  # fmt: skip
+    assert {float(r.amount): r.period for r in rows} == {
+        12008: PricePeriod.YEARLY,
+        18219: PricePeriod.YEARLY,
+        31830: PricePeriod.YEARLY,
+    }
+    assert "pricing.tuition.yearly" in {s.field_key for s in sources}
+    total = next(r for r in rows if float(r.amount) == 18219)
+    assert "period yearly from the tuition the total adds up" in total.pricing_context["checks"]
+    # Tuition of two periods gives a total none; a whole fee's own name is not a total.
+    rows, _ = fees_agent._build_rows(
+        school,
+        [
+            (read(12008, "Annual Tuition Fee 2026-2027\n€12,008", period=PricePeriod.YEARLY), page),
+            (read(900, "Total monthly €900", period=PricePeriod.MONTHLY, plan_name="Monthly"), page),
+            (read(5000, "TOTAL €5,000", plan_name="Total"), page),
+        ],
+    )  # fmt: skip
+    assert next(r for r in rows if float(r.amount) == 5000).period is None
