@@ -31,7 +31,7 @@ from app.scrapers.stages import school_pool
 from app.scrapers.stages.fees_agent import PageRead, Spend, SpendCapReached, find_pages
 from app.services.pipeline_runs import finalize_pipeline_run, pipeline_run_heartbeat, start_pipeline_run
 from app.services.provider_costs import ProviderCostError, execute_billable_request, provider_cost_scope
-from app.utils.school_facts import ATTRIBUTE_KEY, SITE_ACCEPTED_STATUSES
+from app.utils.school_facts import ATTRIBUTE_KEY, LANGUAGES_READ_KEY, SITE_ACCEPTED_STATUSES
 
 logger = logging.getLogger(__name__)
 
@@ -247,6 +247,10 @@ async def run_school(db: AsyncSession, school: School, *, find: Finder, call: Ca
         report["kept_stored_facts"] = bool(stored)
     elif apply:
         block = facts_block(facts, get_model(TIER), school.website_url)
+        # Only a full read can list every taught language: not a partial crawl whose language
+        # pages timed out, nor the open-days check's block (open_days.py).
+        if report.get("pages_read", 0) >= FULL_READ_PAGES:
+            block[LANGUAGES_READ_KEY] = True
         # The read takes a while and other stages write other attributes keys meanwhile:
         # re-read the row under a lock so only this key changes.
         await db.refresh(school, attribute_names=["attributes"], with_for_update=True)

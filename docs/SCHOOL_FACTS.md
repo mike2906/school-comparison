@@ -74,7 +74,9 @@ parent's or graduate's remark is not shown at all.
 
 **Labels feed the existing filters and fields** (`publication_attributes`): a shown fact's
 tags join `filter_tags` (so the search filters and the compare page's meals, transport and
-after-school rows see them), its languages join `language_focus`, and its class size is
+after-school rows see them), its languages join `language_focus` (a read made since 2026-10-20 lists every foreign language the
+school teaches, and one of at least 4 pages is marked `languages_read`; its languages then replace the old extraction's
+unchecked list), and its class size is
 used when no curated one exists (before the old extraction's), unless the fact is about one
 grade, intake, profile or course, or a summer programme: the fact still shows, but the
 class-size tile is for the whole school. The response also carries

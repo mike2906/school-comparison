@@ -104,15 +104,17 @@ Rules:
 - Be specific: name the sports, clubs, languages, rooms or hours. "Sports activities are part of the programme"
   or "pupils are at school for the full day" with nothing more says too little; give the detail the page has
   (which sports, until what time) or leave the fact out. The subjects every school teaches under the state
-  programme are not worth a fact.
+  programme are not worth a fact, but which foreign languages are taught always is: name every one the pages
+  say the school teaches.
 - Label a fact, only when its quote states it:
   - tags, from this list: transportation (a school bus or transport service), cafeteria (the school's own
     canteen or kitchen), meals_provided (meals served to pupils), extended_day (full-day schooling or
     after-school care: целодневно обучение, занималня), sports_facilities (a gym, pool, pitch or courts),
     library, computer_lab, music_program, sports_program (sports training or teams), arts_program,
     montessori, waldorf, ib_program, project_based
-  - languages: each language the quote says is taught beyond the standard state programme, with a level when
-    stated: immersion (most teaching is in it), bilingual (some subjects are taught in it), enrichment
+  - languages: each foreign language the quote says the school teaches (a subject, a profile, a language class or
+    club), with a level when stated; not a language offered only on request or if enough parents ask, nor one only
+    named in a review, news item or trip. Levels: immersion (most teaching is in it), bilingual (some subjects are taught in it), enrichment
     (intensive or extended study of it); no level otherwise. Write the language's English name.
     For a language the quote gives weekly hours for, add hours_per_week.
   - instruction_languages: the languages most lessons are taught in, when the quote says.
@@ -181,7 +183,7 @@ class Fact(BaseModel):
     quote: str = Field(description="The page line (or a heading and up to 8 rows) the fact comes from, verbatim")
     source_url: str = Field(description="The URL from the PAGE line of the page the quote is on")
     tags: list[Tag] = Field(default_factory=list, description="Filter tags the quote states")
-    languages: list[LanguageLabel] = Field(default_factory=list, description="Languages taught beyond the standard")
+    languages: list[LanguageLabel] = Field(default_factory=list, description="Foreign languages the school teaches")
     max_class_size: Optional[int] = Field(default=None, description="The most pupils in a class, if the quote gives it")
     instruction_languages: list[str] = Field(default_factory=list)
     admission: list[Admission] = Field(default_factory=list)

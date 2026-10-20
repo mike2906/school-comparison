@@ -183,6 +183,19 @@ async def test_apply_replaces_stored_facts_and_dry_run_writes_nothing():
     assert report["stored"] == 1 and db.commits == 1 and school.attributes["other"] == 1
     assert stored["_schema_version"] == 1 and [f["topic"] for f in stored["facts"]] == ["school_day"]
     assert stored["website_url"] == HOME
+    # Two pages read is a partial crawl: it may have missed the language pages.
+    assert "languages_read" not in stored
+    assert "languages_read" not in stage.facts_block([], "m", HOME)  # the open-days check's block
+
+
+@pytest.mark.asyncio
+async def test_only_a_full_read_says_every_language_was_read():
+    quote = "Учебният ден започва в 08:00 часа и приключва в 14:00 часа."
+    extra = [PageRead(f"https://school.example/p{n}", f"Страница {n}.", False) for n in range(2)]
+    school, db = _school(), _Db()
+    calls = _Calls([_fact("school_day", quote)], passed=[1])
+    await stage.run_school(db, school, find=await _find(PAGES + extra), call=calls, apply=True)
+    assert school.attributes["school_facts"]["languages_read"] is True
 
 
 @pytest.mark.asyncio
@@ -312,6 +325,33 @@ async def test_fact_labels_feed_the_filters_languages_and_class_size(client, db_
     assert {"language": "English", "level": "enrichment"} in body["attributes_i18n"]["en"]["language_focus"]
     assert body["attributes"]["class_size"] == 16
     assert [f["rank"] for f in body["school_facts"]["facts"]] == ["key", "more"]  # minor is not shown
+
+
+@pytest.mark.parametrize("languages_read,shown", [(False, ["English", "Russian"]), (True, ["English"])])
+def test_a_read_listing_every_language_replaces_the_old_extractions(languages_read, shown):
+    from app.utils.school_attributes import build_localized_attributes
+    from app.utils.school_facts import PUBLISHED_KEY
+
+    # 625: the old extraction listed Russian, German and Italian; the site names only English.
+    block = {
+        "_schema_version": 1,
+        "read_at": "t",
+        "website_url": HOME,
+        "facts": [_fact_row(topic="languages", languages=[{"language": "English"}])],
+    }
+    if languages_read:
+        block["languages_read"] = True
+    published = publishable_school_facts({"school_facts": block}, HOME)
+    attrs = {"extracted": {"languages": ["Russian"]}, PUBLISHED_KEY: published}
+    focus = build_localized_attributes(attrs, "en", "private")["language_focus"]
+    assert sorted(entry["language"] for entry in focus) == shown
+
+
+@pytest.mark.asyncio
+async def test_the_languages_read_marker_stays_internal(client, db_session):
+    block = {"_schema_version": 1, "read_at": "t", "website_url": HOME, "languages_read": True, "facts": [_fact_row()]}
+    body = await _detail(client, db_session, school_facts=block)
+    assert "languages_read" not in body["school_facts"]
 
 
 @pytest.mark.asyncio
