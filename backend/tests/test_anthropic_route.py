@@ -160,6 +160,27 @@ async def test_an_answer_cut_off_at_max_tokens_fails_instead_of_reading_as_empty
         await agent.run("hello")
 
 
+async def test_a_cut_off_answer_is_noted_at_its_price_for_the_cost_guard(monkeypatch, haiku_pricing):
+    from app.services import provider_costs
+
+    def cut_off(request):
+        body = _tool_answer(request).json()
+        body["stop_reason"] = "max_tokens"
+        return httpx.Response(200, json=body)
+
+    _mock_anthropic(monkeypatch, cut_off)
+    call = provider_costs._PricedCall()
+    token = provider_costs._PRICED_CALL.set(call)
+    try:
+        with pytest.raises(UnexpectedModelBehavior):
+            await ai_client.create_agent("pricing", "system", Pick).run("hello")
+    finally:
+        provider_costs._PRICED_CALL.reset(token)
+    assert call.started == len(call.responses) == 1
+    [row] = provider_costs._failed_call_attributions(call)
+    assert float(row["provider_cost_usd"]) > 0
+
+
 @pytest.mark.parametrize(
     ("status", "error"),
     [

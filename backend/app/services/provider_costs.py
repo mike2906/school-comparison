@@ -66,6 +66,40 @@ _SCOPE: contextvars.ContextVar[ProviderCostScope | None] = contextvars.ContextVa
 )
 
 
+@dataclass
+class _PricedCall:
+    """The requests a self-pricing model (the Anthropic route) made inside one billable call.
+    A call that fails after every request came back (invalid output twice, a cut-off answer)
+    is then booked at its exact cost, not at the request reserve."""
+
+    started: int = 0
+    responses: list[Any] = field(default_factory=list)
+
+
+_PRICED_CALL: contextvars.ContextVar[_PricedCall | None] = contextvars.ContextVar("priced_call", default=None)
+
+
+def note_priced_request_started() -> None:
+    if (call := _PRICED_CALL.get()) is not None:
+        call.started += 1
+
+
+def note_priced_response(response: Any) -> None:
+    if (call := _PRICED_CALL.get()) is not None:
+        call.responses.append(response)
+
+
+def _failed_call_attributions(call: _PricedCall) -> Optional[list[dict[str, Any]]]:
+    """Exact attributions of the answers a failed call got back; None when it got none or
+    the route does not price its responses. A request still in flight is not among them."""
+    if not call.responses:
+        return None
+    try:
+        return _attributions(call.responses)
+    except ProviderAttributionUncertain:
+        return None
+
+
 def _usd(value: Any, *, field: str) -> Decimal:
     try:
         parsed = Decimal(str(value))
@@ -320,8 +354,12 @@ def _usage_counts(usage: Any) -> tuple[Any, Any]:
 
 def extract_exact_provider_attributions(result: Any) -> list[dict[str, Any]]:
     """Extract exact identity, usage, cost, and time for every provider response."""
+    return _attributions(_provider_responses(result))
+
+
+def _attributions(responses: list[Any]) -> list[dict[str, Any]]:
     attributions: list[dict[str, Any]] = []
-    for response in _provider_responses(result):
+    for response in responses:
         details = getattr(response, "provider_details", None)
         details = details if isinstance(details, dict) else {}
         request_id = getattr(response, "provider_response_id", None) or next(
@@ -374,8 +412,12 @@ async def attribute_provider_responses(
     *,
     reservation_client_request_id: str,
     attributions: list[dict[str, Any]],
+    keep_reservation: bool = False,
 ) -> list[ProviderRequestLedger]:
-    """Attribute one agent dispatch as one ledger row per provider response."""
+    """Attribute one agent dispatch as one ledger row per provider response.
+
+    ``keep_reservation`` books every response on a row of its own and leaves the
+    reservation row to the caller: a failed call's request still in flight stays on it."""
     if not attributions:
         raise ProviderAttributionUncertain("provider returned no attributable responses")
     reservation = (
@@ -428,7 +470,7 @@ async def attribute_provider_responses(
 
     rows: list[ProviderRequestLedger] = []
     for index, attribution in enumerate(normalized):
-        row = reservation if index == 0 else ProviderRequestLedger(
+        row = reservation if index == 0 and not keep_reservation else ProviderRequestLedger(
             client_request_id=str(uuid4()),
             pipeline_run_id=reservation.pipeline_run_id,
             stage=reservation.stage,
@@ -514,16 +556,36 @@ async def _execute_tracked_billable_request(
             request_reserve_usd=scope.request_reserve_usd,
             model_reserves=scope.model_reserves,
         )
+    priced = _PricedCall()
+    token = _PRICED_CALL.set(priced)
     try:
         result = await _bounded(call, timeout_seconds)
     except BaseException as exc:
-        async with async_session_maker() as ledger_db:
-            await mark_provider_request_uncertain(
-                ledger_db,
-                client_request_id=reservation.client_request_id,
-                reason=f"provider dispatch ended without exact attribution: {type(exc).__name__}",
-            )
+        attributions = _failed_call_attributions(priced)
+        # A request still out when the call failed (a timeout during a retry) may be billed:
+        # it keeps the reservation, uncertain at the request reserve, beside the answers' rows.
+        in_flight = attributions is None or len(priced.responses) < priced.started
+        if in_flight:
+            async with async_session_maker() as ledger_db:
+                await mark_provider_request_uncertain(
+                    ledger_db,
+                    client_request_id=reservation.client_request_id,
+                    reason=f"provider dispatch ended without exact attribution: {type(exc).__name__}",
+                )
+        if attributions:
+            try:
+                async with async_session_maker() as ledger_db:
+                    await attribute_provider_responses(
+                        ledger_db,
+                        reservation_client_request_id=reservation.client_request_id,
+                        attributions=attributions,
+                        keep_reservation=in_flight,
+                    )
+            except ProviderAttributionUncertain:
+                pass  # it marked the reservation uncertain
         raise
+    finally:
+        _PRICED_CALL.reset(token)
 
     try:
         attributions = extract_exact_provider_attributions(result)
