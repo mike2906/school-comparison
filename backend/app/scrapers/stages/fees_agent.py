@@ -48,7 +48,6 @@ from app.models.source_page import SourcePage
 from app.schemas.extraction import ExtractedPrice
 from app.scrapers.extraction import llm_results, price_step, text_values
 from app.scrapers.extraction.agent_fees import (
-    _PERIOD_WORDS,
     READER_PROMPT,
     AgentDiscount,
     AgentFee,
@@ -682,43 +681,6 @@ def _ungrouped_elsewhere(entry: tuple, built: list[tuple]) -> bool:
     )
 
 
-# A total the school prints of a group's fees (fees_agent prompt): "Общо", "Total Fee for New
-# Students" (506). The same words as the headline's total (frontend isStatedTotal); keep the two alike.
-_STATED_TOTAL_RE = re.compile(
-    r"^\s*(?:общо|обща\s+сума)(?!\w)|^\s*total(?:\s+(?:fees?|cost))?\s*(?:$|[:(,–-]|for\b|per\b)", re.IGNORECASE
-)
-
-
-def _period_of_totals(built: list[tuple]) -> None:
-    """A printed total with no period of its own takes the period its group's tuition is read
-    with: 506's "Total Fee for New Students" adds up an annual tuition and the yearly or one-off
-    fees beside it, under a heading that names no period. Only when the total's name states no
-    period ("Общо месечно") and the group's tuition has one period; the checks note the step."""
-
-    def names(fields: dict, english: dict) -> list[str]:
-        return [fields["plan_name"] or "", english.get("plan_name_en") or ""]
-
-    def is_total(fields: dict, english: dict) -> bool:
-        return any(_STATED_TOTAL_RE.match(text) for text in names(fields, english))
-
-    tuition = [
-        (fields, result, english)
-        for result, _, fields, _, english in built
-        if fields["category"] is PriceCategory.TUITION
-    ]
-    parts = [fields for fields, _, english in tuition if not is_total(fields, english)]
-    for fields, result, english in tuition:
-        if fields["period"] is not None or not is_total(fields, english):
-            continue
-        if any(re.search(words, text.casefold()) for text in names(fields, english) for words in _PERIOD_WORDS.values()):
-            continue
-        periods = {part["period"] for part in parts if part["age_group"] == fields["age_group"]}
-        if len(periods) == 1 and None not in periods:
-            (period,) = periods
-            fields["period"] = period
-            result.checks.append(f"period {period.value} from the tuition the total adds up")
-
-
 def _build_rows(
     school: School, checked: list[tuple[CheckedFee, SourcePage]]
 ) -> tuple[list[Pricing], list[FieldSource]]:
@@ -760,7 +722,6 @@ def _build_rows(
     restated = {unperiodic(f) for r, _, f, _, _ in built if not _single_payment(r.fee)}
     built = [b for b in built if not (_single_payment(b[0].fee) and unperiodic(b[2]) in restated)]
     built = [b for b in built if not _ungrouped_elsewhere(b, built)]
-    _period_of_totals(built)
     # The same fee on two pages is one row (564 lists its fees on three). On one page a
     # second fee with the same fields but its own label is a fee of its own: two grade
     # tiers at one price when the reader left their groups empty. So each set of fields
