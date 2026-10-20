@@ -219,7 +219,8 @@ describe('admission from a school page', () => {
     assert.ok(await rows.count() >= 1, `${classes.length} classes in the API`)
     // The first ranking is the headline; a later ranking that let in a lower score gets its own line.
     await cutoffs.getByText(t('bg', 'cutoffs.ref.main', { date: '' }).replace(/[,\s]+$/, '')).first().waitFor()
-    if (classes.some(row => row.latest?.min_score < row.first?.min_score)) {
+    // laterEasierRound: same kind of result (no gender quota) after a main ranking with places.
+    if (classes.some(row => !row.quota && row.first?.places !== 0 && row.latest?.min_score < row.first?.min_score)) {
       await cutoffs.getByText(t('bg', 'cutoffs.later', { date: '' }).split('(')[0].trim()).first().waitFor()
     }
   })

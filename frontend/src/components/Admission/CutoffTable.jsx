@@ -90,7 +90,9 @@ function Headline({ row, rounds }) {
     const from = formatRankingDay(rounds[0].classified_on, i18n.language)
     return <div className="font-medium text-neutral-900">{t('cutoffs.ref.noPlacesIn', { count: rounds.length, from, to: day })}</div>
   }
-  const label = round.round_kind === 'current' ? t('cutoffs.ref.free', { date: day }) : t('cutoffs.ref.main', { date: day })
+  const label = round.round_kind === 'current'
+    ? t('cutoffs.ref.free', { date: day })
+    : t(round === row.first ? 'cutoffs.ref.main' : 'cutoffs.ref.other', { date: day })
   const counts = roundCounts(round, t)
   return (
     <>
@@ -129,9 +131,10 @@ function Later({ row }) {
 }
 
 /** Every ranking of the row, folded away: one line each, never side by side. */
-function History({ rounds }) {
+function History({ row, rounds }) {
   const { t, i18n } = useTranslation()
-  if (rounds.length < 2) return null
+  // A list response has only the first and the latest: no list to show.
+  if (!row.history || rounds.length < 2) return null
   return (
     <details className="mt-1 text-xs text-neutral-600">
       <summary className="cursor-pointer select-none text-primary-700 hover:text-primary-800">
@@ -184,7 +187,7 @@ function CutoffTable({ rows, isCurrentRules = () => null }) {
               </div>
               <div className="mt-1"><Headline row={row} rounds={rounds} /></div>
               <Later row={row} />
-              <History rounds={rounds} />
+              <History row={row} rounds={rounds} />
             </li>
           )
         })}

@@ -1137,7 +1137,7 @@
       "everyone": "Everyone who applied was admitted.",
       "noPlaces": "There were no free places.",
       "otherRules": "That ranking used different rules.",
-      "note": "The latest ranking is a guide, not a promise: places and applicants change every time.",
+      "note": "A past ranking is a guide, not a promise: places and applicants change every year.",
       "sameGroup": "The same group as the last child admitted; the list gives no points to compare."
     },
     "score": "{{score}} points",
@@ -1157,7 +1157,8 @@
     "ref": {
       "main": "First ranking, {{date}}",
       "free": "Free-place ranking, {{date}}",
-      "noPlacesIn": "No place came free in any of {{count}} rankings ({{from}} – {{to}})"
+      "noPlacesIn": "No place came free in any of {{count}} rankings ({{from}} – {{to}})",
+      "other": "Ranking of {{date}}"
     },
     "later": "Later, for a place that came free ({{date}})",
     "groupMeaning": {
