@@ -183,6 +183,9 @@ async def test_apply_replaces_stored_facts_and_dry_run_writes_nothing():
     assert report["stored"] == 1 and db.commits == 1 and school.attributes["other"] == 1
     assert stored["_schema_version"] == 1 and [f["topic"] for f in stored["facts"]] == ["school_day"]
     assert stored["website_url"] == HOME
+    # A full read lists every taught language; the open-days check's empty block does not.
+    assert stored["languages_read"] is True
+    assert "languages_read" not in stage.facts_block([], "m", HOME)
 
 
 @pytest.mark.asyncio

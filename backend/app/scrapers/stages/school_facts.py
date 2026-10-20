@@ -225,7 +225,6 @@ def facts_block(facts: list[dict], model: str, website_url: Optional[str]) -> di
         "read_at": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
         "website_url": website_url,
         "model": model,
-        LANGUAGES_READ_KEY: True,
         "facts": facts,
     }
 
@@ -247,7 +246,8 @@ async def run_school(db: AsyncSession, school: School, *, find: Finder, call: Ca
     if facts is None or (not facts and stored and report.get("pages_read", 0) < FULL_READ_PAGES):
         report["kept_stored_facts"] = bool(stored)
     elif apply:
-        block = facts_block(facts, get_model(TIER), school.website_url)
+        # Only a full read lists every taught language (open_days.py builds blocks too).
+        block = facts_block(facts, get_model(TIER), school.website_url) | {LANGUAGES_READ_KEY: True}
         # The read takes a while and other stages write other attributes keys meanwhile:
         # re-read the row under a lock so only this key changes.
         await db.refresh(school, attribute_names=["attributes"], with_for_update=True)
