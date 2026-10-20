@@ -845,7 +845,7 @@
       "support": "Подкрепа за деца със СОП",
       "grade": "{{grade}} клас",
       "grades": "{{from}}–{{to}} клас",
-      "kindergarten": "Детска градина",
+      "preschool": "Предучилищна група",
       "admissionTypes": {
         "entrance_exam": "Приемен изпит",
         "interview": "Събеседване",

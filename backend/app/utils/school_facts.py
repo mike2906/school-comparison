@@ -136,7 +136,7 @@ def _labels(fact: Mapping[str, Any]) -> dict[str, Any]:
             for name in dict.fromkeys(canonical_language(v) for v in _as_list(fact.get("instruction_languages")))
             if name
         ],
-        "admission": listed("admission", ADMISSION_TYPES),
+        "admission": _admission_types(fact),
         "admission_grade": _int_in(fact.get("admission_grade"), 0, 12),
         "admission_grade_to": _grade_to(fact),
         "exam_subjects": _bilingual(fact.get("exam_subjects"), 8),
@@ -170,6 +170,12 @@ def _url(value: Any) -> Optional[str]:
 def _as_list(value: Any) -> list[str]:
     """The strings of a stored list; anything else (a nested list, a dict) is dropped."""
     return [item for item in value if isinstance(item, str)] if isinstance(value, list) else []
+
+
+def _subject_key(subject: Any) -> str:
+    if isinstance(subject, Mapping):
+        return str(subject.get("bg") or subject.get("en") or "").casefold().strip()
+    return str(subject).casefold().strip()
 
 
 PLACES_SHOWN_DAYS = 180
@@ -209,7 +215,21 @@ def at_a_glance(
             row = {"grade": grade, "grade_to": grade_to, "types": [], "subjects": []}
             admission.append(row)
         row["types"] += [t for t in fact.get("admission") or [] if t not in row["types"]]
-        row["subjects"] += [s for s in fact.get("exam_subjects") or [] if s not in row["subjects"]]
+        # "Математика" and "математика" from two facts are one subject (568, 575).
+        seen = {_subject_key(s) for s in row["subjects"]}
+        for subject in fact.get("exam_subjects") or []:
+            if _subject_key(subject) not in seen:
+                seen.add(_subject_key(subject))
+                row["subjects"].append(subject)
+    # A row naming no grade beside rows that do reads as the whole school's rule and
+    # contradicts them ("8 клас: Приемен изпит; Без приемен изпит", 329); its fact still shows.
+    if any(row["grade"] is not None for row in admission):
+        admission = [row for row in admission if row["grade"] is not None]
+    for row in admission:
+        # "No entrance test" beside an exam, interview or trial day for the same grades.
+        if "open_entry" in row["types"] and len(row["types"]) > 1:
+            row["types"].remove("open_entry")
+    admission = [row for row in admission if row["types"] or row["subjects"]]
     places = []
     read = _date(read_at[:10]) if isinstance(read_at, str) else None
     if read and (today - datetime.date.fromisoformat(read)).days <= PLACES_SHOWN_DAYS:
@@ -336,6 +356,21 @@ _ON_REQUEST_RE = re.compile(
     r"|\bif\s+(?:enough\s+)?parents\s+(?:are\s+)?(?:interested|wish|want|ask)",
     re.IGNORECASE,
 )
+
+
+# The national exams (НВО) a state school ranks eighth-graders by are not the school's own
+# entrance exam (332); and an "entrance exam" label needs an exam or test in the text (332's
+# "documents accepted ... ranking" fact).
+_NATIONAL_EXAM_RE = re.compile(r"\bNVO\b|\bnational (?:external )?(?:assessment|exam)", re.IGNORECASE)
+_EXAM_WORD_RE = re.compile(r"\b(?:exam\w*|tests?|testing|assessment)\b", re.IGNORECASE)
+
+
+def _admission_types(fact: Mapping[str, Any]) -> list[str]:
+    types = [value for value in dict.fromkeys(_as_list(fact.get("admission"))) if value in ADMISSION_TYPES]
+    english = _english(fact)
+    if "entrance_exam" in types and english and (_NATIONAL_EXAM_RE.search(english) or not _EXAM_WORD_RE.search(english)):
+        types.remove("entrance_exam")
+    return types
 
 
 def _on_request(fact: Mapping[str, Any]) -> bool:
