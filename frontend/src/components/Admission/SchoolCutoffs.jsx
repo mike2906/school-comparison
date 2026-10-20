@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import CutoffTable from './CutoffTable'
-import { calculatorLinksFor } from '../../admission/calculator'
+import { calculatorLinksFor, withRoundHistory } from '../../admission/calculator'
 import { useSavedVerdicts } from '../../hooks/useSavedAdmission'
 import { SavedVerdictPanel } from './SavedVerdict'
 
@@ -11,7 +11,7 @@ import { SavedVerdictPanel } from './SavedVerdict'
  */
 function SchoolCutoffs({ school }) {
   const { t } = useTranslation()
-  const rows = school.admission_info?.cutoff_summary || []
+  const rows = withRoundHistory(school.admission_info)
   const links = calculatorLinksFor(school)
   const verdicts = useSavedVerdicts(school)
   if (rows.length === 0 && links.length === 0) return null

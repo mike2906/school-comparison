@@ -1104,12 +1104,9 @@
   },
   "cutoffs": {
     "title": "Who got in before",
-    "intro": "The last child admitted in each ranking we have, from the official lists. A past result is a guide, not a promise.",
+    "intro": "Each ranking is separate, with its own free places and applicants. We show the first (main) ranking; later ones, which only fill places that came free, are under “All rankings”. A past result is a guide, not a promise.",
     "none": "We have no published rankings for this school yet.",
-    "what": "Group or class",
-    "firstRound": "First ranking we have",
-    "latestRound": "Latest ranking",
-    "everyone": "Everyone admitted",
+    "everyone": "Nobody turned down",
     "noPlaces": "No free places",
     "points": "{{points}} points",
     "groupOnly": "Group {{group}}",
@@ -1147,13 +1144,36 @@
     "groupNoPoints": "Group {{group}}, no extra points",
     "places_one": "{{count}} place",
     "places_other": "{{count}} places",
-    "currentRound": "later ranking for free places",
     "legend": {
-      "rounds": "Each ranking is separate: a later ranking fills only the places still free or freed up, among the children still looking for a place. So a group or class that filled up can later show \"Everyone admitted\" for a single free place, and a later cut-off can be higher or lower than an earlier one.",
-      "current": "Later ranking for free places: a ranking after the main one, for the places still free. The official site no longer shows some main rankings, so the first ranking we have can be a later one.",
-      "everyone": "Everyone admitted: every child who applied got a place, so there was no cut-off.",
-      "noPlaces": "No free places: the ranking had no places for this group."
-    }
+      "higherWish": "“Nobody turned down”: every child got a place here or at a school they listed higher. So fewer may be admitted than applied.",
+      "mainMissing": "The official site no longer shows the main kindergarten ranking, so we show the free-place rankings from the start of the school year. They have few places and their cut-off varies a lot."
+    },
+    "noApplicants": "No applicants",
+    "noneAdmitted": "Nobody admitted",
+    "applicants_one": "{{count}} applicant",
+    "applicants_other": "{{count}} applicants",
+    "admitted_one": "{{count}} admitted",
+    "admitted_other": "{{count}} admitted",
+    "ref": {
+      "main": "First ranking, {{date}}",
+      "free": "Free-place ranking, {{date}}",
+      "noPlacesIn_one": "No place came free in the ranking of {{to}}",
+      "noPlacesIn_other": "No place came free in any of {{count}} rankings ({{from}} – {{to}})"
+    },
+    "later": "Later, for a place that came free ({{date}})",
+    "groupMeaning": {
+      "inside": "Group {{group}}: address in the school's area (also group 1 with a brother or sister there). Lower groups are admitted first; points order the children within a group.",
+      "outside": "Group 4: address outside the school's area. Groups 1–3 are admitted first; points order the children within group 4."
+    },
+    "history_one": "{{count}} ranking",
+    "history_other": "All rankings ({{count}})",
+    "kind": {
+      "first": "first ranking",
+      "later": "ranking {{number}}",
+      "current": "free places"
+    },
+    "lastAdmitted": "last admitted:",
+    "listLabel": "Groups and classes"
   },
   "driveTime": {
     "minutes": "~{{minutes}} min",

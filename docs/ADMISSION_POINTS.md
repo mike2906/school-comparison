@@ -223,7 +223,8 @@ snapshots per city, stage, campaign and round, and `admission_info.cutoffs` /
 total (kindergarten: the child's age group, and a birth year as far before the row's
 campaign as the child's is before the start year, so a child starting next year meets
 last campaign's cut-off for the same group) or group and points (first
-grade) with the last admitted child of the school's latest ranking: above, below, tie
+grade) with the last admitted child of the school's reference ranking (`comparableRound`,
+below): above, below, tie
 (drawn by lot), or "depends on your not-sure answers" when the range spans it. Rows
 ranked under other rules are marked. Eighth grade has no comparison, since the class's
 formula isn't known.
@@ -237,7 +238,7 @@ while those later rankings run.
 ## Saved answers across schools
 
 With answers saved, each state kindergarten and municipal school in the search list and on
-its own page shows the parent's result against its latest published cut-off
+its own page shows the parent's result against its reference ranking's cut-off
 (`src/admission/schoolVerdict.js`, `SavedVerdict.jsx`): above, below, a tie, "depends on
 your not-sure answers", or "no cut-off to compare with". Never a chance or a percentage.
 The calculator re-runs per school with that school's own facts (district for the
@@ -246,8 +247,18 @@ not have answered for every school: a kindergarten is their first wish with no s
 there; a first-grade school has no sibling or preparatory group of theirs. The list says
 so in a banner. First grade needs an address checked against the official table, since
 only that says which catchment it is in. Only the newest campaign's rows are compared,
-on the latest round unless that round had no places (then the first). Eighth grade is
-left out: without each class's formula most rows would read "depends".
+on the reference ranking: the campaign's main (first) ranking, since later ones only fill
+places that came free; for kindergarten rows where kg.sofia.bg keeps only the free-place
+rankings, the latest one with places (else the first with places). It needs only the
+summary's first and latest rounds, so a list card and the school page always agree.
+Eighth grade is left out: without each class's formula most rows would read "depends".
+
+**The cut-off list on a school page** (`CutoffTable.jsx`) never puts two rankings side by
+side, which parents read as a trend (2026-10-20 trial). Each row leads with the reference
+ranking, its places, applicants and admitted; adds one line when a later ranking let in a
+weaker result for a place that came free (`laterEasierRound`); and folds every ranking
+into "All rankings". The school page reads the full list from `admission_info.cutoffs`
+(`withRoundHistory`).
 
 On a school page the saved result also leads the key-facts strip at the top. Before
 saving, the calculator says what the list will assume for every school.

@@ -13,9 +13,10 @@ const TONE = {
 }
 
 /**
- * The result beside this school's last admitted child in its latest ranking, one line
- * per group or building. `yours` is `{ points }` or `{ group, points }`; rows ranked
- * under other rules are marked, since their points don't add up the same way.
+ * The result beside this school's last admitted child in its reference ranking (the main
+ * one, see `comparableRound`), one line per group or building. `yours` is `{ points }` or
+ * `{ group, points }`; rows ranked under other rules are marked, since their points don't
+ * add up the same way.
  */
 function CutoffComparison({ rows, yours, isCurrentRules = () => null }) {
   const { t, i18n } = useTranslation()

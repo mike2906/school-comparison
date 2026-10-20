@@ -14,6 +14,7 @@ import {
   STAGES,
   startYearChoices,
   summaryRowsFor,
+  withRoundHistory,
 } from '../../admission/calculator'
 import { schoolCatchmentIds } from '../../admission/catchments'
 import { kindergartenDistrictFeature } from '../../admission/schoolVerdict'
@@ -104,7 +105,7 @@ function AdmissionPage() {
       catchmentIds: schoolCatchmentIds(school),
       districtCode: district?.properties.code ?? null,
       districtName: district?.properties.name ?? null,
-      cutoffSummary: info.cutoff_summary || [],
+      cutoffSummary: withRoundHistory(info),
     }
   }, [school, districts, i18n.language])
 
