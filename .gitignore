@@ -92,3 +92,9 @@ frontend/live-flows-report/
 
 # Road graph: fetched from the road-graph release at deploy time (docs/DRIVE_TIMES.md)
 frontend/public/routing/
+
+# Local data on the launch-DB machine: not code, so the scheduled jobs' checkout guard
+# (backend/scripts/lib/scheduled_job.sh) must not count them as unmerged changes
+backend/backups/
+celerybeat-schedule
+price_audit_export/
