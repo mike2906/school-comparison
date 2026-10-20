@@ -347,6 +347,18 @@ def test_a_read_listing_every_language_replaces_the_old_extractions(languages_re
     assert sorted(entry["language"] for entry in focus) == shown
 
 
+def test_a_read_that_kept_no_language_leaves_the_old_extractions():
+    from app.utils.school_attributes import build_localized_attributes
+    from app.utils.school_facts import PUBLISHED_KEY
+
+    # 267 (НПМГ): a full read kept facts, none naming a language; its old list stays.
+    block = {"_schema_version": 1, "read_at": "t", "website_url": HOME, "languages_read": True, "facts": [_fact_row()]}
+    published = publishable_school_facts({"school_facts": block}, HOME)
+    attrs = {"extracted": {"languages": ["German"]}, PUBLISHED_KEY: published}
+    focus = build_localized_attributes(attrs, "en", "private")["language_focus"]
+    assert [entry["language"] for entry in focus] == ["German"]
+
+
 @pytest.mark.asyncio
 async def test_the_languages_read_marker_stays_internal(client, db_session):
     block = {"_schema_version": 1, "read_at": "t", "website_url": HOME, "languages_read": True, "facts": [_fact_row()]}
