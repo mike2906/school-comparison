@@ -808,7 +808,7 @@ def test_a_malformed_stored_list_is_dropped_not_raised():
     assert labels["tags"] == ["cafeteria"] and labels["admission"] == [] and labels["curricula"] == []
 
 
-def test_admission_facts_without_a_grade_give_way_to_graded_ones_and_ranges_are_kept():
+def test_grade_less_admission_rows_stay_unless_they_contradict_graded_ones():
     from app.utils.school_facts import _labels, at_a_glance
 
     exam = {"bg": "Изпит.", "en": "Entrance exam."}
@@ -819,10 +819,16 @@ def test_admission_facts_without_a_grade_give_way_to_graded_ones_and_ranges_are_
         _labels({"admission": ["interview"], "admission_grade": 5, "admission_grade_to": 3}),  # bad range
     ]
     rows = at_a_glance(facts)["admission"]
+    # A school-wide rule beside graded ones stays when it doesn't contradict them.
+    assert [(r["grade"], r["grade_to"], r["types"]) for r in rows] == [
+        (2, 4, ["entrance_exam"]),
+        (None, None, ["entrance_exam"]),
+        (None, None, ["interview"]),
+        (5, None, ["interview"]),
+    ]
     # 329: "8 клас: Приемен изпит; Без приемен изпит" read as a contradiction.
-    assert [(r["grade"], r["grade_to"], r["types"]) for r in rows] == [(2, 4, ["entrance_exam"]), (5, None, ["interview"])]
-    # With no graded row, the grade-less ones are all there is to say.
-    assert [r["types"] for r in at_a_glance(facts[1:3])["admission"]] == [["entrance_exam"], ["interview"]]
+    clash = [facts[0], _labels({"admission": ["open_entry"]})]
+    assert [(r["grade"], r["types"]) for r in at_a_glance(clash)["admission"]] == [(2, ["entrance_exam"])]
 
 
 @pytest.mark.parametrize(
@@ -832,6 +838,7 @@ def test_admission_facts_without_a_grade_give_way_to_graded_ones_and_ranges_are_
         ("Admission to VIII grade: documents accepted from 18.08; ranking 09.09; enrolment 10.09", False),
         ("Applicants to grade 8 take an entrance exam in Bulgarian and mathematics", True),
         ("Pupils sit admission tests in maths and English", True),
+        ("Admission is based on an entrance exam and NVO results", True),
     ],
 )
 def test_an_entrance_exam_label_needs_the_schools_own_exam_in_the_text(en, kept):

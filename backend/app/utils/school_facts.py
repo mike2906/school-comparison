@@ -221,10 +221,17 @@ def at_a_glance(
             if _subject_key(subject) not in seen:
                 seen.add(_subject_key(subject))
                 row["subjects"].append(subject)
-    # A row naming no grade beside rows that do reads as the whole school's rule and
-    # contradicts them ("8 клас: Приемен изпит; Без приемен изпит", 329); its fact still shows.
-    if any(row["grade"] is not None for row in admission):
-        admission = [row for row in admission if row["grade"] is not None]
+    # A row naming no grade reads as the whole school's rule: "no entrance test" there beside
+    # graded rows with a test, or a test beside graded "no entrance test" rows, contradicts
+    # them ("8 клас: Приемен изпит; Без приемен изпит", 329). Its fact still shows.
+    graded = {t for row in admission if row["grade"] is not None for t in row["types"]}
+    for row in admission:
+        if row["grade"] is not None:
+            continue
+        if graded - {"open_entry"} and "open_entry" in row["types"]:
+            row["types"].remove("open_entry")
+        if "open_entry" in graded:
+            row["types"] = [t for t in row["types"] if t == "open_entry"]
     for row in admission:
         # "No entrance test" beside an exam, interview or trial day for the same grades.
         if "open_entry" in row["types"] and len(row["types"]) > 1:
@@ -363,12 +370,14 @@ _ON_REQUEST_RE = re.compile(
 # "documents accepted ... ranking" fact).
 _NATIONAL_EXAM_RE = re.compile(r"\bNVO\b|\bnational (?:external )?(?:assessment|exam)", re.IGNORECASE)
 _EXAM_WORD_RE = re.compile(r"\b(?:exam\w*|tests?|testing|assessment)\b", re.IGNORECASE)
+_OWN_EXAM_RE = re.compile(r"\b(?:entrance|admission|aptitude)\s+(?:exam\w*|tests?)\b", re.IGNORECASE)
 
 
 def _admission_types(fact: Mapping[str, Any]) -> list[str]:
     types = [value for value in dict.fromkeys(_as_list(fact.get("admission"))) if value in ADMISSION_TYPES]
     english = _english(fact)
-    if "entrance_exam" in types and english and (_NATIONAL_EXAM_RE.search(english) or not _EXAM_WORD_RE.search(english)):
+    national_only = _NATIONAL_EXAM_RE.search(english) and not _OWN_EXAM_RE.search(english)
+    if "entrance_exam" in types and english and (national_only or not _EXAM_WORD_RE.search(english)):
         types.remove("entrance_exam")
     return types
 
