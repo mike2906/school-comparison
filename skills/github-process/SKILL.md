@@ -105,7 +105,39 @@ While the site has no users, agents may change the launch DB and publish without
   pins, results...) and raises the issue "Publish stopped: schools would lose data". Publish
   the drop with `PUBLISH_ALLOW_DROPS=1` only when you made it on purpose and can say why;
   otherwise it is a diff you cannot explain: find what wiped the data, or ask Mike.
-- Provider spend stays under $0.50 a run unless Mike agreed a bigger run.
+- Provider spend: about $1 a day is the guide (there is no per-run cap). Tell Mike the
+  real spend you expect before a paid run bigger than that, and warn him when a run looks
+  well over its estimate.
+
+### Jobs on Mike's PC
+
+Launch-DB runs and publishes happen in a Remote Control session on Mike's PC. A thread
+can only start one from a message Mike typed in that thread (a platform rule), so ask
+for one message per job, and make it cover the whole job:
+
+- **One go covers the job.** When Mike says go to a job (or it falls under the standing
+  permission), that covers every step you described: backup, dry run, checks, the full
+  run and the publish. Brief the PC session with the whole job and the rule for each step
+  ("if the dry run shows X, carry on to the full run; otherwise stop and report"). Don't
+  write "stop and wait for my message" into a brief, and don't ask Mike to repeat a go
+  between steps. Stop only for a result you can't explain or an item from "Still goes to
+  Mike".
+- **Steering a running session.** To change the plan mid-job, send the new instructions
+  with the same tool that started the session; it delivers them to the running session.
+  The general cross-session message tool is refused for Remote Control sessions. That
+  refusal does not mean only Mike's typed text reaches the PC.
+- **Cost.** Give Mike the real spend you expect. The `--max-usd` guard books an unpriced
+  or in-flight call at a fixed reserve, so pick the guard value yourself with headroom. A
+  higher guard is not a new cost decision. Ask Mike again only if the real spend would go
+  well over what he saw (about 1.5x, or past the day's guide on a provider he asked to
+  spare).
+- **Name his consent in the brief.** Quote the go message and its time ("Mike typed 'go
+  and publish' at 08:26 UTC"), and list the commands it covers. Mike's own messages in the
+  thread are also forwarded to the session.
+- **Publish as the plain command:** `backend/scripts/publish_snapshot.sh` takes the publish
+  lock itself. Use the `flock` wrapper only when a write and a publish must share one lock.
+  If the safety check refuses a routine step, quote its rule, try the plain named command
+  once if a wrapper was involved, and then report.
 
 ## Commit / PR conventions
 
