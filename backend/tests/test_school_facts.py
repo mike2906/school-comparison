@@ -183,9 +183,19 @@ async def test_apply_replaces_stored_facts_and_dry_run_writes_nothing():
     assert report["stored"] == 1 and db.commits == 1 and school.attributes["other"] == 1
     assert stored["_schema_version"] == 1 and [f["topic"] for f in stored["facts"]] == ["school_day"]
     assert stored["website_url"] == HOME
-    # A full read lists every taught language; the open-days check's empty block does not.
-    assert stored["languages_read"] is True
-    assert "languages_read" not in stage.facts_block([], "m", HOME)
+    # Two pages read is a partial crawl: it may have missed the language pages.
+    assert "languages_read" not in stored
+    assert "languages_read" not in stage.facts_block([], "m", HOME)  # the open-days check's block
+
+
+@pytest.mark.asyncio
+async def test_only_a_full_read_says_every_language_was_read():
+    quote = "Учебният ден започва в 08:00 часа и приключва в 14:00 часа."
+    extra = [PageRead(f"https://school.example/p{n}", f"Страница {n}.", False) for n in range(2)]
+    school, db = _school(), _Db()
+    calls = _Calls([_fact("school_day", quote)], passed=[1])
+    await stage.run_school(db, school, find=await _find(PAGES + extra), call=calls, apply=True)
+    assert school.attributes["school_facts"]["languages_read"] is True
 
 
 @pytest.mark.asyncio
