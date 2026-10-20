@@ -225,12 +225,13 @@ def at_a_glance(
     # graded rows with a test, or a test beside graded "no entrance test" rows, contradicts
     # them ("8 клас: Приемен изпит; Без приемен изпит", 329). Its fact still shows.
     graded = {t for row in admission if row["grade"] is not None for t in row["types"]}
+    tested = {t for row in admission for t in row["types"]} - {"open_entry"}
     for row in admission:
         if row["grade"] is not None:
             continue
-        if graded - {"open_entry"} and "open_entry" in row["types"]:
+        if tested and "open_entry" in row["types"]:
             row["types"].remove("open_entry")
-        if "open_entry" in graded:
+        elif "open_entry" in graded:
             row["types"] = [t for t in row["types"] if t == "open_entry"]
     for row in admission:
         # "No entrance test" beside an exam, interview or trial day for the same grades.
