@@ -90,9 +90,9 @@ def note_priced_response(response: Any) -> None:
 
 
 def _failed_call_attributions(call: _PricedCall) -> Optional[list[dict[str, Any]]]:
-    """Exact attributions of a failed call whose requests all came back; None when one was
-    still in flight (a timeout) or the route does not price its responses."""
-    if not call.started or len(call.responses) != call.started:
+    """Exact attributions of the answers a failed call got back; None when it got none or
+    the route does not price its responses. A request still in flight is not among them."""
+    if not call.responses:
         return None
     try:
         return _attributions(call.responses)
@@ -412,8 +412,12 @@ async def attribute_provider_responses(
     *,
     reservation_client_request_id: str,
     attributions: list[dict[str, Any]],
+    keep_reservation: bool = False,
 ) -> list[ProviderRequestLedger]:
-    """Attribute one agent dispatch as one ledger row per provider response."""
+    """Attribute one agent dispatch as one ledger row per provider response.
+
+    ``keep_reservation`` books every response on a row of its own and leaves the
+    reservation row to the caller: a failed call's request still in flight stays on it."""
     if not attributions:
         raise ProviderAttributionUncertain("provider returned no attributable responses")
     reservation = (
@@ -466,7 +470,7 @@ async def attribute_provider_responses(
 
     rows: list[ProviderRequestLedger] = []
     for index, attribution in enumerate(normalized):
-        row = reservation if index == 0 else ProviderRequestLedger(
+        row = reservation if index == 0 and not keep_reservation else ProviderRequestLedger(
             client_request_id=str(uuid4()),
             pipeline_run_id=reservation.pipeline_run_id,
             stage=reservation.stage,
@@ -558,7 +562,16 @@ async def _execute_tracked_billable_request(
         result = await _bounded(call, timeout_seconds)
     except BaseException as exc:
         attributions = _failed_call_attributions(priced)
-        booked = False
+        # A request still out when the call failed (a timeout during a retry) may be billed:
+        # it keeps the reservation, uncertain at the request reserve, beside the answers' rows.
+        in_flight = attributions is None or len(priced.responses) < priced.started
+        if in_flight:
+            async with async_session_maker() as ledger_db:
+                await mark_provider_request_uncertain(
+                    ledger_db,
+                    client_request_id=reservation.client_request_id,
+                    reason=f"provider dispatch ended without exact attribution: {type(exc).__name__}",
+                )
         if attributions:
             try:
                 async with async_session_maker() as ledger_db:
@@ -566,18 +579,10 @@ async def _execute_tracked_billable_request(
                         ledger_db,
                         reservation_client_request_id=reservation.client_request_id,
                         attributions=attributions,
+                        keep_reservation=in_flight,
                     )
-                booked = True
             except ProviderAttributionUncertain:
-                pass
-        if booked:
-            raise
-        async with async_session_maker() as ledger_db:
-            await mark_provider_request_uncertain(
-                ledger_db,
-                client_request_id=reservation.client_request_id,
-                reason=f"provider dispatch ended without exact attribution: {type(exc).__name__}",
-            )
+                pass  # it marked the reservation uncertain
         raise
     finally:
         _PRICED_CALL.reset(token)
