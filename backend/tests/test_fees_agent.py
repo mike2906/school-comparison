@@ -257,10 +257,10 @@ def test_valid_fees_keep_their_period():
         assert result.checks == []
 
 
-def test_a_row_alone_does_not_name_the_yearly_period():
-    """Without a heading line naming the year, 515's 11400 publishes with a blank period."""
+def test_a_row_giving_the_school_years_length_names_the_yearly_period():
+    """515's row alone: its "9 месеца" period cell is the school year, so 11400 is yearly (as its key)."""
     result = check_fee(fee(PriceCategory.TUITION, ROWS_515["first"], amount=11400, period=PricePeriod.YEARLY), PAGE_515)
-    assert published(result) and result.fee.period is None
+    assert published(result) and result.fee.period is PricePeriod.YEARLY
 
 
 def test_deposit_filed_as_registration_publishes():
@@ -2122,3 +2122,51 @@ def test_no_gh_leaves_the_run_alone(monkeypatch):
     monkeypatch.setattr(fee_check.subprocess, "run", run)
     results = [{"school_id": 1, "check": {"wrong": [{"fee": 0, "problem": "p", "evidence": "e"}]}}]
     assert fee_check.open_wrong_fees_issue(results).startswith("not reported")
+
+
+@pytest.mark.parametrize(
+    ("category", "evidence", "amount", "period"),
+    [
+        # Trial 3 (2026-10-20): periods the school states in words the checks did not know.
+        (PriceCategory.TUITION, "Таксата за обучение за учебната 2026/2027 г. е 8110 евро. Таксата може да бъде платена на 1, 2 или 3 вноски.", 8110, PricePeriod.YEARLY),  # 381
+        (PriceCategory.TUITION, "## Учебен\nпериод\nТакса обучение на полудневна база\n11\nмесеца\n8064\n4Х 2016", 8064, PricePeriod.YEARLY),  # 541
+        (PriceCategory.CAMP, "## Учебен период\n1 седмица\n170", 170, PricePeriod.WEEKLY),  # 541's summer school
+        (PriceCategory.TUITION, "Такса за учебната година 8110 евро, платима в срок до 15 юни", 8110, PricePeriod.YEARLY),
+        (PriceCategory.TUITION, "месечни такси\n| 11 месеца |\nТаксата за учебната 2026/2027 г. е 8110 евро", 8110, PricePeriod.YEARLY),
+        (PriceCategory.FOOD, "Храна – 8 Евро за присъствен ден", 8, PricePeriod.DAILY),  # 569
+        (PriceCategory.TRANSPORT, "Транспорт в посока – 179 Евро за 1 месец", 179, PricePeriod.MONTHLY),  # 569
+    ],
+)  # fmt: skip
+def test_periods_stated_with_a_school_year_or_a_count_of_one_are_kept(category, evidence, amount, period):
+    result = check_fee(fee(category, evidence, amount=amount, period=period), evidence)
+    assert published(result) and result.fee.period is period, result.checks
+
+
+@pytest.mark.parametrize(
+    ("evidence", "period"),
+    [
+        ("Деца от 10 месеца до 3 години: 550 евро", PricePeriod.YEARLY),  # an age
+        ("Бебета на 12 месеца: 550 евро", PricePeriod.YEARLY),
+        ("11 месеца\n550 евро на месец", PricePeriod.YEARLY),  # the column's length, the fee monthly
+        ("Такса за целия ден 550 евро", PricePeriod.DAILY),  # a full day
+        ("Еднократно плащане за 6 месеца 550 евро", PricePeriod.MONTHLY),  # prepaid for six months
+        ("Лагер 2 седмици 550 евро", PricePeriod.WEEKLY),
+        ("Таксата за 2026 г. е 550 евро", PricePeriod.YEARLY),
+        # Code review of #434: a dated line of another period, ages, counts and deadlines.
+        ("Месечна такса за учебната 2026/2027 г.: 550 евро", PricePeriod.YEARLY),
+        ("Цена 2026/2027 г.: 550 евро на месец", PricePeriod.YEARLY),
+        ("Infants 12 months and older: 550 euro", PricePeriod.YEARLY),
+        ("Деца на възраст 10-12 месеца: 550 евро", PricePeriod.YEARLY),
+        ("10 месеца по 550 евро", PricePeriod.YEARLY),
+        ("| 9 месеца | 550 евро на срок |", PricePeriod.YEARLY),
+        ("Плаща се 1 седмица преди началото: 550 евро", PricePeriod.WEEKLY),
+        ("Занимания по време на учебен ден: 550 евро", PricePeriod.DAILY),
+        ("Екскурзия на един ден 550 евро", PricePeriod.DAILY),
+        ("Деца на 1 месец: 550 евро", PricePeriod.MONTHLY),
+        ("| Възраст | Такса |\n| 12 месеца | 550 |", PricePeriod.YEARLY),  # an age column
+    ],
+)
+def test_lengths_and_ages_name_no_period(evidence, period):
+    result = check_fee(fee(PriceCategory.TUITION, evidence, amount=550, period=period), evidence)
+    assert result.fee.period is None, result.checks
+
