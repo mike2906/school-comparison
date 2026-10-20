@@ -231,8 +231,10 @@ def at_a_glance(
             continue
         if tested and "open_entry" in row["types"]:
             row["types"].remove("open_entry")
-        elif "open_entry" in graded:
-            row["types"] = [t for t in row["types"] if t == "open_entry"]
+        elif "open_entry" in graded and "entrance_exam" in row["types"]:
+            # A school-wide exam the graded rows deny; its subjects are that exam's.
+            row["types"].remove("entrance_exam")
+            row["subjects"] = []
     for row in admission:
         # "No entrance test" beside an exam, interview or trial day for the same grades.
         if "open_entry" in row["types"] and len(row["types"]) > 1:

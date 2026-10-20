@@ -829,6 +829,9 @@ def test_grade_less_admission_rows_stay_unless_they_contradict_graded_ones():
     # 329: "8 клас: Приемен изпит; Без приемен изпит" read as a contradiction.
     clash = [facts[0], _labels({"admission": ["open_entry"]})]
     assert [(r["grade"], r["types"]) for r in at_a_glance(clash)["admission"]] == [(2, ["entrance_exam"])]
+    # A grade-less exam beside graded "no entrance test" goes, subjects and all.
+    denied = [facts[1], _labels({"admission": ["open_entry"], "admission_grade": 1})]
+    assert [(r["grade"], r["types"], r["subjects"]) for r in at_a_glance(denied)["admission"]] == [(1, ["open_entry"], [])]
     # Two grade-less facts, one with a test and one without, clash the same way.
     ungraded = [facts[1], _labels({"admission": ["open_entry"]})]
     assert [r["types"] for r in at_a_glance(ungraded)["admission"]] == [["entrance_exam"]]
