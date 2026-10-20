@@ -144,7 +144,7 @@ keeps its rows. A failed or partial crawl must not wipe good prices or make them
 
 **Freshness.** Fees change about once a year, for the new school year. Run monthly, and
 weekly from June to September. One run over Sofia's 175 private and international schools
-costs about $0.20, inside the $0.50-a-run cap.
+costs about $0.20, inside the $1-a-day guide.
 
 **Publishing without a person.** A run changes only the launch DB; production sees it
 after a publish (AGENTS.md invariant 3). A scheduled run that waits for someone to publish
