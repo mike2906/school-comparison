@@ -179,6 +179,8 @@ test('a row is read on its main ranking; free-place-only rows on the latest with
   const none = { round_id: 446, round_kind: 'current', places: 0 }
   assert.equal(comparableRound({ rounds: 4, first: freeFirst, latest: none }), freeFirst)
   assert.equal(comparableRound({ rounds: 4, first: { ...freeFirst, places: 0 }, latest: none }), none)
+  // A main ranking with no places says less than a later one that had some.
+  assert.equal(comparableRound({ rounds: 2, first: { ...first, places: 0 }, latest }), latest)
 })
 
 test('a later ranking is mentioned only when it let in a weaker result', () => {
@@ -191,6 +193,8 @@ test('a later ranking is mentioned only when it let in a weaker result', () => {
   // First grade: a higher group is weaker; points only within a group.
   const g = { rounds: 2, first: r(1, { last_admitted_group: 3, last_admitted_points: 2 }), latest: r(2, { last_admitted_group: 4, last_admitted_points: 9 }) }
   assert.equal(laterEasierRound(g).round_id, 2)
+  // Points and a group are not comparable.
+  assert.equal(laterEasierRound({ rounds: 2, first: r(1, { last_admitted_points: 12 }), latest: r(2, { last_admitted_group: 3, last_admitted_points: 5 }) }), null)
   // No places later (241), or no main ranking at all: nothing to add.
   assert.equal(laterEasierRound({ rounds: 2, first: r(1, { last_admitted_points: 5, last_admitted_group: 4 }), latest: r(2, { places: 0 }) }), null)
   assert.equal(laterEasierRound({ rounds: 2, first: { round_id: 443, round_kind: 'current', last_admitted_points: 19 }, latest: { round_id: 446, round_kind: 'current', last_admitted_points: 3 } }), null)

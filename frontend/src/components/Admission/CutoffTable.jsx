@@ -84,8 +84,9 @@ function Headline({ row, rounds }) {
   if (!round) return null
   const day = formatRankingDay(round.classified_on, i18n.language)
   const value = cutoffValue(round)
-  // No later ranking had a place either: say how many we looked at, once.
-  if (value?.kind === 'noPlaces' && round.round_kind === 'current' && rounds.length > 1) {
+  // No ranking had a place: say how many, when we have them all.
+  if (value?.kind === 'noPlaces' && round.round_kind === 'current' && rounds.length > 1 &&
+      rounds.length === row.rounds && rounds.every(r => r.places === 0)) {
     const from = formatRankingDay(rounds[0].classified_on, i18n.language)
     return <div className="font-medium text-neutral-900">{t('cutoffs.ref.noPlacesIn', { count: rounds.length, from, to: day })}</div>
   }

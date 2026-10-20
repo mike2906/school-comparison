@@ -210,14 +210,16 @@ export function roundsOf(row) {
  * The ranking a row is read and compared on, the same on a list card and a school page:
  * the campaign's main (first) ranking when we have it, since most places go there and
  * later rankings only fill places that came free. kg.sofia.bg keeps only the later
- * free-place rankings, so for those rows it is the latest one that had places, else the
- * first that had, else the latest (no place came free).
+ * free-place rankings, so for those rows (and a main ranking with no places) it is the
+ * latest one that had places, else the first that had, else the latest (no place came
+ * free).
  */
 export function comparableRound(row) {
   const first = row?.first
   const latest = row?.rounds > 1 && row?.latest ? row.latest : null
-  if (!first) return latest
-  if (first.round_kind !== 'current' || !latest) return first
+  if (!first || !latest) return first || latest
+  // A main ranking with places to fill; one without says nothing a later ranking can't.
+  if (first.round_kind !== 'current' && first.places !== 0) return first
   if (latest.places !== 0) return latest
   return first.places !== 0 ? first : latest
 }
@@ -244,15 +246,16 @@ export function laterEasierRound(row) {
   const main = comparableRound(row)
   if (!main || main !== row.first || main.round_kind === 'current') return null
   const mainValue = cutoffValue(main)
-  if (!mainValue || ['everyone', 'noPlaces', 'quota'].includes(mainValue.kind)) return null
-  const mainKey = easeKey(mainValue)
+  const mainKey = mainValue && easeKey(mainValue)
+  if (!mainKey) return null
   let best = null
   let bestKey = mainKey
   for (const round of roundsOf(row).slice(1)) {
     const value = cutoffValue(round)
     if (value?.kind === 'everyone' && round.admitted_count > 0) return round
-    const key = value && easeKey(value)
-    if (key && mainKey && easier(key, bestKey)) {
+    // Points, a group or a score: only a result of the same kind can be weaker.
+    const key = value?.kind === mainValue.kind ? easeKey(value) : null
+    if (key && easier(key, bestKey)) {
       best = round
       bestKey = key
     }
