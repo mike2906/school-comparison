@@ -421,10 +421,6 @@ _BEFORE_SCHOOL_RE = re.compile(
 
 
 def _school_grades_fact(fact: Mapping[str, Any]) -> bool:
-    if any(_int_in(fact.get(key), 1, 12) is not None for key in ("admission_grade", "admission_grade_to")):
-        return True
-    if _int_in(fact.get("highest_grade"), 1, 12) is not None:
-        return True
     return bool(_SCHOOL_GRADES_RE.search(_BEFORE_SCHOOL_RE.sub(" ", _english(fact))))
 
 
@@ -470,6 +466,12 @@ def publishable_school_facts(
         if fact.get("topic") == "admissions" and _past_school_years_only(_english(fact), today):
             continue  # "14 places for 2025/2026" is a past campaign's
         labels = _labels(fact)
+        if kindergarten:
+            # A school grade on a kindergarten's fact is the reader's slip ("preparatory groups
+            # for 5- and 6-year-olds" as grades 5-6, 587): 0 is the kindergarten's grade.
+            for key in ("admission_grade", "admission_grade_to", "highest_grade"):
+                if labels.get(key):
+                    labels[key] = None
         if labels.get("open_days") and max(labels["open_days"]) < today and not (
             labels.get("applications_close") and labels["applications_close"] >= today
         ):
