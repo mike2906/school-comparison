@@ -45,6 +45,14 @@ export function toSearchSelection({ ageGroup, where = 'both' }) {
   return { ageGroup, educationLevel: null, includeCrossover: true }
 }
 
+/**
+ * The September a parent is most likely planning for: this year's until the end of
+ * September, then next year's. The search and the calculator both start from it.
+ */
+export function planningYear(now = new Date()) {
+  return now.getMonth() >= 9 ? now.getFullYear() + 1 : now.getFullYear()
+}
+
 /** Enrolment years offered: this year's September intake and the next few. */
 export function enrolmentYears(now = new Date(), count = 5) {
   const first = now.getFullYear()

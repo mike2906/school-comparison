@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
+import { planningYear } from './ageSelection.js'
 import {
   filterSearchParams,
   nextFilterState,
@@ -22,9 +23,9 @@ test('readFiltersFromUrl reads repeated list params', () => {
   assert.deepEqual(filters.facilities, ['library', 'cafeteria'])
 })
 
-test('readFiltersFromUrl defaults the target year to next year', () => {
+test('readFiltersFromUrl defaults the target year to the September being planned for', () => {
   const filters = readFiltersFromUrl(new URLSearchParams(''))
-  assert.equal(filters.targetYear, new Date().getFullYear() + 1)
+  assert.equal(filters.targetYear, planningYear())
   assert.equal(filters.birthYear, null)
   assert.deepEqual(filters.languageFocus, [])
 })
@@ -55,4 +56,10 @@ test('normalizeAvailableFilters fills missing groups', () => {
   assert.deepEqual(result.facilities, ['library'])
   assert.deepEqual(result.special_programs, [])
   assert.deepEqual(result.language_focus_pairs, [])
+})
+
+test('planningYear is this September until the end of September, then next year', () => {
+  assert.equal(planningYear(new Date(2027, 2, 1)), 2027)
+  assert.equal(planningYear(new Date(2026, 8, 30)), 2026)
+  assert.equal(planningYear(new Date(2026, 9, 1)), 2027)
 })

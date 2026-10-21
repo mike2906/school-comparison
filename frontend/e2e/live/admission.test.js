@@ -13,6 +13,7 @@ import { catchmentSchoolFor, catchmentUrl, displayPlaceName, indexAddresses, sch
 import { CATCHMENT_CAMPAIGNS } from '../../src/admission/loadCatchments.js'
 import { usesSofiaKindergartenSystem } from '../../src/utils/admission.js'
 import { DESKTOP, findSchool, number, open, page, schoolName, t, liveBrowser } from './live.js'
+import { planningYear } from '../../src/utils/ageSelection.js'
 
 liveBrowser(DESKTOP)
 
@@ -66,6 +67,8 @@ describe('admission calculator', () => {
     await open('bg', '/admission?stage=kindergarten')
     const kg = (key, vars) => t('bg', `admissionCalc.kg.${key}`, vars)
     const start = Number((await campaign()).slice(0, 4))
+    // The same September the search starts from, so both give the child the same group.
+    assert.equal(start, planningYear(), 'the calculator opens on the search\'s start year')
     // Three years before the start year is a kindergarten group (not the nursery).
     await page.getByLabel(kg('birthYear')).selectOption(String(start - 3))
     await answer(kg('inSofia'), t('bg', 'admissionCalc.yes')).click()
@@ -176,6 +179,13 @@ describe('admission from a school page', () => {
       const birthYear = row.birth_year + start - Number(row.campaign.slice(0, 4))
       await page.getByLabel(t('bg', 'admissionCalc.kg.birthYear')).selectOption(String(birthYear))
       await page.locator('aside').getByText(t('bg', 'cutoffs.compare.title')).waitFor()
+      // A sibling answered here is saved for this kindergarten, so the list counts it there.
+      await answer(t('bg', 'admissionCalc.kg.siblingThere'), t('bg', 'admissionCalc.yes')).click()
+      await page.getByRole('button', { name: t('bg', 'savedAdmission.save') }).click()
+      const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('admissionAnswers') || 'null'))
+      assert.equal(saved?.kindergarten?.siblings?.[school.id]?.siblingThere, true, 'the sibling is kept for this kindergarten')
+      assert.equal(saved.kindergarten.answers.siblingThere, null, 'and not for every kindergarten')
+      await page.evaluate(() => localStorage.removeItem('admissionAnswers'))
     }
   })
 

@@ -1,3 +1,4 @@
+import { planningYear } from './ageSelection.js'
 import { canonicalLanguagePair, languageKey } from './languages.js'
 
 export const uniqueCanonical = (values, canonical) => (
@@ -17,7 +18,7 @@ export function readFiltersFromUrl(params) {
   const targetYearParam = params.get('target_year')
   return {
     ageGroup: params.get('age_group'),
-    targetYear: targetYearParam ? parseInt(targetYearParam) : new Date().getFullYear() + 1,
+    targetYear: targetYearParam ? parseInt(targetYearParam) : planningYear(),
     birthYear: Number.parseInt(params.get('birth_year') || '', 10) || null,
     schoolType: type === 'international' ? 'private' : type,
     educationLevel: params.get('education_level'),
