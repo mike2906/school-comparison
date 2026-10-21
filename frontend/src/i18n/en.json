@@ -849,6 +849,7 @@
       "preschool": "Preschool",
       "admissionTypes": {
         "entrance_exam": "Entrance exam",
+        "some_classes_exam": "Entrance exam for some classes",
         "interview": "Interview",
         "trial_day": "Trial day",
         "open_entry": "No entrance test"

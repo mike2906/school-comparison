@@ -13,8 +13,13 @@ highest grade the site states when nothing on the site names a grade in it. Both
 tagged on the location (``campus_sync.SITE_GRADES_ADDED_PREFIX`` / ``_HIDDEN_PREFIX``):
 withholding the website undoes both (``remove_website_campus_data``) and the register
 import keeps both (``base_adapter._sync_source_location``). Each run recomputes from the register's own
-bands, so a band the site stops naming goes back. Schools only, one location with school
-bands only (several are left as they are). No model calls; the default is a dry run.
+bands, so a band the site stops naming goes back. One location with school bands only
+(several are left as they are). No model calls; the default is a dry run.
+
+A kindergarten gets only its nursery group: the register lists private kindergartens' groups
+from age 3, while their sites take children from two (351, 185; parent trial 2026-10-21).
+The stage adds ``nursery`` when the published facts or fee names say so (``site_nursery``),
+and never hides a group.
 """
 
 from __future__ import annotations
@@ -96,6 +101,36 @@ def site_grades(pricing: Iterable[Any], at_a_glance: Optional[dict[str, Any]]) -
     return named, highest if isinstance(highest, int) else None
 
 
+# A kindergarten's own site saying it takes children of two or younger, or has a nursery
+# group (351, 185: "children aged 2 to 7"), while the register lists groups from age 3 only.
+NURSERY = "nursery"
+_KINDERGARTEN_GROUPS = frozenset({"first", "second", "third", "preschool", NURSERY})
+_UNDER_THREE = r"(?:1(?:[.,]5)?|2|one|two)"
+_NURSERY_RE = re.compile(
+    # An age, not a time of day ("activities from 2 to 4 pm"): an age word or a year unit.
+    rf"\b(?:aged?|ages|age of|children (?:of|from))\s+{_UNDER_THREE}\b"
+    rf"|\b{_UNDER_THREE}\s*(?:-|–|to)\s*\d\s*(?:-?\s*years?|-year-olds?|y\.?\s*o\b)"
+    r"|\bfrom\s+(?:the\s+age\s+of\s+)?\d{1,2}\s+months\b"
+    r"|\bnursery\s+groups?\b|\btoddler\s+groups?\b"
+    r"|\bот\s+(?:1[.,]5|2)\s*(?:до|-|–)\s*\d\s*г|\b(?:1[.,]5|2)-годишн|ясл",
+    re.IGNORECASE,
+)
+
+
+def site_nursery(pricing: Iterable[Any], facts: Iterable[Any]) -> bool:
+    """Whether the published site data says the kindergarten takes children under three."""
+    for row in pricing:
+        context = row.pricing_context
+        english = context.get("age_group_en") if isinstance(context, dict) else getattr(context, "age_group_en", None)
+        if any(_NURSERY_RE.search(str(label or "")) for label in (row.age_group, row.plan_name, english)):
+            return True
+    for fact in facts:
+        text = getattr(fact, "text_i18n", None) or {}
+        if any(_NURSERY_RE.search(str(text.get(lang) or "")) for lang in ("en", "bg")):
+            return True
+    return False
+
+
 def _band(grade: int) -> Optional[str]:
     return next((key for key, (low, high) in BANDS.items() if low <= grade <= high), None)
 
@@ -134,7 +169,6 @@ async def run_site_grades(
 
     query = select(School.id).where(
         School.country_code == country,
-        School.education_level != "kindergarten",
         School.website_url.isnot(None),
         School.scrape_status.in_(SITE_ACCEPTED_STATUSES),
     )
@@ -148,10 +182,13 @@ async def run_site_grades(
     changes: list[dict[str, Any]] = []
     for school_id in ids:
         school = await service.get_school_with_details(school_id)
+        kindergarten = school.education_level == "kindergarten"
+        # A kindergarten's site can only add its nursery group; a school's sets its grade bands.
+        bands = {NURSERY} if kindergarten else set(BANDS)
         locations = [
             location
             for location in school.locations
-            if {link.age_group for link in location.age_group_shifts} & set(BANDS)
+            if {link.age_group for link in location.age_group_shifts} & (_KINDERGARTEN_GROUPS if kindergarten else bands)
             or site_hidden_bands(location.location_tags)
         ]
         if len(locations) != 1:
@@ -162,15 +199,20 @@ async def run_site_grades(
         current = {link.age_group for link in location.age_group_shifts}
         # Bands the website's campus data added are the site's claim, not the register's.
         website = _tagged(tags, AGE_GROUP_TAG_PREFIX)
-        register_bands = ((current - added - website) | hidden) & set(BANDS)
+        register_bands = ((current - added - website) | hidden) & bands
         published = SchoolDetailResponse.model_validate(school)
         facts = published.school_facts
-        glance = facts.at_a_glance.model_dump() if facts and facts.at_a_glance else None
-        named, highest = site_grades(published.pricing, glance)
-        add, hide = planned_bands(register_bands, named, highest)
-        desired = (register_bands | add | website) - hide
+        if kindergarten:
+            named, highest = set(), None
+            nursery = site_nursery(published.pricing, facts.facts if facts else [])
+            add, hide = ({NURSERY} - register_bands if nursery else set()), set()
+        else:
+            glance = facts.at_a_glance.model_dump() if facts and facts.at_a_glance else None
+            named, highest = site_grades(published.pricing, glance)
+            add, hide = planned_bands(register_bands, named, highest)
+        desired = (register_bands | add | (website & bands)) - hide
         # Tags alone can match while a band came back another way (a campus sync, an import).
-        if add == added and hide == hidden and desired == current & set(BANDS):
+        if add == added and hide == hidden and desired == current & bands:
             continue
         change = {
             "school_id": school_id,
@@ -188,7 +230,7 @@ async def run_site_grades(
         hidden_tags = [tag for tag in tags if site_hidden_band(tag) in hide]
         hidden_tags += [site_hidden_tag(link) for link in location.age_group_shifts if link.age_group in hide - hidden]
         for link in list(location.age_group_shifts):
-            if link.age_group in BANDS and link.age_group not in desired:
+            if link.age_group in bands and link.age_group not in desired:
                 await db.delete(link)
         was_hidden = site_hidden_bands(tags)
         for band in sorted(desired - current):

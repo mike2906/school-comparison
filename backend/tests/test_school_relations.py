@@ -1,5 +1,7 @@
 """UF42c: computed kindergarten ↔ school links (continues_to, continued_from, same_place)."""
 
+from dataclasses import replace
+
 import pytest
 
 from app.models.school import School, SchoolLocation, SchoolLocationAgeGroupShift
@@ -380,6 +382,24 @@ class TestSamePlaceEndpoints:
         assert [entry["id"] for entry in response.json()["same_place"]] == [kg.id]
 
     @pytest.mark.asyncio
+    async def test_a_school_its_site_puts_elsewhere_is_not_at_its_kindergarten(self, seeded_db, seeded_client):
+        from app.scrapers.campus_sync import CAMPUS_TAG, WEBSITE_CONTACT_ADDRESS_TAG
+
+        kg, school = await self._pair(seeded_db, school_lat=42.65)
+        await seeded_db.execute(
+            SchoolLocation.__table__.update()
+            .where(SchoolLocation.school_id.in_([kg.id, school.id]))
+            .values(address_i18n={"bg": 'ул. "Горски пътник" № 44'})
+        )
+        seeded_db.add(SchoolLocation(
+            school_id=school.id, address_i18n={"bg": 'ул. "Александър фон Хумболт" № 7'}, lat=42.6785,
+            lng=23.357, is_primary=False, location_tags=[WEBSITE_CONTACT_ADDRESS_TAG, CAMPUS_TAG],
+        ))
+        await seeded_db.commit()
+        response = await seeded_client.get(f"/schools/{kg.id}")
+        assert response.json()["same_place"] == []
+
+    @pytest.mark.asyncio
     async def test_too_far_apart_is_two_places(self, seeded_db, seeded_client):
         kg, _ = await self._pair(seeded_db, school_lat=42.6520)
         response = await seeded_client.get(f"/schools/{kg.id}")
@@ -427,3 +447,24 @@ class TestSamePlaceEndpoints:
 
         response = await seeded_client.get("/schools?age_group=preschool&education_level=primary")
         assert kg.id not in {row["id"] for row in response.json()}
+
+
+class TestAnotherOnesBuilding:
+    WALDORF_KG = 'Частна детска градина "Професор Николай Райнов"'
+    WALDORF_SCHOOL = 'Частно средно училище "Професор Николай Райнов"'
+
+    def test_a_school_the_site_puts_elsewhere_is_not_at_its_kindergarten(self):
+        # 630: the register gives the school 514's Горски пътник 44; its site says Хумболт 7.
+        kg = pin(514, self.WALDORF_KG, "kindergarten", 42.6725)
+        kg = replace(kg, address='ул. "Горски пътник" № 44')
+        school = replace(
+            pin(630, self.WALDORF_SCHOOL, "upper_secondary", 42.6725),
+            address='ул. "Горски пътник" № 44', site_elsewhere=True, only_pin=False,
+        )
+        assert same_place_groups([kg, school]) == []
+        # Without the site's other address, the register's shared address is one place.
+        assert len(same_place_groups([kg, replace(school, site_elsewhere=False)])) == 1
+        # Both with other buildings (Светлина): the site doesn't say whose this one is.
+        assert len(same_place_groups([replace(kg, only_pin=False), school])) == 1
+        # Next door at another address is still one place.
+        assert len(same_place_groups([kg, replace(school, address='ул. "Горски пътник" № 46')])) == 1

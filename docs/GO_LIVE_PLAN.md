@@ -1995,7 +1995,9 @@ the session scratchpad only.
       kindergarten-level and a private school-level institution of one brand
       (`shared_brand_key`, ≥4 characters) in one city with pins ≤150 m apart; places are the
       joined pins, so a kindergarten next to a school and its gymnasium is one place of three.
-      State institutions are left out (a municipal kindergarten and a state school sharing a
+      A pin at the other's address does not join when the school's own site puts it elsewhere
+      (a website campus location) and the other has no other pin (630 Waldorf: the register
+      gives it 514's Горски пътник 44, its site Хумболт 7; 2026-10-21). State institutions are left out (a municipal kindergarten and a state school sharing a
       patron's name are separate bodies). Published on the list and detail responses as
       `same_place` (the other's id, resolved name, type, level, a place id and the two pin ids), and the
       detail adds `continued_from`, the school-side inverse of `continues_to`. The map draws

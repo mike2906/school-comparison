@@ -215,12 +215,24 @@ def at_a_glance(
             row = {"grade": grade, "grade_to": grade_to, "types": [], "subjects": []}
             admission.append(row)
         row["types"] += [t for t in fact.get("admission") or [] if t not in row["types"]]
+        if fact.get("admission") == ["open_entry"] and not fact.get("exam_subjects"):
+            row["no_exam_fact"] = True  # a fact for these grades that says only "no exam"
         # "Математика" and "математика" from two facts are one subject (568, 575).
         seen = {_subject_key(s) for s in row["subjects"]}
         for subject in fact.get("exam_subjects") or []:
             if _subject_key(subject) not in seen:
                 seen.add(_subject_key(subject))
                 row["subjects"].append(subject)
+    for row in admission:
+        # One class's exam beside "no exam" for the same grade (192: Graphic design tests, the
+        # two dance classes don't) is an exam for some of its classes, said once.
+        no_exam_fact = row.pop("no_exam_fact", False)
+        if row["grade"] is not None and "entrance_exam" in row["types"] and (
+            no_exam_fact or SOME_CLASSES_EXAM in row["types"]
+        ):
+            row["types"] = list(
+                dict.fromkeys(SOME_CLASSES_EXAM if t == "entrance_exam" else t for t in row["types"])
+            )
     # A row naming no grade reads as the whole school's rule: "no entrance test" there beside
     # graded rows with a test, or a test beside graded "no entrance test" rows, contradicts
     # them ("8 клас: Приемен изпит; Без приемен изпит", 329). Its fact still shows.
@@ -235,6 +247,9 @@ def at_a_glance(
             # A school-wide exam the graded rows deny; its subjects are that exam's.
             row["types"].remove("entrance_exam")
             row["subjects"] = []
+        elif "entrance_exam" in row["types"] and SOME_CLASSES_EXAM in graded:
+            # "Entrance exam" for the whole school beside a grade where only some classes sit one.
+            row["types"].remove("entrance_exam")
     for row in admission:
         # "No entrance test" beside an exam, interview or trial day for the same grades.
         if "open_entry" in row["types"] and len(row["types"]) > 1:
@@ -398,19 +413,53 @@ _EXAM_WORD_RE = re.compile(r"\b(?:exam\w*|tests?|testing|assessment)\b", re.IGNO
 _OWN_EXAM_RE = re.compile(r"\b(?:entrance|admission|aptitude)\s+(?:exam\w*|tests?)\b", re.IGNORECASE)
 
 
+# "No entrance test" needs the text to say so: "Admission for 2026/2027 is open" is not (558).
+_NO_TEST_RE = re.compile(
+    r"\b(?:no|not|without|nor)\b[^.;]{0,40}?\b(?:exam\w*|tests?|testing|interviews?|selection|assessment)\b"
+    r"|\bfirst[- ]come\b|\border of (?:application|registration|enrol\w*)\b|\bopen (?:entry|enrol\w*)\b",
+    re.IGNORECASE,
+)
+# An exam for one class, profession, specialty or profile of a grade (192: only the Graphic
+# design class of three tests in fine arts), not for the whole grade.
+_ONE_CLASS_RE = re.compile(
+    r"\b(?:profession|specialt(?:y|ies)|speciality|profiles?)\b|(?-i:\b[A-Z][a-z]+) class\b", re.IGNORECASE
+)
+# The ministry's aptitude tests (изпити за проверка на способностите) in all three of art,
+# music and sport: the national calendar a state school copies onto its page (316), not its
+# own exam. A school with an aptitude test names its one or two subjects.
+_NATIONAL_APTITUDE_SUBJECTS = (r"\b(?:visual|fine) arts?\b", r"\bmusic\b", r"\bsports?\b")
+# Shown instead of entrance_exam for a grade only some of whose classes sit an exam.
+SOME_CLASSES_EXAM = "some_classes_exam"
+
+
+def _national_aptitude_calendar(english: str) -> bool:
+    return all(re.search(subject, english, re.IGNORECASE) for subject in _NATIONAL_APTITUDE_SUBJECTS) and not (
+        _ONE_CLASS_RE.search(english)
+    )
+
+
 def _admission_types(fact: Mapping[str, Any]) -> list[str]:
     types = [value for value in dict.fromkeys(_as_list(fact.get("admission"))) if value in ADMISSION_TYPES]
     english = _english(fact)
     national_only = _NATIONAL_EXAM_RE.search(english) and not _OWN_EXAM_RE.search(english)
-    if "entrance_exam" in types and english and (national_only or not _EXAM_WORD_RE.search(english)):
+    if "entrance_exam" in types and english and (
+        national_only or not _EXAM_WORD_RE.search(english) or _national_aptitude_calendar(english)
+    ):
         types.remove("entrance_exam")
+    if "open_entry" in types and english and not _NO_TEST_RE.search(english):
+        types.remove("open_entry")
+    if "entrance_exam" in types and _ONE_CLASS_RE.search(english):
+        types[types.index("entrance_exam")] = SOME_CLASSES_EXAM
     return types
 
 
 def _exam_subjects(fact: Mapping[str, Any]) -> list[dict[str, str]]:
     english = _english(fact)
-    if english and _NATIONAL_EXAM_RE.search(english) and not _OWN_EXAM_RE.search(english):
-        return []  # the НВО's subjects, not the school's exam's
+    if english and (
+        (_NATIONAL_EXAM_RE.search(english) and not _OWN_EXAM_RE.search(english))
+        or _national_aptitude_calendar(english)
+    ):
+        return []  # the НВО's or the ministry's aptitude tests' subjects, not the school's exam's
     return _bilingual(fact.get("exam_subjects"), 8)
 
 
@@ -444,6 +493,76 @@ _BEFORE_SCHOOL_RE = re.compile(
 
 def _school_grades_fact(fact: Mapping[str, Any]) -> bool:
     return bool(_SCHOOL_GRADES_RE.search(_BEFORE_SCHOOL_RE.sub(" ", _english(fact))))
+
+
+# The old extraction read a shared site's school pages for its kindergarten too (510: "IB
+# Diploma", "IELTS", "TOEFL" under the kindergarten's programmes). An item naming a school
+# grade, a school-leaving exam or diploma, or a language exam for teenagers is the school's.
+_SCHOOL_ONLY_ITEM_RE = re.compile(
+    _SCHOOL_GRADES_RE.pattern
+    + r"|\bIELTS\b|\bTOEFL\b|\bSAT\b|\bdiploma|диплом|матур|\b\d+\.?\s*(?:-?(?:ви|ри|ти|ми)\s+)?клас",
+    re.IGNORECASE,
+)
+# Where the old extraction keeps the lists a kindergarten page shows or its filters read.
+_EXTRACTED_LISTS = ("programs", "accreditations", "facilities", "extracurricular")
+_SUMMARY_SOURCE_LISTS = ("teaching_approach", "canonical_tags", "positioning", "differentiators")
+_ATTRIBUTE_LISTS = ("special_programs", "facilities", "activities_offered", "teaching_approach")
+
+
+def _item_text(item: Any) -> str:
+    if isinstance(item, Mapping):
+        return " ".join(str(value) for value in item.values() if isinstance(value, str))
+    return item if isinstance(item, str) else ""
+
+
+# "Подготовка за 1. клас" on a kindergarten is its school readiness.
+_BEFORE_SCHOOL_BG_RE = re.compile(
+    r"(?:подготов\w*|готовност)\s+за\s+(?:постъпване\s+в\s+)?(?:първи|1\.?)\s*клас"
+    r"|(?:до|преди)\s+(?:постъпване\w*\s+в\s+)?(?:първи|1\.?)\s*клас",
+    re.IGNORECASE,
+)
+
+
+def _school_item(text: str) -> bool:
+    text = _BEFORE_SCHOOL_BG_RE.sub(" ", _BEFORE_SCHOOL_RE.sub(" ", text))
+    return bool(_SCHOOL_ONLY_ITEM_RE.search(text))
+
+
+def _without_school_items(values: Any) -> Any:
+    if isinstance(values, str):
+        return None if _school_item(values) else values
+    if not isinstance(values, list):
+        return values
+    return [item for item in values if not _school_item(_item_text(item))]
+
+
+def _kindergarten_lists(attrs: dict[str, Any]) -> dict[str, Any]:
+    """``attrs`` with the old extraction's school-only list items left out (copies, never the stored JSON)."""
+
+    def cleaned(extracted: Any) -> Any:
+        if not isinstance(extracted, Mapping):
+            return extracted
+        out = dict(extracted)
+        for key in _EXTRACTED_LISTS:
+            if key in out:
+                out[key] = _without_school_items(out[key])
+        summary = out.get("summary_source")
+        if isinstance(summary, Mapping):
+            out["summary_source"] = {
+                key: _without_school_items(value) if key in _SUMMARY_SOURCE_LISTS else value
+                for key, value in summary.items()
+            }
+        return out
+
+    attrs = dict(attrs)
+    if "extracted" in attrs:
+        attrs["extracted"] = cleaned(attrs["extracted"])
+    if isinstance(attrs.get("extracted_i18n"), Mapping):
+        attrs["extracted_i18n"] = {locale: cleaned(value) for locale, value in attrs["extracted_i18n"].items()}
+    for key in _ATTRIBUTE_LISTS:
+        if key in attrs:
+            attrs[key] = _without_school_items(attrs[key])
+    return attrs
 
 
 def publishable_school_facts(
@@ -553,6 +672,8 @@ def publication_attributes(
     display and filter projections can use their tags, languages and class size, and the
     shown website name for the English name (``app.utils.i18n_resolver``)."""
     attrs = attributes_for_publication(attributes, scrape_status)
+    if str(education_level or "").casefold() in KINDERGARTEN_LEVELS:
+        attrs = _kindergarten_lists(attrs)
     facts = shown_school_facts(attributes, scrape_status, website_url, education_level)
     if facts:
         attrs[PUBLISHED_KEY] = facts

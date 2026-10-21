@@ -849,6 +849,7 @@
       "preschool": "Предучилищна група",
       "admissionTypes": {
         "entrance_exam": "Приемен изпит",
+        "some_classes_exam": "Приемен изпит за някои паралелки",
         "interview": "Събеседване",
         "trial_day": "Пробен ден",
         "open_entry": "Без приемен изпит"
