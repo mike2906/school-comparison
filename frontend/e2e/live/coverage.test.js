@@ -130,7 +130,7 @@ describe('coverage for realistic parents', () => {
 
   test('languages: every school with an official German intensive class is found by the German filter', async () => {
     // "Чужди езици - НЕ интензивно, АЕ": НЕ is RUO's code for German (73 СУ, 31 СУ were missed).
-    const german = /(?<![\p{L}])НЕ\s*-?\s*интензивно/u
+    const german = /(?<![\p{L}])(?:НЕ(?:\s+|\s*-\s*)интензивно|интензивно\s+НЕ)(?![\p{L}])/u
     const schools = (await allSchools()).filter(school =>
       (school.admission_info?.cutoff_summary || []).some(row => row.stage === 'grade_8' && german.test(row.class_name || '')))
     assert.ok(schools.length > 0, 'some school has a German intensive class')

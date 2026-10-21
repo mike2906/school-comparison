@@ -25,6 +25,7 @@ import re
 from typing import Any, Iterable, Mapping, Optional, Union
 
 from app.config import get_settings
+from app.utils.class_languages import OFFICIAL_LANGUAGES_KEY
 from app.utils.display_gating import (
     admission_value_is_semantically_valid,
     blocked_display_fields,
@@ -476,6 +477,13 @@ def build_localized_attributes(
     for field in blocked:
         if field in resolved:
             resolved[field] = []
+    # A language the school's official 8th-grade classes teach intensively, unless the
+    # site's reading already names that language.
+    named = {entry["language"] for entry in resolved["language_focus"]}
+    resolved["language_focus"] += [
+        entry for entry in _as_list(attrs.get(OFFICIAL_LANGUAGES_KEY))
+        if isinstance(entry, dict) and entry.get("language") not in named
+    ]
     resolved["language_focus"] = [
         entry
         for entry in resolved["language_focus"]

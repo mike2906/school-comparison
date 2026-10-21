@@ -24,9 +24,12 @@ _LANGUAGE_CODES = {
 }
 _CODE = "|".join(sorted(map(re.escape, _LANGUAGE_CODES), key=len, reverse=True))
 # Case-sensitive: lower-case "не интензивно" would mean "not intensive".
-_INTENSIVE_RE = re.compile(rf"(?<!\w)(?:({_CODE})\s*-?\s*интензивно|интензивно\s+({_CODE}))(?!\w)")
+_INTENSIVE_RE = re.compile(rf"(?<!\w)(?:({_CODE})(?:\s+|\s*-\s*)интензивно|интензивно\s+({_CODE}))(?!\w)")
 # How the display projection names an intensive study (app.utils.school_attributes).
 INTENSIVE_LEVEL = "enrichment"
+# Where publication_attributes puts them: the display projection adds them after the
+# website-data gate, since they come from RUO, not the school's site.
+OFFICIAL_LANGUAGES_KEY = "official_class_languages"
 
 
 def official_intensive_languages(admission_info: Any) -> list[dict[str, str]]:

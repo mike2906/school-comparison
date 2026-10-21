@@ -322,7 +322,7 @@ class SchoolService:
         # facilities/special_programs/teaching_approach are already mapped onto the
         # controlled vocabulary there (P1.9), so only canonical tags are surfaced.
         for attrs, scrape_status, school_type, website_url, education_level, admission_info in rows:
-            if not attrs:
+            if not attrs and not admission_info:
                 continue
             filterable = build_filterable_attributes(
                 publication_attributes(attrs, scrape_status, website_url, education_level, admission_info),

@@ -14,7 +14,7 @@ from typing import Any, Optional
 from urllib.parse import urlparse
 
 from app.utils.academic_year import current_academic_year
-from app.utils.class_languages import official_intensive_languages
+from app.utils.class_languages import OFFICIAL_LANGUAGES_KEY, official_intensive_languages
 from app.utils.display_lists import canonical_language
 from app.utils.facility_vocabulary import APPROACH_VOCAB, FACILITY_VOCAB, PROGRAM_VOCAB
 from app.utils.website_data import (  # noqa: F401 (SITE_ACCEPTED_STATUSES is imported from here)
@@ -717,8 +717,7 @@ def publication_attributes(
     language focus."""
     attrs = attributes_for_publication(attributes, scrape_status)
     if official := official_intensive_languages(admission_info):
-        current = attrs.get("language_focus")
-        attrs["language_focus"] = [*(current if isinstance(current, list) else []), *official]
+        attrs[OFFICIAL_LANGUAGES_KEY] = official
     if str(education_level or "").casefold() in KINDERGARTEN_LEVELS:
         attrs = _kindergarten_lists(attrs)
     facts = shown_school_facts(attributes, scrape_status, website_url, education_level)

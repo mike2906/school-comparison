@@ -86,7 +86,10 @@ tags join `filter_tags` (so the search filters and the compare page's meals, tra
 after-school rows see them), its languages join `language_focus` (a read made since 2026-10-20 lists every foreign language the
 school teaches, and one of at least 4 pages is marked `languages_read`; its languages then replace the old extraction's
 unchecked list, unless it kept no language at all: 32 Sofia schools, НПМГ among them, would
-have lost real languages to a miss), and its class size is
+have lost real languages to a miss); a language the school's official 8th-grade classes teach
+intensively (RUO class names such as "Чужди езици - НЕ интензивно, АЕ",
+`app/utils/class_languages.py`) is added as enrichment unless the reading already names it,
+after the website gate, since it comes from RUO and not the site (73 СУ and 31 СУ, 2026-10-21), and its class size is
 used when no curated one exists (before the old extraction's), unless the fact is about one
 grade, intake, profile or course, or a summer programme: the fact still shows, but the
 class-size tile is for the whole school. The response also carries

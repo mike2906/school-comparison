@@ -1,5 +1,7 @@
 """Intensive languages from the official 8th-grade class names."""
 
+from app.utils.school_attributes import build_localized_attributes
+from app.utils.school_facts import publication_attributes
 from app.utils.class_languages import official_intensive_languages
 
 
@@ -29,3 +31,23 @@ def test_no_classes_or_other_stages_give_nothing():
     assert official_intensive_languages(_admission("Чужди езици - НЕ интензивно", stage="grade_1")) == []
     # Lower-case "не интензивно" is "not intensive", not German.
     assert official_intensive_languages(_admission("Изобразително изкуство - не интензивно")) == []
+
+
+def _focus(attributes, admission):
+    projected = build_localized_attributes(publication_attributes(attributes, "accepted", None, "upper_secondary", admission), "en", "state")
+    return [(entry["language"], entry.get("level")) for entry in projected["language_focus"]]
+
+
+def test_official_languages_survive_without_site_data_and_skip_a_language_already_named():
+    admission = _admission("Чужди езици - НЕ интензивно, АЕ", "Чужди езици - АЕ интензивно, НЕ")
+    # No site data at all (or a site reading the gate withholds): the RUO classes still count.
+    assert _focus(None, admission) == [("German", "enrichment"), ("English", "enrichment")]
+    # The site's own reading of English wins; German is added.
+    assert _focus({"language_focus": [{"language": "English", "level": "bilingual"}]}, admission) == [
+        ("English", "bilingual"),
+        ("German", "enrichment"),
+    ]
+
+
+def test_a_code_run_into_the_word_is_not_a_language():
+    assert official_intensive_languages(_admission("Изкуства - НЕинтензивно")) == []
