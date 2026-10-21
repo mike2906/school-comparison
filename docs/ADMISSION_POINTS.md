@@ -59,7 +59,10 @@ grade) and the catchment map. Research: `/mnt/project-files/admission-points/res
    **Saving is opt-in and stays on the device** (Mike, 2026-10-15, reversing "no
    storage"): "Save on this device" keeps the answers and the checked home address in
    localStorage (`src/admission/saved.js`), so the search list and school pages can
-   compare every school. Every place that uses them has "forget". Sending them to our
+   compare every school. Every place that uses them has "forget".
+   Answers about one school are not saved, except a sibling: answered "yes" on a
+   school's own calculator, it is kept for that school (`siblings` in the saved entry),
+   and the list counts it there only (parent check, 2026-10-21). Sending them to our
    server would be collecting user data and needs Mike's own decision.
 8. **Unknown is an answer.** A question left unanswered counts as unknown, and the result
    is then a range; its maximum assumes every unknown is favourable, so the page says "up

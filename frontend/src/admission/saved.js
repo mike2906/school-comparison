@@ -5,8 +5,9 @@
  * official address table, which the catchment maps reuse.
  *
  * Shape: { version, home: { streetId, number } | null,
- *          kindergarten: { startYear, answers, savedOn } | null,
- *          grade_1: { startYear, addresses, answers, savedOn } | null }
+ *          kindergarten: { startYear, answers, siblings?, savedOn } | null,
+ *          grade_1: { startYear, addresses, answers, siblings?, savedOn } | null }
+ * `siblings` maps a school id to that school's sibling answers (see siblingsWith).
  */
 
 const STORAGE_KEY = 'admissionAnswers'
@@ -93,6 +94,19 @@ export function saveStage(stage, entry, { home } = {}) {
   const next = { ...read(), [stage]: { ...entry, savedOn: new Date().toISOString().slice(0, 10) } }
   if (home !== undefined) next.home = home
   write(next)
+}
+
+/**
+ * The schools where a sibling attends, from answers given on that school's own calculator
+ * page: the list counts a sibling only there. `place` is the school's sibling answers for
+ * a yes, null for a no (forgets the school) and undefined for no answer (keeps it as saved).
+ */
+export function siblingsWith(siblings, schoolId, place) {
+  const next = { ...siblings }
+  if (schoolId == null || place === undefined) return next
+  if (place) next[schoolId] = place
+  else delete next[schoolId]
+  return next
 }
 
 export function saveHome(home) {

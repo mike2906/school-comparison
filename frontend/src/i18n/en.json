@@ -1039,6 +1039,7 @@
       "thisKindergarten": "At {{name}}",
       "perKindergartenIntro": "These differ for each kindergarten or school on your list.",
       "siblingThere": "Will a brother or sister attend the same kindergarten or school at the same time?",
+      "siblingListHint": "The list counts this only at that kindergarten: open the calculator from its page and answer there.",
       "wishRank": "Where is it on your list?",
       "wishRankHint": "Your first three wishes get 3, 2 and 1 points.",
       "wish": "Wish {{n}}",
@@ -1070,6 +1071,7 @@
       "thisSchool": "At {{name}}",
       "perSchoolIntro": "These differ for each school on your list.",
       "siblingAtSchool": "Does a brother or sister study at this school?",
+      "siblingListHint": "The list counts this only at that school: open the calculator from its page and answer there.",
       "siblingYoung": "Is that brother or sister {{max}} or younger in {{year}}?",
       "preparatoryGroupHere": "Did the child attend the preparatory group at this school?",
       "familyTitle": "Family",
@@ -1211,8 +1213,8 @@
     },
     "panelTitle": "Your saved answers at this school",
     "assumed": {
-      "kindergarten": "Assumes it's your 1st wish, with no sibling there.",
-      "grade_1": "Uses your first address and assumes no sibling or preparatory group at the school."
+      "kindergarten": "Assumes it's your 1st wish, and a sibling only where you said so in that kindergarten's own calculator.",
+      "grade_1": "Uses your first address, assumes no preparatory group at the school, and a sibling only where you said so in that school's own calculator."
     },
     "banner": {
       "kindergarten": "Each kindergarten shows your saved points (child born {{year}}) against the last child admitted.",

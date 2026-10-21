@@ -176,6 +176,13 @@ describe('admission from a school page', () => {
       const birthYear = row.birth_year + start - Number(row.campaign.slice(0, 4))
       await page.getByLabel(t('bg', 'admissionCalc.kg.birthYear')).selectOption(String(birthYear))
       await page.locator('aside').getByText(t('bg', 'cutoffs.compare.title')).waitFor()
+      // A sibling answered here is saved for this kindergarten, so the list counts it there.
+      await answer(t('bg', 'admissionCalc.kg.siblingThere'), t('bg', 'admissionCalc.yes')).click()
+      await page.getByRole('button', { name: t('bg', 'savedAdmission.save') }).click()
+      const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('admissionAnswers') || 'null'))
+      assert.equal(saved?.kindergarten?.siblings?.[school.id]?.siblingThere, true, 'the sibling is kept for this kindergarten')
+      assert.equal(saved.kindergarten.answers.siblingThere, null, 'and not for every kindergarten')
+      await page.evaluate(() => localStorage.removeItem('admissionAnswers'))
     }
   })
 

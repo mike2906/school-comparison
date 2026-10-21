@@ -4,7 +4,7 @@ import { formatRange, measuredOnFor } from '../../admission/calculator'
 import { addressFactsForSchool } from '../../admission/catchments'
 import { EMPTY_ADDRESS, evaluateGrade1, GRADE1_INITIAL } from '../../admission/inputs'
 import { loadCatchments } from '../../admission/loadCatchments'
-import { getSaved, saveStage } from '../../admission/saved'
+import { getSaved, saveStage, siblingsWith } from '../../admission/saved'
 import { useSavedAdmission } from '../../hooks/useSavedAdmission'
 import AddressCheck from '../Admission/AddressCheck'
 import CutoffComparison from '../Admission/CutoffComparison'
@@ -142,7 +142,9 @@ function Grade1Calculator({ selected, startYear, school, cutoffRows = [], isCurr
   })
   const [a, setA] = useState(() => {
     const entry = getSaved().grade_1
-    return entry ? { ...GRADE1_INITIAL, ...withoutPlace(entry.answers) } : GRADE1_INITIAL
+    const sibling = entry?.siblings?.[school?.id]
+    const here = sibling ? { siblingAtSchool: true, siblingYoung: sibling.siblingUnderAgeAtSchool } : {}
+    return entry ? { ...GRADE1_INITIAL, ...withoutPlace(entry.answers), ...here } : GRADE1_INITIAL
   })
   const set = (key, value) => setA(prev => ({ ...prev, [key]: value }))
   const updateAddress = (i, update) => setAddresses(prev => prev.map((old, j) => (j === i ? update(old) : old)))
@@ -156,8 +158,17 @@ function Grade1Calculator({ selected, startYear, school, cutoffRows = [], isCurr
   const results = addresses.map(evaluate)
 
   // Only what the list can reuse: the checked address and dates, not yes/no answers
-  // about whichever school was on the page.
-  const toSave = () => ({ startYear, addresses: addresses.map(restoredAddress), answers: withoutPlace(a) })
+  // about whichever school was on the page, except a sibling there, kept for that school.
+  const siblingPlace = { true: { siblingAtSchool: true, siblingUnderAgeAtSchool: context.siblingUnderAgeAtSchool }, false: null }[a.siblingAtSchool]
+  const toSave = () => {
+    const siblings = siblingsWith(saved?.siblings, school?.id, siblingPlace)
+    return {
+      startYear,
+      addresses: addresses.map(restoredAddress),
+      answers: withoutPlace(a),
+      ...(Object.keys(siblings).length > 0 ? { siblings } : {}),
+    }
+  }
   const home = addresses[0]?.check ? { streetId: addresses[0].check.streetId, number: addresses[0].check.number } : undefined
   const save = () => saveStage('grade_1', toSave(), { home })
   const dirty = !saved || JSON.stringify({ ...toSave(), savedOn: saved.savedOn }) !== JSON.stringify(saved)
@@ -205,6 +216,7 @@ function Grade1Calculator({ selected, startYear, school, cutoffRows = [], isCurr
           intro={t('admissionCalc.g1.perSchoolIntro')}
         >
           <YesNo label={t('admissionCalc.g1.siblingAtSchool')} value={a.siblingAtSchool} onChange={v => set('siblingAtSchool', v)} />
+          {!school && a.siblingAtSchool === true && <p className="text-xs text-neutral-600">{t('admissionCalc.g1.siblingListHint')}</p>}
           {a.siblingAtSchool === true && (
             <YesNo
               label={t('admissionCalc.g1.siblingYoung', { max: params.groups.sibling_max_age, year: startYear })}

@@ -11,7 +11,8 @@ import { evaluateGrade1, evaluateKindergarten, KINDERGARTEN_GROUPS, kindergarten
 import { usesSofiaKindergartenSystem } from '../utils/admission.js'
 import { parseCoordinate } from '../utils/coordinates.js'
 
-// What the list assumes for answers that depend on the school.
+// What the list assumes for answers that depend on the school, except a sibling the parent
+// named on that school's own calculator page (the saved entry's `siblings`).
 export const KINDERGARTEN_ASSUMED = { siblingThere: false, wishRank: 1 }
 export const GRADE1_ASSUMED = { siblingAtSchool: false, siblingUnderAgeAtSchool: false, preparatoryGroupHere: false }
 
@@ -69,7 +70,7 @@ function kindergartenVerdict(school, entry, { ruleSets, districts, today }, sear
   const selected = ruleSetFor(ruleSets, stageById('kindergarten'), entry.startYear, today)
   if (!selected) return null
   const district = kindergartenDistrict(school, districts)
-  const result = evaluateKindergarten(selected.ruleSet, entry.answers, entry.startYear, { district, ...KINDERGARTEN_ASSUMED }, today)
+  const result = evaluateKindergarten(selected.ruleSet, entry.answers, entry.startYear, { district, ...KINDERGARTEN_ASSUMED, ...entry.siblings?.[school.id] }, today)
   if (!result) return null
   const rows = summaryRowsFor(summary, stageById('kindergarten'))
     .filter(row => rowFitsChild(row, ageGroup, entry.answers.birthYear, entry.startYear))
@@ -99,7 +100,7 @@ function grade1Verdict(school, entry, { ruleSets, catchments, today }) {
     selected.ruleSet,
     entry.answers,
     { inCatchment, inNeighbouring: !inCatchment && facts.some(f => f.inNeighbouring), since: address.since },
-    GRADE1_ASSUMED
+    { ...GRADE1_ASSUMED, ...entry.siblings?.[school.id] }
   )
   const rows = summaryRowsFor(school.admission_info?.cutoff_summary, stageById('grade_1'))
   return { stage: 'grade_1', yours: result, ...compareRows(rows, result, selected.ruleSet) }
