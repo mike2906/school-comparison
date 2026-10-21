@@ -1,7 +1,10 @@
 # Fees eval: the fee reader on saved pages, scored against the blind answer keys
 # (backend/scripts/fees_eval.py). Runs on a PR that touches the reader, its checks, the
 # publish gate or the model choice when it is opened, reopened or marked ready, and again when the
-# `fees-eval` label is added; not on every push. About $0.002 per school per trial.
+# `fees-eval` label is added; not on every push. About $0.15 a run (3 trials). At most
+# MAX_RUNS_PER_DAY PR runs a day (UTC), about $1: past that a PR run fails without calling the
+# model, and the label runs it the next day. A run by hand is not capped. The cap counts runs, not
+# dollars; a daily limit on the CI key in OpenRouter is what caps the dollars.
 name: Fees eval
 
 on:
@@ -37,6 +40,7 @@ on:
 
 permissions:
   contents: read
+  actions: read  # the daily cap counts today's runs
 
 concurrency:
   # Another label gets a group of its own, so it can't cancel an eval that is running.
@@ -59,6 +63,7 @@ jobs:
     env:
       OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
       MODEL_TIER_PRICING: ${{ inputs.model }}
+      MAX_RUNS_PER_DAY: 6
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -69,6 +74,26 @@ jobs:
           if [ -z "$OPENROUTER_API_KEY" ]; then
             echo "::notice::No OPENROUTER_API_KEY secret (or a fork's PR): fees eval skipped."
             echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Daily cap
+        id: cap
+        if: steps.key.outputs.skip != 'true' && github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # PR runs started today (UTC), each attempt of a re-run counted; this one left out.
+          # Skipped runs (a draft, another label) called no model; cancelled ones may have, so
+          # they count. A run that failed before the model counts too: the cap errs toward less spend.
+          ran="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/fees-eval.yml/runs?event=pull_request&created=>=$(date -u +%F)&per_page=100" \
+            -q "[.workflow_runs[] | select(.id != $GITHUB_RUN_ID and .conclusion != \"skipped\")
+                 | select(.run_started_at >= \"$(date -u +%F)\") | .run_attempt] | add // 0")"
+          echo "Fees eval PR runs today before this one: $ran of $MAX_RUNS_PER_DAY"
+          if [ "$ran" -ge "$MAX_RUNS_PER_DAY" ]; then
+            msg="The fees eval already ran $ran times today (UTC), its daily cap, so it did not run. To run it on this PR tomorrow, remove the fees-eval label if it is on, then add it."
+            echo "::error::$msg"
+            echo "$msg" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
           fi
 
       - name: Install uv
@@ -86,6 +111,7 @@ jobs:
         run: uv sync --locked
 
       - name: Run the eval
+        id: eval
         if: steps.key.outputs.skip != 'true'
         env:
           TRIALS: ${{ inputs.trials || '3' }}
@@ -97,7 +123,7 @@ jobs:
             --out "$RUNNER_TEMP/fees-eval.json" | tee "$RUNNER_TEMP/fees-eval.txt"
 
       - name: Summary
-        if: always() && steps.key.outputs.skip != 'true'
+        if: always() && steps.eval.outcome != 'skipped' && steps.key.outputs.skip != 'true'
         run: |
           { echo '```'; cat "$RUNNER_TEMP/fees-eval.txt" 2>/dev/null; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
 
