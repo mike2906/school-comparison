@@ -26,5 +26,6 @@ publish_pending
 cycle="$(date -u -d "@$now" +%Y-%m)"
 cycle_due
 claim_day
+update_checkout
 # $0.40: below that the fee check's reserve alone would stop the run.
 agent_run "$month_usd" "$month_usd" 0.40 fees-agent --city "$city" --workers "$workers"

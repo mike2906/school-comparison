@@ -25,7 +25,17 @@ They share `backend/scripts/lib/scheduled_job.sh`:
 - **Merged code only.** Cron runs whatever is checked out. A job stops (with its issue) when the
   checkout has local edits to tracked files, an untracked file under `backend/` that git does
   not ignore, or its HEAD is not on `origin/main` as last
-  fetched. Nothing pulls main by itself: a thread updates the checkout with Mike's go.
+  fetched.
+- **Up to main before a run.** Once a job is due and has claimed the day, it fast-forwards the
+  checkout to `origin/main`, so merged fixes reach the schedule without a go (Mike,
+  2026-10-21). It does not pull when main changes `job_files` in `lib/scheduled_job.sh` (the
+  scheduled scripts, `publish_snapshot.sh`, the spend guard `app/services/provider_costs.py`,
+  and `backend/alembic`: a pull does not apply migrations), when the fetch fails, or when the
+  checkout is on a branch other than `main`. It then runs on the code it has and opens one
+  issue, "Scheduled fees re-read: checkout not updated" (or the facts or register job's).
+  Those changes reach the PC only through a thread's pull with Mike's go (with the migration
+  applied). It also skips the pull, without an issue, while the open-days check or a publish
+  is running from the checkout.
 - **Installing starts nothing.** The first run records the current month or cycle as done, so
   the first scheduled run is the next one.
 - **One at a time, one start a day.** One lock (`scheduled.lock`) for the three, and at most

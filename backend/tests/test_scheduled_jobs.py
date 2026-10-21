@@ -1,5 +1,6 @@
 """Exercise the scheduled refresh scripts (backend/scripts/refresh_*.sh) with uv, docker, gh
 and the publish stubbed: when they run, what they spend, how they carry on after a stop."""
+import fcntl
 import json
 import os
 import shutil
@@ -42,6 +43,7 @@ GH_STUB = """#!/bin/sh
 echo "gh $*" >> "$CALLS.gh"
 """
 PUBLISH_STUB = """#!/bin/sh
+if [ "$1" = "--lock-path" ]; then echo "$SCHEDULED_STATE_DIR/publish.lock"; exit 0; fi
 echo '{"publish": true}' >> "$CALLS"
 """
 PINS_STUB = """#!/bin/sh
@@ -71,7 +73,11 @@ def pc(tmp_path):
     subprocess.run([*git, "init", "-q", "-b", "main"], check=True)
     subprocess.run([*git, "add", "."], check=True)
     subprocess.run([*git, "commit", "-qm", "scripts"], check=True)
-    subprocess.run([*git, "update-ref", "refs/remotes/origin/main", "HEAD"], check=True)
+    origin = tmp_path / "origin.git"
+    subprocess.run(["git", "init", "-q", "--bare", "-b", "main", str(origin)], check=True)
+    subprocess.run([*git, "remote", "add", "origin", str(origin)], check=True)
+    subprocess.run([*git, "push", "-q", "origin", "main"], check=True)
+    subprocess.run([*git, "fetch", "-q", "origin"], check=True)
     binaries = tmp_path / "bin"
     _exe(binaries / "uv", UV_STUB)
     _exe(binaries / "docker", DOCKER_STUB)
@@ -84,6 +90,7 @@ def pc(tmp_path):
         PATH=f"{binaries}:{os.environ['PATH']}",
         SCHEDULED_STATE_DIR=str(state),
         PINS_STATE_DIR=str(state),
+        OPEN_DAYS_STATE_DIR=str(state),
         SCHEDULED_BACKUPS=str(tmp_path / "backups"),
         CALLS=str(calls),
         UV_PLAN=str(plan),
@@ -92,6 +99,24 @@ def pc(tmp_path):
     class PC:
         def __init__(self):
             self.state, self.checkout = state, checkout
+
+        def merge_to_main(self, path, text):
+            """A PR merged on GitHub: a commit on origin's main that the checkout lacks."""
+            clone = tmp_path / "clone"
+            if not clone.exists():
+                subprocess.run(["git", "clone", "-q", str(origin), str(clone)], check=True)
+            other = ["git", "-C", str(clone), "-c", "user.name=t", "-c", "user.email=t@t"]
+            subprocess.run([*other, "pull", "-q", "origin", "main"], check=True)
+            (clone / path).parent.mkdir(parents=True, exist_ok=True)
+            (clone / path).write_text(text)
+            subprocess.run([*other, "add", "."], check=True)
+            subprocess.run([*other, "commit", "-qm", f"change {path}"], check=True)
+            subprocess.run([*other, "push", "-q", "origin", "main"], check=True)
+
+        def head(self):
+            return subprocess.run(
+                ["git", "-C", str(checkout), "rev-parse", "HEAD"], capture_output=True, text=True, check=True
+            ).stdout.strip()
 
         def run(self, script, day, runs=(), **extra):
             plan.write_text(json.dumps(list(runs)))
@@ -242,3 +267,53 @@ def test_an_untracked_file_under_backend_runs_nothing(pc):
     (pc.checkout / "backend/sitecustomize.py").write_text("print('not merged')\n")
     pc.run("refresh_fees.sh", "2026-11-01T02:20", [{"schools": [1], "spent": 0.5}])
     assert pc.code == 1 and pc.calls == [] and "untracked files" in pc.log("fees")
+
+
+def test_a_run_first_brings_the_checkout_up_to_main(pc):
+    pc.run("refresh_fees.sh", "2026-10-20T12:20")
+    pc.merge_to_main("backend/app/fix.py", "FIXED = True\n")
+    pc.run("refresh_fees.sh", "2026-11-01T02:20", [{"schools": [1], "spent": 0.5}])
+    assert pc.code == 0 and pc.option("--max-usd") is not None
+    assert (pc.checkout / "backend/app/fix.py").exists() and "checkout at" in pc.log("fees")
+
+
+def test_a_change_to_a_scheduled_job_on_main_runs_the_old_code_and_says_so(pc):
+    pc.run("refresh_fees.sh", "2026-10-20T12:20")
+    before = pc.head()
+    pc.merge_to_main("backend/scripts/refresh_fees.sh", "#!/usr/bin/env bash\n# a higher cap\n")
+    pc.run("refresh_fees.sh", "2026-11-01T02:20", [{"schools": [1], "spent": 0.5}])
+    assert pc.code == 0 and pc.option("--max-usd") is not None and pc.head() == before
+    assert "backend/scripts/refresh_fees.sh" in pc.log("fees") and "checkout not updated" in pc.issues
+
+
+def test_a_new_migration_on_main_is_not_pulled(pc):
+    pc.run("refresh_fees.sh", "2026-10-20T12:20")
+    before = pc.head()
+    pc.merge_to_main("backend/alembic/versions/abc_new.py", "revision = 'abc'\n")
+    pc.run("refresh_fees.sh", "2026-11-01T02:20", [{"schools": [1], "spent": 0.5}])
+    assert pc.head() == before and "backend/alembic/versions/abc_new.py" in pc.log("fees")
+
+
+def test_a_failed_fetch_runs_the_code_it_has_and_says_so(pc):
+    pc.run("refresh_fees.sh", "2026-10-20T12:20")
+    subprocess.run(["git", "-C", str(pc.checkout), "remote", "set-url", "origin", "/nowhere"], check=True)
+    pc.run("refresh_fees.sh", "2026-11-01T02:20", [{"schools": [1], "spent": 0.5}])
+    assert pc.code == 0 and "git fetch origin main failed" in pc.log("fees") and "checkout not updated" in pc.issues
+
+
+def test_a_detached_checkout_moves_to_main(pc):
+    pc.run("refresh_fees.sh", "2026-10-20T12:20")
+    subprocess.run(["git", "-C", str(pc.checkout), "checkout", "-q", "--detach"], check=True)
+    pc.merge_to_main("backend/app/fix.py", "FIXED = True\n")
+    pc.run("refresh_fees.sh", "2026-11-01T02:20", [{"schools": [1], "spent": 0.5}])
+    assert pc.code == 0 and (pc.checkout / "backend/app/fix.py").exists()
+
+
+def test_no_update_while_a_publish_runs(pc):
+    pc.run("refresh_fees.sh", "2026-10-20T12:20")
+    pc.merge_to_main("backend/app/fix.py", "FIXED = True\n")
+    with open(pc.state / "publish.lock", "a") as held:
+        fcntl.flock(held, fcntl.LOCK_EX)
+        pc.run("refresh_fees.sh", "2026-11-01T02:20", [{"schools": [1], "spent": 0.5}])
+    assert pc.code == 0 and not (pc.checkout / "backend/app/fix.py").exists()
+    assert "a publish is running" in pc.log("fees")

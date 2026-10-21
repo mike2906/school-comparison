@@ -24,6 +24,7 @@ check_checkout
 cycle="$(date -u -d "@$now" +%Y-%m)"
 cycle_due
 claim_day
+update_checkout
 pass_usd="${REGISTER_PINS_USD:-0.05}"
 try_usd="$(python3 -c 'import sys; print(2 * float(sys.argv[1]))' "$pass_usd")"
 if lt "$(python3 -c 'import sys; print(float(sys.argv[1]) - float(sys.argv[2]))' "${REGISTER_MONTH_USD:-0.30}" "$(spent)")" "$try_usd"; then
