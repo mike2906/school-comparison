@@ -2,7 +2,7 @@
 
 Terraform manages the Cloudflare side of production: the `api` and site DNS records, TLS
 mode, the API's Origin CA certificate, the Pages project and its domain, the `www`
-redirect and the crawler settings. It does not manage the API host: the OVH provider can
+redirect, the API cache rule and the crawler settings. It does not manage the API host: the OVH provider can
 order a VPS, but a changed image reinstalls (wipes) it and the SSH key needs an image ID
 that only exists after the first order. The host is ordered by hand and set up by
 `deploy/bootstrap.sh`. Email Routing's records are not declared here, so Terraform leaves
@@ -24,7 +24,7 @@ Monthly cost: everything here is on Cloudflare's free plan. The only paid item i
 4. **Cloudflare API token** (My Profile → API Tokens → Create Custom Token), limited to
    the `schooldecider.com` zone and your account:
    - Zone: Zone Read, DNS Write, Zone Settings Write, SSL and Certificates Write, Bot
-     Management Write, Single Redirect Write
+     Management Write, Single Redirect Write, Cache Rules Write
    - Account: Cloudflare Pages Write
 
    A token with the same items as Read is enough for `terraform plan`.

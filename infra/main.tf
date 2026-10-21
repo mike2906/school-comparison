@@ -116,6 +116,35 @@ resource "cloudflare_ruleset" "redirects" {
   ]
 }
 
+# API answers are public and change only when a snapshot is published: let the edge keep
+# them for the time the API's own Cache-Control allows (backend/app/main.py, a few
+# minutes), so most visits never reach the VPS. Every other GET answer (errors, /health,
+# docs) carries no-store; an unhandled 500 has no header, and Cloudflare keeps no 5xx by
+# default. POSTs are never cached.
+resource "cloudflare_ruleset" "cache" {
+  zone_id = var.zone_id
+  name    = "Cache"
+  kind    = "zone"
+  phase   = "http_request_cache_settings"
+
+  rules = [
+    {
+      description = "API GET answers, for as long as the API says"
+      expression  = "(http.host eq \"${local.api_host}\" and http.request.method eq \"GET\")"
+      action      = "set_cache_settings"
+      action_parameters = {
+        cache = true
+        edge_ttl = {
+          mode = "respect_origin"
+        }
+        browser_ttl = {
+          mode = "respect_origin"
+        }
+      }
+    }
+  ]
+}
+
 # --- Crawlers ---------------------------------------------------------------------------
 # Policy (frontend robots.txt): search yes, AI input yes, AI training no, and no crawler is
 # blocked at the edge. `ai_training = "disallow"` is the robots.txt-only choice; Bot

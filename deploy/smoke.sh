@@ -23,7 +23,9 @@ body() {
 }
 
 smoke_api() {
-	local api="$1" site="$2" ready="" count id headers
+	local api="$1" site="$2" ready="" count id headers fresh
+	# Cloudflare keeps GET answers a few minutes: ask past its copy, to check this deploy.
+	fresh="smoke=$(date +%s%N)"
 
 	for _ in $(seq 12); do
 		ready="$(body "$api/ready" 2>/dev/null | jq -r '.status' 2>/dev/null || true)"
@@ -33,24 +35,31 @@ smoke_api() {
 	[ "$ready" = ready ] || fail "$api/ready did not report ready"
 	ok "/ready"
 
-	count="$(body "$api/schools" | jq 'length')"
+	count="$(body "$api/schools?$fresh" | jq 'length')"
 	[ "$count" -gt 0 ] || fail "/schools returned no schools"
 	ok "/schools lists $count schools"
 
-	id="$(body "$api/schools" | jq '.[0].id')"
-	[ "$(status "$api/schools/$id")" = 200 ] || fail "/schools/$id is not 200"
+	id="$(body "$api/schools?$fresh" | jq '.[0].id')"
+	[ "$(status "$api/schools/$id?$fresh")" = 200 ] || fail "/schools/$id is not 200"
 	ok "/schools/$id"
 
-	[ "$(status "$api/countries/bg")" = 200 ] || fail "/countries/bg is not 200"
+	[ "$(status "$api/countries/bg?$fresh")" = 200 ] || fail "/countries/bg is not 200"
 	ok "/countries/bg"
 
-	headers="$(curl -sS -m 30 -o /dev/null -D - -H "Origin: $site" "$api/countries/bg")"
-	grep -qi "^access-control-allow-origin: $site" <<< "$headers" || fail "CORS does not allow $site"
-	headers="$(curl -sS -m 30 -o /dev/null -D - -H "Origin: https://example.com" "$api/countries/bg")"
-	if grep -qi "^access-control-allow-origin:" <<< "$headers"; then
-		fail "CORS allows https://example.com"
+	# Public GET answers allow any origin, so the copy Cloudflare keeps suits every caller
+	# (backend/app/main.py); the one write, POST /search-misses, keeps the allowlist.
+	headers="$(curl -sS -m 30 -o /dev/null -D - -H "Origin: $site" "$api/countries/bg?$fresh")"
+	grep -qi "^access-control-allow-origin: \*" <<< "$headers" || fail "GET answers do not allow any origin"
+	preflight() {
+		curl -sS -m 30 -o /dev/null -D - -X OPTIONS -H "Origin: $1" \
+			-H "Access-Control-Request-Method: POST" -H "Access-Control-Request-Headers: content-type" \
+			"$api/search-misses"
+	}
+	grep -qi "^access-control-allow-origin: $site" <<< "$(preflight "$site")" || fail "CORS does not let $site post"
+	if grep -qi "^access-control-allow-origin:" <<< "$(preflight https://example.com)"; then
+		fail "CORS lets https://example.com post"
 	fi
-	ok "CORS allows only $site"
+	ok "CORS: public GETs, posts only from $site"
 }
 
 smoke_site() {

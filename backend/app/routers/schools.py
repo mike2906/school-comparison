@@ -1,10 +1,11 @@
 import asyncio
+import gzip
 import logging
 import time
 from functools import partial
 from typing import Annotated, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Path, Query, Response
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request, Response
 from pydantic import TypeAdapter
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -40,7 +41,7 @@ router = APIRouter()
 # task rebuilds it for the next request.
 LIST_CACHE_TTL_SECONDS = 600
 LIST_CACHE_MAX_ENTRIES = 64
-_list_cache: dict[tuple, tuple[float, bytes]] = {}
+_list_cache: dict[tuple, tuple[float, bytes]] = {}  # gzipped bodies
 _filters_cache: dict[tuple, tuple[float, dict[str, list[str]]]] = {}
 # Name search and the school page also need the whole city (every school's names; the
 # schools sharing a building), so those are kept the same way, per country and city.
@@ -141,6 +142,17 @@ async def _build_list_body(db: AsyncSession, **filters) -> bytes:
     return await asyncio.to_thread(_serialize_list, schools)
 
 
+async def _build_list_entry(db: AsyncSession, **filters) -> bytes:
+    """The list body gzipped, once here instead of on every request (~4 MB of JSON)."""
+    body = await _build_list_body(db, **filters)
+    return await asyncio.to_thread(gzip.compress, body)
+
+
+def _accepts_gzip(request: Request) -> bool:
+    # The same test GZipMiddleware uses for every other response.
+    return "gzip" in request.headers.get("accept-encoding", "")
+
+
 def _preschool_location_ids(school) -> set[int]:
     return {
         location.id for location in school.locations
@@ -200,7 +212,7 @@ async def warm_cache(country_code: str = "bg", city: str = "sofia") -> None:
                 "include_crossover": False,
                 **variant,
             }
-            await _refresh(_list_cache, _list_key(**filters), partial(_build_list_body, **filters))
+            await _refresh(_list_cache, _list_key(**filters), partial(_build_list_entry, **filters))
     except Exception:
         logger.exception("Warming the schools cache failed")
 
@@ -225,6 +237,7 @@ async def _build_same_place(db: AsyncSession, *, country_code, city) -> dict[int
 
 @router.get("", response_model=list[SchoolListResponse])
 async def list_schools(
+    request: Request,
     country_code: str = Query("bg", description="Country code (ISO 3166-1 alpha-2)"),
     city: Optional[str] = Query("sofia", description="City scope; use 'all' for country-wide results"),
     age_group: Optional[str] = Query(None, description="Filter by age group"),
@@ -262,12 +275,21 @@ async def list_schools(
                 teaching_approach=teaching_approach,
             )
         else:
-            body = await _cached_or_build(
+            gzipped = await _cached_or_build(
                 _list_cache,
                 _list_key(**filters),
-                partial(_build_list_body, **filters),
+                partial(_build_list_entry, **filters),
                 db,
             )
+            # GZipMiddleware passes a response that already has a Content-Encoding.
+            if _accepts_gzip(request):
+                return Response(
+                    content=gzipped,
+                    media_type="application/json",
+                    headers={"Content-Encoding": "gzip", "Vary": "Accept-Encoding"},
+                )
+            # Rare: the edge always asks for gzip. GZipMiddleware adds the Vary.
+            body = gzip.decompress(gzipped)
         return Response(content=body, media_type="application/json")
     except Exception as e:
         logger.error(f"Error listing schools: {e}", exc_info=True)
