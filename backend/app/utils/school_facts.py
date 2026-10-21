@@ -240,9 +240,10 @@ def at_a_glance(
         if "open_entry" in row["types"] and len(row["types"]) > 1:
             row["types"].remove("open_entry")
     admission = [row for row in admission if row["types"] or row["subjects"]]
+    highest = max((fact["highest_grade"] for fact in facts if fact.get("highest_grade") is not None), default=None)
     # A grade-less row another grade-less row, or a row for the whole school's grades, already
     # says is one rule twice ("Без приемен изпит; Без приемен изпит", 598; 533's "Събеседване,
-    # Пробен ден" beside the same for grades 0-7).
+    # Пробен ден" beside the same for grades 0-7, when the facts say 7 is its highest).
     def covers(row: dict[str, Any], other: dict[str, Any]) -> bool:
         return set(other["types"]) <= set(row["types"]) and {_subject_key(s) for s in other["subjects"]} <= {
             _subject_key(s) for s in row["subjects"]
@@ -251,8 +252,12 @@ def at_a_glance(
     kept: list[dict[str, Any]] = []
     for row in admission:
         earlier = [other for other in kept if other["grade"] is None]
-        # A graded row from the first grade (or preschool) to a later one is the whole school's.
-        graded_rows = [other for other in admission if other["grade"] is not None and other["grade"] <= 1 and other["grade_to"]]
+        # A graded row from the first grade (or preschool) to the school's highest is the whole school's.
+        graded_rows = [
+            other
+            for other in admission
+            if other["grade"] is not None and other["grade"] <= 1 and highest and (other["grade_to"] or 0) >= highest
+        ]
         if row["grade"] is None and any(covers(other, row) for other in earlier + graded_rows):
             continue
         kept.append(row)
