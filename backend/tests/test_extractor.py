@@ -2566,7 +2566,7 @@ def test_normalized_price_fields_still_rejects_unknown_stated_period():
             category="tuition",
             amount=8000,
             currency="EUR",
-            period="weekly",
+            period="fortnightly",
             confidence=0.9,
         )
     )
