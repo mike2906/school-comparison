@@ -1,7 +1,9 @@
 # Fees eval: the fee reader on saved pages, scored against the blind answer keys
 # (backend/scripts/fees_eval.py). Runs on a PR that touches the reader, its checks, the
 # publish gate or the model choice when it is opened, reopened or marked ready, and again when the
-# `fees-eval` label is added; not on every push. About $0.002 per school per trial.
+# `fees-eval` label is added; not on every push. About $0.15 a run (3 trials). At most
+# MAX_RUNS_PER_DAY PR runs a day (UTC), about $1: past that a PR run fails without calling the
+# model, and adding the label the next day runs it. A run by hand is not capped.
 name: Fees eval
 
 on:
@@ -37,6 +39,7 @@ on:
 
 permissions:
   contents: read
+  actions: read  # the daily cap counts today's runs
 
 concurrency:
   # Another label gets a group of its own, so it can't cancel an eval that is running.
@@ -59,6 +62,7 @@ jobs:
     env:
       OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
       MODEL_TIER_PRICING: ${{ inputs.model }}
+      MAX_RUNS_PER_DAY: 6
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -69,6 +73,21 @@ jobs:
           if [ -z "$OPENROUTER_API_KEY" ]; then
             echo "::notice::No OPENROUTER_API_KEY secret (or a fork's PR): fees eval skipped."
             echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Daily cap
+        if: steps.key.outputs.skip != 'true' && github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Earlier runs today that reached the eval (skipped and cancelled runs don't count).
+          ran="$(gh run list -R "$GITHUB_REPOSITORY" -w fees-eval.yml --created ">=$(date -u +%F)" -L 100 \
+            --json databaseId,conclusion,status \
+            -q "[.[] | select(.databaseId != $GITHUB_RUN_ID) | select(.status != \"completed\" or .conclusion == \"success\" or .conclusion == \"failure\")] | length")"
+          echo "Fees eval runs today before this one: $ran of $MAX_RUNS_PER_DAY"
+          if [ "$ran" -ge "$MAX_RUNS_PER_DAY" ]; then
+            echo "::error::The fees eval ran $ran times today (UTC), its daily cap: not run. Add the fees-eval label tomorrow to run it on this PR."
+            exit 1
           fi
 
       - name: Install uv
