@@ -9,7 +9,7 @@ This module provides:
 """
 import inspect
 from math import isfinite
-from typing import Any, Literal
+from typing import Any, Literal, Optional
 
 from pydantic_ai import Agent
 from pydantic_ai.exceptions import ModelHTTPError, UnexpectedModelBehavior
@@ -127,6 +127,14 @@ def get_provider(tier: ModelTier) -> Literal["openrouter", "anthropic"]:
     else (``openrouter/<vendor>/<model>``, or a bare ``<vendor>/<model>`` as before) goes
     to OpenRouter. ``anthropic/...`` on OpenRouter is spelled ``openrouter/anthropic/...``."""
     return "anthropic" if get_model(tier).startswith(ANTHROPIC_PREFIX) else "openrouter"
+
+
+def missing_key(tier: ModelTier) -> Optional[str]:
+    """The API key setting a tier needs and this checkout's .env lacks, or None."""
+    settings = get_settings()
+    if get_provider(tier) == "anthropic":
+        return None if settings.anthropic_api_key else "ANTHROPIC_API_KEY"
+    return None if settings.openrouter_api_key else "OPENROUTER_API_KEY"
 
 
 def _anthropic_model_name(tier: ModelTier) -> str:

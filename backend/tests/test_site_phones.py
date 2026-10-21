@@ -172,3 +172,17 @@ async def test_another_schools_number_is_skipped_but_our_second_one_counts(db_se
     report = await stage.run_site_phones(db_session, fetch=_fetcher(pages))
     ours = next(r for r in report["results"] if r["phone"] == "02/824 11 70")
     assert ours["outcome"] == "replace" and ours["new_phone"] == "0888 123 456"
+
+
+def test_an_outside_data_protection_officers_number_is_not_the_schools():
+    text = (
+        "Тел.: 02 987 65 43. Длъжностно лице по защита на личните данни: Снежана Иванова, "
+        "dpo@responsaprevent.bg, Тел: 0885 103 173"
+    )
+    assert stage.page_numbers(text) == ["29876543"]
+
+
+def test_every_listing_of_our_address_counts():
+    # НЕМО-Бояна: the footer gives the main office's number after our address, the list ours.
+    page = 'Адрес: кв. Бояна, бул. "Ал. Пушкин" № 63 тел. 0889 599 118 ... бул. "Александър Пушкин" 63 0898 790 549'
+    assert stage.numbers_at(page, 'ул. "Александър Пушкин" № 63') == ["889599118", "898790549"]

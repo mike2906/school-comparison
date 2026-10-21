@@ -259,3 +259,13 @@ async def test_apply_keeps_a_write_another_stage_made_during_the_run(db_session)
 
     await stage.run_social_links(db_session, school_ids=[school.id], fetch=fetch, apply=True)
     assert school.attributes["other"] == 2 and school.attributes["social_links"]["facebook"] == FB
+
+
+def test_a_sites_home_page_path_is_its_folder():
+    from app.scrapers.stages.social_links import _contact_page
+
+    html = '<a href="./contact">Контакти</a>'
+    base = "https://tzarsimeon.bg/dgrosica/home"
+    assert _contact_page(html, base, base) == "https://tzarsimeon.bg/dgrosica/contact"
+    other = '<a href="/other-school/contact">Контакти</a>'
+    assert _contact_page(other, base, base) is None

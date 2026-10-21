@@ -78,7 +78,8 @@ It also settles any location that is not an official or hand pin by itself: a si
 the register point of the location's own address places a hidden one or moves a shown one pinned
 over 300 m away (ЧДГ Росица's "Кирил и Методий 70" pinned in Оборище, the site maps Иваняне), and a
 shown location whose address is no street and number or block at all takes the register address the site names
-within 40 m of our pin ("ул. 315 - III м. р." → "ул. Петър Бонев 3").
+within 40 m of our pin ("ул. 315 - III м. р." → "ул. Петър Бонев 3"). An official or hand pin keeps its point and takes
+only that address ("relabelled").
 
 `cli hand-pin --location-id N --lat --lng [--address] --note "..." [--apply]` pins one hidden
 location by hand (manual_fix, old address and point kept in `manual_fix.previous`) when the

@@ -46,6 +46,11 @@ _PHONE_FAX = re.compile(r"тел\W{0,3}(?:факс|fax)|phone\W{0,3}fax", re.IGN
 _SIDE_ROLE = re.compile(
     r"(?<![а-яa-z])(?:зам\.|заместник|deputy|психолог|счетовод|accountant|медицинск|домакин)", re.IGNORECASE
 )
+# Not the school's own line: its outside data-protection officer (sgcag.info's "лице по
+# защита на личните данни ... dpo@responsaprevent.bg, Тел: 0885 103 173").
+_NOT_SCHOOLS = re.compile(
+    r"защита на (?:личните )?данни|длъжностно лице|(?<![a-z])dpo(?![a-z])|data protection", re.IGNORECASE
+)
 # A Sofia landline or a mobile, digits apart by at most one separator: exactly as many
 # digits as the number has, so two numbers in a row stay two.
 _PHONE = re.compile(
@@ -82,19 +87,20 @@ def stored_numbers(phone: Optional[str]) -> list[str]:
 
 def page_numbers(text: str) -> list[str]:
     """The school's phones a page gives, in page order: Sofia landlines and mobiles. A fax
-    (not a "тел./факс") is left out, and so are a deputy's, the psychologist's or the
-    accountant's when the page gives another."""
+    (not a "тел./факс") and an outside data-protection officer's are left out, and so are a
+    deputy's, the psychologist's or the accountant's when the page gives another."""
     main, side = [], []
-    last_end, is_side, is_fax = 0, False, False
+    last_end, is_side, is_fax, is_outside = 0, False, False, False
     for match in _PHONE.finditer(text or ""):
         # The words between the previous number and this one are this number's label; a
         # number after only a comma shares the previous one's ("Зам.: 02 945 2906, 02 845 2682").
-        label = text[max(last_end, match.start() - 40): match.start()]
-        last_end = match.end()
+        prev_end, last_end = last_end, match.end()
+        label = text[max(prev_end, match.start() - 40): match.start()]
         if re.search(r"[^\W\d_]", label):
             is_side = bool(_SIDE_ROLE.search(label))
             is_fax = bool(_FAX_BEFORE.search(label)) and not _PHONE_FAX.search(label)
-        if is_fax:
+            is_outside = bool(_NOT_SCHOOLS.search(text[max(prev_end, match.start() - 160): match.start()]))
+        if is_fax or is_outside:
             continue
         number = nsn(match.group())
         if not number or number in main or number in side:
@@ -122,13 +128,15 @@ def numbers_at(text: str, address: str) -> list[str]:
         number = re.escape(digits) + (rf"[\s-]?{re.escape(letter.casefold())}" if letter else "")
     pattern = rf"(?<!\w){re.escape(words[0])}\W{{1,6}}(?:№\s*)?{number}(?![\w/-])"
     lowered = (text or "").casefold()
+    numbers: list[str] = []
+    # Every place it names our address: a footer may give the main office's number after
+    # it (НЕМО-Бояна's footer gives НЕМО's), the contact list the building's own.
     for found in re.finditer(pattern, lowered):
         following = text[found.end(): found.end() + 160]
         if stop := _NEXT_ADDRESS.search(following):
             following = following[: stop.start()]  # the next building's numbers are not ours
-        if numbers := page_numbers(following):
-            return numbers
-    return []
+        numbers += [n for n in page_numbers(following) if n not in numbers]
+    return numbers
 
 
 def _site_key(url: str) -> str:

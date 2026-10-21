@@ -64,6 +64,9 @@ def page_links(html: str, base: str) -> list[str]:
     return [url for url in (_join(base, href) for href in found) if url]
 
 
+_HOME_PAGES = frozenset({"home", "index", "main", "начало", "nachalo"})
+
+
 def _on_site(url: str, site: str) -> bool:
     """On the school's own site: the same host, and under its path when it has one
     (sites.google.com/view/a is not /view/b)."""
@@ -71,7 +74,9 @@ def _on_site(url: str, site: str) -> bool:
     if host(url) != host(site):
         return False
     prefix = home.path.lower()
-    if "." in prefix.rsplit("/", 1)[-1]:  # a file (/index.php): its folder is the site
+    last = prefix.rstrip("/").rsplit("/", 1)[-1]
+    # A file (/index.php) or a home page (tzarsimeon.bg/dgrosica/home): its folder is the site.
+    if "." in last or last in _HOME_PAGES:
         prefix = prefix.rsplit("/", 1)[0]
     prefix = prefix.rstrip("/")
     path = parsed.path.lower()

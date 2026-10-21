@@ -45,7 +45,8 @@ fi
 # (cli translate-texts: fee names, 8th-grade class names, list items). It calls the model only
 # for text no school has a translation for yet, and writes only when something changes, after
 # a local pg_dump (usually nothing changes: no dump, no call). A failure only leaves that text
-# as written, so the publish goes ahead.
+# as written, so the publish goes ahead; but a checkout whose .env lacks the model's key
+# (exit 78, e.g. a worktree with a stale .env copy) stops it.
 translate() { (cd "$repo_root/backend" && uv run python -m app.scrapers.cli translate-texts "$@") >&2; }
 rc=0
 translate --plan || rc=$?
@@ -62,6 +63,8 @@ if [ "$rc" = 10 ]; then
 		rm -f "$backup"
 		echo "publish: pg_dump failed; translations skipped, the new text shows as written" >&2
 	fi
+elif [ "$rc" = 78 ]; then
+	die "translate-texts has text to translate but no API key in $repo_root/backend/.env; copy the key in (or publish from the main checkout)"
 elif [ "$rc" != 0 ]; then
 	echo "publish: translate-texts --plan failed (exit $rc); the new text shows as written" >&2
 fi

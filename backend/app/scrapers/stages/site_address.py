@@ -49,7 +49,7 @@ logger = logging.getLogger(__name__)
 PIN_TAG = "coords_source=school_site_address"
 # A site's map point this close to a register point is at that address.
 NEAR_M = 40
-FIXED = ("placed", "moved", "readdressed")
+FIXED = ("placed", "moved", "readdressed", "relabelled")
 
 
 def _address_key(point: register_lib.RegisterPoint) -> tuple[str, ...]:
@@ -105,11 +105,11 @@ def site_fixes(
     itself: "placed" or "moved" (a site map point at the register point of the location's
     own address; moved when a shown pin is over ``ELSEWHERE_M`` from it), "readdressed" (a
     shown location whose address is no street and number or block, at a register address the site
-    names within ``NEAR_M`` of our pin)."""
+    names within ``NEAR_M`` of our pin), "relabelled" (the same for an official or hand pin:
+    the address only, the point stays)."""
     fixes: dict[int, tuple[str, register_lib.RegisterPoint]] = {}
     for location in locations:
-        if has_pinned_point(location):
-            continue
+        pinned = has_pinned_point(location)
         ours = register_lib.parse(_address(location))
         at_map = {
             _address_key(candidate): candidate
@@ -119,7 +119,7 @@ def site_fixes(
         }
         hidden = needs_pin(location)
         fix: Optional[tuple[str, register_lib.RegisterPoint]] = None
-        if len(at_map) == 1:
+        if len(at_map) == 1 and not pinned:
             (candidate,) = at_map.values()
             if hidden:
                 fix = ("placed", candidate)
@@ -134,7 +134,7 @@ def site_fixes(
             at_pin = site_addresses([(location.lat, location.lng)], page, register)
             if len(at_pin) == 1:
                 ((candidate, _),) = at_pin.values()
-                fix = ("readdressed", candidate)
+                fix = ("relabelled" if pinned else "readdressed", candidate)
         # Another of our locations there already: this one is an old address of it.
         if fix and not any(
             other.id != location.id
@@ -227,8 +227,6 @@ async def run_site_address(
                 .all()
             )
             hidden = [loc for loc in locations if needs_pin(loc)]
-            if all(has_pinned_point(loc) for loc in locations):
-                continue
             if register is None:
                 register = await download_register()
 
@@ -335,7 +333,9 @@ async def run_site_address(
         results = await _run(fetch, fetch_script)
     if apply:
         for result in results:
-            if result["outcome"] in FIXED:
+            if result["outcome"] == "relabelled":
+                result["outcome"] = await _relabel(db, result["location_id"], result["address"], result["site_address"])
+            elif result["outcome"] in FIXED:
                 fixed = result["outcome"]
                 result["outcome"] = await write_pin(
                     db,
@@ -362,3 +362,26 @@ async def run_site_address(
     for result in results:
         outcomes[result["outcome"]] = outcomes.get(result["outcome"], 0) + 1
     return {"apply": apply, "locations": len(results), "outcomes": outcomes, "results": results}
+
+
+async def _relabel(db: AsyncSession, location_id: int, read_address: str, address: str) -> str:
+    """Give an official or hand pin the register address its site names there, under a row
+    lock; the point stays. The old address is kept in the evidence (re-imports match it)."""
+    location = await db.get(SchoolLocation, location_id)
+    await db.refresh(location, with_for_update=True)
+    if _address(location) != read_address or not has_pinned_point(location):
+        await db.rollback()
+        return "changed_meanwhile"
+    meta = dict(location.geocode_meta or {})
+    meta["evidence"] = {
+        **(meta.get("evidence") if isinstance(meta.get("evidence"), dict) else {}),
+        "site_address": address,
+        "previous_address_i18n": dict(location.address_i18n or {}),
+    }
+    location.geocode_meta = meta
+    location.address_i18n = {"bg": address}  # English is derived from it for display
+    tags = list(location.location_tags or [])
+    location.location_tags = tags + [WEBSITE_CONTACT_ADDRESS_TAG] * (WEBSITE_CONTACT_ADDRESS_TAG not in tags)
+    db.add(location)
+    await db.commit()
+    return "relabelled"
