@@ -755,6 +755,10 @@ class TestMoeRegistryAgeGroupExtraction:
 
         for name in ('5. Вечерно средно училище "Пеньо Пенев"', 'IV Сменно-вечерна гимназия " Отец Паисий "'):
             assert MoeRegistryAdapter._get_age_groups_for_detailed_type(124, 'upper_secondary', name) == ['grade_8_12']
+        # Not a kindergarten that happens to be called "Вечерница".
+        assert MoeRegistryAdapter._get_age_groups_for_detailed_type(151, 'kindergarten', 'ДГ № 47 "Вечерница"') == [
+            'first', 'second', 'third', 'preschool'
+        ]
         assert MoeRegistryAdapter._get_age_groups_for_detailed_type(124, 'upper_secondary', '119 Средно училище') == [
             'grade_1_4', 'grade_5_7', 'grade_8_12'
         ]

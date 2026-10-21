@@ -106,7 +106,7 @@ _SOUND_RULES = [
     (re.compile(pattern), repl)
     for pattern, repl in (
         ("ph", "f"), ("sch", "sk"), ("ck", "k"), ("dzh", "j"), ("dg", "j"), ("zh", "j"), ("g(?=e[aeiou])", "j"), ("ge$", "j"),
-        ("c(?!h)", "k"), ("q", "k"), ("x", "ks"), ("w", "v"), ("[aeiouyh]", ""), (r"(.)\1+", r"\1"),
+        ("c(?=[eiy])", "s"), ("c(?!h)", "k"), ("q", "k"), ("x", "ks"), ("w", "v"), ("[aeiouyh]", ""), (r"(.)\1+", r"\1"),
     )
 ]
 # A query needs this many consonants in all to be matched by sound: "Лайтхаус" (l-t-s)
@@ -157,7 +157,6 @@ _ALIASES_LATIN = [
 ]
 
 
-@lru_cache(maxsize=4096)
 def _sound(latin_word: str) -> str:
     for pattern, repl in _SOUND_RULES:
         latin_word = pattern.sub(repl, latin_word)

@@ -23,7 +23,7 @@ from app.schemas.scraping import DiscoveredLocation, DiscoveredSchool
 from app.scrapers.base import BaseScraper
 from app.scrapers.sources import register_adapter
 from app.scrapers.sources.base_adapter import BaseSourceAdapter
-from app.scrapers.sources.bg.school_kinds import EVENING_SCHOOL_BANDS, is_evening_school
+from app.scrapers.sources.bg.school_kinds import child_bands
 from app.services.geocoding.base import GeocodingResult
 from app.services.geocoding.bg import GeoJSONProvider, city_storage_value
 from app.services.geocoding.nominatim import NominatimProvider
@@ -166,16 +166,14 @@ class MoeRegistryAdapter(BaseSourceAdapter):
         Returns:
             List of age group codes
         """
-        # Evening schools (вечерно / сменно-вечерно) teach pupils of 16 and over: grades
-        # 1-7 there are for adults, so they are no school for a child starting 1st grade.
-        if education_level != 'kindergarten' and is_evening_school(name_bg):
-            return sorted(EVENING_SCHOOL_BANDS)
         # Try detailed type mapping first (more accurate for multi-grade schools)
         if detailed_type and detailed_type in MoeRegistryAdapter.DETAILED_TYPE_AGE_GROUPS:
-            return MoeRegistryAdapter.DETAILED_TYPE_AGE_GROUPS[detailed_type]
-
-        # Fall back to education level mapping
-        return MoeRegistryAdapter.EDUCATION_LEVEL_AGE_GROUPS.get(education_level, [])
+            bands = MoeRegistryAdapter.DETAILED_TYPE_AGE_GROUPS[detailed_type]
+        else:
+            # Fall back to education level mapping
+            bands = MoeRegistryAdapter.EDUCATION_LEVEL_AGE_GROUPS.get(education_level, [])
+        # Evening schools are registered as средно (1-12) but teach pupils of 16 and over.
+        return child_bands(bands, name_bg, education_level)
 
     @staticmethod
     def _get_age_groups_for_education_level(education_level: str) -> list[str]:

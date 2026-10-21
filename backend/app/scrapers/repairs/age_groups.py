@@ -12,7 +12,7 @@ from urllib.parse import unquote
 from rich.console import Console
 from rich.table import Table
 
-from app.scrapers.sources.bg.school_kinds import EVENING_SCHOOL_BANDS, is_evening_school
+from app.scrapers.sources.bg.school_kinds import child_bands
 from app.scrapers.stages import common as stage_common
 from app.scrapers.stages import navigate as navigate_stage
 
@@ -128,13 +128,14 @@ def _school_name_bg(school) -> str:
 
 
 def _allowed_age_group_repairs_for_school(school) -> set[str]:
-    education_level = str(getattr(school, "education_level", "") or "")
-    name_bg = _school_name_bg(school)
-
     # Evening schools take pupils of 16 and over: a page listing grades 1-7 there
     # describes classes for adults.
-    if education_level != "kindergarten" and is_evening_school(name_bg):
-        return set(EVENING_SCHOOL_BANDS)
+    return set(child_bands(_allowed_by_type(school), _school_name_bg(school), getattr(school, "education_level", None)))
+
+
+def _allowed_by_type(school) -> set[str]:
+    education_level = str(getattr(school, "education_level", "") or "")
+    name_bg = _school_name_bg(school)
 
     # A gymnasium (registry type 125 profiled / 126 vocational) has no preschool or
     # grades 1-4; pages that mention them describe a sibling school on a shared site,

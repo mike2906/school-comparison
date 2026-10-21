@@ -39,7 +39,7 @@ from app.scrapers.shared_site_check import (
     level_family,
     site_id,
 )
-from app.scrapers.sources.bg.school_kinds import EVENING_SCHOOL_BANDS, is_evening_school
+from app.scrapers.sources.bg.school_kinds import child_bands
 from app.utils.transliteration import transliterate_bulgarian
 
 logger = logging.getLogger(__name__)
@@ -464,12 +464,10 @@ def plan_campus_sync(
         return plan
     family = level_family(education_level)
     defs = age_group_defs(education_config)
-    # An evening school's "от 1 до 12 клас" includes classes for adults.
-    evening = family != "kindergarten" and is_evening_school(name_bg)
 
     def groups_for(diff_range) -> list[str]:
-        groups = groups_for_range(diff_range, family, defs)
-        return [g for g in groups if g in EVENING_SCHOOL_BANDS] if evening else groups
+        # An evening school's "от 1 до 12 клас" includes classes for adults.
+        return child_bands(groups_for_range(diff_range, family, defs), name_bg, education_level)
 
     def add_groups(location: ExistingLocation, diff_range, evidence) -> None:
         missing = [g for g in groups_for(diff_range) if g not in location.age_groups]
