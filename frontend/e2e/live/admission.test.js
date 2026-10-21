@@ -295,6 +295,12 @@ describe('admission from a school page', () => {
     await page.waitForURL(url => url.pathname === '/search' && url.searchParams.get('age_group') === 'grade_1_4')
     await page.getByTestId('saved-admission-banner').waitFor()
     await page.getByTestId('saved-verdict-line').first().waitFor()
+    // The saved home is offered as the list's location, so the parent need not type it again.
+    await page.getByRole('button', { name: t('bg', 'location.setShortSaved') }).first().click()
+    await page.getByRole('button', { name: t('bg', 'location.useSavedHome') }).click()
+    await page.waitForFunction(() => JSON.parse(localStorage.getItem('userLocation') || 'null')?.savedHome, null, { timeout: 30_000 })
+    // The rest of the flow as a parent without a location (drive times would load too).
+    await page.evaluate(() => localStorage.removeItem('userLocation'))
     // Hiding schools where the saved result is below the last admitted child.
     await page.getByTestId('hide-below').check()
     await page.getByTestId('hidden-count').waitFor()

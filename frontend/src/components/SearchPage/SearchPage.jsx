@@ -29,6 +29,7 @@ import SchoolDetailPanel from './SchoolDetailPanel'
 import AgePicker from './AgePicker'
 import SchoolNameSearch from './SchoolNameSearch'
 import LocationControl from './LocationControl'
+import AreaHint from './AreaHint'
 import { ActiveFilterChips, AdvancedFilters } from './AdvancedFilters'
 import { useAdvancedFilterOptions } from './advancedFilterOptions'
 import { useUserLocation } from './useUserLocation'
@@ -106,7 +107,8 @@ function SearchPage() {
   const { compareList } = useCompare()
   const { config, countryCode } = useCountry()
 
-  const geocodingConfig = config?.map_config?.geocoding || {}
+  // The map bounds also stop an address lookup that lands outside the city.
+  const geocodingConfig = { ...config?.map_config?.geocoding, bounds: config?.map_config?.bounds }
 
   const [selectedSchoolId, setSelectedSchoolId] = useState(initialView.school)
   const [hoveredSchoolId, setHoveredSchoolId] = useState(null)
@@ -124,6 +126,8 @@ function SearchPage() {
     clearLocationError,
     locateMe,
     searchAddress,
+    canUseSavedHome,
+    locateSavedHome,
     clearLocation,
     setLocationFromMap,
   } = useUserLocation({ t, geocodingConfig })
@@ -1254,6 +1258,10 @@ function SearchPage() {
                   addressInput={addressInput}
                   onAddressInputChange={changeAddressInput}
                   onUseMyLocation={handleUseMyLocation}
+                  onUseSavedHome={canUseSavedHome ? () => {
+                    setIsPickingLocation(false)
+                    locateSavedHome()
+                  } : null}
                   onAddressSearch={handleAddressSearch}
                   onStartMapPick={handleStartMapPick}
                   onClear={handleClearLocation}
@@ -1373,6 +1381,15 @@ function SearchPage() {
                     </div>
                     <p className="text-neutral-600">{t('schools.noResults')}</p>
                     <p className="text-sm text-neutral-400 mt-1">{t('schools.tryDifferentFilters')}</p>
+                    <AreaHint
+                      nameQuery={nameQuery}
+                      onSearchNear={async () => {
+                        setIsPickingLocation(false)
+                        if (await searchAddress(nameQuery)) setNameQuery('')
+                      }}
+                      isGeocoding={isGeocoding}
+                      locationError={locationError}
+                    />
                     <button
                       type="button"
                       onClick={handleClearFilters}

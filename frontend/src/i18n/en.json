@@ -42,6 +42,7 @@
   },
   "location": {
     "useMyLocation": "Use my location",
+    "useSavedHome": "Use the home address saved in the calculator",
     "selectOnMap": "Choose on map",
     "cancelMapPick": "Cancel map selection",
     "mapPickHint": "Click anywhere on the map to set your location.",
@@ -54,6 +55,7 @@
     "errorDenied": "Location access denied. Try entering an address manually.",
     "errorUnavailable": "Unable to get your location. Try entering an address.",
     "errorNotFound": "Address not found in Bulgaria. Try a different format.",
+    "errorOutsideCity": "That address is outside Sofia ({{place}}). Add the street type or the quarter, e.g. \"ж.к. Люлин 5\" or \"ул. Граф Игнатиев 2\".",
     "errorUnableToGeocode": "Unable to get your location. Try entering an address.",
     "errorPleaseWait": "Please wait...",
     "errorRateLimited": "Too many requests. Please wait a moment.",
@@ -66,6 +68,7 @@
     "fromYou": "from you",
     "nearShort": "Near {{address}}",
     "setShort": "Set your location",
+    "setShortSaved": "Near my saved address?",
     "whyShort": "See distances, sort by the nearest and limit by distance.",
     "changeShort": "Change location"
   },
@@ -143,6 +146,8 @@
     "results_other": "schools",
     "noResults": "No schools found",
     "tryDifferentFilters": "Try adjusting your filters",
+    "areaHint": "No match for this name. Looking for schools in an area?",
+    "searchNear": "Show schools near \"{{place}}\"",
     "details": "Details",
     "address": "Address",
     "phone": "Phone",
