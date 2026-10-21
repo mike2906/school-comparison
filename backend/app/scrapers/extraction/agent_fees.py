@@ -131,11 +131,11 @@ Rules:
 - When the site prints a total of a group's fees ("Общо", "Total"), list the total as a tuition entry of its own, with the site's word for it as plan_name ("Общо"); the fees it adds up stay their own entries.
 - Paying one fee in parts is not a fee of its own. When the site offers the same fee paid in one go and also in parts (2 instalments, quarterly or monthly instalments, "Plan 1 / Plan 2 / Plan 3", "1 x A + 9 x B"), list one entry: amount is the price paid in one go, and each way of paying in parts goes in payment_options with the numbers the site prints (total, payments, instalment, first_payment). Paying in one go is the entry itself, never an option.
 - If the site prints no price for paying in one go, the entry's amount is the total it prints for one plan; with no total printed, list each instalment amount as its own entry with the plan name.
-- A monthly fee that is the school's ordinary price (a kindergarten's monthly fee) is the entry itself, not an option.
+- A monthly fee that is the school's ordinary price (a kindergarten's monthly fee) is the entry itself, not an option. When the site prints beside it a price for paying the whole year at once ("Такса / месец" and "Такса / годишно плащане" columns), list both: the monthly fee, and the year paid at once as an entry of its own whose plan_name says so ("Годишно плащане").
 - List the fees of every page, to the end of the last one: a school often has a fee page per stage (kindergarten, primary, secondary), and each one's fees are listed. Include services billed separately (uniforms, transport, food, extended day, clubs), not only tuition.
 - Skip what is not a cost of attending: fines and penalties (глоба, неустойка, a reminder or late-payment charge), duplicates of documents and certificates, transcripts and official notes (дубликат, академична справка, служебна бележка), and replacing lost items (a key, a badge).
 - Skip a payment schedule. Never invent an amount, and never compute a total the site does not print.
-- A discount the school offers (for siblings, for paying early, for paying the whole year at once, any other stated discount) goes in discounts, never in fees, and only when the page states it with a percentage or an amount. One entry per discount ("5% for a second child, 10% for a third" is two). text_i18n says in bg and en only what the evidence says. A discounted price the site prints as an amount stays a fee entry (see above).
+- A discount the school offers (for siblings, for paying early, for paying the whole year at once, any other stated discount) goes in discounts, never in fees, and only when the page states it with a percentage or an amount. A fee the school waives on a condition ("се освобождават от такса кандидатстване и такса регистрация" for those who sign by a date) is a discount of percent 100, applies_to naming the fees waived, and its sentences say on what condition. One entry per discount ("5% for a second child, 10% for a third" is two). text_i18n says in bg and en only what the evidence says. A discounted price the site prints as an amount stays a fee entry (see above).
 - currency as printed (EUR or BGN); if both are printed, the EUR figure.
 - category: the monthly kindergarten fee and school tuition are tuition, and so is the main fee of an institution that charges no other tuition, even when the fee is named for a subject or the classes are held in another school's building; a subject's fee charged on top of the institution's own tuition is extracurricular; an enrolment, exam, application or entry-test fee is registration; a deposit (депозит, капаро) is registration, never tuition, and its plan_name is the site's word for it ("Депозит", "Капаро"), with notes saying whether it is returned or taken off a later fee when the site says; learning support, therapy and similar services are activities; optional classes, clubs and sports charged on top are extracurricular; transport, food, uniforms and extended day (after-school care) are their own categories.
 - period only when the page states it for THAT amount (per month, per year, per term...); otherwise null. Never guess.
@@ -149,7 +149,7 @@ Rules:
 - Never build a range from two different fees (a full-day and a half-day price are two entries). A range only when the site prints one.
 - source_url: the URL of the page the fee is on.
 - evidence: the line of the page the amount is on, copied character for character, and the lines of its payment options. For a table row, also copy the heading line that gives its period, plan or group, as a separate line. If the period is stated in a sentence above the table, copy that sentence too. A PDF's tables are repeated after its text, one row per line with cells split by " | " and a cell's lines by " / ": when the text above splits a table row over several lines, copy the row and its heading row from there instead of joining lines yourself.
-- label: the site's own wording, short. academic_year, age_group and plan_name as the site states them, or null. plan_name names what the fee buys (full day, half day) and any price terms, not a way of paying in parts: a payment plan's name is its option's label. It is never taken from a list of what the fee includes.
+- label: the site's own wording, short. academic_year, age_group and plan_name as the site states them, or null. plan_name names what the fee buys (full day, half day, a programme such as "IB Diploma" when the page or table is for one) and any price terms, not a way of paying in parts: a payment plan's name is its option's label. It is never taken from a list of what the fee includes.
 - plan_name_en and age_group_en: the same words in plain English, as a parent would read them on the English page ("Half day", "Paid for 6 months at once", "Ages 3 to 6"), adding nothing the Bulgarian does not say; null when the Bulgarian field is null."""
 
 
@@ -711,10 +711,15 @@ def _percent_printed(value: Decimal, text: str) -> bool:
     )
 
 
+# A fee waived outright: 595's "се освобождават от такса кандидатстване и такса регистрация".
+_WAIVER_RE = re.compile(r"освобожд\w* от\s+такс|не се (?:дължи|заплаща)|waived|exempt(?:ed)? from", re.IGNORECASE)
+
+
 def check_discount(discount: AgentDiscount, page_text: str) -> Optional[AgentDiscount]:
     """The discount if the page backs it, else None: its evidence is on the page and prints
     its number as a percentage (or holds its amount), a sibling discount's child is named
-    there, and both sentences state that number."""
+    there, and both sentences state that number. A waiver (percent 100 on evidence that
+    waives a fee) prints no number, so its sentences need only be there."""
     page = _normalized(page_text)
     lines = [_normalized(line) for line in discount.evidence.splitlines() if line.strip()]
     if not lines:
@@ -730,12 +735,14 @@ def check_discount(discount: AgentDiscount, page_text: str) -> Optional[AgentDis
         return None
     value = _decimal(number)
     evidence = "\n".join(lines)
+    texts = [discount.text_i18n.bg, discount.text_i18n.en]
+    if discount.percent == 100 and _WAIVER_RE.search(evidence):
+        return discount.model_copy(update={"currency": None}) if all(text.strip() for text in texts) else None
     # "до 15 май – 10% отстъпка": 15 is a date, so a percent must be printed as one.
     if not (_percent_printed(value, evidence) if discount.percent is not None else value in page_numbers(evidence)):
         return None
     if discount.child in _CHILD_WORDS and not re.search(_CHILD_WORDS[discount.child], evidence, re.IGNORECASE):
         return None
-    texts = [discount.text_i18n.bg, discount.text_i18n.en]
     if any(not text.strip() or value not in page_numbers(text) for text in texts):
         return None
     return discount.model_copy(update={"currency": discount.currency if discount.amount is not None else None})

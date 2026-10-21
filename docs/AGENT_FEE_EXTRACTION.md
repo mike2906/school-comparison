@@ -83,7 +83,9 @@ For one school, with its `website_url`:
    - **Discounts.** A percentage or amount off (siblings, paying early, paying the whole year
      at once) is no fee: the reader lists it in `discounts` with a bg and an en sentence. Code
      keeps one only when its evidence line is on the page, holds its one number (percent or
-     amount, never both), and both sentences state that number. A read that passed the
+     amount, never both), and both sentences state that number. A fee waived on a condition (595's application and
+     registration fees for a contract signed by 31.01.2027) is a 100% discount; its evidence must
+     waive a fee in words, and its sentences carry no number (2026-10-21). A read that passed the
      thin-read guard stores the kept ones, or none, in `attributes.fee_discounts` (the first
      read's; a thin read leaves them alone); the detail page shows them under the fees, gated
      like `school_facts` and only while the school has a published fee.
