@@ -30,5 +30,8 @@ USER app
 EXPOSE 8000
 
 # Only Caddy can reach this port, so its X-Forwarded-* headers are trusted.
-# Worker count comes from WEB_CONCURRENCY (uvicorn default: 1).
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--forwarded-allow-ips", "*"]
+# Two workers, one per vCPU of the VPS (OVH VPS-1). Set here, not from WEB_CONCURRENCY,
+# so it ships with the image through CD: docker-compose.prod.yml still passes
+# WEB_CONCURRENCY (default 1), which --workers overrides. Each worker keeps its own
+# response caches (routers/schools.py).
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--forwarded-allow-ips", "*", "--workers", "2"]
