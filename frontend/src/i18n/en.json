@@ -1225,6 +1225,7 @@
     "update": "Update the saved answers",
     "saved": "Saved on this device. The school list and school pages now compare your result with each school.",
     "seeList": "See every school in the list",
+    "seeListNear": "See the schools near your saved address",
     "saveNote": "Saved only in this browser, never sent to us. You can forget them here or on any page that uses them.",
     "needsAddressToSave": "Type your address above to save and compare every school: only a checked address says which catchment it is in.",
     "hideBelow": "Hide schools where you're below the last admitted child",
