@@ -240,6 +240,23 @@ def at_a_glance(
         if "open_entry" in row["types"] and len(row["types"]) > 1:
             row["types"].remove("open_entry")
     admission = [row for row in admission if row["types"] or row["subjects"]]
+    # A grade-less row another grade-less row, or a row for the whole school's grades, already
+    # says is one rule twice ("Без приемен изпит; Без приемен изпит", 598; 533's "Събеседване,
+    # Пробен ден" beside the same for grades 0-7).
+    def covers(row: dict[str, Any], other: dict[str, Any]) -> bool:
+        return set(other["types"]) <= set(row["types"]) and {_subject_key(s) for s in other["subjects"]} <= {
+            _subject_key(s) for s in row["subjects"]
+        }
+
+    kept: list[dict[str, Any]] = []
+    for row in admission:
+        earlier = [other for other in kept if other["grade"] is None]
+        # A graded row from the first grade (or preschool) to a later one is the whole school's.
+        graded_rows = [other for other in admission if other["grade"] is not None and other["grade"] <= 1 and other["grade_to"]]
+        if row["grade"] is None and any(covers(other, row) for other in earlier + graded_rows):
+            continue
+        kept.append(row)
+    admission = kept
     places = []
     read = _date(read_at[:10]) if isinstance(read_at, str) else None
     if read and (today - datetime.date.fromisoformat(read)).days <= PLACES_SHOWN_DAYS:

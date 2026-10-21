@@ -1111,3 +1111,18 @@ def test_a_kindergarten_on_its_schools_site_shows_no_school_grade_facts():
     ]
     assert shown["facts"][-1]["admission_grade"] is None and shown["facts"][-1]["admission_grade_to"] is None
     assert len(publishable_school_facts({"school_facts": block}, HOME, "secondary")["facts"]) == 13
+
+
+def test_glance_lists_a_grade_less_admission_rule_once():
+    """598 "Без приемен изпит; Без приемен изпит"; 533 the grades 0-7 rule again with no grade."""
+    from app.utils.school_facts import at_a_glance
+
+    def fact(types, grade=None, grade_to=None):
+        return {"admission": types, "admission_grade": grade, "admission_grade_to": grade_to, "exam_subjects": []}
+
+    rows = at_a_glance([fact(["open_entry"]), fact(["open_entry"])])["admission"]
+    assert [row["types"] for row in rows] == [["open_entry"]]
+    rows = at_a_glance([fact(["interview", "trial_day"], 0, 7), fact(["interview", "trial_day"])])["admission"]
+    assert [(row["grade"], row["types"]) for row in rows] == [(0, ["interview", "trial_day"])]
+    rows = at_a_glance([fact(["interview", "entrance_exam"]), fact(["trial_day"]), fact(["interview"])])["admission"]
+    assert [row["types"] for row in rows] == [["interview", "entrance_exam"], ["trial_day"]]

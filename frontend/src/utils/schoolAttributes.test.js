@@ -309,6 +309,21 @@ test('normalizeLanguageFocus accepts strings, objects and a single value', () =>
   assert.deepEqual(normalizeLanguageFocus(undefined), [])
 })
 
+test('normalizeLanguageFocus lists a language once, at its strongest level (596)', () => {
+  assert.deepEqual(
+    normalizeLanguageFocus([
+      { language: 'English', level: 'bilingual' },
+      { language: 'german', level: null },
+      { language: 'english', level: 'immersion' },
+      { language: 'German', level: 'enrichment' },
+    ]),
+    [
+      { language: 'English', level: 'immersion' },
+      { language: 'german', level: 'enrichment' },
+    ],
+  )
+})
+
 test('getOptionLabel does not treat a colon in scraped text as an i18next namespace', async () => {
   const { default: i18next } = await import('i18next')
   const i18n = i18next.createInstance()

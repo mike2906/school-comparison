@@ -259,5 +259,16 @@ export function normalizeLanguageFocus(languageFocus = []) {
       normalized.push({ language: item.language, level: item.level })
     }
   })
-  return normalized.filter(item => item.language)
+  // One entry a language, at its strongest stated level: "English (Bilingual) • English
+  // (Immersion)" reads as two languages (596).
+  const rank = level => ['immersion', 'bilingual', 'enrichment'].indexOf(level)
+  const stronger = (a, b) => rank(a) !== -1 && (rank(b) === -1 || rank(a) < rank(b))
+  const byLanguage = new Map()
+  normalized.filter(item => item.language).forEach((item) => {
+    const key = String(item.language).trim().toLowerCase()
+    const seen = byLanguage.get(key)
+    if (!seen) byLanguage.set(key, item)
+    else if (stronger(item.level, seen.level)) byLanguage.set(key, { ...seen, level: item.level })
+  })
+  return [...byLanguage.values()]
 }
