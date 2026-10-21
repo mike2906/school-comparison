@@ -173,7 +173,11 @@ class SchoolAttributesMixin(BaseModel):
         # display and filter projections.
         website_url = getattr(self, "website_url", None) or getattr(self, "raw_website_url", None)
         return publication_attributes(
-            self.raw_attributes, self.raw_scrape_status, website_url, getattr(self, "education_level", None)
+            self.raw_attributes,
+            self.raw_scrape_status,
+            website_url,
+            getattr(self, "education_level", None),
+            self.raw_admission_info,
         )
 
     @cached_property
