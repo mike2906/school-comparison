@@ -58,6 +58,8 @@ def test_planned_bands():
     assert planned_bands(register, {8}, 7) == (set(), set())
     # No highest grade stated: nothing is hidden.
     assert planned_bands(register, set(), None) == (set(), set())
+    # Nothing above the highest grade stated (215: another school's high school on its site).
+    assert planned_bands({"grade_1_4", "grade_5_7"}, {8, 9}, 7) == (set(), set())
     # A misread highest grade never takes every register band away (a gymnasium "to grade 7").
     assert planned_bands({"grade_8_12"}, set(), 7) == ({"grade_5_7"}, set())
 
@@ -287,3 +289,24 @@ async def test_a_kindergarten_gets_its_nursery_group_and_nothing_else(db_session
     with patch.object(stage, "site_nursery", return_value=False):
         await stage.run_site_grades(db_session, apply=True)
     assert await _bands(db_session, school_id) == (["first", "preschool", "second", "third"], [])
+
+
+async def test_a_band_a_same_site_school_teaches_is_not_added(db_session):
+    def school(level, bands):
+        row = School(
+            country_code="bg", city="sofia", name_i18n={"bg": "Златарски"}, school_type="private",
+            education_level=level, website_url="https://zlatarskischool.org/", scrape_status="navigated",
+        )
+        location = SchoolLocation(school=row, address_i18n={"bg": "ул. 1"}, location_tags=[])
+        location.age_group_shifts = [SchoolLocationAgeGroupShift(age_group=band) for band in bands]
+        db_session.add(row)
+        return row
+
+    primary = school("lower_secondary", ("grade_1_4", "grade_5_7"))
+    school("upper_secondary", ("grade_8_12",))
+    await db_session.commit()
+    primary_id = primary.id
+    # The shared site's grade-8 and grade-11 admissions are the gymnasium's (151 / 392).
+    with patch.object(stage, "site_grades", return_value=({5, 8, 11}, None)):
+        report = await stage.run_site_grades(db_session, school_ids=[primary_id])
+    assert report["changes"] == []

@@ -1253,3 +1253,19 @@ def test_a_kindergarten_shows_no_school_programmes_from_the_old_extraction():
     school = publication_attributes(attributes, "summarized", None, "upper_secondary")
     assert "ib_program" in compute_filter_tags(school)["teaching_approach"]
     assert "IELTS" in build_display_attributes(school)[1]["en"]["special_programs"]
+
+
+@pytest.mark.parametrize(
+    "en,grade,grade_to,expected",
+    [
+        ("Admission after grade 7 is by a competitive entrance exam", 7, None, (8, None)),  # 301
+        ("Admission after 7th grade (Reception year) is by entrance tests", 7, None, (8, None)),  # 581
+        ("Admission after 4th, 5th, 6th or 7th grade", 4, 7, (5, 8)),  # 314
+        ("A third entrance exam for grades 4 and 7 is held on 28 June", 4, 7, (5, 8)),  # 517
+        ("Admission to grade 7 is by entrance exam", 7, None, (7, None)),
+        ("Admission after grade 7; places in grade 8 are limited", 8, None, (8, None)),  # already the entry grade
+    ],
+)
+def test_admission_after_a_grade_is_for_the_next_grade(en, grade, grade_to, expected):
+    labels = _admission_fact(en, ["entrance_exam"], grade, grade_to)
+    assert (labels["admission_grade"], labels["admission_grade_to"]) == expected

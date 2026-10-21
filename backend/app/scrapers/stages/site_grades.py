@@ -159,7 +159,11 @@ def _band(grade: int) -> Optional[str]:
 def planned_bands(register_bands: set[str], named: set[int], highest: Optional[int]) -> tuple[set[str], set[str]]:
     """(bands to add, bands to hide) given the register's school bands and the site's grades."""
     stated = named | ({highest} if highest is not None else set())
-    add = {band for grade in stated if (band := _band(grade))} - register_bands
+    # Nothing above the highest grade the site states (215: its "language high school
+    # grades 8-12" is another school's, it teaches to grade 7).
+    add = {
+        band for grade in stated if (band := _band(grade)) and (highest is None or BANDS[band][0] <= highest)
+    } - register_bands
     hide = {
         band
         for band in register_bands
@@ -174,6 +178,31 @@ def planned_bands(register_bands: set[str], named: set[int], highest: Optional[i
 
 def _tagged(tags: Iterable[str], prefix: str) -> set[str]:
     return {tag[len(prefix):] for tag in tags if tag.startswith(prefix)}
+
+
+async def _same_site_school_bands(db: AsyncSession, country: str):
+    """``(school_id, website_url) -> bands`` the other school-level institutions on that site teach."""
+    from app.models import SchoolLocation
+    from app.scrapers.shared_site_check import level_family, site_id
+
+    rows = (
+        await db.execute(
+            select(School.id, School.website_url, School.education_level, SchoolLocationAgeGroupShift.age_group)
+            .join(SchoolLocation, SchoolLocation.school_id == School.id)
+            .join(SchoolLocationAgeGroupShift, SchoolLocationAgeGroupShift.location_id == SchoolLocation.id)
+            .where(School.country_code == country, School.website_url.isnot(None))
+        )
+    ).all()
+    by_site: dict[str, dict[int, set[str]]] = {}
+    for row in rows:
+        if level_family(row.education_level) == "school" and row.age_group in BANDS:
+            by_site.setdefault(site_id(row.website_url), {}).setdefault(int(row.id), set()).add(row.age_group)
+
+    def bands(school_id: int, website_url: Optional[str]) -> set[str]:
+        others = by_site.get(site_id(website_url), {}) if website_url else {}
+        return set().union(*(b for sid, b in others.items() if sid != school_id))
+
+    return bands
 
 
 async def run_site_grades(
@@ -200,6 +229,7 @@ async def run_site_grades(
     ids = list((await db.execute(query.order_by(School.id))).scalars().all())
 
     service = SchoolService(db)
+    sibling_bands = await _same_site_school_bands(db, country)
     changes: list[dict[str, Any]] = []
     for school_id in ids:
         school = await service.get_school_with_details(school_id)
@@ -231,6 +261,10 @@ async def run_site_grades(
             glance = facts.at_a_glance.model_dump() if facts and facts.at_a_glance else None
             named, highest = site_grades(published.pricing, glance)
             add, hide = planned_bands(register_bands, named, highest)
+            # A band another school on the same site teaches is that school's (151 and 392
+            # Zlatarski: the site's grade-8 admissions are the gymnasium's, its grade-5 ones
+            # the primary's).
+            add -= sibling_bands(school_id, school.website_url)
         # An evening school's "1-12 клас" includes classes for adults.
         name_bg = (school.name_i18n or {}).get("bg")
         add = set(child_bands(add, name_bg, school.education_level))

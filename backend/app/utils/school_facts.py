@@ -137,8 +137,7 @@ def _labels(fact: Mapping[str, Any]) -> dict[str, Any]:
             if name
         ],
         "admission": _admission_types(fact),
-        "admission_grade": _int_in(fact.get("admission_grade"), 0, 12),
-        "admission_grade_to": _grade_to(fact),
+        **_admission_grades(fact),
         "exam_subjects": _exam_subjects(fact),
         "places": fact.get("places") if fact.get("places") in PLACES else None,
         "highest_grade": _int_in(fact.get("highest_grade"), 1, 12),
@@ -153,6 +152,28 @@ def _labels(fact: Mapping[str, Any]) -> dict[str, Any]:
         "bus_areas": _bilingual(fact.get("bus_areas"), 20),
         "special_needs_support": True if fact.get("special_needs_support") is True else None,
     }
+
+
+# "Admission after grade 7" (301, 581) and "the entrance exam for grades 4 and 7" (517) are
+# for the grade after: pupils finishing 4th or 7th grade enter 5th or 8th. The reader labels
+# the grade it read (7), which shows as "Grade 7: Entrance exam" and gave site-grades a band
+# the school does not teach.
+_AFTER_GRADE_RE = re.compile(
+    r"\bafter\s+(?:the\s+)?(?:(?:grade|class)\s+(?P<a>\d{1,2})\b"
+    # "after 4th, 5th, 6th or 7th grade": the first of the list.
+    r"|(?P<b>\d{1,2})(?:st|nd|rd|th)?\.?(?=(?:\s*(?:,|or|and)\s*\d{1,2}(?:st|nd|rd|th)?\.?)*\s+(?:grade|class)))"
+    r"|\bexams?\s+for\s+grades?\s+(?P<c>[47])\s+and\s+[47]\b",
+    re.IGNORECASE,
+)
+
+
+def _admission_grades(fact: Mapping[str, Any]) -> dict[str, Optional[int]]:
+    first, last = _int_in(fact.get("admission_grade"), 0, 12), _grade_to(fact)
+    match = _AFTER_GRADE_RE.search(_english(fact))
+    finished = next((int(g) for g in (match.groups() if match else ()) if g), None)
+    if first is not None and first == finished and first < 12:
+        first, last = first + 1, (last + 1 if last is not None and last < 12 else None)
+    return {"admission_grade": first, "admission_grade_to": last}
 
 
 def _grade_to(fact: Mapping[str, Any]) -> Optional[int]:
