@@ -100,6 +100,8 @@ async def test_replace_swaps_an_accepted_site_and_drops_what_it_gave(db_session)
     await db_session.refresh(old_page)
     assert school.website_url == "https://dgs.drujba.org/"
     assert school.scrape_status == "pending"  # validation then moves it to "validated"
+    assert school.attributes["website_replaced_url"] == "https://drujba.org/"
+    assert "shared_site_check" not in school.attributes  # no shared-site decision was made
     assert school.attributes[WEBSITE_DATA_WITHHELD_KEY] is True  # the old extraction stays hidden
     assert "validated_website_url" not in school.attributes
     assert old_page.is_valid is False  # its fees no longer publish
@@ -121,3 +123,18 @@ async def test_replace_never_drops_the_old_site_for_an_invalid_one(db_session):
         )
     await db_session.refresh(school)
     assert (school.website_url, school.scrape_status) == ("https://drujba.org/", "extracted")
+
+
+async def test_replace_with_the_same_site_changes_nothing(db_session):
+    school = School(
+        country_code="bg", city="sofia", name_i18n={"bg": "ЧДГ Дружба-София"}, school_type="private",
+        education_level="kindergarten", website_url="https://drujba.org/", scrape_status="extracted",
+    )
+    db_session.add(school)
+    await db_session.commit()
+    validate = AsyncMock()
+    with patch.object(url_validator, "validate_school_url", validate):
+        assert await website_stage.run_validate_url(
+            db_session, school.id, "bg", url="drujba.org/bg", apply=True, replace=True
+        ) is None
+    validate.assert_not_awaited()
