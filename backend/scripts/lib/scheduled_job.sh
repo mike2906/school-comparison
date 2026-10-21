@@ -87,13 +87,19 @@ Log: $state/$job.log. Close this issue once the checkout is updated." > /dev/nul
 # job, cap or migration still reaches the PC through a thread's pull with Mike's go. No update
 # while the open-days check or a publish runs from this checkout: files would change under it.
 update_checkout() {
-	local branch changed
+	local branch changed open_days publish_lock
 	branch="$(git -C "$repo_root" symbolic-ref -q --short HEAD || true)"
 	if [ -n "$branch" ] && [ "$branch" != main ]; then
 		warn "the checkout is on branch $branch"
 		return 0
 	fi
-	exec 6>>"${OPEN_DAYS_STATE_DIR:-$HOME/.local/state/schooldecider}/open_days.lock" 7>>"$("$repo_root/backend/scripts/publish_snapshot.sh" --lock-path)"
+	open_days="${OPEN_DAYS_STATE_DIR:-$HOME/.local/state/schooldecider}"
+	publish_lock="$("$repo_root/backend/scripts/publish_snapshot.sh" --lock-path)" || true
+	if [ -z "$publish_lock" ] || ! mkdir -p "$open_days"; then
+		warn "no publish lock path from publish_snapshot.sh, or no folder for the open-days lock"
+		return 0
+	fi
+	exec 6>>"$open_days/open_days.lock" 7>>"$publish_lock"
 	if ! flock -n 6 || ! flock -n 7; then
 		exec 6>&- 7>&-
 		log "not updated: the open-days check or a publish is running"
