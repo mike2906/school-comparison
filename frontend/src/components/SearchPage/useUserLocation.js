@@ -242,7 +242,7 @@ export function useUserLocation({ t, geocodingConfig, arriveNearSavedHome = fals
     arrivalDoneRef.current = true
     onArrivalHandled()
     if (canUseSaved) locateSavedHome()
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once, on arrival
+    // Runs once, on arrival.
   }, [arriveNearSavedHome, hasBounds])
 
   return {
