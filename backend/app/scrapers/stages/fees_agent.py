@@ -860,12 +860,20 @@ async def _superseded_rows(db: AsyncSession, school: School, rows: list[Pricing]
     does), and a row dated this school year whose fee the read gives with no year. The
     pipeline already treats an undated old row as the fee its dated re-read names; this is
     the other way round. At 170 the read gave 4500, 4700, 5100 and 4000 EUR with no year
-    and the rows stored under 2026-2027 stayed beside them."""
+    and the rows stored under 2026-2027 stayed beside them. An amount the undated read
+    lists as a way to pay one of its fees counts too: 305's earlier read stored "Плащане на
+    две вноски" totals and halves as dated fees of their own, and the re-read gives them as
+    payment options of undated fees, so the dated rows stayed and led the headline."""
     replaced = await price_step._find_superseded_rows(db, school, rows)
+    undated = [row for row in rows if not str(row.academic_year or "").strip()]
     undated_fees = {
-        (row.category, float(row.amount), (row.currency or "").upper())
-        for row in rows
-        if row.amount is not None and not str(row.academic_year or "").strip()
+        (row.category, float(row.amount), (row.currency or "").upper()) for row in undated if row.amount is not None
+    } | {
+        (row.category, float(option[key]), (row.currency or "").upper())
+        for row in undated
+        for option in (row.pricing_context or {}).get("payment_options") or []
+        for key in ("total", "instalment", "first_payment")
+        if option.get(key) is not None
     }
     if not undated_fees:
         return replaced

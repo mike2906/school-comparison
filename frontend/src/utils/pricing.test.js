@@ -654,6 +654,26 @@ test('statedTuition: a price on other terms does not set the range when the grou
   assert.equal(statedTuition(onlyPromo).min, 400)
 })
 
+test('statedTuition: for a chosen group, a fee naming it beats one naming no group (271)', () => {
+  // 271: a lev fee read with no group is the kindergarten's; grade 1 read "7,200–7,950".
+  const school = [
+    current({ id: 1, amount: 15549, currency: 'BGN' }),
+    current({ id: 2, amount: 7200, age_group: '1-ви до 6-ти клас' }),
+    current({ id: 3, amount: 7200, age_group: '7-ми до 12-ти клас' }),
+  ]
+  const grade1 = statedTuition(school, { ageGroup: 'grade_1_4' })
+  assert.deepEqual([grade1.min, grade1.max], [7200, 7200])
+  // With no group chosen, or for a group no fee names, the unnamed fee still counts.
+  assert.equal(Math.round(statedTuition(school).max), 7950)
+  assert.equal(Math.round(statedTuition(school, { ageGroup: 'preschool' }).min), 7950)
+  // A named price on other terms is no regular price for the group: the unnamed fee stays.
+  const promo = [
+    row({ id: 1, amount: 600, period: 'monthly' }),
+    row({ id: 2, amount: 450, period: 'monthly', age_group: 'Ясла', plan_name: 'Промоционална цена' }),
+  ]
+  assert.equal(statedTuition(promo, { ageGroup: 'nursery' }).max, 600)
+})
+
 const NOTES_EN = {
   ...EN,
   'pricing.rangeEnds': '{{low}}: {{lowPrice}} · {{high}}: {{highPrice}}',
