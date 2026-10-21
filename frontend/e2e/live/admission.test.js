@@ -302,11 +302,22 @@ describe('admission from a school page', () => {
     await page.getByLabel(g1('since')).first().fill(`${start - 5}-01-15`)
     await page.getByRole('button', { name: t('bg', 'savedAdmission.save') }).click()
     // "Near your saved address" opens the list already placed at the saved home.
+    // OpenStreetMap turns busy runners away without CORS headers; name that instead of a timeout.
+    const refused = []
+    const noteRefusal = request => /nominatim\.openstreetmap\.org/.test(request.url()) && refused.push(request.failure()?.errorText)
+    page.on('requestfailed', noteRefusal)
     await page.getByRole('link', { name: t('bg', 'savedAdmission.seeListNear') }).click()
     await page.waitForURL(url => url.pathname === '/search' && url.searchParams.get('age_group') === 'grade_1_4')
     await page.getByTestId('saved-admission-banner').waitFor()
     await page.getByTestId('saved-verdict-line').first().waitFor()
-    await page.waitForFunction(() => JSON.parse(localStorage.getItem('userLocation') || 'null')?.savedHome, null, { timeout: 30_000 })
+    try {
+      await page.waitForFunction(() => JSON.parse(localStorage.getItem('userLocation') || 'null')?.savedHome, null, { timeout: 30_000 })
+    } catch (error) {
+      if (refused.length) throw new Error(`OpenStreetMap refused the saved-address lookup (${refused.join(', ')}), not a site bug`)
+      throw error
+    } finally {
+      page.off('requestfailed', noteRefusal)
+    }
     // Used once: a reload or Back must not send the address again without a tap.
     assert.ok(!(await page.evaluate(() => history.state?.usr?.nearSavedHome)), 'the arrival flag stays in history')
     await page.getByRole('button', { name: t('bg', 'location.clear'), exact: true }).first().click()
@@ -314,13 +325,12 @@ describe('admission from a school page', () => {
     await page.reload()
     await page.getByTestId('saved-admission-banner').waitFor()
     assert.equal(await page.evaluate(() => localStorage.getItem('userLocation')), null, 'a reload looked the saved address up again')
-    // The list itself offers the saved home as its location too.
-    await page.getByRole('button', { name: t('bg', 'location.setShortSaved') }).first().click()
-    await page.getByRole('button', { name: t('bg', 'location.useSavedHome') }).click()
-    await page.waitForFunction(() => JSON.parse(localStorage.getItem('userLocation') || 'null')?.savedHome, null, { timeout: 30_000 })
-    // The rest of the flow as a parent without a location (drive times would load too).
-    await page.getByRole('button', { name: t('bg', 'location.clear'), exact: true }).first().click()
-    await page.waitForFunction(() => !localStorage.getItem('userLocation'))
+    // The list itself offers the saved home as its location too. The tap runs the same lookup
+    // as the arrival above, so it is not sent to OpenStreetMap a second time.
+    const locationToggle = page.getByRole('button', { name: t('bg', 'location.setShortSaved') }).first()
+    await locationToggle.click()
+    await page.getByRole('button', { name: t('bg', 'location.useSavedHome') }).waitFor()
+    await locationToggle.click()
     // Hiding schools where the saved result is below the last admitted child.
     await page.getByTestId('hide-below').check()
     await page.getByTestId('hidden-count').waitFor()
