@@ -863,6 +863,26 @@ class TestFilterableProjection:
             assert school.id in {matched.id for matched in schools}
 
     @pytest.mark.asyncio
+    async def test_official_intensive_classes_join_the_language_focus(self, seeded_db):
+        """73 СУ's facts listed only Bulgarian, but its 8th-grade classes are "НЕ интензивно"."""
+        school = (await seeded_db.execute(select(School))).scalars().first()
+        school.attributes = {"language_focus": [{"language": "Bulgarian"}]}
+        school.admission_info = {
+            "cutoff_summary": [{"stage": "grade_8", "class_code": "02656", "class_name": "Чужди езици - НЕ интензивно, ФЕ"}]
+        }
+        await seeded_db.commit()
+
+        service = SchoolService(seeded_db)
+        assert "German:enrichment" in (await service.get_available_filters())["language_focus_pairs"]
+        schools = await service.list_schools_filtered(language_focus=["German:enrichment"])
+        assert school.id in {matched.id for matched in schools}
+        # The served attributes carry it too, so the list's own filter and the page agree.
+        listed = SchoolListResponse.model_validate(school)
+        assert {"language": "German", "level": "enrichment"} in [
+            entry.model_dump(include={"language", "level"}) for entry in listed.attributes_i18n["en"].language_focus
+        ]
+
+    @pytest.mark.asyncio
     async def test_free_text_facilities_surface_as_canonical_options(self, seeded_db):
         """A scraped school's free text becomes canonical filter options that match.
 
