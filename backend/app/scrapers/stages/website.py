@@ -462,12 +462,16 @@ async def run_discover_websites_batch(db, country: str, city: str, limit: Option
     )
 
 
-async def run_validate_url(db, school_id: int, country: str, url: Optional[str] = None, apply: bool = True):
+async def run_validate_url(
+    db, school_id: int, country: str, url: Optional[str] = None, apply: bool = True, replace: bool = False
+):
     """Run URL validation for a single school.
 
     With ``url``, validate that site instead of the stored one (a school's real site that
     search does not find, 256's ou115.com): the same checks decide, and only a valid
-    site is stored. ``apply=False`` reports the verdict and writes nothing."""
+    site is stored. ``apply=False`` reports the verdict and writes nothing. ``replace``
+    lets a valid given site replace an accepted one (587's sibling school's drujba.org),
+    the way the shared-site check replaces a brand hub with a campus."""
     from sqlalchemy import select
 
     from app.models import School
@@ -492,8 +496,12 @@ async def run_validate_url(db, school_id: int, country: str, url: Optional[str] 
         return None
     # A site given by hand is for a school with no accepted site (failed validation,
     # none found): it then starts the pipeline from "validated" like a found one.
-    if given and apply and school.scrape_status not in ("pending", "failed_validate", "no_official_website"):
-        console.print(f"[yellow]School {school_id} already has a site ({school.scrape_status}); not changed[/yellow]")
+    replacing = given and school.scrape_status not in ("pending", "failed_validate", "no_official_website")
+    if replacing and apply and not replace:
+        console.print(
+            f"[yellow]School {school_id} already has a site ({school.scrape_status}); not changed "
+            "(--replace swaps it)[/yellow]"
+        )
         return None
 
     console.print(f"  Validating: {url}")
@@ -512,8 +520,24 @@ async def run_validate_url(db, school_id: int, country: str, url: Optional[str] 
     stored = apply and given and validation_result is ValidationResult.VALID
     if stored:
         source_url = URLValidator(country_code=country).normalize_url(url) or url
+        if replacing and school.website_url:
+            await _replace_accepted_site(db, school, source_url, country)
         await _update_validation_result(school_id, source_url, validation_result, final_url or source_url, reason)
     console.print(f"  Result: {validation_result.value} - {reason}")
     if given:
         console.print("  Stored." if stored else "  Not stored" + ("." if apply else " (dry run; --apply stores a valid site)."))
     return validation_result, final_url, reason
+
+
+async def _replace_accepted_site(db, school, new_url: str, country: str) -> None:
+    """Drop what the old site gave (pages, site-copied addresses, extraction) as the
+    shared-site check's replace does; the new site then starts from "validated"."""
+    from app.scrapers.shared_site_check import REPLACE, Decision, apply_decision
+
+    decision = Decision(school.id, REPLACE, "given_by_hand", school.website_url, new_url, {})
+    applied = await apply_decision(db, school, decision, country_code=country)
+    await db.commit()
+    console.print(
+        f"  Replaced {decision.current_url}: {applied['pages_invalidated']} pages invalidated, "
+        f"{len(applied['locations_cleared'])} site-copied locations cleared"
+    )
