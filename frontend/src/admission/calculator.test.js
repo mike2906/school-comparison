@@ -11,6 +11,7 @@ import {
   comparableRound,
   compareWithCutoff,
   laterEasierRound,
+  laterHarder,
   defaultStartYear,
   formatRange,
   measuredOnFor,
@@ -198,6 +199,13 @@ test('a later ranking is mentioned only when it let in a weaker result', () => {
   // No places later (241), or no main ranking at all: nothing to add.
   assert.equal(laterEasierRound({ rounds: 2, first: r(1, { last_admitted_points: 5, last_admitted_group: 4 }), latest: r(2, { places: 0 }) }), null)
   assert.equal(laterEasierRound({ rounds: 2, first: { round_id: 443, round_kind: 'current', last_admitted_points: 19 }, latest: { round_id: 446, round_kind: 'current', last_admitted_points: 3 } }), null)
+})
+
+test('a later, stricter cut-off of the same kind is flagged', () => {
+  const r = (id, extra) => ({ round_id: id, round_kind: 'general', ...extra })
+  assert.equal(laterHarder({ rounds: 2, first: r(1, { min_score: 328 }), latest: r(2, { min_score: 473.5 }) }), true)
+  assert.equal(laterHarder({ rounds: 2, first: r(1, { min_score: 405 }), latest: r(2, { min_score: 365 }) }), false)
+  assert.equal(laterHarder({ rounds: 2, first: r(1, { last_admitted_points: 5 }), latest: r(2, { places: 0 }) }), false)
 })
 
 test('the school page adds every general ranking of the row to its summary', () => {

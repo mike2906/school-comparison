@@ -223,6 +223,12 @@ describe('admission from a school page', () => {
     if (classes.some(row => !row.quota && row.first?.places !== 0 && row.latest?.min_score < row.first?.min_score)) {
       await cutoffs.getByText(t('bg', 'cutoffs.later', { date: '' }).split('(')[0].trim()).first().waitFor()
     }
+    // A later ranking with a higher score is explained where the rankings are listed (laterHarder).
+    const higher = school.admission_info.cutoff_summary.findIndex(row => row.stage === 'grade_8' && row.latest?.min_score > row.first?.min_score)
+    if (higher >= 0) {
+      await rows.nth(higher).locator('summary').click()
+      await rows.nth(higher).getByText(t('bg', 'cutoffs.historyNote')).waitFor()
+    }
   })
 
   test('the English page shows eighth-grade classes in English', async () => {

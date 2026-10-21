@@ -1,6 +1,6 @@
 import i18next from 'i18next'
 import { useTranslation } from 'react-i18next'
-import { comparableRound, cutoffValue, formatRankingDay, laterEasierRound, roundsOf, shortCampaign } from '../../admission/calculator'
+import { comparableRound, cutoffValue, formatRankingDay, laterEasierRound, laterHarder, roundsOf, shortCampaign } from '../../admission/calculator'
 import { formatAmount } from '../../utils/format'
 
 // First grade: groups 1–3 live in the school's area (by how long), group 4 outside it.
@@ -140,6 +140,7 @@ function History({ row, rounds }) {
       <summary className="cursor-pointer select-none text-primary-700 hover:text-primary-800">
         {t('cutoffs.history', { count: rounds.length })}
       </summary>
+      {laterHarder(row) && <p className="mt-1 pl-4">{t('cutoffs.historyNote')}</p>}
       <ol className="mt-1 space-y-1 pl-4">
         {rounds.map((round, index) => (
           <li key={round.round_id}>
