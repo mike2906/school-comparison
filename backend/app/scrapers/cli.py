@@ -668,7 +668,8 @@ def translate_texts_command(school_ids, city, country, max_usd, apply_changes, p
         console.print(f"Plan: {report['schools_to_change']} schools to change, to ask {report['asked']}")
         from app.ai.client import missing_key
 
-        if report["asked"] and (key := missing_key("translation")):
+        asked = report["asked"]
+        if (sum(asked.values()) if isinstance(asked, dict) else asked) and (key := missing_key("translation")):
             # A checkout whose .env lacks the key (a stale worktree copy) must not publish
             # untranslated text quietly.
             console.print(f"[red]{key} is not set in this checkout's backend/.env[/red]")

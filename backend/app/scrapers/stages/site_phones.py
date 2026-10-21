@@ -48,8 +48,9 @@ _SIDE_ROLE = re.compile(
 )
 # Not the school's own line: its outside data-protection officer (sgcag.info's "лице по
 # защита на личните данни ... dpo@responsaprevent.bg, Тел: 0885 103 173").
+# A footer's "Политика за защита на личните данни" link is not one: the officer is named.
 _NOT_SCHOOLS = re.compile(
-    r"защита на (?:личните )?данни|длъжностно лице|(?<![a-z])dpo(?![a-z])|data protection", re.IGNORECASE
+    r"лице (?:по|за) защита|длъжностно лице|(?<![a-z])dpo(?![a-z])|data protection officer", re.IGNORECASE
 )
 # A Sofia landline or a mobile, digits apart by at most one separator: exactly as many
 # digits as the number has, so two numbers in a row stay two.

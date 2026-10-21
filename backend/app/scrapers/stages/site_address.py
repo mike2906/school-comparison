@@ -17,7 +17,8 @@ point at the register point of the location's own address places a hidden one th
 moves a shown one pinned far away (ЧДГ Росица's "Кирил и Методий 70" was pinned in
 Оборище; the site maps the one in Иваняне); a shown location whose address is no street and number or
 block at all takes the register address the site names at our pin (ЧДГ Христо Ботев's "ул. 315
-- III м. р." is "ул. Петър Бонев 3"). Official and hand pins are never changed. No model
+- III м. р." is "ул. Петър Бонев 3"); an official or hand pin keeps its point then and only
+takes that address. Official and hand points are never moved. No model
 calls. Default is a dry run. Sofia only. Run after ``register-pins``.
 """
 
@@ -180,8 +181,7 @@ async def run_site_address(
     fetch: Optional[Fetch] = None,
     fetch_script: Optional[Fetch] = None,
 ) -> dict[str, Any]:
-    """Run over the city's schools with an accepted website and a location that is not an
-    official or hand pin."""
+    """Run over the city's schools with an accepted website."""
     if (country, (city or "").casefold()) != ("bg", "sofia"):
         raise ValueError(f"site-address has Sofia's address register only, not {city!r}")
     bounds = get_city_bounds(country, city)

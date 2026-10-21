@@ -14,7 +14,7 @@ import logging
 import re
 from collections.abc import Awaitable, Callable, Sequence
 from typing import Any, Optional
-from urllib.parse import urldefrag, urljoin, urlparse
+from urllib.parse import unquote, urldefrag, urljoin, urlparse
 
 from bs4 import BeautifulSoup
 from sqlalchemy import func, select
@@ -73,13 +73,12 @@ def _on_site(url: str, site: str) -> bool:
     parsed, home = urlparse(url), urlparse(site)
     if host(url) != host(site):
         return False
-    prefix = home.path.lower()
-    last = prefix.rstrip("/").rsplit("/", 1)[-1]
+    prefix = unquote(home.path).lower().rstrip("/")
+    last = prefix.rsplit("/", 1)[-1]
     # A file (/index.php) or a home page (tzarsimeon.bg/dgrosica/home): its folder is the site.
     if "." in last or last in _HOME_PAGES:
         prefix = prefix.rsplit("/", 1)[0]
-    prefix = prefix.rstrip("/")
-    path = parsed.path.lower()
+    path = unquote(parsed.path).lower()
     return not prefix or path == prefix or path.startswith(prefix + "/")
 
 

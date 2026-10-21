@@ -186,3 +186,7 @@ def test_every_listing_of_our_address_counts():
     # НЕМО-Бояна: the footer gives the main office's number after our address, the list ours.
     page = 'Адрес: кв. Бояна, бул. "Ал. Пушкин" № 63 тел. 0889 599 118 ... бул. "Александър Пушкин" 63 0898 790 549'
     assert stage.numbers_at(page, 'ул. "Александър Пушкин" № 63') == ["889599118", "898790549"]
+
+
+def test_a_privacy_policy_link_before_the_number_does_not_hide_it():
+    assert stage.page_numbers("Политика за защита на личните данни | Контакти: Тел: 02 987 65 43") == ["29876543"]
