@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 from typing import Any
 
 import httpx
@@ -105,7 +106,9 @@ def diff_lists(live: list[dict], new: list[dict]) -> dict[str, Any]:
 
 async def read_live_list(api: str = LIVE_API, *, country: str = "bg", city: str = "sofia") -> list[dict]:
     async with httpx.AsyncClient(headers={"User-Agent": CRAWLER_USER_AGENT}, timeout=120) as client:
-        response = await client.get(f"{api.rstrip('/')}/schools", params={"country_code": country, "city": city})
+        # A query of its own, so Cloudflare's copy (kept a few minutes) is not what is compared.
+        params = {"country_code": country, "city": city, "fresh": str(time.time_ns())}
+        response = await client.get(f"{api.rstrip('/')}/schools", params=params)
         response.raise_for_status()
         return response.json()
 

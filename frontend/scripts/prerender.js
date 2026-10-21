@@ -38,12 +38,21 @@ function siteOrigin(value) {
   return url.origin
 }
 
+// Cloudflare keeps the API's answers for a few minutes (backend/app/main.py), and a build
+// right after a publish must read the new data: each build asks with its own query string,
+// which the edge caches apart and the API ignores.
+const BUILD_QUERY = `build=${Date.now()}`
+
+function freshUrl(url) {
+  return `${url}${url.includes('?') ? '&' : '?'}${BUILD_QUERY}`
+}
+
 async function fetchJson(url) {
   let lastError
   for (const delaySeconds of [0, 1, 2]) {
     if (delaySeconds) await new Promise((resolve) => setTimeout(resolve, delaySeconds * 1000))
     try {
-      const response = await fetch(url, { signal: AbortSignal.timeout(30_000) })
+      const response = await fetch(freshUrl(url), { signal: AbortSignal.timeout(30_000) })
       if (!response.ok) throw new Error(`HTTP ${response.status}`)
       return await response.json()
     } catch (error) {
