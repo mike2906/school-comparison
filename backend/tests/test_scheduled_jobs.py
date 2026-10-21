@@ -20,6 +20,7 @@ args = sys.argv[1:]
 with open(os.environ["CALLS"], "a") as f:
     f.write(json.dumps({"uv": args, "force": os.environ.get("PINS_FORCE")}) + "\n")
 if "--out" not in args or "--max-usd" not in args:
+    print(os.environ.get("UV_STDOUT", ""))
     sys.exit(int(os.environ.get("UV_FAIL", "0")))
 plan_path = os.environ["UV_PLAN"]
 plan = json.load(open(plan_path))
@@ -222,6 +223,18 @@ def test_a_failed_register_import_stops_before_the_pins_and_tries_three_times_a_
     pc.run("refresh_register.sh", "2026-11-08T12:50", UV_FAIL="1")
     assert pc.calls == [] and "wait for next month" in pc.log("register")
     assert (pc.state / "register_cycle").read_text().strip() == "2026-11"
+
+
+def test_a_blocked_register_names_the_cause_in_its_issue(pc):
+    pc.run("refresh_register.sh", "2026-10-20T12:50")
+    pc.run(
+        "refresh_register.sh",
+        "2026-11-05T12:50",
+        UV_FAIL="1",
+        UV_STDOUT="Running moe_registry...\n✗ Error: https://ri-api.mon.bg answered with a Cloudflare challenge (HTTP 403)",
+    )
+    assert pc.code == 1 and "answered with a Cloudflare challenge (HTTP 403)" in pc.issues
+    assert "Cloudflare challenge" in pc.log("register")
 
 
 def test_an_untracked_file_under_backend_runs_nothing(pc):

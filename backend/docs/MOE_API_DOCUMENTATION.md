@@ -3,6 +3,13 @@
 ## Overview
 The Bulgarian Ministry of Education provides a public API at `https://ri-api.mon.bg` for accessing the official registry of educational institutions.
 
+**Blocked to scripts since October 2026.** Every `*.mon.bg` host (ri.mon.bg, ri-api.mon.bg,
+ruo.mon.bg, mon.bg) answers HTTP 403 with `cf-mitigated: challenge`: a Cloudflare bot check
+that only a real browser passes. Checked on 2026-10-21 from a cloud machine with and without a
+browser User-Agent and Origin/Referer (the PC's import got a 403 the same day), so it is not a
+header, rate limit or endpoint change. The adapter names the challenge in its error, and the
+scheduled register refresh puts that in its issue.
+
 ## Base URL
 ```
 https://ri-api.mon.bg

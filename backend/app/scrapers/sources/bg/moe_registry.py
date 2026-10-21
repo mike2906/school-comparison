@@ -32,6 +32,11 @@ if TYPE_CHECKING:
     from app.models.source_page import SourcePage
 
 logger = logging.getLogger(__name__)
+
+
+def is_cloudflare_challenge(response: httpx.Response) -> bool:
+    """Cloudflare's bot check ("Just a moment..."), which only a real browser passes."""
+    return response.status_code == 403 and response.headers.get("cf-mitigated") == "challenge"
 _LOCALITY_MARKER_RE = re.compile(r"\b(?:гр\.?|с\.?|село|район|кв\.|ж\.к\.)\b", flags=re.IGNORECASE)
 
 
@@ -375,6 +380,12 @@ class MoeRegistryAdapter(BaseSourceAdapter):
                     "Content-Type": "application/json",
                 },
             )
+            if is_cloudflare_challenge(response):
+                raise RuntimeError(
+                    f"{self.API_BASE_URL} answered with a Cloudflare challenge (HTTP {response.status_code},"
+                    " cf-mitigated: challenge), so the ministry now screens out scripts; a header change"
+                    " cannot get past it"
+                )
             response.raise_for_status()
 
             # Step 2: Parse response

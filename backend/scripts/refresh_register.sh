@@ -36,7 +36,10 @@ backup
 stamp="$(date -u +%Y%m%dT%H%M%SZ)"
 cd "$repo_root/backend"
 cli() { timeout -k 5m "$run_timeout" uv run python -m app.scrapers.cli "$@" > /dev/null; }
-cli run --stage discover --city sofia || stop "the register import (discover) failed"
+# Keep the import's output: its adapter errors (a blocked ministry API) go into the issue.
+discover_log="$state/register-discover-$stamp.log"
+COLUMNS=400 timeout -k 5m "$run_timeout" uv run python -m app.scrapers.cli run --stage discover --city sofia > "$discover_log" 2>&1 ||
+	stop "the register import (discover) failed: $(grep -o 'Error: .*' "$discover_log" | head -n 3 | paste -sd ';' -) (output: $discover_log)"
 timeout -k 5m "$run_timeout" uv run python scripts/import_sofia_municipal_points.py --apply > /dev/null || stop "import_sofia_municipal_points.py failed"
 cli register-pins --apply --out "$state/register-pins-$stamp.json" || stop "register-pins failed"
 cli site-address --apply --out "$state/register-site-address-$stamp.json" || stop "site-address failed"
@@ -45,7 +48,7 @@ for report in "$state"/register-*-"$stamp".json; do
 	[ -f "$report" ] || continue
 	log "$(basename "$report"): $(field "$report" 'r["outcomes"]')"
 done
-find "$state" -name 'register-*.json' -mtime +90 -delete
+find "$state" \( -name 'register-*.json' -o -name 'register-discover-*.log' \) -mtime +90 -delete
 
 started="$(date -u +%s)"
 # A small reserve per call, as in watch_open_days.sh: a pin-agent call costs well under a cent.
