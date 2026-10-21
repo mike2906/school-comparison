@@ -407,9 +407,9 @@ _MONTHS = {
 }  # fmt: skip
 _DEADLINE_RE = re.compile(
     r"(?:\bдо|\buntil|\bby|\bbefore)\s+(?:(\d{1,2})\s*[./]\s*(\d{1,2})\s*[./]\s*(20\d{2})"
-    rf"|(\d{{1,2}})\s+({'|'.join(_MONTHS)})\s+(20\d{{2}})"
-    # No year (625's "Запишете Вашето дете до 15-ти октомври"): that day of this school year.
-    rf"|(\d{{1,2}})(?:-?(?:ви|ри|ти|ми))?\s+({'|'.join(_MONTHS)})(?![\s.,]*20\d{{2}}))"
+    rf"|(\d{{1,2}})(?:-?(?:ви|ри|ти|ми))?\s+({'|'.join(_MONTHS)})\s+(20\d{{2}})"
+    # No year (625's "Запишете Вашето дете до 15-ти октомври"): the nearest such day.
+    rf"|(\d{{1,2}})(?:-?(?:ви|ри|ти|ми))?\s+({'|'.join(_MONTHS)})(?!\w)(?![\s.,]*20\d{{2}}))"
 )
 _OFFER_WORDS_RE = re.compile(
     r"записани|сключ|договор|в срок|ранн|отстъпк|намален|промо|цени\b|цена\b|валидн|важи"
@@ -847,6 +847,13 @@ def label_is_another_institutions(
     return bool(re.search(_KINDERGARTEN_NAME, text)) or not _only_school_ages(text)
 
 
+def _date_or_far(year: int, month: int, day: int) -> datetime.date:
+    try:
+        return datetime.date(year, month, day)
+    except ValueError:  # 29 February, or a day the month lacks
+        return datetime.date.max
+
+
 def offer_end(context: str, today: datetime.date | None = None) -> Optional[datetime.date]:
     """The last day of the offer an amount's words make, past or not, or None.
 
@@ -856,12 +863,12 @@ def offer_end(context: str, today: datetime.date | None = None) -> Optional[date
     falls due, not the last day it is charged. A date followed by "след" ("до 31.05.2026,
     след това 8 500 €") ends the offer before the price that replaced it, and one followed
     by a percentage ("до 31.05.2026 г. отстъпка 10%"), or preceded by one ("Отстъпка 5%
-    при записване до 31.05.2026"), is a discount on the price shown. A date with no year
-    falls in the school year of ``today`` (September to August).
+    при записване до 31.05.2026"), is a discount on the price shown. A day and month name
+    with no year is the one nearest ``today``: "до 15 октомври" has passed on 21 October
+    and is still to come in July.
     """
     context = _EMPHASIS_RE.sub("", context)
     today = today or datetime.date.today()
-    school_year = today.year if today.month >= 9 else today.year - 1
     previous_end = 0
     deadlines = []
     for match in _DEADLINE_RE.finditer(context):
@@ -882,7 +889,10 @@ def offer_end(context: str, today: datetime.date | None = None) -> Optional[date
             day, month, year = match.group(4), _MONTHS[match.group(5)], match.group(6)
         else:
             day, month = match.group(7), _MONTHS[match.group(8)]
-            year = school_year if month >= 9 else school_year + 1
+            year = min(
+                (today.year - 1, today.year, today.year + 1),
+                key=lambda year: abs((_date_or_far(year, month, int(day)) - today).days),
+            )
         try:
             deadlines.append(datetime.date(int(year), int(month), int(day)))
         except ValueError:

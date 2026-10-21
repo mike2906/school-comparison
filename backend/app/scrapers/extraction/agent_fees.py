@@ -274,8 +274,9 @@ _HOW_OFTEN_RE = re.compile(
     r"|седмичн\w*\s+(?:програм|разпис|график)|weekly (?:schedule|timetable)"
 )
 _DEPOSIT_RE = re.compile(r"депозит|капаро|deposit")
-# A deposit's names, a guarantee too: 300's "гаранционна вноска" is taken off the last fee.
-_DEPOSIT_NAME_RE = re.compile(r"депозит|капаро|deposit|гаранци|guarantee")
+# A deposit's names, a guarantee payment too: 300's "гаранционна вноска" is taken off the last
+# fee (not "гарантира място", which an enrolment fee may also say).
+_DEPOSIT_NAME_RE = re.compile(_DEPOSIT_RE.pattern + r"|гаранционн")
 # An age, not a period: "6-годишни деца", "5 годишни", "6-месечни бебета" (564's "такса за
 # обследване" for 5-year-olds lost its one-off period to the "годиш" of the age). Like Stage 6's
 # (price_evidence._AGE_RE), but spaced only before a child word: "€ 3000 годишно" and

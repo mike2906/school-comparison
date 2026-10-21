@@ -283,7 +283,7 @@ def test_deposit_filed_as_registration_publishes():
         ("Заплаща се при подписване на договора: 300 €", 300, "Депозит", True),
         # 300: a guarantee taken off the last fee is a deposit by another name.
         ("Договорът се сключва с внасяне на гаранционна вноска в размер на 1500 евро,", 1500, "такса", True),
-        ("Place guarantee: 1000 EUR", 1000, "fee", True),
+        ("Registration fee guarantees your child a place: 500 EUR, non-refundable", 500, "fee", False),
         # Only the amount the word stands before: the enrolment fee on the deposit's line is a fee.
         ("Такса за записване 200 €, депозит 500 €", 200, "Такса за записване", False),
         ("Такса за записване 200 €, депозит 500 €", 500, "депозит", True),

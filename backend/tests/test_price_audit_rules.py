@@ -561,13 +561,18 @@ def test_625_a_promotion_with_a_yearless_deadline_has_expired():
 @pytest.mark.parametrize(
     "today,expected",
     [
-        (datetime.date(2026, 10, 21), datetime.date(2027, 5, 31)),  # later in this school year
-        (datetime.date(2027, 6, 2), datetime.date(2027, 5, 31)),  # passed, same school year
-        (datetime.date(2027, 9, 1), datetime.date(2028, 5, 31)),  # the next school year's
+        (datetime.date(2026, 7, 1), datetime.date(2026, 9, 15)),  # still to come this summer
+        (datetime.date(2026, 10, 21), datetime.date(2026, 9, 15)),  # just passed
+        (datetime.date(2027, 2, 1), datetime.date(2026, 9, 15)),  # passed, not next autumn's
     ],
 )
-def test_a_yearless_offer_deadline_falls_in_the_school_year(today, expected):
-    assert offer_end("Ранно записване: цени за договори, сключени до 31 май\n5500 €", today) == expected
+def test_a_yearless_offer_deadline_is_the_nearest_such_day(today, expected):
+    assert offer_end("Отстъпка за договори, сключени до 15 септември\n5500 €", today) == expected
+
+
+def test_an_ordinal_day_with_a_year_and_a_word_after_a_day_number():
+    assert offer_end("Цени за договори, сключени до 15-ти октомври 2025\n5500 €") == datetime.date(2025, 10, 15)
+    assert offer_end("Early bird price, offer valid until 2 mayors sign\n5500 EUR") is None
 
 
 def test_a_yearless_due_date_or_a_dated_deadline_is_not_read_as_yearless():
