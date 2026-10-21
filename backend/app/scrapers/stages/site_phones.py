@@ -114,8 +114,12 @@ def numbers_at(text: str, address: str) -> list[str]:
     words = [w for w in parsed.street.split()[1:] if len(w) > 1][-1:]
     if not words:
         return []
-    digits, letter = re.fullmatch(r"(\d+)(\D*)", parsed.number).groups()
-    number = re.escape(digits) + (rf"[\s-]?{re.escape(letter.casefold())}" if letter else "")
+    split = re.fullmatch(r"(\d+)(\D*)", parsed.number)
+    if split is None:  # the parser gives digits and a letter; anything else as written
+        number = re.escape(parsed.number.casefold())
+    else:
+        digits, letter = split.groups()
+        number = re.escape(digits) + (rf"[\s-]?{re.escape(letter.casefold())}" if letter else "")
     pattern = rf"(?<!\w){re.escape(words[0])}\W{{1,6}}(?:№\s*)?{number}(?![\w/-])"
     lowered = (text or "").casefold()
     for found in re.finditer(pattern, lowered):

@@ -1148,6 +1148,8 @@ async def clear_website_derived_locations(
             db.add(location)
         tags = [str(tag) for tag in (location.location_tags or [])]
         if CAMPUS_TAG in tags:
+            if phone_change:
+                changed.append({"location_id": location.id, "school_id": school_id, **phone_change})
             continue
         website_address = "address_source=website_contact" in tags
         if website_address and keep_officially_confirmed_addresses and OFFICIAL_COORDS_TAG in tags:

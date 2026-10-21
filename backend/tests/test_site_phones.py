@@ -138,6 +138,7 @@ def test_two_numbers_in_a_row_stay_two_and_the_next_buildings_number_is_not_ours
     page = "ул. Примерна №1 1421 София ул. Друга №5 Прием: 0894 935 013"
     assert stage.numbers_at(page, "ул. Примерна 1") == []
     assert stage.numbers_at(page, "ул. Друга 5") == ["894935013"]
+    assert stage.numbers_at("ул. Друга № 5 А тел. 02 987 65 43", "ул. Друга 5а") == ["29876543"]
 
 
 def test_a_host_of_many_sites_is_not_one_shared_site():
