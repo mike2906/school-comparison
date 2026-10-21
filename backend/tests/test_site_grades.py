@@ -58,6 +58,8 @@ def test_planned_bands():
     assert planned_bands(register, {8}, 7) == (set(), set())
     # No highest grade stated: nothing is hidden.
     assert planned_bands(register, set(), None) == (set(), set())
+    # Nothing above the highest grade stated (215: another school's high school on its site).
+    assert planned_bands({"grade_1_4", "grade_5_7"}, {8, 9}, 7) == (set(), set())
     # A misread highest grade never takes every register band away (a gymnasium "to grade 7").
     assert planned_bands({"grade_8_12"}, set(), 7) == ({"grade_5_7"}, set())
 
@@ -228,11 +230,30 @@ async def test_re_reading_the_site_keeps_site_grades_bands(db_session):
         ("2-годишна програма по английски", False),
         ("Pick up children from 2 pm", False),
         ("Children from 1 September attend", False),
+        ("Children aged 2.7 to 7 are accepted if places are available", True),  # 330: born early in the year
+        ("Children aged 2,5 to 7", True),
+        ("The kindergarten has no nursery group and does not accept children born after 2024", False),  # 515
+        ("Детската градина няма яслена група", False),
+        ("Нямаме яслена група", False),
+        ("Nursery groups take children from 18 months. There is no nursery fee for siblings", True),
+        ("Деца от 1,6 до 3 г. в яслата", True),
+        ("We do not charge an enrolment fee; nursery groups take children from 18 months", True),
+        ("Kindergarten No 12 has a nursery group for children aged 1-3", True),
+        ("Accepts children aged 1.6 to 3", True),
     ],
 )
 def test_site_nursery_reads_an_age_under_three(text, nursery):
     fact = SimpleNamespace(text_i18n={"en": text, "bg": ""})
     assert stage.site_nursery([], [fact]) is nursery
+
+
+def test_a_denial_anywhere_wins():
+    # 515: one fact denies a nursery group, another names an age of two.
+    facts = [
+        SimpleNamespace(text_i18n={"en": "The kindergarten has no nursery group.", "bg": ""}),
+        SimpleNamespace(text_i18n={"en": "Admission for children aged 2 to 7", "bg": ""}),
+    ]
+    assert not stage.site_nursery([], facts)
 
 
 def test_site_nursery_reads_a_nursery_fee():
@@ -270,3 +291,34 @@ async def test_a_kindergarten_gets_its_nursery_group_and_nothing_else(db_session
     with patch.object(stage, "site_nursery", return_value=False):
         await stage.run_site_grades(db_session, apply=True)
     assert await _bands(db_session, school_id) == (["first", "preschool", "second", "third"], [])
+
+
+async def test_a_band_a_same_site_school_teaches_is_not_added(db_session):
+    def school(level, bands):
+        row = School(
+            country_code="bg", city="sofia", name_i18n={"bg": "Златарски"}, school_type="private",
+            education_level=level, website_url="https://zlatarskischool.org/", scrape_status="navigated",
+        )
+        location = SchoolLocation(school=row, address_i18n={"bg": "ул. 1"}, location_tags=[])
+        location.age_group_shifts = [SchoolLocationAgeGroupShift(age_group=band) for band in bands]
+        db_session.add(row)
+        return row
+
+    primary = school("lower_secondary", ("grade_1_4", "grade_5_7"))
+    school("upper_secondary", ("grade_8_12",))
+    await db_session.commit()
+    primary_id = primary.id
+    # The shared site's grade-8 and grade-11 admissions are the gymnasium's (151 / 392).
+    with patch.object(stage, "site_grades", return_value=({5, 8, 11}, None)):
+        report = await stage.run_site_grades(db_session, school_ids=[primary_id])
+    assert report["changes"] == []
+
+    # A band site-grades added to the sibling is not the sibling's register band: no flip-flop.
+    gymnasium = (await db_session.execute(
+        select(SchoolLocation).where(SchoolLocation.school_id != primary_id)
+    )).scalar_one()
+    gymnasium.location_tags = [SITE_GRADES_ADDED_PREFIX + "grade_8_12"]
+    await db_session.commit()
+    with patch.object(stage, "site_grades", return_value=({8}, None)):
+        report = await stage.run_site_grades(db_session, school_ids=[primary_id])
+    assert report["changes"][0]["add"] == ["grade_8_12"]

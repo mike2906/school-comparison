@@ -111,7 +111,7 @@ def site_grades(pricing: Iterable[Any], at_a_glance: Optional[dict[str, Any]]) -
 # group (351, 185: "children aged 2 to 7"), while the register lists groups from age 3 only.
 NURSERY = "nursery"
 _KINDERGARTEN_GROUPS = frozenset({"first", "second", "third", "preschool", NURSERY})
-_UNDER_THREE = r"(?:1(?:[.,]5)?|2|one|two)"
+_UNDER_THREE = r"(?:1(?:[.,]\d)?|2|one|two)"
 _NURSERY_RE = re.compile(
     # An age, not a time of day ("children from 2 pm") or a family ("children of one family"):
     # an age word, or a number with a year unit.
@@ -119,23 +119,37 @@ _NURSERY_RE = re.compile(
     rf"|\b{_UNDER_THREE}\s*(?:-|–|to)\s*\d\s*(?:-?\s*years?|-year-olds?|y\.?\s*o\b)"
     r"|\bfrom\s+(?:the\s+age\s+of\s+)?(?:[1-9]|[12]\d|3[0-5])\s+months\b"
     r"|\bnursery\s+groups?\b|\btoddler\s+groups?\b"
-    r"|\bот\s+(?:1[.,]5|2)\s*(?:до|-|–)\s*\d\s*г|\b(?:1[.,]5|2)-годишн\w*\s+(?:деца|дете)|ясл",
+    r"|\bот\s+(?:1[.,]\d|2)\s*(?:до|-|–)\s*\d\s*г|\b(?:1[.,]\d|2)-годишн\w*\s+(?:деца|дете)|ясл",
+    re.IGNORECASE,
+)
+
+
+# "The kindergarten has no nursery group" (515): the school's own denial wins over any age
+# it names elsewhere. Only a negation of the nursery itself, not one nearby ("we do not
+# charge a fee, nursery groups from 18 months").
+_NO_NURSERY_RE = re.compile(
+    r"\b(?:no|without)\s+(?:a\s+)?(?:nursery|toddler)\s+groups?\b"
+    r"|\b(?:does\s+not|doesn't|do\s+not|don't)\s+(?:have|run|offer)\s+(?:a\s+)?(?:nursery|toddler)\s+groups?\b"
+    r"|\b(?:няма|нямаме|без)\s+ясл|не\s+(?:разполага|разполагаме)\s+с\s+ясл",
     re.IGNORECASE,
 )
 
 
 def site_nursery(pricing: Iterable[Any], facts: Iterable[Any]) -> bool:
     """Whether the published site data says the kindergarten takes children under three."""
-    for row in pricing:
-        if str(getattr(row.category, "value", row.category)) != "tuition":
-            continue  # "Swimming for ages 2-3" is an activity, not a group
-        if any(_NURSERY_RE.search(str(label or "")) for label in _fee_labels(row)):
-            return True
+    texts = [
+        str(label or "")
+        for row in pricing
+        # "Swimming for ages 2-3" is an activity, not a group.
+        if str(getattr(row.category, "value", row.category)) == "tuition"
+        for label in _fee_labels(row)
+    ]
     for fact in facts:  # the published facts: minor ones never reach them
         text = getattr(fact, "text_i18n", None) or {}
-        if any(_NURSERY_RE.search(str(text.get(lang) or "")) for lang in ("en", "bg")):
-            return True
-    return False
+        texts += [str(text.get(lang) or "") for lang in ("en", "bg")]
+    if any(_NO_NURSERY_RE.search(text) for text in texts):
+        return False
+    return any(_NURSERY_RE.search(text) for text in texts)
 
 
 def _band(grade: int) -> Optional[str]:
@@ -145,7 +159,11 @@ def _band(grade: int) -> Optional[str]:
 def planned_bands(register_bands: set[str], named: set[int], highest: Optional[int]) -> tuple[set[str], set[str]]:
     """(bands to add, bands to hide) given the register's school bands and the site's grades."""
     stated = named | ({highest} if highest is not None else set())
-    add = {band for grade in stated if (band := _band(grade))} - register_bands
+    # Nothing above the highest grade the site states (215: its "language high school
+    # grades 8-12" is another school's, it teaches to grade 7).
+    add = {
+        band for grade in stated if (band := _band(grade)) and (highest is None or BANDS[band][0] <= highest)
+    } - register_bands
     hide = {
         band
         for band in register_bands
@@ -160,6 +178,46 @@ def planned_bands(register_bands: set[str], named: set[int], highest: Optional[i
 
 def _tagged(tags: Iterable[str], prefix: str) -> set[str]:
     return {tag[len(prefix):] for tag in tags if tag.startswith(prefix)}
+
+
+async def _same_site_school_bands(db: AsyncSession, country: str):
+    """``(school_id, website_url) -> bands`` the other school-level institutions on that site teach."""
+    from app.models import SchoolLocation
+    from app.scrapers.shared_site_check import level_family, site_group_key
+
+    rows = (
+        await db.execute(
+            select(
+                School.id,
+                School.website_url,
+                School.education_level,
+                SchoolLocation.location_tags,
+                SchoolLocationAgeGroupShift.age_group,
+            )
+            .join(SchoolLocation, SchoolLocation.school_id == School.id)
+            .join(SchoolLocationAgeGroupShift, SchoolLocationAgeGroupShift.location_id == SchoolLocation.id)
+            .where(School.country_code == country, School.website_url.isnot(None))
+        )
+    ).all()
+    by_site: dict[str, dict[int, set[str]]] = {}
+    for row in rows:
+        tags = row.location_tags or []
+        # The register's bands only: a band a site added to the sibling would cancel ours and
+        # ours its, a different answer every run.
+        if (
+            level_family(row.education_level) == "school"
+            and row.age_group in BANDS
+            and SITE_GRADES_ADDED_PREFIX + row.age_group not in tags
+            and AGE_GROUP_TAG_PREFIX + row.age_group not in tags
+            and (key := site_group_key(row.website_url))
+        ):
+            by_site.setdefault(key, {}).setdefault(int(row.id), set()).add(row.age_group)
+
+    def bands(school_id: int, website_url: Optional[str]) -> set[str]:
+        others = by_site.get(site_group_key(website_url) or "", {})
+        return set().union(*(b for sid, b in others.items() if sid != school_id))
+
+    return bands
 
 
 async def run_site_grades(
@@ -186,6 +244,7 @@ async def run_site_grades(
     ids = list((await db.execute(query.order_by(School.id))).scalars().all())
 
     service = SchoolService(db)
+    sibling_bands = await _same_site_school_bands(db, country)
     changes: list[dict[str, Any]] = []
     for school_id in ids:
         school = await service.get_school_with_details(school_id)
@@ -217,6 +276,10 @@ async def run_site_grades(
             glance = facts.at_a_glance.model_dump() if facts and facts.at_a_glance else None
             named, highest = site_grades(published.pricing, glance)
             add, hide = planned_bands(register_bands, named, highest)
+            # A band another school on the same site teaches is that school's (151 and 392
+            # Zlatarski: the site's grade-8 admissions are the gymnasium's, its grade-5 ones
+            # the primary's).
+            add -= sibling_bands(school_id, school.website_url)
         # An evening school's "1-12 клас" includes classes for adults.
         name_bg = (school.name_i18n or {}).get("bg")
         add = set(child_bands(add, name_bg, school.education_level))
