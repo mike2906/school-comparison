@@ -827,3 +827,26 @@ def test_a_labels_menu_link_is_not_where_its_fee_is_printed():
 
     assert check_price_row(row, UWEKIND_ADMIN, "school") == []
     assert check_price_row(applied, UWEKIND_ADMIN, "school") == []
+
+
+def test_layout_allowances_keep_other_fees_apart():
+    # The day fee filed as the month's: other lists' labels stand in between.
+    daily_as_monthly = _fee("AFTER_SCHOOL", 50, "MONTHLY", "Месечна такса", "Ученици от 5. клас")
+    assert RULE_AMOUNT_NEAR_LABEL in {f.rule for f in check_price_row(daily_as_monthly, ORFEI_AFTER_SCHOOL, "school")}
+    # Another fee's name in brackets still parts its price from the label.
+    page = "Такса: 300 евро (обучение) / 50 евро (храна)\n"
+    assert RULE_AMOUNT_NEAR_LABEL in {f.rule for f in check_price_row(_fee("TUITION", 50, None, "Такса"), page, "school")}
+    # A link on its price's own line is where that fee is printed.
+    linked = "Такса обучение: 500 евро за година\n\n* [Такса обучение](http://x) - 900 евро\n"
+    assert check_price_row(_fee("TUITION", 900, "YEARLY", "Такса обучение"), linked, "school") == []
+
+
+def test_only_age_ranges_past_kindergarten_clear_a_kindergarten_label():
+    def kindergartens(label):
+        return label_is_another_institutions(label, "school", set())
+
+    assert not kindergartens("деца от 5 до 14 години")
+    assert not kindergartens("5-14 y.o")
+    assert kindergartens("Група 3-4 години, 10 годишни вноски")
+    assert kindergartens("Детска градина 3-6 години и лятна школа 6-12 години")
+    assert kindergartens("Програми за деца от 2 до 12 години\n3-4 години: 500 евро")
