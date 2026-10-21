@@ -1018,7 +1018,7 @@ def site_grades_command(school_ids, city, country, apply_changes, report_path):
     report = asyncio.run(_run())
     console.print(f"Checked {report['checked']} schools; bands change on {len(report['changes'])}")
     for change in report["changes"]:
-        console.print(f"  {change['school_id']} {change['name_bg']}: register {change['register']}, add {change['add']}, hide {change['hide']}")
+        console.print(f"  {change['school_id']} {change['name_bg']}: register {change['register']}, add {change['add']}, hide {change['hide']}, remove {change['remove']}")
     if report_path is not None:
         report_path.parent.mkdir(parents=True, exist_ok=True)
         report_path.write_text(json.dumps(report, ensure_ascii=False, indent=1), encoding="utf-8")

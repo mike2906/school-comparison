@@ -92,6 +92,7 @@ async def test_stage_adds_hides_and_undoes(db_session):
     with patch.object(stage, "site_grades", return_value=({0, 1, 7}, 7)):
         report = await stage.run_site_grades(db_session)
         assert report["changes"][0]["add"] == ["preschool"] and report["changes"][0]["hide"] == ["grade_8_12"]
+        assert report["changes"][0]["remove"] == ["grade_8_12"]
         assert (await _bands(db_session, school_id))[0] == ["grade_1_4", "grade_5_7", "grade_8_12"]  # dry run
 
         await stage.run_site_grades(db_session, apply=True)
@@ -322,3 +323,22 @@ async def test_a_band_a_same_site_school_teaches_is_not_added(db_session):
     with patch.object(stage, "site_grades", return_value=({8}, None)):
         report = await stage.run_site_grades(db_session, school_ids=[primary_id])
     assert report["changes"][0]["add"] == ["grade_8_12"]
+
+
+async def test_dry_run_reports_what_an_evening_school_loses(db_session):
+    # 209: the register's "1-12 клас" includes adults' classes; only 8-12 are for children.
+    school = School(
+        country_code="bg", city="sofia", name_i18n={"bg": "209 Сменно-вечерно средно училище"}, school_type="state",
+        education_level="upper_secondary", website_url="https://ve4erna.com/", scrape_status="navigated",
+    )
+    location = SchoolLocation(school=school, address_i18n={"bg": "ул. Кирил и Методий 63"}, location_tags=[])
+    location.age_group_shifts = [SchoolLocationAgeGroupShift(age_group=band) for band in ("grade_1_4", "grade_5_7", "grade_8_12")]
+    db_session.add(school)
+    await db_session.commit()
+    school_id = school.id
+
+    with patch.object(stage, "site_grades", return_value=({5, 9, 12}, 12)):
+        report = await stage.run_site_grades(db_session)
+        assert report["changes"][0]["hide"] == [] and report["changes"][0]["remove"] == ["grade_1_4", "grade_5_7"]
+        await stage.run_site_grades(db_session, apply=True)
+    assert (await _bands(db_session, school_id))[0] == ["grade_8_12"]

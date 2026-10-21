@@ -293,6 +293,8 @@ async def run_site_grades(
             "register": sorted(register_bands),
             "add": sorted(add),
             "hide": sorted(hide),
+            # What the apply deletes, including bands an evening school's child_bands drop.
+            "remove": sorted((current & bands) - desired),
             "highest_grade": highest,
             "site_grades": sorted(named),
         }
