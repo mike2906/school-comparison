@@ -226,6 +226,8 @@ async def test_re_reading_the_site_keeps_site_grades_bands(db_session):
         ("Discount for children of one family", False),
         ("We take children from 36 months", False),
         ("2-годишна програма по английски", False),
+        ("Pick up children from 2 pm", False),
+        ("Children from 1 September attend", False),
     ],
 )
 def test_site_nursery_reads_an_age_under_three(text, nursery):
@@ -233,14 +235,10 @@ def test_site_nursery_reads_an_age_under_three(text, nursery):
     assert stage.site_nursery([], [fact]) is nursery
 
 
-def test_site_nursery_skips_minor_facts():
-    fact = SimpleNamespace(text_i18n={"en": "Children aged 2 to 7"}, rank="minor")
-    assert not stage.site_nursery([], [fact])
-
-
 def test_site_nursery_reads_a_nursery_fee():
     assert stage.site_nursery([_fee("tuition", "Яслена група")], [])
     assert not stage.site_nursery([_fee("tuition", "3-7 години")], [])
+    assert not stage.site_nursery([_fee("extracurricular", "Плуване за деца от 2 до 3 години")], [])
 
 
 async def test_a_kindergarten_gets_its_nursery_group_and_nothing_else(db_session):

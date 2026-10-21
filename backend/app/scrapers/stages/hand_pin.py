@@ -104,13 +104,12 @@ async def move_to_site_campus(
     says Горски пътник 44, the kindergarten's building; waldorf.bg/contacts puts the school at
     Хумболт 7). Mike's rule (2026-10-15): the school's own site wins. The register location
     takes the campus's address and point as a hand correction (``manual_fix.previous`` keeps
-    the register's, so a re-import finds the row), adds the campus's age groups, and the
-    campus row goes: one building, one location, with the register's grades. Default is a
-    dry run."""
+    the register's, so a re-import finds the row) and the campus row, which has no age
+    groups of its own, goes: one building, one location, with the register's grades. Default
+    is a dry run."""
     from sqlalchemy import select
     from sqlalchemy.orm import selectinload
 
-    from app.models import SchoolLocationAgeGroupShift
     from app.scrapers.campus_sync import CAMPUS_TAG
 
     if not note.strip():
@@ -138,6 +137,8 @@ async def move_to_site_campus(
         outcome = "not_a_register_location"
     elif campus.lat is None or campus.lng is None or needs_pin(campus):
         outcome = "campus_not_pinned"
+    elif campus.age_group_shifts:
+        outcome = "campus_has_age_groups"  # the site's claim; it would lose its website tags
     else:
         outcome = "moved"
     report["outcome"] = outcome
@@ -148,8 +149,7 @@ async def move_to_site_campus(
         old_address=(location.address_i18n or {}).get("bg"),
         address=(campus.address_i18n or {}).get("bg"),
         point=(campus.lat, campus.lng),
-        age_groups=sorted({link.age_group for link in location.age_group_shifts}
-                          | {link.age_group for link in campus.age_group_shifts}),
+        age_groups=sorted(link.age_group for link in location.age_group_shifts),
     )
     if not apply:
         await db.rollback()
@@ -161,13 +161,6 @@ async def move_to_site_campus(
         "lng": location.lng,
         "geocode_meta": location.geocode_meta,
     }
-    have = {link.age_group for link in location.age_group_shifts}
-    for link in campus.age_group_shifts:
-        if link.age_group not in have:
-            db.add(SchoolLocationAgeGroupShift(
-                location_id=location.id, age_group=link.age_group, shift=link.shift,
-                has_organised_groups=link.has_organised_groups,
-            ))
     location.address_i18n = dict(campus.address_i18n or {})
     location.district = campus.district
     location.lat, location.lng = campus.lat, campus.lng
@@ -178,11 +171,8 @@ async def move_to_site_campus(
         "formatted_address": (campus.address_i18n or {}).get("bg"),
         "manual_fix": {"previous": previous, "note": note, "from_campus_location_id": campus.id},
     }
-    location.location_tags = [
-        tag
-        for tag in location.location_tags or []
-        if not str(tag).startswith("coords_source=") or tag == OFFICIAL_COORDS_TAG
-    ]
+    # The point is the site campus's now, not an official source's.
+    location.location_tags = [tag for tag in location.location_tags or [] if not str(tag).startswith("coords_source=")]
     await db.delete(campus)
     await db.commit()
     return report

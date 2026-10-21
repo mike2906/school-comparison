@@ -81,7 +81,7 @@ evidence is the school's own but no stage can read it. Run it as a named command
 
 `cli move-to-site-campus --location-id N --campus-id M --note "..." [--apply]` moves a shown
 register location to the address and point of the school's own site campus location (M,
-campus-tagged), keeping the register's grades and deleting the campus row: for a register
+campus-tagged, no age groups of its own), keeping the register's grades and deleting the campus row: for a register
 address the site gives to someone else (630 Waldorf at its kindergarten's building).
 
 `cli confirm-pins [--apply]` publishes a hidden point that already stands on our building:

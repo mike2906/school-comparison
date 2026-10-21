@@ -317,29 +317,6 @@ class PlacePin:
     education_level: str
     school_type: str
     city: str
-    address: str = ""
-    # The school's own site puts it at another address (a website campus location).
-    site_elsewhere: bool = False
-    # The school has no other published pin.
-    only_pin: bool = True
-
-
-def _another_ones_building(pin: PlacePin, other: PlacePin) -> bool:
-    """Whether ``pin`` is at ``other``'s building, not its own school's.
-
-    The register can give a school its kindergarten's address (630 Waldorf at Горски пътник
-    44, where its site puts only the kindergarten; the school is at Хумболт 7). Mike's rule
-    (2026-10-15): the school's own site wins. So a pin at the other's address does not make
-    one place when the site puts this school elsewhere and the other has only this pin."""
-    from app.scrapers.campus_sync import addresses_equivalent
-
-    return bool(
-        pin.site_elsewhere
-        and other.only_pin
-        and pin.address
-        and other.address
-        and addresses_equivalent(pin.address, other.address)
-    )
 
 
 def same_place_groups(pins: Iterable[PlacePin]) -> list[list[PlacePin]]:
@@ -371,8 +348,6 @@ def same_place_groups(pins: Iterable[PlacePin]) -> list[list[PlacePin]]:
             if first.city != second.city or first.school_id == second.school_id:
                 continue
             if _distance_m(first.lat, first.lng, second.lat, second.lng) > SAME_PLACE_MAX_METRES:
-                continue
-            if _another_ones_building(first, second) or _another_ones_building(second, first):
                 continue
             shared = shared_brand_key([keys[k], keys[s]])
             if shared and len(shared) >= MIN_BRAND_KEY_LENGTH:
@@ -415,8 +390,6 @@ async def same_place_by_school(db, *, country_code: str, city: Optional[str]) ->
             SchoolLocation.id.label("location_id"),
             SchoolLocation.lat,
             SchoolLocation.lng,
-            SchoolLocation.address_i18n,
-            SchoolLocation.location_tags,
         )
         .join(SchoolLocation, SchoolLocation.school_id == School.id)
         .where(
@@ -431,23 +404,6 @@ async def same_place_by_school(db, *, country_code: str, city: Optional[str]) ->
     if city_clause is not None:
         query = query.where(city_clause)
     rows = (await db.execute(query)).all()
-    from app.scrapers.campus_sync import CAMPUS_TAG, addresses_equivalent
-
-    def address(row) -> str:
-        return str((row.address_i18n or {}).get("bg") or "")
-
-    by_school: dict[int, list[Any]] = {}
-    for row in rows:
-        by_school.setdefault(int(row.id), []).append(row)
-
-    def site_elsewhere(row) -> bool:
-        """The site gives the school a campus at another address and none at this pin's."""
-        campuses = [other for other in by_school[int(row.id)] if CAMPUS_TAG in (other.location_tags or [])]
-        here = [other for other in campuses if address(other) and addresses_equivalent(address(other), address(row))]
-        return bool(address(row)) and not here and any(
-            address(other) and other.location_id != row.location_id for other in campuses
-        )
-
     pins = [
         PlacePin(
             school_id=int(row.id),
@@ -458,9 +414,6 @@ async def same_place_by_school(db, *, country_code: str, city: Optional[str]) ->
             education_level=str(row.education_level or ""),
             school_type=str(row.school_type or ""),
             city=str(row.city or "").strip().casefold(),
-            address=address(row),
-            site_elsewhere=site_elsewhere(row),
-            only_pin=len(by_school[int(row.id)]) == 1,
         )
         for row in rows
     ]

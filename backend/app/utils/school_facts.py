@@ -424,8 +424,9 @@ _NO_TEST_RE = re.compile(
 # An exam for one class, profession, specialty or profile of a grade (192: only the Graphic
 # design class of three tests in fine arts), not for the whole grade.
 _ONE_CLASS_RE = re.compile(
-    r"\b(?:profession|specialty|speciality|profile)\b"
-    r"|(?-i:\b(?!(?:The|This|That|Each|Every|Any|One|Our|Your|Per|A|An)\b)[A-Z][a-z]+) class\b",
+    r"\b(?:profession|specialty|speciality)\b"
+    r"|(?-i:\b(?!(?:The|This|That|Each|Every|Any|One|Our|Your|Per|A|An|First|Second|Third)\b)[A-Z][a-z]+)"
+    r" (?:profile )?class\b",
     re.IGNORECASE,
 )
 # The ministry's aptitude tests (изпити за проверка на способностите) in all three of art,
@@ -488,7 +489,7 @@ def _one_part(fact: Mapping[str, Any]) -> bool:
 KINDERGARTEN_LEVELS = frozenset({"kindergarten", "nursery"})
 _SCHOOL_GRADES_RE = re.compile(
     # Not "swimming classes 2 times a week".
-    r"\bgrades?\s*\d|\bclass(?:es)?\s*\d+\b(?!\s*(?:times?|x|hours?|days?|minutes?|per|a\s+week)\b)"
+    r"\bgrades?\s*\d|\bclass(?:es)?\s*\d+\b(?!\s*(?:[-–]\s*\d+\s*)?(?:times?|x|hours?|days?|minutes?|per|a\s+week)\b)"
     r"|\b\d+(?:st|nd|rd|th)\s+class"
     r"|\b(?:\d+(?:st|nd|rd|th)|first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|eleventh|twelfth)"
     r"[- ]grade|\bIB\b|\bIGCSE\b|(?-i:\bA[- ]levels?\b)|\b(?:lower|upper) secondary"
@@ -509,10 +510,11 @@ def _school_grades_fact(fact: Mapping[str, Any]) -> bool:
 
 # The old extraction read a shared site's school pages for its kindergarten too (510: "IB
 # Diploma", "IELTS", "TOEFL" under the kindergarten's programmes). An item naming a school
-# grade, a school-leaving exam or diploma, or a language exam for teenagers is the school's.
+# grade, a school-leaving exam or diploma, or a language exam for teenagers is the school's;
+# a teacher's "Montessori diploma" is not.
 _SCHOOL_ONLY_ITEM_RE = re.compile(
     _SCHOOL_GRADES_RE.pattern
-    + r"|\bIELTS\b|\bTOEFL\b|\bSAT\b|\bdiploma|диплом(?!ир)|матур|\b\d+\.?\s*(?:-?(?:ви|ри|ти|ми)\s+)?клас\b",
+    + r"|(?-i:\bIELTS\b|\bTOEFL\b|\bSAT\b)|матур|\b\d+\.?\s*(?:-?(?:ви|ри|ти|ми)\s+)?клас\b",
     re.IGNORECASE,
 )
 # Where the old extraction keeps the lists a kindergarten page shows or its filters read.

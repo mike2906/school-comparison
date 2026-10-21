@@ -1175,6 +1175,7 @@ def test_an_exam_for_one_class_is_shown_as_an_exam_for_some_classes():
     for en in (
         "Entrance exam in maths. The class size is 22.",
         "Entrance exam in maths and English; students then choose one of two profiles.",
+        "Entrance exam for grade 8 classes in the Mathematics profile and the English profile.",
     ):
         assert _admission_fact(en, ["entrance_exam"], 8)["admission"] == ["entrance_exam"]
     # A school-wide exam row goes beside a grade where only some classes sit one.
@@ -1231,6 +1232,7 @@ def test_a_kindergarten_shows_no_school_programmes_from_the_old_extraction():
     programs = [
         "IB Diploma", "Cambridge English", "IELTS", "TOEFL", "Preparation for first grade",
         "Swimming classes 2 times a week", "Learning at a level suited to each child",
+        "Classes 2-3 times a week", "Sat & Sun workshops", "Montessori diploma teachers",
     ]
     attributes = {
         "extracted": {"programs": programs, "summary_source": {"canonical_tags": ["IB", "Montessori"]}},
@@ -1241,7 +1243,8 @@ def test_a_kindergarten_shows_no_school_programmes_from_the_old_extraction():
     _, localized = build_display_attributes(kindergarten)
     assert localized["en"]["special_programs"] == [
         "Cambridge English", "Preparation for first grade", "Swimming classes 2 times a week",
-        "Learning at a level suited to each child",
+        "Learning at a level suited to each child", "Classes 2-3 times a week", "Sat & Sun workshops",
+        "Montessori diploma teachers",
     ]
     assert localized["bg"]["special_programs"] == ["Кеймбридж", "Подготовка за 1. клас", "Дипломирани педагози", "4 класни стаи"]
     assert "ib_program" not in compute_filter_tags(kindergarten)["teaching_approach"]

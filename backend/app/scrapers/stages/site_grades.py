@@ -112,9 +112,9 @@ NURSERY = "nursery"
 _KINDERGARTEN_GROUPS = frozenset({"first", "second", "third", "preschool", NURSERY})
 _UNDER_THREE = r"(?:1(?:[.,]5)?|2|one|two)"
 _NURSERY_RE = re.compile(
-    # An age, not a time of day ("activities from 2 to 4 pm") or a family ("children of one
-    # family"): an age word, or a number with a year unit.
-    rf"\b(?:aged?|ages|age of)\s+{_UNDER_THREE}\b|\bchildren (?:of|from)\s+(?:1(?:[.,]5)?|2)\b(?!\s*famil)"
+    # An age, not a time of day ("children from 2 pm") or a family ("children of one family"):
+    # an age word, or a number with a year unit.
+    rf"\b(?:aged?|ages|age of)\s+{_UNDER_THREE}\b"
     rf"|\b{_UNDER_THREE}\s*(?:-|–|to)\s*\d\s*(?:-?\s*years?|-year-olds?|y\.?\s*o\b)"
     r"|\bfrom\s+(?:the\s+age\s+of\s+)?(?:[1-9]|[12]\d|3[0-5])\s+months\b"
     r"|\bnursery\s+groups?\b|\btoddler\s+groups?\b"
@@ -126,11 +126,11 @@ _NURSERY_RE = re.compile(
 def site_nursery(pricing: Iterable[Any], facts: Iterable[Any]) -> bool:
     """Whether the published site data says the kindergarten takes children under three."""
     for row in pricing:
+        if str(getattr(row.category, "value", row.category)) != "tuition":
+            continue  # "Swimming for ages 2-3" is an activity, not a group
         if any(_NURSERY_RE.search(str(label or "")) for label in _fee_labels(row)):
             return True
-    for fact in facts:
-        if getattr(fact, "rank", None) == "minor":
-            continue  # never shown, as in the schools' at_a_glance
+    for fact in facts:  # the published facts: minor ones never reach them
         text = getattr(fact, "text_i18n", None) or {}
         if any(_NURSERY_RE.search(str(text.get(lang) or "")) for lang in ("en", "bg")):
             return True
