@@ -228,6 +228,10 @@ async def test_re_reading_the_site_keeps_site_grades_bands(db_session):
         ("2-годишна програма по английски", False),
         ("Pick up children from 2 pm", False),
         ("Children from 1 September attend", False),
+        ("Children aged 2.7 to 7 are accepted if places are available", False),  # 330
+        ("The kindergarten has no nursery group and does not accept children born after 2024", False),  # 515
+        ("Nursery groups accept children from 1 year 6 months", True),
+        ("Children aged 1.6 to 3 in the nursery group", True),
     ],
 )
 def test_site_nursery_reads_an_age_under_three(text, nursery):
