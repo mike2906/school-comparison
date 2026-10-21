@@ -243,7 +243,7 @@ class TestSchoolsEndpoint:
 
     @pytest.mark.asyncio
     async def test_warm_cache_builds_the_default_list_filters_and_age_groups(
-        self, seeded_client, seeded_db, monkeypatch
+        self, seeded_client, seeded_db, monkeypatch, caplog
     ):
         from contextlib import asynccontextmanager
 
@@ -271,16 +271,24 @@ class TestSchoolsEndpoint:
             ("bg", "sofia", "preschool", None, None, True),
         }
         assert set(schools_router._filters_cache) == {("bg", "sofia")}
+        assert set(schools_router._search_index_cache) == {("bg", "sofia")}
+        assert set(schools_router._same_place_cache) == {("bg", "sofia")}
 
         # The requests the site makes are now cache hits.
-        async def fail(self, **kwargs):
+        async def fail(*args, **kwargs):
             raise AssertionError("served from the warm cache, not rebuilt")
 
         monkeypatch.setattr(SchoolService, "list_schools_filtered", fail)
         monkeypatch.setattr(SchoolService, "get_available_filters", fail)
+        monkeypatch.setattr(SchoolService, "search_index", fail)
+        monkeypatch.setattr(schools_router, "same_place_by_school", fail)
         assert len((await seeded_client.get("/schools?country_code=bg&city=sofia")).json()) == 3
         assert (await seeded_client.get("/schools?age_group=first")).status_code == 200
         assert (await seeded_client.get("/schools/filters")).status_code == 200
+        search = (await seeded_client.get("/schools/search?q=Happy")).json()
+        assert [d["name_i18n"]["en"] for d in search] == ["KG #1 Happy Childhood"]
+        assert (await seeded_client.get(f"/schools/{search[0]['id']}")).status_code == 200
+        assert "same_place failed" not in caplog.text  # the detail page swallows a failure
 
     @pytest.mark.asyncio
     async def test_list_schools_advanced_filters_are_not_cached(self, seeded_client):

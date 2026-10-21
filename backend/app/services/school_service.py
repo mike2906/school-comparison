@@ -338,24 +338,14 @@ class SchoolService:
 
         return {key: sorted(values) for key, values in categories.items()}
 
-    async def search_schools(
-        self,
-        search_query: str,
-        country_code: str = "bg",
-        city: Optional[str] = "sofia",
-        limit: int = 10,
-    ) -> list[School]:
-        """
-        Search schools by name (registry and public display names) or address.
+    async def search_index(
+        self, country_code: str = "bg", city: Optional[str] = "sofia"
+    ) -> dict[int, school_search.PreparedSchool]:
+        """The names and addresses name search matches against, for every listed school.
 
-        Matching and ranking rules (type abbreviations, "№"/ordinals, curated acronyms,
-        transliteration) live in app/utils/school_search.py. Display names go through
-        the same publication predicate as response serialization.
+        Building it projects every school's attributes, so the API keeps it cached
+        (`routers/schools.py`) instead of building it on each search.
         """
-        tokens = school_search.query_tokens(search_query)
-        if not tokens:
-            return []
-
         city_clause = self._city_clause(city)
         query = (
             select(
@@ -372,11 +362,14 @@ class SchoolService:
         )
         if city_clause is not None:
             query = query.where(city_clause)
+        rows = (await self.db.execute(query)).all()
+        # CPU work for every school: keep it off the event loop.
+        return await asyncio.to_thread(self._search_entries, rows)
 
+    @staticmethod
+    def _search_entries(rows) -> dict[int, school_search.PreparedSchool]:
         schools: dict[int, dict] = {}
-        for school_id, name_i18n, attributes, scrape_status, website_url, address_i18n in (
-            await self.db.execute(query)
-        ).all():
+        for school_id, name_i18n, attributes, scrape_status, website_url, address_i18n in rows:
             entry = schools.get(school_id)
             if entry is None:
                 name_i18n = name_i18n or {}
@@ -398,17 +391,50 @@ class SchoolService:
                 }
             entry["addresses"].extend((address_i18n or {}).values())
             entry["addresses"].extend(resolve_address_i18n(address_i18n).values())
+        return {school_id: school_search.PreparedSchool(**entry) for school_id, entry in schools.items()}
+
+    async def search_schools(
+        self,
+        search_query: str,
+        country_code: str = "bg",
+        city: Optional[str] = "sofia",
+        limit: int = 10,
+        index: Optional[dict[int, school_search.PreparedSchool]] = None,
+    ) -> list[School]:
+        """
+        Search schools by name (registry and public display names) or address.
+
+        Matching and ranking rules (type abbreviations, "№"/ordinals, curated acronyms,
+        transliteration) live in app/utils/school_search.py. Display names go through
+        the same publication predicate as response serialization. ``index`` is a cached
+        `search_index` for the same country and city; without one it is built here.
+        """
+        tokens = school_search.query_tokens(search_query)
+        if not tokens:
+            return []
+        if index is None:
+            index = await self.search_index(country_code, city)
 
         ranked: list[tuple[int, int, int]] = []
-        for school_id, entry in schools.items():
-            rank = school_search.rank_school(tokens, **entry)
+        for school_id, school in index.items():
+            rank = school_search.rank_prepared(tokens, school)
             if rank is not None:
-                ranked.append((rank, len(school_search.normalize(entry["registry_name"])), school_id))
+                ranked.append((rank, len(school.registry), school_id))
         matched_ids = [school_id for _, _, school_id in sorted(ranked)[:limit]]
         if not matched_ids:
             return []
 
-        result = await self.db.execute(self._list_query().where(School.id.in_(matched_ids)))
+        # The same scope as the index, on current rows: a cached index can be minutes old.
+        query = (
+            self._list_query()
+            .where(School.id.in_(matched_ids))
+            .where(School.country_code == country_code)
+            .where(self._has_listable_location(city))
+        )
+        city_clause = self._city_clause(city)
+        if city_clause is not None:
+            query = query.where(city_clause)
+        result = await self.db.execute(query)
         schools_by_id = {school.id: school for school in result.scalars().unique().all()}
         return [schools_by_id[school_id] for school_id in matched_ids if school_id in schools_by_id]
 

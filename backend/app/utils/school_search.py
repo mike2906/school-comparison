@@ -236,6 +236,17 @@ def query_tokens(query: str) -> list[str]:
     return normalized.split(" ") if normalized else []
 
 
+class PreparedSchool:
+    """A school's names and addresses normalised once, for ranking against many queries."""
+
+    __slots__ = ("registry", "names", "addresses")
+
+    def __init__(self, *, registry_name: object, names: Iterable[object], addresses: Iterable[object] = ()):
+        self.registry = normalize(registry_name)
+        self.names = [_Name(value) for value in names]
+        self.addresses = [_Name(value, saints=False) for value in addresses]
+
+
 def rank_school(
     tokens: list[str],
     *,
@@ -248,16 +259,19 @@ def rank_school(
     ``registry_name`` is name_i18n["bg"] (alias targets refer to it); ``names`` are
     every public name (registry and resolved, all languages).
     """
+    return rank_prepared(tokens, PreparedSchool(registry_name=registry_name, names=names, addresses=addresses))
+
+
+def rank_prepared(tokens: list[str], school: PreparedSchool) -> Optional[int]:
+    """`rank_school` for a school prepared once (the API's cached search index)."""
     if not tokens:
         return None
-    name_objs = [_Name(value) for value in names]
-    registry = normalize(registry_name)
-    for remainder in _alias_remainders(tokens, registry):
-        if not remainder or _tokens_rank(remainder, name_objs) is not None:
+    for remainder in _alias_remainders(tokens, school.registry):
+        if not remainder or _tokens_rank(remainder, school.names) is not None:
             return RANK_ALIAS
-    rank = _tokens_rank(tokens, name_objs)
+    rank = _tokens_rank(tokens, school.names)
     if rank is not None:
         return rank
-    if _tokens_rank(tokens, [_Name(value, saints=False) for value in addresses]) is not None:
+    if _tokens_rank(tokens, school.addresses) is not None:
         return RANK_ADDRESS
     return None

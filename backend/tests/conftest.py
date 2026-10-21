@@ -59,10 +59,22 @@ def frozen_today(monkeypatch):
 @pytest.fixture(autouse=True)
 def clear_school_list_cache():
     """Each test has its own database, so a cached list or filters response must not outlive the test."""
-    for state in (schools_router._list_cache, schools_router._filters_cache, schools_router._refreshing):
+    for state in (
+        schools_router._list_cache,
+        schools_router._filters_cache,
+        schools_router._search_index_cache,
+        schools_router._same_place_cache,
+        schools_router._refreshing,
+    ):
         state.clear()
     yield
-    for state in (schools_router._list_cache, schools_router._filters_cache, schools_router._refreshing):
+    for state in (
+        schools_router._list_cache,
+        schools_router._filters_cache,
+        schools_router._search_index_cache,
+        schools_router._same_place_cache,
+        schools_router._refreshing,
+    ):
         state.clear()
 
 
