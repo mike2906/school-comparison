@@ -15,8 +15,8 @@ school has more than one hidden location (which one moved is unclear).
 The site also settles a location by itself (``site_fixes``), shown or hidden: a site map
 point at the register point of the location's own address places a hidden one there, or
 moves a shown one pinned far away (ЧДГ Росица's "Кирил и Методий 70" was pinned in
-Оборище; the site maps the one in Иваняне); a shown location whose address is not in the
-register takes the register address the site names at our pin (ЧДГ Христо Ботев's "ул. 315
+Оборище; the site maps the one in Иваняне); a shown location whose address is no street and number or
+block at all takes the register address the site names at our pin (ЧДГ Христо Ботев's "ул. 315
 - III м. р." is "ул. Петър Бонев 3"). Official and hand pins are never changed. No model
 calls. Default is a dry run. Sofia only. Run after ``register-pins``.
 """
@@ -104,7 +104,7 @@ def site_fixes(
     """``{location id: (outcome, register point)}`` for the locations the site settles by
     itself: "placed" or "moved" (a site map point at the register point of the location's
     own address; moved when a shown pin is over ``ELSEWHERE_M`` from it), "readdressed" (a
-    shown location whose address is not in the register, at a register address the site
+    shown location whose address is no street and number or block, at a register address the site
     names within ``NEAR_M`` of our pin)."""
     fixes: dict[int, tuple[str, register_lib.RegisterPoint]] = {}
     for location in locations:
@@ -125,7 +125,12 @@ def site_fixes(
                 fix = ("placed", candidate)
             elif _distance_m((location.lat, location.lng), (candidate.lat, candidate.lng)) > ELSEWHERE_M:
                 fix = ("moved", candidate)
-        elif not hidden and register_lib.match(ours, register).outcome == "no_address":
+        elif (
+            not hidden
+            and not ours.near  # "до бл. 12" is a real address beside the register's
+            # Not an address at all; a well-formed one the register lacks may be new and right.
+            and register_lib.match(ours, register).outcome == "no_address"
+        ):
             at_pin = site_addresses([(location.lat, location.lng)], page, register)
             if len(at_pin) == 1:
                 ((candidate, _),) = at_pin.values()
@@ -211,8 +216,9 @@ async def run_site_address(
     async def _run(fetch: Fetch, fetch_script: Optional[Fetch]) -> list[dict[str, Any]]:
         nonlocal register
         results: list[dict[str, Any]] = []
+        read = 0  # schools whose site was read
         for school_id in ids:
-            if limit is not None and len({r["school_id"] for r in results}) >= limit:
+            if limit is not None and read >= limit:
                 break
             school = await db.get(School, school_id)
             locations = (
@@ -235,6 +241,7 @@ async def run_site_address(
                 }
 
             rows = [_row(loc) for loc in hidden]
+            read += 1
             try:
                 site = await read_site(school, fetch, fetch_script=fetch_script, bounds=bounds)
             except Exception:
@@ -276,7 +283,7 @@ async def run_site_address(
             shown = [
                 (fixes[loc.id][1].lat, fixes[loc.id][1].lng) if loc.id in fixes else (loc.lat, loc.lng)
                 for loc in locations
-                if (loc.id in fixes or not needs_pin(loc)) and loc.lat is not None
+                if loc.id in fixes or (not needs_pin(loc) and loc.lat is not None)
             ]
             outcome, extra = "placed", {}
             if not found:

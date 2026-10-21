@@ -650,3 +650,10 @@ def test_a_quarter_named_with_a_branch_address_counts_as_the_city_on_a_sofia_onl
     payload = extract([SitePage("https://nemo-bg.com/contacti/", other, "contact")], "https://nemo-bg.com/", "kindergarten")
     skipped = {c["address"]: c["reason"] for c in payload["skipped"]}
     assert skipped['кв. Бояна, бул. "Александър Пушкин" 63'] == "city_not_stated"
+
+
+def test_only_sofia_quarters_and_villages_name_the_city():
+    from app.scrapers.campus_sync import _QUARTER_RE
+
+    assert _QUARTER_RE.search("жк Младост 1, бл. 12") and _QUARTER_RE.search("с. Иваняне, ул. Х 5")
+    assert not _QUARTER_RE.search("с. Гурмазово, ул. Х 5")

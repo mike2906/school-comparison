@@ -240,9 +240,20 @@ def addresses_equivalent(first: str, second: str) -> bool:
     return False
 
 
-# "кв. Бояна", "ж.к. Люлин 3", "с. Иваняне", "м. Гърдова глава": a quarter or village named
-# with its address. Sofia branch addresses often give it in place of the city.
-_QUARTER_RE = re.compile(r"(?<![^\W\d_])(?i:кв|ж\.?\s*к|с|м)\.\s*[А-Я]")
+# "кв. Бояна", "ж.к. Люлин 3", "м. Гърдова глава", "с. Иваняне": a quarter or village named
+# with its address. Sofia branch addresses often give it in place of the city. Only Sofia's
+# own villages (Столична община, as in its address register) count: "с. Гурмазово" is not.
+_SOFIA_VILLAGES = (
+    "Балша", "Бистрица", "Бусманци", "Владая", "Войнеговци", "Волуяк", "Герман", "Горни Богров",
+    "Доброславци", "Долни Богров", "Долни Пасарел", "Железница", "Желява", "Житен", "Иваняне",
+    "Казичене", "Клисура", "Кокаляне", "Кривина", "Кубратово", "Кътина", "Лозен", "Локорско",
+    "Мало Бучино", "Мировяне", "Мрамор", "Мърчаево", "Негован", "Панчарево", "Плана", "Подгумер",
+    "Световрачене", "Чепинци", "Яна",
+)
+_QUARTER_RE = re.compile(
+    r"(?<![^\W\d_])(?:(?i:кв|ж\.?\s*к|жк)\.?\s*|м\.\s*)[А-Я]"
+    rf"|(?<![^\W\d_])с\.\s*(?:{'|'.join(_SOFIA_VILLAGES)})(?![^\W\d_])"
+)
 
 
 def _only_our_city(text: str, city: str) -> bool:
