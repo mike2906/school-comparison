@@ -47,6 +47,9 @@ _PERIOD_ALIASES: dict[str, PricePeriod] = {
     "term": PricePeriod.TERM,
     "semester": PricePeriod.SEMESTER,
     "семестър": PricePeriod.SEMESTER,
+    "daily": PricePeriod.DAILY,
+    "weekly": PricePeriod.WEEKLY,
+    "hourly": PricePeriod.HOURLY,
 }
 
 _PROVIDER_ERROR_MARKERS = (

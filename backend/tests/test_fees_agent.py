@@ -2171,20 +2171,19 @@ def test_lengths_and_ages_name_no_period(evidence, period):
     assert result.fee.period is None, result.checks
 
 
-
 @pytest.mark.parametrize(
-    ("line", "amount", "period"),
+    ("category", "line", "amount", "period"),
     [
-        ("Седмична такса – полудневна база (лятно училище) 170", 170, PricePeriod.WEEKLY),  # 541
-        ("Храна – 8 Евро за присъствен ден", 8, PricePeriod.DAILY),  # 569
-        ("Индивидуален урок 30 евро на час", 30, PricePeriod.HOURLY),
+        (PriceCategory.CAMP, "Седмична такса – полудневна база (лятно училище) 170", 170, PricePeriod.WEEKLY),  # 541
+        (PriceCategory.FOOD, "Храна – 8 Евро за присъствен ден", 8, PricePeriod.DAILY),  # 569
+        (PriceCategory.EXTRACURRICULAR, "Индивидуален урок 30 евро на час", 30, PricePeriod.HOURLY),
     ],
-)
-def test_daily_weekly_and_hourly_fees_are_stored(line, amount, period):
+)  # fmt: skip
+def test_daily_weekly_and_hourly_fees_are_stored(category, line, amount, period):
     """Their periods were not among the stored-period aliases, so the row was dropped unseen."""
     school = School(id=1, name_i18n={}, country_code="bg", school_type="private", education_level="primary")
     page = SourcePage(id=-1, school_id=1, scrape_type=ScrapeType.WEBSITE, source_url=URL)
-    result = check_fee(fee(PriceCategory.CAMP, line, amount=amount, period=period), line)
+    result = check_fee(fee(category, line, amount=amount, period=period), line)
     rows, sources = fees_agent._build_rows(school, [(result, page)])
     assert [(float(r.amount), r.period) for r in rows] == [(amount, period)]
-    assert [s.field_key for s in sources] == [f"pricing.camp.{period.value}"]
+    assert [s.field_key for s in sources] == [f"pricing.{category.value}.{period.value}"]
