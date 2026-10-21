@@ -14,6 +14,7 @@ from app.scrapers.extraction import price_lines, text_values
 from app.scrapers.price_evidence import (
     RULE_EXPIRED,
     RULE_LEVEL,
+    RULE_OFFER_ENDS,
     RULE_PERIOD_MISSING,
     RULE_SUPERSEDED,
     PriceRow,
@@ -535,3 +536,46 @@ def test_a_dated_fee_with_no_later_price_stands(page):
     assert RULE_SUPERSEDED not in [
         f.rule for f in check_price_row(row(475.5, period="MONTHLY"), page, "kindergarten", today=TODAY)
     ]
+
+
+# --- 2026-10-21 round 6 (625) -----------------------------------------------------------------
+
+
+PAGE_625 = (
+    "# Запишете Вашето дете до **15-ти октомври** и се възползвайте от промоционална месечна такса "
+    "в размер на **550 лв.** за първите 3 месеца.\n"
+    "### 1330лв\n#### 680 €\n"
+)
+
+
+def test_625_a_promotion_with_a_yearless_deadline_has_expired():
+    promo = row(550, period="MONTHLY", currency="BGN")
+    expired = check_price_row(promo, PAGE_625, "kindergarten", today=datetime.date(2026, 10, 21))
+    assert [f.rule for f in expired] == [RULE_EXPIRED]
+    running = [f.rule for f in check_price_row(promo, PAGE_625, "kindergarten", today=datetime.date(2026, 10, 1))]
+    assert RULE_EXPIRED not in running and RULE_OFFER_ENDS in running
+    fee = row(680, period="MONTHLY")
+    assert check_price_row(fee, PAGE_625, "kindergarten", today=datetime.date(2026, 10, 21)) == []
+
+
+@pytest.mark.parametrize(
+    "today,expected",
+    [
+        (datetime.date(2026, 7, 1), datetime.date(2026, 9, 15)),  # still to come this summer
+        (datetime.date(2026, 10, 21), datetime.date(2026, 9, 15)),  # just passed
+        (datetime.date(2027, 2, 1), datetime.date(2026, 9, 15)),  # passed, not next autumn's
+    ],
+)
+def test_a_yearless_offer_deadline_is_the_nearest_such_day(today, expected):
+    assert offer_end("Отстъпка за договори, сключени до 15 септември\n5500 €", today) == expected
+
+
+def test_an_ordinal_day_with_a_year_and_a_word_after_a_day_number():
+    assert offer_end("Цени за договори, сключени до 15-ти октомври 2025\n5500 €") == datetime.date(2025, 10, 15)
+    assert offer_end("Early bird price, offer valid until 2 mayors sign\n5500 EUR") is None
+
+
+def test_a_yearless_due_date_or_a_dated_deadline_is_not_read_as_yearless():
+    assert offer_end("I вноска, платима до 15 септември\n2000 €", datetime.date(2026, 10, 21)) is None
+    dated = offer_end("Цени за договори, сключени до 15 май 2026\n5500 €", datetime.date(2026, 10, 21))
+    assert dated == datetime.date(2026, 5, 15)

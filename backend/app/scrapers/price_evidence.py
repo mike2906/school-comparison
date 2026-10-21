@@ -407,13 +407,18 @@ _MONTHS = {
 }  # fmt: skip
 _DEADLINE_RE = re.compile(
     r"(?:\bдо|\buntil|\bby|\bbefore)\s+(?:(\d{1,2})\s*[./]\s*(\d{1,2})\s*[./]\s*(20\d{2})"
-    rf"|(\d{{1,2}})\s+({'|'.join(_MONTHS)})\s+(20\d{{2}}))"
+    rf"|(\d{{1,2}})(?:-?(?:ви|ри|ти|ми))?\s+({'|'.join(_MONTHS)})\s+(20\d{{2}})"
+    # No year (625's "Запишете Вашето дете до 15-ти октомври"): the nearest such day.
+    rf"|(\d{{1,2}})(?:-?(?:ви|ри|ти|ми))?\s+({'|'.join(_MONTHS)})(?!\w)(?![\s.,]*20\d{{2}}))"
 )
 _OFFER_WORDS_RE = re.compile(
     r"записани|сключ|договор|в срок|ранн|отстъпк|намален|промо|цени\b|цена\b|валидн|важи"
     r"|early|contract|discount|offer|valid|price"
 )
 _OFFER_WINDOW = 60  # characters before "до <date>" that say what ends then
+# A promotional price named after its date: "до 15-ти октомври и се възползвайте от
+# промоционална месечна такса" (625).
+_PROMO_AFTER_RE = re.compile(r"промоц|promotional")
 _DUE_DATE_RE = re.compile(r"платим|плаща|вноск|заплат|падеж|\bpaid\b|\bpay(?:able|ment)?\b|\bdue\b|instal")
 # After the date: a later price ("след това 8 500 €"), or a percentage off the price.
 _AFTER_RE = re.compile(r"\bслед\b|\bafter\b|thereafter|%")
@@ -842,7 +847,14 @@ def label_is_another_institutions(
     return bool(re.search(_KINDERGARTEN_NAME, text)) or not _only_school_ages(text)
 
 
-def offer_end(context: str) -> Optional[datetime.date]:
+def _date_or_far(year: int, month: int, day: int) -> datetime.date:
+    try:
+        return datetime.date(year, month, day)
+    except ValueError:  # 29 February, or a day the month lacks
+        return datetime.date.max
+
+
+def offer_end(context: str, today: datetime.date | None = None) -> Optional[datetime.date]:
     """The last day of the offer an amount's words make, past or not, or None.
 
     Each "до <date>" is read with the words just before it. They must speak of an offer
@@ -851,8 +863,12 @@ def offer_end(context: str) -> Optional[datetime.date]:
     falls due, not the last day it is charged. A date followed by "след" ("до 31.05.2026,
     след това 8 500 €") ends the offer before the price that replaced it, and one followed
     by a percentage ("до 31.05.2026 г. отстъпка 10%"), or preceded by one ("Отстъпка 5%
-    при записване до 31.05.2026"), is a discount on the price shown.
+    при записване до 31.05.2026"), is a discount on the price shown. A day and month name
+    with no year is the one nearest ``today``: "до 15 октомври" has passed on 21 October
+    and is still to come in July.
     """
+    context = _EMPHASIS_RE.sub("", context)
+    today = today or datetime.date.today()
     previous_end = 0
     deadlines = []
     for match in _DEADLINE_RE.finditer(context):
@@ -862,16 +878,21 @@ def offer_end(context: str) -> Optional[datetime.date]:
         if (
             _DUE_DATE_RE.search(before)
             or _AFTER_RE.search(after)
-            or not _OFFER_WORDS_RE.search(before)
+            or not (_OFFER_WORDS_RE.search(before) or _PROMO_AFTER_RE.search(after))
             or (_ENROLMENT_END_RE.search(before) and "в срок" not in before)
             or _DISCOUNT_NOTE_RE.search(before)
         ):
             continue
-        day, month, year = (
-            (match.group(1), match.group(2), match.group(3))
-            if match.group(1)
-            else (match.group(4), _MONTHS[match.group(5)], match.group(6))
-        )
+        if match.group(1):
+            day, month, year = match.group(1), match.group(2), match.group(3)
+        elif match.group(4):
+            day, month, year = match.group(4), _MONTHS[match.group(5)], match.group(6)
+        else:
+            day, month = match.group(7), _MONTHS[match.group(8)]
+            year = min(
+                (today.year - 1, today.year, today.year + 1),
+                key=lambda year: abs((_date_or_far(year, month, int(day)) - today).days),
+            )
         try:
             deadlines.append(datetime.date(int(year), int(month), int(day)))
         except ValueError:
@@ -1166,7 +1187,7 @@ def check_price_row(
     # note below it ("Ранно записване до 31.03. - 10% отстъпка" is a discount on the price
     # above, which stays).
     # Every occurrence must be a dated offer; the row ends with the last of them.
-    ends = [offer_end(f"{_column_terms(text, span)}\n{amount_segment(text, span)}") for span in chosen]
+    ends = [offer_end(f"{_column_terms(text, span)}\n{amount_segment(text, span)}", today) for span in chosen]
     if all(ends):
         end = max(ends)
         if end < (today or datetime.date.today()):
