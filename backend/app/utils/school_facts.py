@@ -159,7 +159,9 @@ def _labels(fact: Mapping[str, Any]) -> dict[str, Any]:
 # the grade it read (7), which shows as "Grade 7: Entrance exam" and gave site-grades a band
 # the school does not teach.
 _AFTER_GRADE_RE = re.compile(
-    r"\bafter\s+(?:the\s+)?(?:(?:grade|class)\s+(?P<a>\d{1,2})\b"
+    # Admission or an exam "after" a grade, not "after grade 7 pupils continue to our high school".
+    r"\b(?:admission|admitted|entry|appl\w+|enrol\w*|exams?|tests?)\s+after\s+(?:the\s+)?"
+    r"(?:(?:grades?|class(?:es)?)\s+(?P<a>\d{1,2})\b"
     # "after 4th, 5th, 6th or 7th grade": the first of the list.
     r"|(?P<b>\d{1,2})(?:st|nd|rd|th)?\.?(?=(?:\s*(?:,|or|and)\s*\d{1,2}(?:st|nd|rd|th)?\.?)*\s+(?:grade|class)))"
     r"|\bexams?\s+for\s+grades?\s+(?P<c>[47])\s+and\s+[47]\b",
@@ -172,7 +174,7 @@ def _admission_grades(fact: Mapping[str, Any]) -> dict[str, Optional[int]]:
     match = _AFTER_GRADE_RE.search(_english(fact))
     finished = next((int(g) for g in (match.groups() if match else ()) if g), None)
     if first is not None and first == finished and first < 12:
-        first, last = first + 1, (last + 1 if last is not None and last < 12 else None)
+        first, last = first + 1, (min(last + 1, 12) if last is not None else None)
     return {"admission_grade": first, "admission_grade_to": last}
 
 

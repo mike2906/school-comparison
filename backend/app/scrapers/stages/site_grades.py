@@ -119,7 +119,7 @@ _NURSERY_RE = re.compile(
     rf"|\b{_UNDER_THREE}\s*(?:-|–|to)\s*\d\s*(?:-?\s*years?|-year-olds?|y\.?\s*o\b)"
     r"|\bfrom\s+(?:the\s+age\s+of\s+)?(?:[1-9]|[12]\d|3[0-5])\s+months\b"
     r"|\bnursery\s+groups?\b|\btoddler\s+groups?\b"
-    r"|\bот\s+(?:1[.,]5|2)\s*(?:до|-|–)\s*\d\s*г|\b(?:1[.,]5|2)-годишн\w*\s+(?:деца|дете)|ясл",
+    r"|\bот\s+(?:1[.,]\d|2)\s*(?:до|-|–)\s*\d\s*г|\b(?:1[.,]\d|2)-годишн\w*\s+(?:деца|дете)|ясл",
     re.IGNORECASE,
 )
 
@@ -128,8 +128,8 @@ _NURSERY_RE = re.compile(
 # it names elsewhere. Only a negation of the nursery itself, not one nearby ("we do not
 # charge a fee, nursery groups from 18 months").
 _NO_NURSERY_RE = re.compile(
-    r"\b(?:no|without)\s+(?:a\s+)?(?:nursery|toddler)\b"
-    r"|\b(?:does\s+not|doesn't|do\s+not|don't)\s+(?:have|run|offer)\s+(?:a\s+)?(?:nursery|toddler)\b"
+    r"\b(?:no|without)\s+(?:a\s+)?(?:nursery|toddler)\s+groups?\b"
+    r"|\b(?:does\s+not|doesn't|do\s+not|don't)\s+(?:have|run|offer)\s+(?:a\s+)?(?:nursery|toddler)\s+groups?\b"
     r"|\b(?:няма|нямаме|без)\s+ясл|не\s+(?:разполага|разполагаме)\s+с\s+ясл",
     re.IGNORECASE,
 )
@@ -183,11 +183,17 @@ def _tagged(tags: Iterable[str], prefix: str) -> set[str]:
 async def _same_site_school_bands(db: AsyncSession, country: str):
     """``(school_id, website_url) -> bands`` the other school-level institutions on that site teach."""
     from app.models import SchoolLocation
-    from app.scrapers.shared_site_check import level_family, site_id
+    from app.scrapers.shared_site_check import level_family, site_group_key
 
     rows = (
         await db.execute(
-            select(School.id, School.website_url, School.education_level, SchoolLocationAgeGroupShift.age_group)
+            select(
+                School.id,
+                School.website_url,
+                School.education_level,
+                SchoolLocation.location_tags,
+                SchoolLocationAgeGroupShift.age_group,
+            )
             .join(SchoolLocation, SchoolLocation.school_id == School.id)
             .join(SchoolLocationAgeGroupShift, SchoolLocationAgeGroupShift.location_id == SchoolLocation.id)
             .where(School.country_code == country, School.website_url.isnot(None))
@@ -195,11 +201,20 @@ async def _same_site_school_bands(db: AsyncSession, country: str):
     ).all()
     by_site: dict[str, dict[int, set[str]]] = {}
     for row in rows:
-        if level_family(row.education_level) == "school" and row.age_group in BANDS:
-            by_site.setdefault(site_id(row.website_url), {}).setdefault(int(row.id), set()).add(row.age_group)
+        tags = row.location_tags or []
+        # The register's bands only: a band a site added to the sibling would cancel ours and
+        # ours its, a different answer every run.
+        if (
+            level_family(row.education_level) == "school"
+            and row.age_group in BANDS
+            and SITE_GRADES_ADDED_PREFIX + row.age_group not in tags
+            and AGE_GROUP_TAG_PREFIX + row.age_group not in tags
+            and (key := site_group_key(row.website_url))
+        ):
+            by_site.setdefault(key, {}).setdefault(int(row.id), set()).add(row.age_group)
 
     def bands(school_id: int, website_url: Optional[str]) -> set[str]:
-        others = by_site.get(site_id(website_url), {}) if website_url else {}
+        others = by_site.get(site_group_key(website_url) or "", {})
         return set().union(*(b for sid, b in others.items() if sid != school_id))
 
     return bands

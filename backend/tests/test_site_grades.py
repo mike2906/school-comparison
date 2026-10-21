@@ -235,6 +235,8 @@ async def test_re_reading_the_site_keeps_site_grades_bands(db_session):
         ("The kindergarten has no nursery group and does not accept children born after 2024", False),  # 515
         ("Детската градина няма яслена група", False),
         ("Нямаме яслена група", False),
+        ("Nursery groups take children from 18 months. There is no nursery fee for siblings", True),
+        ("Деца от 1,6 до 3 г. в яслата", True),
         ("We do not charge an enrolment fee; nursery groups take children from 18 months", True),
         ("Kindergarten No 12 has a nursery group for children aged 1-3", True),
         ("Accepts children aged 1.6 to 3", True),
@@ -310,3 +312,13 @@ async def test_a_band_a_same_site_school_teaches_is_not_added(db_session):
     with patch.object(stage, "site_grades", return_value=({5, 8, 11}, None)):
         report = await stage.run_site_grades(db_session, school_ids=[primary_id])
     assert report["changes"] == []
+
+    # A band site-grades added to the sibling is not the sibling's register band: no flip-flop.
+    gymnasium = (await db_session.execute(
+        select(SchoolLocation).where(SchoolLocation.school_id != primary_id)
+    )).scalar_one()
+    gymnasium.location_tags = [SITE_GRADES_ADDED_PREFIX + "grade_8_12"]
+    await db_session.commit()
+    with patch.object(stage, "site_grades", return_value=({8}, None)):
+        report = await stage.run_site_grades(db_session, school_ids=[primary_id])
+    assert report["changes"][0]["add"] == ["grade_8_12"]

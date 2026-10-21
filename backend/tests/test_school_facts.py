@@ -1264,6 +1264,9 @@ def test_a_kindergarten_shows_no_school_programmes_from_the_old_extraction():
         ("A third entrance exam for grades 4 and 7 is held on 28 June", 4, 7, (5, 8)),  # 517
         ("Admission to grade 7 is by entrance exam", 7, None, (7, None)),
         ("Admission after grade 7; places in grade 8 are limited", 8, None, (8, None)),  # already the entry grade
+        ("Admission after grades 4 and 7 is by entrance exam", 4, 7, (5, 8)),
+        ("Admission after grade 7 to grades 8-12", 7, 12, (8, 12)),
+        ("Admission to grade 7 is by interview; after grade 7 pupils continue to our high school", 7, None, (7, None)),
     ],
 )
 def test_admission_after_a_grade_is_for_the_next_grade(en, grade, grade_to, expected):
