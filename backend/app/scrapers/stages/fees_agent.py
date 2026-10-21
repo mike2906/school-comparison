@@ -58,6 +58,7 @@ from app.scrapers.extraction.agent_fees import (
     check_discount,
     check_fee,
     fee_amounts,
+    names_deposit,
     number_spans,
     page_numbers,
     read_amounts,
@@ -764,6 +765,8 @@ def _build_rows(
                     "installments": fee.installments,
                     "payment_options": [option.model_dump(exclude_none=True) for option in fee.payment_options],
                     "notes": fee.notes,
+                    # A deposit is listed apart from the fees: it is returned or taken off a later one.
+                    **({"deposit": True} if names_deposit(fee) else {}),
                     # The site's words in English for the English page; the columns keep the site's own.
                     **{key: value for key, value in english.items() if value},
                 },

@@ -5,7 +5,7 @@ import { sharedPriceSource, sourceSiteName } from '../../utils/priceSources'
 import { groupPricingByCategory } from './helpers'
 import { formatAmount } from '../../utils/format'
 import PriceSource from './PriceSource'
-import { pricePeriod, periodUnknown, rowAgeGroupKeys, splitRowsForAgeGroup } from '../../utils/priceRows'
+import { priceCategory, pricePeriod, periodUnknown, rowAgeGroupKeys, splitRowsForAgeGroup } from '../../utils/priceRows'
 import { planNameBeside, textLang } from '../../utils/priceLabels'
 import { paymentOptionTexts } from '../../utils/paymentOptions'
 import { feeDiscountLines } from '../../utils/feeDiscounts'
@@ -57,7 +57,7 @@ function PricingSection({ pricing, discounts, ageGroup = null }) {
       <div key={price.id} className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3 p-4 bg-neutral-50 rounded-lg border border-neutral-200">
         <div className="flex-1 min-w-0 space-y-1">
           <div className="font-medium text-neutral-900 break-words" lang={textLang(planName, i18n.language)}>
-            {planName || t(`pricing.${price.category}`)}
+            {planName || t(`pricing.${priceCategory(price)}`)}
           </div>
           {ageGroupLabel && (
             <div className="text-sm text-neutral-500 break-words" lang={textLang(ageGroupLabel, i18n.language)}>{ageGroupLabel}</div>

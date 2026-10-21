@@ -29,6 +29,7 @@ from app.scrapers.extraction.agent_fees import (
     AgentFee,
     PaymentOption,
     check_fee,
+    names_deposit,
     page_numbers,
 )
 from app.scrapers.stages import fee_check, fees_agent
@@ -269,6 +270,35 @@ def test_deposit_filed_as_registration_publishes():
         fee(PriceCategory.REGISTRATION, page, amount=475.5, period=PricePeriod.ONE_TIME, label="депозит"), page
     )
     assert published(result) and result.fee.period is PricePeriod.ONE_TIME
+
+
+@pytest.mark.parametrize(
+    ("line", "amount", "label", "deposit"),
+    [
+        # 574, 514, 351, 185: the word before the amount, or the fee's own label.
+        ("При записване се заплаща еднократен депозит от 590.00 €, който се приспада от последния месец.", 590, "такса", True),
+        ("еднократен възстановим депозит за нови деца във Валдорфската детска градина: **400****евро**", 400, "такса", True),
+        ("Първоначален Депозит в размер на 600€ се заплаща при подписване на Договора;", 600, "такса", True),
+        ("Ако желаете да запазите своето място при нас се заплаща капаро в размер на 150€", 150, "такса", True),
+        ("Заплаща се при подписване на договора: 300 €", 300, "Депозит", True),
+        # Only the amount the word stands before: the enrolment fee on the deposit's line is a fee.
+        ("Такса за записване 200 €, депозит 500 €", 200, "Такса за записване", False),
+        ("Такса за записване 200 €, депозит 500 €", 500, "депозит", True),
+        ("Такса записване: 250 €", 250, "Такса записване", False),
+    ],
+)
+def test_a_deposit_is_marked_apart_from_the_fees(line, amount, label, deposit):
+    school = School(id=1, name_i18n={}, country_code="bg", school_type="private", education_level="kindergarten")
+    page = SourcePage(id=-1, school_id=1, scrape_type=ScrapeType.WEBSITE, source_url=URL)
+    result = check_fee(fee(PriceCategory.REGISTRATION, line, amount=amount, period=PricePeriod.ONE_TIME, label=label), line)
+    rows, _ = fees_agent._build_rows(school, [(result, page)])
+    assert [bool(row.pricing_context.get("deposit")) for row in rows] == [deposit]
+
+
+def test_a_deposit_word_does_not_mark_tuition():
+    line = "Месечна такса 590 €, депозит в размер на една месечна такса"
+    result = check_fee(fee(PriceCategory.TUITION, line, amount=590, period=PricePeriod.MONTHLY), line)
+    assert not names_deposit(result.fee)
 
 
 @pytest.mark.parametrize(
@@ -2191,3 +2221,10 @@ def test_daily_weekly_and_hourly_fees_are_stored(category, line, amount, period)
     rows, sources = fees_agent._build_rows(school, [(result, page)])
     assert [(float(r.amount), r.period) for r in rows] == [(amount, period)]
     assert [s.field_key for s in sources] == [f"pricing.{category.value}.{period.value}"]
+
+
+def test_the_deposit_mark_reaches_the_response_and_the_evidence_does_not():
+    from app.schemas.pricing import PricingContextResponse
+
+    context = PricingContextResponse.model_validate({"deposit": True, "evidence": "депозит от 590.00 €"}).model_dump()
+    assert context["deposit"] is True and "evidence" not in context

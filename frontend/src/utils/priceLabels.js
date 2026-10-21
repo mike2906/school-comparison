@@ -3,6 +3,7 @@
 // stage) are shown in the page language; other text in the page language's translation when
 // the API has one, else as written and marked with its language.
 import { gradeBandLabel, gradesInText, gradesNamedIn, parseGradeBand } from './gradeBand.js'
+import { priceCategory } from './priceRows.js'
 
 const LANGUAGES = ['bg', 'en']
 
@@ -60,7 +61,7 @@ export function planNameLabel(price, t, language) {
   if (!raw) return null
   const shown = websiteWords(price, 'plan_name', language)
   const names = [normalize(raw), normalize(shown)]
-  if (price.category && LANGUAGES.some(lng => names.includes(normalize(t(`pricing.${price.category}`, { lng }))))) return null
+  if (price.category && LANGUAGES.some(lng => names.includes(normalize(t(`pricing.${priceCategory(price)}`, { lng }))))) return null
   return stageLabel(raw, t) || gradesOnlyLabel(raw, t) || shown
 }
 

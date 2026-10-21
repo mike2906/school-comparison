@@ -100,6 +100,10 @@ For one school, with its `website_url`:
        not `registration`;
      - a range, unless the line joins its two ends with a range marker (`–`, `от … до`, to).
        Two fees in one table row are not a range.
+   - **Deposits** (2026-10-21): a registration fee named a deposit (`депозит`, `капаро`,
+     deposit), by its label or by the words just before its amount, is stored with
+     `pricing_context.deposit`, and the page lists it under "Депозит" / "Deposit", not as a
+     registration fee: it is returned or taken off a later fee (185, 351, 514, 574).
    - **0.9** for everything else that passes step 3.
 
    The amount check in step 3 only guards against invented numbers. On the fresh sample, every

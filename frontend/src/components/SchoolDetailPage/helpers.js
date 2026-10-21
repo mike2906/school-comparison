@@ -8,6 +8,7 @@ import {
 } from '../../utils/nvo'
 import { getCanonicalAmenityFlags } from '../../utils/schoolAttributes'
 import { PRICE_CATEGORY_ORDER } from '../../utils/pricing'
+import { priceCategory } from '../../utils/priceRows'
 
 const SOURCE_BADGE_COLORS = {
   official: 'bg-emerald-100 text-emerald-700 border-emerald-300',
@@ -30,7 +31,8 @@ export function getNvoDetail(school, t, ageGroup = null) {
 export function groupPricingByCategory(pricing) {
   const grouped = Object.fromEntries(PRICE_CATEGORY_ORDER.map(category => [category, []]))
   pricing.forEach(item => {
-    grouped[grouped[item.category] ? item.category : 'other'].push(item)
+    const category = priceCategory(item)
+    grouped[grouped[category] ? category : 'other'].push(item)
   })
   return grouped
 }

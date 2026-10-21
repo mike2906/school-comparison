@@ -40,6 +40,7 @@ from app.scrapers.price_evidence import (
     RULE_PERIOD_CONFLICT,
     RULE_PERIOD_MISSING,
     RULE_PERIOD_UNFIT,
+    RULE_SUPERSEDED,
     PriceRow,
     check_price_row,
     name_key,
@@ -386,6 +387,7 @@ _PRICE_EVIDENCE_ERROR_CODES = {
     RULE_DEPOSIT: "pricing_deposit_as_tuition",
     RULE_INSTALLMENT: "pricing_installment_as_tuition",
     RULE_EXPIRED: "pricing_offer_expired",
+    RULE_SUPERSEDED: "pricing_superseded",
     RULE_PERIOD_UNFIT: "pricing_period_unfit_for_category",
 }
 

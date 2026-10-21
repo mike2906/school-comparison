@@ -465,6 +465,15 @@ test('sortByCategory: tuition first, then the listing order, unknown categories 
   assert.deepEqual(sortByCategory(rows).map(r => r.id), [2, 4, 5, 1, 3])
 })
 
+test('sortByCategory: a deposit comes after the registration fees, before food', () => {
+  const rows = [
+    row({ id: 1, category: 'food' }),
+    row({ id: 2, category: 'registration', pricing_context: { deposit: true } }),
+    row({ id: 3, category: 'registration' }),
+  ]
+  assert.deepEqual(sortByCategory(rows).map(r => r.id), [3, 2, 1])
+})
+
 // Buditel-like: this year's fee and next year's, as the API dates them in October 2026.
 const OCTOBER = new Date(2026, 9, 11)
 const SEPTEMBER = new Date(2026, 8, 15)

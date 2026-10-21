@@ -1,6 +1,6 @@
 import { intlLocale } from './format.js'
 import { gradeBandLabel, gradeRangeInText, gradesInText, gradesNamedIn, rowGradeBand } from './gradeBand.js'
-import { isClosedGroupFee, isOnePayment, pricePeriod, priceTerms, rowAgeGroupKeys, rowsForAgeGroup } from './priceRows.js'
+import { isClosedGroupFee, isOnePayment, priceCategory, pricePeriod, priceTerms, rowAgeGroupKeys, rowsForAgeGroup } from './priceRows.js'
 import { planNameLabel, stageLabel, websiteWords } from './priceLabels.js'
 
 /**
@@ -164,11 +164,12 @@ export function groupPricingByAcademicYear(pricing = [], { today = new Date() } 
   })
 }
 
-// Every category the API sends, in the order fees are listed (tuition first), then a
-// catch-all.
+// Every category the API sends, and the deposits listed apart from registration fees
+// (`priceCategory`), in the order fees are listed (tuition first), then a catch-all.
 export const PRICE_CATEGORY_ORDER = [
   'tuition',
   'registration',
+  'deposit',
   'food',
   'transport',
   'extended_day',
@@ -183,7 +184,7 @@ export const PRICE_CATEGORY_ORDER = [
 /** Rows in listing order by category, tuition first; the order within a category kept. */
 export function sortByCategory(rows = []) {
   const rank = (row) => {
-    const index = PRICE_CATEGORY_ORDER.indexOf(row.category)
+    const index = PRICE_CATEGORY_ORDER.indexOf(priceCategory(row))
     return index === -1 ? PRICE_CATEGORY_ORDER.length : index
   }
   return rows.map((row, index) => ({ row, index }))
@@ -545,7 +546,7 @@ export function feeRangeNotes(fee, t, language, formatPrice) {
   const optional = (fee.optionalIncluded || []).map(row => {
     const shown = displayPrice(row.amount, row.currency)
     return t('pricing.includesOptional', {
-      name: planNameLabel(row, t, language) || t(`pricing.${row.category}`),
+      name: planNameLabel(row, t, language) || t(`pricing.${priceCategory(row)}`),
       price: formatPrice(shown.value, shown.currency),
     })
   })
