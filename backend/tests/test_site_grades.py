@@ -210,3 +210,63 @@ async def test_re_reading_the_site_keeps_site_grades_bands(db_session):
     await remove_website_campus_data(db_session, school.id, keep_site_grades=True)
     await db_session.commit()
     assert await _bands(db_session, school.id) == (["grade_1_4", "grade_8_12"], [SITE_GRADES_ADDED_PREFIX + "grade_1_4"])
+
+
+@pytest.mark.parametrize(
+    "text, nursery",
+    [
+        ("Admission for children from 2 to 7 years old in five age groups", True),  # 351
+        ("Year-round admission for children aged 2 to 7", True),  # 185
+        ("Groups for 2-3 year olds and 3-7 year olds", True),
+        ("We take children from 18 months", True),
+        ("Яслена група за деца от 2 до 3 години", True),
+        ("Children aged 3 to 7 in four groups", False),
+        ("Afternoon activities run from 2 to 4 pm", False),
+        ("The school day runs to 18:00", False),
+        ("Discount for children of one family", False),
+        ("We take children from 36 months", False),
+        ("2-годишна програма по английски", False),
+        ("Pick up children from 2 pm", False),
+        ("Children from 1 September attend", False),
+    ],
+)
+def test_site_nursery_reads_an_age_under_three(text, nursery):
+    fact = SimpleNamespace(text_i18n={"en": text, "bg": ""})
+    assert stage.site_nursery([], [fact]) is nursery
+
+
+def test_site_nursery_reads_a_nursery_fee():
+    assert stage.site_nursery([_fee("tuition", "Яслена група")], [])
+    assert not stage.site_nursery([_fee("tuition", "3-7 години")], [])
+    assert not stage.site_nursery([_fee("extracurricular", "Плуване за деца от 2 до 3 години")], [])
+
+
+async def test_a_kindergarten_gets_its_nursery_group_and_nothing_else(db_session):
+    school = School(
+        country_code="bg", city="sofia", name_i18n={"bg": "Слънчогледи"}, school_type="private",
+        education_level="kindergarten", website_url="https://slanchogledi.bg/", scrape_status="navigated",
+    )
+    location = SchoolLocation(school=school, address_i18n={"bg": "местност Ширините 1А"}, location_tags=[])
+    location.age_group_shifts = [
+        SchoolLocationAgeGroupShift(age_group=group) for group in ("first", "second", "third", "preschool")
+    ]
+    db_session.add(school)
+    await db_session.commit()
+    school_id = school.id
+
+    # site_grades never runs for a kindergarten: a "grade 1" in its facts is no band of its own.
+    with patch.object(stage, "site_nursery", return_value=True), patch.object(
+        stage, "site_grades", return_value=({1, 2}, 4)
+    ):
+        report = await stage.run_site_grades(db_session, apply=True)
+        assert report["changes"][0]["add"] == ["nursery"] and report["changes"][0]["hide"] == []
+        assert await _bands(db_session, school_id) == (
+            ["first", "nursery", "preschool", "second", "third"],
+            [SITE_GRADES_ADDED_PREFIX + "nursery"],
+        )
+        assert (await stage.run_site_grades(db_session, apply=True))["changes"] == []
+
+    # The site stops saying so: the nursery group goes again.
+    with patch.object(stage, "site_nursery", return_value=False):
+        await stage.run_site_grades(db_session, apply=True)
+    assert await _bands(db_session, school_id) == (["first", "preschool", "second", "third"], [])

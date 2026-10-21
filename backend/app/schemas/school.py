@@ -455,7 +455,7 @@ class BilingualName(BaseModel):
 class FactAdmission(BaseModel):
     grade: Optional[int] = None  # 0 is kindergarten or preschool
     grade_to: Optional[int] = None  # the last grade of a range
-    types: list[str] = []  # entrance_exam, interview, trial_day, open_entry
+    types: list[str] = []  # entrance_exam, some_classes_exam, interview, trial_day, open_entry
     subjects: list[BilingualName] = []
 
 
