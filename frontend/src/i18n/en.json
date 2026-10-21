@@ -1105,7 +1105,7 @@
   },
   "cutoffs": {
     "title": "Who got in before",
-    "intro": "Each ranking is separate, with its own free places and applicants. For each group we show the first (main) ranking. Where that is no longer published (kindergartens), we show the latest free-place ranking that had places. The rest are under “All rankings”. A past result is a guide, not a promise.",
+    "intro": "Each ranking is separate, with its own free places and applicants. For each group we show the first (main) ranking, or, when it had no places or is no longer published, the latest ranking that had places. The rest are under “All rankings”. A past result is a guide, not a promise.",
     "none": "We have no published rankings for this school yet.",
     "everyone": "Nobody turned down",
     "noPlaces": "No free places",
@@ -1174,7 +1174,7 @@
     "lastAdmitted": "last admitted:",
     "listLabel": "Groups and classes",
     "history": "All rankings ({{count}})",
-    "historyNote": "Later rankings only fill places that came free, among the children still waiting. So their cut-off can be higher or lower than the first ranking's; a higher one does not mean getting in became harder."
+    "historyNote": "Each later ranking is separate and only fills places that came free, so its cut-off can be higher than an earlier one. That does not mean getting in became harder."
   },
   "driveTime": {
     "minutes": "~{{minutes}} min",

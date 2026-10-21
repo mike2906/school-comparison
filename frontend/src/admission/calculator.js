@@ -264,6 +264,21 @@ export function laterEasierRound(row) {
 }
 
 /**
+ * Whether a ranking after the first had a stricter cut-off of the same kind (a higher
+ * score or more points): read in date order, that looks like the bar went up.
+ */
+export function laterHarder(row) {
+  const rounds = roundsOf(row)
+  const firstValue = cutoffValue(rounds[0])
+  const firstKey = firstValue && easeKey(firstValue)
+  if (!firstKey) return false
+  return rounds.slice(1).some(round => {
+    const value = cutoffValue(round)
+    return value?.kind === firstValue.kind && easier(firstKey, easeKey(value))
+  })
+}
+
+/**
  * The summary rows with `history`: every general-queue ranking of the row's campaign,
  * oldest first, from `admission_info.cutoffs` (the school page has it; lists don't).
  */

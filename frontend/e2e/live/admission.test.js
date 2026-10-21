@@ -154,8 +154,6 @@ describe('admission from a school page', () => {
       const row = rows.nth(several)
       await row.locator('summary').click()
       assert.ok(await row.locator('ol > li').count() >= 2, 'one line per ranking')
-      // A later, higher cut-off is explained where the rankings are listed.
-      await row.getByText(t('bg', 'cutoffs.historyNote')).waitFor()
     }
     await page.getByRole('heading', { name: t('bg', 'admissionArea.districtTitle') }).waitFor()
 
@@ -224,6 +222,12 @@ describe('admission from a school page', () => {
     // laterEasierRound: same kind of result (no gender quota) after a main ranking with places.
     if (classes.some(row => !row.quota && row.first?.places !== 0 && row.latest?.min_score < row.first?.min_score)) {
       await cutoffs.getByText(t('bg', 'cutoffs.later', { date: '' }).split('(')[0].trim()).first().waitFor()
+    }
+    // A later ranking with a higher score is explained where the rankings are listed (laterHarder).
+    const higher = school.admission_info.cutoff_summary.findIndex(row => row.stage === 'grade_8' && row.latest?.min_score > row.first?.min_score)
+    if (higher >= 0) {
+      await rows.nth(higher).locator('summary').click()
+      await rows.nth(higher).getByText(t('bg', 'cutoffs.historyNote')).waitFor()
     }
   })
 
