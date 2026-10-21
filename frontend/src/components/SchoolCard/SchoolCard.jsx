@@ -52,6 +52,7 @@ const SchoolCard = memo(function SchoolCard({
   onHoverEnd,
   location,
   activeAgeGroup = null,
+  targetYear = null,
   nvoExamType = null,
   ageGroupOrder = [],
   isLocationsOpen = false,
@@ -685,7 +686,7 @@ const SchoolCard = memo(function SchoolCard({
             {samePlace.map(({ school: member }) => (
               <li key={member.id} className="text-sm">
                 <Link
-                  to={schoolPath(member.id, activeAgeGroup)}
+                  to={schoolPath(member.id, activeAgeGroup, targetYear)}
                   onClick={(event) => {
                     event.stopPropagation()
                     if (onOpenDetails && isPlainLeftClick(event) && isDesktopViewport()) {
@@ -729,7 +730,7 @@ const SchoolCard = memo(function SchoolCard({
           )}
         </button>
         <Link
-          to={schoolPath(school.id, activeAgeGroup)}
+          to={schoolPath(school.id, activeAgeGroup, targetYear)}
           onClick={handleDetailsClick}
           className="flex-1 min-h-[44px] md:min-h-0 inline-flex items-center justify-center px-3 py-2 text-center text-sm font-medium text-white bg-primary-700 hover:bg-primary-800 rounded-lg transition-colors transition-transform hover:scale-[1.02]"
         >

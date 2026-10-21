@@ -68,6 +68,7 @@ import {
 function SchoolMap({
   schools,
   activeAgeGroup,
+  targetYear = null,
   selectedSchoolId,
   hoveredSchoolId,
   onSchoolSelect,
@@ -329,8 +330,8 @@ function SchoolMap({
       onOpenDetails(school)
       return
     }
-    navigate(schoolPath(school.id, activeAgeGroup))
-  }, [navigate, onOpenDetails, activeAgeGroup])
+    navigate(schoolPath(school.id, activeAgeGroup, targetYear))
+  }, [navigate, onOpenDetails, activeAgeGroup, targetYear])
 
   return (
     <div

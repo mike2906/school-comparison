@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { isClosedGroupFee, periodFromLabel, priceCategory, priceTerms, periodUnknown, pricePeriod, rowAgeGroupKeys, rowsForAgeGroup, splitRowsForAgeGroup } from './priceRows.js'
+import { isClosedGroupFee, isHalfDay, periodFromLabel, priceCategory, priceTerms, periodUnknown, pricePeriod, rowAgeGroupKeys, rowsForAgeGroup, splitRowsForAgeGroup } from './priceRows.js'
 
 test('periodFromLabel: the period a fee name states', () => {
   const cases = {
@@ -206,4 +206,23 @@ test('a deposit is listed apart from the registration fees it is filed with', ()
   assert.equal(priceCategory({ category: 'registration' }), 'registration')
   // Only a registration row: a deposit filed as tuition is withheld by the API, not relabelled.
   assert.equal(priceCategory({ category: 'tuition', pricing_context: { deposit: true } }), 'tuition')
+})
+
+test('isHalfDay: part-day care by its words or its hours, never a full day or a date', () => {
+  for (const name of ['Полудневен престой', 'посещението на половин ден', 'Half-day Program', 'до 13:00 часа', 'ПЪРВИ ВАРИАНТ — 8:00 – 13 часа']) {
+    assert.equal(isHalfDay({ plan_name: name }), true, name)
+  }
+  for (const name of ['Целодневен престой', 'Full day', 'ВТОРИ ВАРИАНТ — 8:00 – 15.00 часа', 'Записване до 12.05.2026', null]) {
+    assert.equal(isHalfDay({ plan_name: name }), false, String(name))
+  }
+})
+
+test('priceTerms: "годишно плащане" beside a monthly fee is the year paid at once (199)', () => {
+  assert.equal(priceTerms({ plan_name: 'Preschool / Такса / годишно плащане' }), 'one_payment')
+  assert.equal(priceTerms({ plan_name: 'x', pricing_context: { plan_name_en: 'Fee / annual payment' } }), 'one_payment')
+  assert.equal(priceTerms({ plan_name: 'Годишна такса' }), null)
+})
+
+test('rowAgeGroupKeys: an English "preparatory group" is the preschool year (555)', () => {
+  assert.ok(rowAgeGroupKeys({ age_group: 'PREPARATORY GROUP | YEAR 2' }).has('preschool'))
 })

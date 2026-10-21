@@ -404,7 +404,7 @@ function SearchPage() {
     if (isDesktopViewport()) {
       handleOpenDetails(school)
     } else {
-      navigate(schoolPath(school.id, filters.ageGroup))
+      navigate(schoolPath(school.id, filters.ageGroup, filters.targetYear))
     }
   })
 
@@ -1417,6 +1417,7 @@ function SearchPage() {
                     onHoverEnd={handleSchoolHoverEnd}
                     ageGroupOrder={ageGroupOrder}
                     activeAgeGroup={filters.ageGroup}
+                    targetYear={filters.targetYear}
                     nvoExamType={activeSort === 'nvo' ? nvoSortExamType : null}
                     isLocationsOpen={openLocationsId === school.id}
                     locationOverlay={locationOverlay}
@@ -1456,6 +1457,7 @@ function SearchPage() {
                 <SchoolMap
                   schools={filteredSchools}
                   activeAgeGroup={filters.ageGroup}
+                  targetYear={filters.targetYear}
                   selectedSchoolId={detailSchoolId || selectedSchoolId}
                   hoveredSchoolId={hoveredSchoolId}
                   onOpenDetails={handleOpenDetails}

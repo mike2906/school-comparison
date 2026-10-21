@@ -21,7 +21,12 @@ export function paymentOptionText(option, currency, money, t) {
     const schedule = option.first_payment != null ? `${shown(option.first_payment)} + ${parts}` : parts
     return total != null ? `${schedule} (${t('pricing.paymentOptionTotal', { total: shown(total) })})` : schedule
   }
-  return total != null ? t('pricing.paymentOptionInParts', { total: shown(total) }) : null
+  // The total of a plan, said to be one: 170's "4,200 EUR in instalments" read as the size of
+  // each instalment.
+  if (total == null) return null
+  return option.payments != null
+    ? t('pricing.paymentOptionPaymentsTotal', { count: option.payments, total: shown(total) })
+    : t('pricing.paymentOptionTotal', { total: shown(total) })
 }
 
 /** The texts of a price row's payment options, in the school's order. */

@@ -688,6 +688,11 @@ const NOTES_EN = {
   'pricing.rangeEnds': '{{low}}: {{lowPrice}} · {{high}}: {{highPrice}}',
   'pricing.includesOptional': 'Includes an optional fee: {{name}}, {{price}}',
   'pricing.activities': 'Activities',
+  'pricing.food': 'Food',
+  'pricing.materials': 'Materials',
+  'pricing.per.yearly': 'year',
+  'pricing.alsoRequired': 'Also required: {{fees}}',
+  'pricing.someYearNotStated': "Some groups' fees state no academic year",
 }
 const price = (value, currency) => `${value} ${currency}`
 const tNotes = (key, vars = {}) =>
@@ -739,4 +744,76 @@ test('feeRangeNotes: a printed total says which optional fee it adds up (633)', 
   // When the fees do not add up to the total, it is not known to include the donation.
   const unknown = statedTuition(rows.filter(fee => fee.id !== 3))
   assert.deepEqual(unknown.optionalIncluded, [])
+})
+
+test('tuitionSortValue: a full day is compared, not a half-day price beside it (527, 542)', () => {
+  // 527: half day 540 лв (276 €) beside full day 550 € ranked it the cheapest kindergarten.
+  const halfAndFull = [
+    row({ id: 1, amount: 550, period: 'monthly', plan_name: 'Детска градина Целодневна' }),
+    row({ id: 2, amount: 540, currency: 'BGN', period: 'monthly', plan_name: 'Детска градина Полудневна' }),
+  ]
+  assert.equal(tuitionSortValue(halfAndFull), 550)
+  // The headline still shows both.
+  assert.equal(Math.round(statedTuition(halfAndFull).min), 276)
+  // 330's hours: the day that ends at 13:00 gives way to the longer ones.
+  const hours = [
+    row({ id: 1, amount: 400, period: 'monthly', plan_name: 'ПЪРВИ ВАРИАНТ — 8:00 – 13 часа' }),
+    row({ id: 2, amount: 510, period: 'monthly', plan_name: 'ТРЕТИ ВАРИАНТ — 8:00 – 18.00 часа' }),
+  ]
+  assert.equal(tuitionSortValue(hours), 510)
+  // Only a half-day price: it is the price.
+  assert.equal(tuitionSortValue([row({ amount: 450, period: 'monthly', plan_name: 'Половин ден' })]), 450)
+  // A group with its own full-day price keeps it; another group's half day alone still counts.
+  const groups = [
+    row({ id: 1, amount: 700, period: 'monthly', age_group: 'Ясла', plan_name: 'Целодневно' }),
+    row({ id: 2, amount: 400, period: 'monthly', age_group: 'Ясла', plan_name: 'Полудневно' }),
+    row({ id: 3, amount: 300, period: 'monthly', age_group: 'ПГ', plan_name: 'Полудневно' }),
+  ]
+  assert.equal(tuitionSortValue(groups), 300)
+})
+
+test('tuitionSortValue: a price for paying the year at once gives way to the monthly fee (199)', () => {
+  const arlekino = [
+    row({ id: 1, amount: 450, period: 'monthly', age_group: 'Preschool', plan_name: 'Preschool / Такса / месец' }),
+    row({ id: 2, amount: 4702, period: 'yearly', age_group: 'Preschool', plan_name: 'Preschool / Такса / годишно плащане' }),
+  ]
+  assert.equal(tuitionSortValue(arlekino), 450)
+})
+
+test('selectPricingCohort: a year with no tuition for the group gives way to one that has it (593)', () => {
+  const izzi = [
+    current({ id: 1, amount: 7500, age_group: 'Grades 8th- 12th' }),
+    current({ id: 2, category: 'registration', amount: 30, period: 'one_time' }),
+    row({ id: 3, amount: 8100, plan_name: 'Izzi Science (Grades 1-3)' }),
+    row({ id: 4, amount: 9000, plan_name: 'Izzi Science (Grades 4-7)' }),
+    row({ id: 5, amount: 7500, age_group: 'Grades 8th - 12th' }),
+  ]
+  const grade1 = statedTuition(izzi, { ageGroup: 'grade_1_4' })
+  assert.equal(grade1.min, 8100)
+  assert.equal(grade1.yearStatus, YEAR_STATUS.NOT_STATED)
+  assert.equal(statedTuition(izzi, { ageGroup: 'grade_8_12' }).yearStatus, YEAR_STATUS.CURRENT)
+  // With no group, the undated grades 1–7 join this year's grades 8–12, and the page says so.
+  const all = statedTuition(izzi)
+  assert.deepEqual([all.min, all.max, all.yearStatus, all.otherYears], [7500, 9000, YEAR_STATUS.CURRENT, true])
+  assert.ok(feeRangeNotes(all, tNotes, 'en', price).includes("Some groups' fees state no academic year"))
+  // An undated fee for a group this year prices, or naming no group, does not join.
+  const covered = [current({ id: 1, amount: 7500, age_group: '1-12 клас' }), row({ id: 2, amount: 100, age_group: '1-4 клас' }), row({ id: 3, amount: 50 })]
+  assert.deepEqual([statedTuition(covered).min, statedTuition(covered).otherYears], [7500, false])
+})
+
+test('feeRangeNotes: extras the school says every child pays are named under the fee (634)', () => {
+  const uwekind = [
+    current({ id: 1, amount: 6820, age_group: 'Детска градина' }),
+    current({ id: 2, category: 'food', amount: 1410, period: null, age_group: 'Детска градина', pricing_context: { notes: 'Задължителна услуга за детската градина и предучилищния клас.' } }),
+    current({ id: 3, category: 'materials', amount: 450, pricing_context: { notes: 'Таксата е задължителна за всяка учебна година.' } }),
+    current({ id: 4, category: 'registration', amount: 500, period: 'one_time', pricing_context: { notes: 'Задължителна и приложима само за новопостъпили.' } }),
+    current({ id: 5, category: 'food', amount: 2.3, pricing_context: { notes: 'Optional; not mandatory.' } }),
+    current({ id: 6, category: 'materials', amount: 90, pricing_context: { notes: 'Незадължителна такса.' } }),
+  ]
+  assert.deepEqual(feeRangeNotes(statedTuition(uwekind), tNotes, 'en', price), [
+    'Also required: Food 1410 EUR · Materials 450 EUR / year',
+  ])
+  // Only extras for the chosen group (or naming none).
+  const forGroup = [...uwekind, current({ id: 7, category: 'food', amount: 900, age_group: '8-12 клас', pricing_context: { notes: 'Mandatory' } })]
+  assert.equal(statedTuition(forGroup, { ageGroup: 'third' }).required.length, 2)
 })

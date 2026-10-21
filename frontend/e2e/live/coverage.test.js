@@ -18,7 +18,8 @@ import { GRADE1_INITIAL, KINDERGARTEN_GROUPS, KINDERGARTEN_INITIAL, kindergarten
 import { CATCHMENT_CAMPAIGNS } from '../../src/admission/loadCatchments.js'
 import { kindergartenDistrict, savedVerdictsFor } from '../../src/admission/schoolVerdict.js'
 import { usesSofiaKindergartenSystem } from '../../src/utils/admission.js'
-import { statedTuition } from '../../src/utils/pricing.js'
+import { isInstallmentPlan, statedTuition } from '../../src/utils/pricing.js'
+import { isClosedGroupFee, rowAgeGroupKeys } from '../../src/utils/priceRows.js'
 import { allSchools } from './live.js'
 
 // A parent should get an answer at no fewer than this share of the schools that publish
@@ -124,5 +125,22 @@ describe('coverage for realistic parents', () => {
       results.push({ persona: `age group ${group}`, withData: taking.length, shown: taking.filter(s => statedTuition(s.pricing, { ageGroup: group })).length })
     }
     assertCoverage(t, results)
+  })
+
+  test('fees: every age a school lists a tuition for gets a headline fee for that age', async () => {
+    // 593 listed grades 1–7 on an undated page and grades 8–12 for 2026/27; a search for
+    // grade 1 showed no fee, because only the 2026/27 rows were looked at.
+    const whole = row => row.category === 'tuition' && !isInstallmentPlan(row) && !isClosedGroupFee(row) &&
+      [row.amount, row.amount_min, row.amount_max].some(value => value != null)
+    const missing = []
+    let checked = 0
+    for (const school of (await allSchools()).filter(s => s.school_type !== 'state')) {
+      for (const group of new Set((school.pricing || []).filter(whole).flatMap(row => [...rowAgeGroupKeys(row)]))) {
+        checked += 1
+        if (!statedTuition(school.pricing, { ageGroup: group })) missing.push(`${school.id}: ${group}`)
+      }
+    }
+    assert.ok(checked >= MIN_WITH_DATA, `only ${checked} school ages with a tuition`)
+    assert.deepEqual(missing, [], 'ages with a listed tuition but no headline fee')
   })
 })
