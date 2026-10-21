@@ -1130,3 +1130,126 @@ def test_glance_lists_a_grade_less_admission_rule_once():
     assert len(rows) == 2
     rows = at_a_glance([fact(["interview", "entrance_exam"]), fact(["trial_day"]), fact(["interview"])])["admission"]
     assert [row["types"] for row in rows] == [["interview", "entrance_exam"], ["trial_day"]]
+
+
+def _admission_fact(en: str, types: list[str], grade=None, grade_to=None, subjects=None) -> dict:
+    return _labels(
+        {
+            "text_i18n": {"bg": "Прием.", "en": en},
+            "admission": types,
+            "admission_grade": grade,
+            "admission_grade_to": grade_to,
+            "exam_subjects": subjects or [],
+        }
+    )
+
+
+def test_an_exam_for_one_class_is_shown_as_an_exam_for_some_classes():
+    from app.utils.school_facts import SOME_CLASSES_EXAM, at_a_glance
+
+    art = [{"bg": "Изобразително изкуство", "en": "Fine arts"}]
+    # 192: the Graphic design class has an aptitude test; the two dance classes have none.
+    facts = [
+        _admission_fact(
+            "State admission to 8th grade for 2026/2027: profession Dance – Bulgarian folk dances, "
+            "2 parallel classes of 26 places each (52 total), no additional exam",
+            ["open_entry"],
+            8,
+        ),
+        _admission_fact(
+            "Admission to the grade VIII Graphic Design class requires an aptitude test in visual arts.",
+            ["entrance_exam"],
+            8,
+            subjects=art,
+        ),
+    ]
+    assert facts[1]["admission"] == [SOME_CLASSES_EXAM]
+    rows = at_a_glance(facts)["admission"]
+    assert [(r["grade"], r["types"], r["subjects"]) for r in rows] == [(8, [SOME_CLASSES_EXAM], art)]
+    # An exam fact naming no class, beside "no exam" for the same grade, is the same thing said once.
+    plain = [facts[0], _admission_fact("Grade 8 admission includes an aptitude test in fine arts.", ["entrance_exam"], 8)]
+    assert [r["types"] for r in at_a_glance(plain)["admission"]] == [[SOME_CLASSES_EXAM]]
+    # A whole-grade exam is still an entrance exam.
+    whole = [_admission_fact("Grade 5 entrance exam in mathematics and Bulgarian.", ["entrance_exam"], 5)]
+    assert [r["types"] for r in at_a_glance(whole)["admission"]] == [["entrance_exam"]]
+    for en in (
+        "Entrance exam in maths. The class size is 22.",
+        "Entrance exam in maths and English; students then choose one of two profiles.",
+        "Entrance exam for grade 8 classes in the Mathematics profile and the English profile.",
+    ):
+        assert _admission_fact(en, ["entrance_exam"], 8)["admission"] == ["entrance_exam"]
+    # A school-wide exam row goes beside a grade where only some classes sit one.
+    school_wide = [*facts, _admission_fact("Admission is by entrance exam.", ["entrance_exam"], subjects=art)]
+    assert [(r["grade"], r["types"]) for r in at_a_glance(school_wide)["admission"]] == [(8, [SOME_CLASSES_EXAM])]
+
+
+def test_the_ministrys_aptitude_test_calendar_is_not_the_schools_exam():
+    from app.utils.school_facts import at_a_glance
+
+    # 316: both its classes admit on the NVO score; the page lists the national calendar.
+    fact = _admission_fact(
+        "For grade 8 admission, aptitude examinations are held in visual arts, music, and physical education and sport.",
+        ["entrance_exam"],
+        8,
+        [
+            {"bg": "Изобразително изкуство", "en": "Visual arts"},
+            {"bg": "Музика", "en": "Music"},
+            {"bg": "Физическо възпитание и спорт", "en": "Physical education and sport"},
+        ],
+    )
+    assert fact["admission"] == [] and fact["exam_subjects"] == []
+    assert at_a_glance([fact])["admission"] == []
+    # One aptitude subject named for a class is the school's own.
+    own = _admission_fact("The Music profile class requires an aptitude test in music.", ["entrance_exam"], 8)
+    assert own["admission"] == ["some_classes_exam"]
+    # A school's own exam beside its art, music and sports clubs is still its exam.
+    clubs = _admission_fact(
+        "Entrance exam in maths for grade 5; the school offers fine arts, music and sports clubs.", ["entrance_exam"], 5
+    )
+    assert clubs["admission"] == ["entrance_exam"]
+
+
+@pytest.mark.parametrize(
+    "en,kept",
+    [
+        ("Admission for 2026/2027 is open; places are limited.", False),  # 558
+        ("Grade 1 admission for 2026/2027: 96 children in 4 classes.", False),  # 316
+        ("Children are admitted without an entrance exam.", True),
+        ("There is no entrance test for first grade.", True),
+        ("Places are filled on a first-come, first-served basis.", True),
+        ("profession Dance, 2 classes of 26 places, no additional exam", True),
+    ],
+)
+def test_no_entrance_test_needs_the_text_to_say_so(en, kept):
+    assert (_admission_fact(en, ["open_entry"], 1)["admission"] == ["open_entry"]) is kept
+
+
+def test_a_kindergarten_shows_no_school_programmes_from_the_old_extraction():
+    from app.utils.school_attributes import build_display_attributes, compute_filter_tags
+    from app.utils.school_facts import publication_attributes
+
+    # 510: the old extraction read Светлина's school pages for its kindergarten.
+    programs = [
+        "IB Diploma", "Cambridge English", "IELTS", "TOEFL", "Preparation for first grade",
+        "Swimming classes 2 times a week", "Learning at a level suited to each child",
+        "Classes 2-3 times a week", "Sat & Sun workshops", "Montessori diploma teachers",
+    ]
+    attributes = {
+        "extracted": {"programs": programs, "summary_source": {"canonical_tags": ["IB", "Montessori"]}},
+        "extracted_i18n": {"bg": {"programs": ["IB диплома", "Кеймбридж", "Подготовка за 1. клас", "Дипломирани педагози", "4 класни стаи"]}},
+        "data_validation": {"_schema_version": 1, "status": "ok", "issues": [], "issue_counts": {"error": 0}},
+    }
+    kindergarten = publication_attributes(attributes, "summarized", None, "kindergarten")
+    _, localized = build_display_attributes(kindergarten)
+    assert localized["en"]["special_programs"] == [
+        "Cambridge English", "Preparation for first grade", "Swimming classes 2 times a week",
+        "Learning at a level suited to each child", "Classes 2-3 times a week", "Sat & Sun workshops",
+        "Montessori diploma teachers",
+    ]
+    assert localized["bg"]["special_programs"] == ["Кеймбридж", "Подготовка за 1. клас", "Дипломирани педагози", "4 класни стаи"]
+    assert "ib_program" not in compute_filter_tags(kindergarten)["teaching_approach"]
+    assert attributes["extracted"]["programs"] == programs  # the stored JSON is untouched
+    # The school keeps them.
+    school = publication_attributes(attributes, "summarized", None, "upper_secondary")
+    assert "ib_program" in compute_filter_tags(school)["teaching_approach"]
+    assert "IELTS" in build_display_attributes(school)[1]["en"]["special_programs"]

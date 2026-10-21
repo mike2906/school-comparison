@@ -42,7 +42,7 @@ some picks were trivia, yearly counts go stale, the paragraph only restated the 
    existing vocabulary (`FACT_TAGS`: transportation, cafeteria, meals_provided, extended_day,
    ...), languages with a level (immersion, bilingual, enrichment) and weekly hours,
    languages of instruction, a maximum class size, the admission route for a grade
-   (`ADMISSION_TYPES`: entrance_exam, interview, trial_day, open_entry) with exam subjects
+   (`ADMISSION_TYPES`: entrance_exam, interview, trial_day, open_entry; the summary adds some_classes_exam) with exam subjects
    and the grade or range of grades it is for,
    places full or waiting list for a grade, the highest grade taught, curricula
    (`CURRICULA`) and whether the diploma is recognised, application open/close dates, bus
@@ -73,7 +73,13 @@ none shows nothing. An admissions fact naming only school years before the one i
 parent's or graduate's remark is not shown at all. A kindergarten shows no fact naming a
 school grade or school-only programme (grade 5, IB, IGCSE, diploma; "until they enter first
 grade" stays): several share their school's website (515, 555, 587, 634) and were read its
-facts too.
+facts too. The same goes for the old extraction's programme, facility and activity lists on a
+kindergarten (510's "IB Diploma", "IELTS", "TOEFL"; `publication_attributes`), so its filter
+tags lose them too. Admission labels are checked against the fact's English line: "no
+entrance test" needs it to say so (558's "admission for 2026/2027 is open" is not), the
+ministry's aptitude-test calendar in art, music and sport is not the school's exam (316), and
+an exam for one class, profession or profile, or beside "no exam" for the same grade, shows
+as `some_classes_exam` ("Entrance exam for some classes", 192).
 
 **Labels feed the existing filters and fields** (`publication_attributes`): a shown fact's
 tags join `filter_tags` (so the search filters and the compare page's meals, transport and
