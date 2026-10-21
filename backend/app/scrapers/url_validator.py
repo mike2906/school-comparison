@@ -1119,6 +1119,7 @@ async def clear_website_derived_locations(
 
     from app.models import SchoolLocation
     from app.scrapers.campus_sync import CAMPUS_TAG, remove_website_campus_data
+    from app.scrapers.stages.site_phones import PHONE_TAG, restore_register_phone
     from app.services.geocoding.write_gate import OFFICIAL_COORDS_TAG
 
     # Campus locations and age groups added from the site go entirely (UF42b).
@@ -1137,6 +1138,10 @@ async def clear_website_derived_locations(
     )
     changed: list[dict] = []
     for location in locations:
+        if PHONE_TAG in (location.location_tags or []):  # site-phones' number goes too
+            changed.append({"location_id": location.id, "school_id": school_id, "phone_before": location.phone, "restores_phone": True})
+            if not preview and restore_register_phone(location):
+                db.add(location)
         tags = [str(tag) for tag in (location.location_tags or [])]
         if CAMPUS_TAG in tags:
             continue

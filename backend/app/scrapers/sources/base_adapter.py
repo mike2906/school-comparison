@@ -511,7 +511,10 @@ class BaseSourceAdapter(ABC):
         from app.models import SchoolLocationAgeGroupShift
 
         row.district = incoming.district or row.district
-        row.phone = incoming.phone or row.phone
+        from app.scrapers.stages.site_phones import keep_site_phone
+
+        if not keep_site_phone(row, incoming.phone):  # the school's own site wins
+            row.phone = incoming.phone or row.phone
         if incoming.location_tags:
             # Replace only this source's own tags; other stages keep markers here
             # (e.g. address_source=website_contact, coords_cleared=...).

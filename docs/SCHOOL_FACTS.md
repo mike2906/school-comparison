@@ -255,6 +255,12 @@ usually among them) instead of the old navigation. They must be exact, a wrong p
 worse than none, and most are already stored (Sofia, 2026-10-13: phones for 208 of 214
 state, 60 of 74 private, 296 of 329 kindergartens). So: same crawl, separate step, keep
 the stored value unless the new one passes the same format checks.
+Phones now (2026-10-21, Mike: the school's site wins over the register, as for addresses):
+`cli site-phones` reads the home and contact pages and gives a school's primary location the
+site's numbers when the register's is not among them (numbers listed under that location's
+address first; a fax or a deputy's number only when nothing else is given; a number on two
+schools' sites or another school's is held back). The register's number stays in the
+location's tags for a wrong-website undo, and a re-import leaves the site's in place.
 
 **Social links** (2026-10-14): the `social-links` stage (`app/scrapers/stages/social_links.py`,
 no model calls) reads the home page, and the contact page when the home page links neither

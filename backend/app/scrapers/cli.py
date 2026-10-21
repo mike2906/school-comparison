@@ -797,6 +797,31 @@ def site_address_command(school_ids, limit, register_file, apply_changes, report
         console.print(f"Report: {report_path}")
 
 
+@cli.command("site-phones")
+@click.option("--school-id", "school_ids", type=int, multiple=True, help="Run these schools (repeatable)")
+@click.option("--limit", type=int, default=None, help="Maximum schools")
+@click.option("--apply", "apply_changes", is_flag=True, help="Write phones (default is a dry run that writes nothing)")
+@click.option("--out", "report_path", type=click.Path(dir_okay=False, path_type=Path), help="Write the JSON report")
+def site_phones_command(school_ids, limit, apply_changes, report_path):
+    """Show the phone a school's own website gives instead of the register's."""
+    import json
+
+    from app.database import async_session_maker
+    from app.scrapers.stages import site_phones as site_phones_stage
+
+    async def _run():
+        async with async_session_maker() as db:
+            return await site_phones_stage.run_site_phones(db, school_ids=school_ids, limit=limit, apply=apply_changes)
+
+    report = asyncio.run(_run())
+    mode = "Applied" if apply_changes else "Dry run"
+    console.print(f"{mode}: {report['locations']} locations, outcomes {report['outcomes']}")
+    if report_path is not None:
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        report_path.write_text(json.dumps(report, ensure_ascii=False, indent=1, default=str), encoding="utf-8")
+        console.print(f"Report: {report_path}")
+
+
 @cli.command("website-pins")
 @click.option("--school-id", "school_ids", type=int, multiple=True, help="Run these schools (repeatable)")
 @click.option("--city", default="sofia", show_default=True, help="City (only Sofia has the bounds and town name yet)")
