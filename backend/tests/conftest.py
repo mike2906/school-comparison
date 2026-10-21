@@ -64,6 +64,7 @@ def clear_school_list_cache():
         schools_router._filters_cache,
         schools_router._search_index_cache,
         schools_router._same_place_cache,
+        schools_router._detail_cache,
         schools_router._refreshing,
     ):
         state.clear()
@@ -73,6 +74,7 @@ def clear_school_list_cache():
         schools_router._filters_cache,
         schools_router._search_index_cache,
         schools_router._same_place_cache,
+        schools_router._detail_cache,
         schools_router._refreshing,
     ):
         state.clear()

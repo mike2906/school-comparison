@@ -17,6 +17,7 @@ from app.models import Pricing, School
 from app.models.pricing import PriceSource
 from app.models.scrape_log import ScrapeType
 from app.models.source_page import SourcePage
+from app.routers import schools as schools_router
 from app.scrapers import validator as validator_module
 from app.utils import display_gating
 from app.utils.display_gating import OFFER_ENDS_KEY, display_name_blocked
@@ -447,6 +448,7 @@ async def test_offer_stops_publishing_the_day_after_it_ends_without_revalidation
     published = {}
     for day in (datetime.date(2026, 10, 14), datetime.date(2026, 10, 15), datetime.date(2026, 10, 16)):
         monkeypatch.setattr(display_gating, "datetime", _clock_on(day))
+        schools_router._detail_cache.clear()  # a day apart: past the page cache's TTL
         response = await client.get(f"/schools/{school.id}")
         published[day.day] = [row["id"] for row in response.json()["pricing"]]
     assert published == {14: [offer.id], 15: [offer.id], 16: []}
@@ -537,11 +539,13 @@ async def test_fees_agent_rows_show_before_the_old_extraction_moves_the_status(d
     await validator_module.validate_school_data(db_session, school.id, "bg")
     await db_session.refresh(school)
     assert school.scrape_status == "validated"
+    schools_router._detail_cache.clear()  # new data reaches the site with a publish, which restarts the API
     response = await client.get(f"/schools/{school.id}")
     assert [row["id"] for row in response.json()["pricing"]] == [agent.id]
 
     school.scrape_status = "failed_validate"  # the website is no longer accepted as the school's
     await db_session.commit()
+    schools_router._detail_cache.clear()
     response = await client.get(f"/schools/{school.id}")
     assert response.json()["pricing"] == []
 
