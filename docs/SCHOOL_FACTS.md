@@ -70,7 +70,10 @@ topic any compared school has a key fact for. `minor` facts are not shown. A sch
 none shows nothing. An admissions fact naming only school years before the one in progress
 ("14 places for 2025/2026") is not shown. A fact about a summer school, camp or holiday programme is never `key`
 (its hours or meals would read as the school year's), and a fact that reports a pupil's,
-parent's or graduate's remark is not shown at all.
+parent's or graduate's remark is not shown at all. A kindergarten shows no fact naming a
+school grade or school-only programme (grade 5, IB, IGCSE, diploma; "until they enter first
+grade" stays): several share their school's website (515, 555, 587, 634) and were read its
+facts too.
 
 **Labels feed the existing filters and fields** (`publication_attributes`): a shown fact's
 tags join `filter_tags` (so the search filters and the compare page's meals, transport and

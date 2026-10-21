@@ -128,7 +128,9 @@ def shown_texts(school: School) -> dict[str, set[str]]:
         for locale, texts in price_texts(row).items():
             out[locale].update(texts)
     out["en"].update(cutoff_texts(school.admission_info))
-    public = publication_attributes(school.attributes, school.scrape_status, school.website_url)
+    public = publication_attributes(
+        school.attributes, school.scrape_status, school.website_url, school.education_level
+    )
     for locale in LOCALES:
         localized = build_localized_attributes(public, locale, school.school_type, translate=False)
         for field in LIST_FIELDS:
