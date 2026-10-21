@@ -187,13 +187,22 @@ async def read_school(school: School, pages: list[PageRead], call: Caller) -> di
     return report | {"outcome": outcome + (f", {len(report['carried'])} carried" if report["carried"] else "")}
 
 
+def _stored_on_site(school: School) -> list[dict[str, Any]]:
+    """Stored facts read from the school's current website: after its site is replaced (587,
+    drujba.org to dgs.drujba.org), facts from the old one are neither re-read nor carried."""
+    from app.scrapers.shared_site_check import site_id
+
+    stored = ((school.attributes or {}).get(ATTRIBUTE_KEY) or {}).get("facts") or []
+    site = site_id(school.website_url)
+    return [row for row in stored if isinstance(row, dict) and site and site_id(row.get("source_url")) == site]
+
+
 def stored_fact_pages(school: School) -> list[str]:
     """The pages the stored key facts came from, then the others', most facts first.
 
     Read every time, so a stored fact is carried over (or dropped) on its own page's current
     text rather than lost because the picker chose other pages this run (514's /school-of-arts/)."""
-    stored = ((school.attributes or {}).get(ATTRIBUTE_KEY) or {}).get("facts") or []
-    rows = [row for row in stored if isinstance(row, dict) and row.get("source_url")]
+    rows = _stored_on_site(school)
     counts = Counter((row.get("rank") != "key", row["source_url"]) for row in rows)
     return list(dict.fromkeys(url for (_, url), _ in sorted(counts.items(), key=lambda item: (item[0][0], -item[1]))))
 
@@ -205,11 +214,10 @@ def _carried(school: School, readable: list[tuple[str, str]], kept: list[Ranked]
     Reads vary from run to run; a fact accepted before stays while its page still says it,
     with no model call, so the school's facts do not change on every refresh. New facts
     come first within each grade."""
-    stored = ((school.attributes or {}).get(ATTRIBUTE_KEY) or {}).get("facts") or []
     new_quotes = {facts_rules.quote_key(fact) for fact, _, _ in kept}
     carried = []
-    for row in stored:
-        fact = facts_rules.stored_as_fact(row) if isinstance(row, dict) else None
+    for row in _stored_on_site(school):
+        fact = facts_rules.stored_as_fact(row)
         if fact is None or fact.topic not in facts_rules.TOPICS or facts_rules.quote_key(fact) in new_quotes:
             continue
         url = facts_rules.quote_on_page(fact, readable)

@@ -505,7 +505,10 @@ def test_stored_fact_pages_put_key_pages_first():
         {"source_url": "https://s.example/c", "rank": "key"},
         {"rank": "key"},
     ]
-    school = School(id=1, name_i18n={}, country_code="bg", attributes={"school_facts": {"facts": facts}})
+    school = School(
+        id=1, name_i18n={}, country_code="bg", website_url="https://www.s.example/",
+        attributes={"school_facts": {"facts": facts + [{"source_url": "https://old.example/x", "rank": "key"}]}},
+    )
     assert stored_fact_pages(school) == ["https://s.example/c", "https://s.example/b", "https://s.example/a"]
     assert stored_fact_pages(School(id=2, name_i18n={}, country_code="bg")) == []
 
@@ -623,6 +626,19 @@ async def test_a_stored_fact_whose_quote_is_still_on_the_page_is_carried():
     report = await stage.read_school(school, LINES, _Calls(new, passed=[1]))
     assert [f["text_i18n"]["en"] for f in report["store"]] == ["New.", "Still there."]
     assert report["carried"] == ["Still there."]
+
+
+@pytest.mark.asyncio
+async def test_a_stored_fact_from_a_replaced_site_is_not_carried():
+    """587 moved from drujba.org (its school's) to dgs.drujba.org, which links back to it."""
+    old = _fact_row(
+        topic="admissions", quote=_line(2), text_i18n={"bg": "Б", "en": "Grade 5 exam."},
+        source_url="https://drujba.org/kak-da-kandidatstvam/",
+    )
+    school = _school(school_facts={"_schema_version": 1, "facts": [old]})
+    old_page = [PageRead("https://drujba.org/kak-da-kandidatstvam/", LINES[0].text, False)]
+    report = await stage.read_school(school, LINES + old_page, _Calls([_fact("languages", _line(5), en="New.")], passed=[1]))
+    assert [f["text_i18n"]["en"] for f in report["store"]] == ["New."]
 
 
 @pytest.mark.asyncio
