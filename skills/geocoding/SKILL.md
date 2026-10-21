@@ -142,7 +142,9 @@ run's publish and `recover-failed-urls` looks for the real site. When search doe
 run; `--apply` stores it only if valid). A school whose accepted site is wrong (587, a
 kindergarten on its sibling school's drujba.org) takes `--replace --apply`: the old site's
 pages, site-copied addresses and extraction are dropped as in the shared-site check's
-replace, so re-run `navigate` and `extract`, then `school-facts` and `fees-agent`. More than `SITE_CITY_MAX`
+replace, so re-run `navigate` and `extract`, then `school-facts` and `fees-agent`. A school stored
+with its group's home page (574 on novigradini.com, whose own pages are under /anika/) takes
+`--replace --section` with its section's URL. More than `SITE_CITY_MAX`
 (3) at once withholds none and opens the issue "Website town check stopped"; the pins go
 ahead either way. URL validation applies the same rule to new sites
 (`app/scrapers/site_city.py`).
