@@ -583,6 +583,7 @@ def test_rule_6_allows_a_period_change_the_page_states():
 # ---------------------------------------------------------------------------
 
 from app.scrapers.price_evidence import (  # noqa: E402
+    RULE_AMOUNT_NEAR_LABEL,
     RULE_LEVEL,
     label_grades,
     label_is_another_institutions,
@@ -745,3 +746,107 @@ def test_a_page_address_that_names_another_stage_is_a_siblings_page():
     assert label_grades("Основно училище") == set(range(1, 8))
     # 635: the site's English page spells it "Kindergarden".
     assert label_is_another_institutions("Academic resources fee / Kindergarden", "school", set())
+
+
+def _fee(category, amount, period, plan_name, age_group=None):
+    return PriceRow(
+        category=category, amount=amount, amount_min=None, amount_max=None, period=period,
+        plan_name=plan_name, notes=None, currency="EUR", age_group=age_group,
+    )  # fmt: skip
+
+
+# orfei.net/lyatna-zanimalnya (535), shortened.
+ORFEI_SUMMER = """  * [Лятна занималня](https://www.orfei.net/lyatna-zanimalnya)
+# Лятна занималня
+  1. **Възраст:** деца от 5 до 14 години
+#### Такси и условия
+  1. **Месечна такса:** 400 евро (целодневно) / 300 евро (полудневно)
+  2. **Седмична такса:** 150 евро (целодневно) / 130 евро (полудневно)
+  3. **Дневна такса:** 40 евро (целодневно)
+"""
+
+# orfei.net/uchilishtna-zanimalnya (535), shortened.
+ORFEI_AFTER_SCHOOL = """**💰 Такси и условия**
+**Месечна такса:**
+  1. **Ученици от ПГ до 4. клас: 300 евро**
+  2. **Ученици от 5. клас: 400 евро**
+**Седмичнна такса** :
+  1. **Ученици от ПГ до 4. клас: 150 евро**
+  2. **Ученици от 5. клас: 200 евро**
+**Дневна такса:**
+  1. **Ученици от ПГ до 4. клас: 40 евро**
+  2. **Ученици от 5. клас: 50 евро**
+"""
+
+# uwekind.com/admission/fees/ (635), shortened: the fee's own heading is folded away.
+UWEKIND_ADMIN = """  * [Административна такса за кандидатстване за прием ](https://uwekind.com/admission/fees/)
+  * [Административна такса за обработка на документи при постъпване ](https://uwekind.com/admission/fees/)
+**__Административна такса за кандидатстване за прием__**
+Такса кандидатстване: **150 € (ПК – 12. клас)**
+Такса кандидатстване: **100 € (детска градина)**
+Таксата е **задължителна** и се заплаща **еднократно** с падежа на първа вноска.
+**500 €**
+"""
+
+
+def test_a_camps_age_range_past_kindergarten_is_not_a_kindergarten_group():
+    camp = _fee("CAMP", 400, "MONTHLY", "Месечна такса", "деца от 5 до 14 години")
+    kindergarten = _fee("CAMP", 400, "MONTHLY", "Месечна такса", "деца от 3 до 6 години")
+
+    assert RULE_LEVEL not in {f.rule for f in check_price_row(camp, ORFEI_SUMMER, "school", shares_site=True)}
+    assert RULE_LEVEL in {f.rule for f in check_price_row(kindergarten, ORFEI_SUMMER, "school")}
+
+
+def test_an_option_in_brackets_does_not_part_a_price_from_its_label():
+    half_day = _fee("CAMP", 300, "MONTHLY", "Месечна такса")
+    weekly = _fee("CAMP", 130, "WEEKLY", "Седмична такса")
+    # The day fee's label, not the week's, stands right before 40.
+    daily_as_weekly = _fee("CAMP", 40, "WEEKLY", "Седмична такса")
+
+    assert check_price_row(half_day, ORFEI_SUMMER, "school") == []
+    assert check_price_row(weekly, ORFEI_SUMMER, "school") == []
+    assert RULE_AMOUNT_NEAR_LABEL in {f.rule for f in check_price_row(daily_as_weekly, ORFEI_SUMMER, "school")}
+
+
+def test_a_list_item_that_gives_the_rows_age_group_belongs_to_its_label():
+    rows = [
+        _fee("AFTER_SCHOOL", 400, "MONTHLY", "Месечна такса", "Ученици от 5. клас"),
+        _fee("AFTER_SCHOOL", 200, "WEEKLY", "Седмичнна такса", "Ученици от 5. клас"),
+        _fee("AFTER_SCHOOL", 50, "DAILY", "Дневна такса", "Ученици от 5. клас"),
+    ]
+    for row in rows:
+        assert check_price_row(row, ORFEI_AFTER_SCHOOL, "school") == [], row
+    # Another group's item: the label is still separated from the amount.
+    other_group = _fee("AFTER_SCHOOL", 400, "MONTHLY", "Месечна такса", "Ученици от ПГ до 4. клас")
+    assert RULE_AMOUNT_NEAR_LABEL in {f.rule for f in check_price_row(other_group, ORFEI_AFTER_SCHOOL, "school")}
+
+
+def test_a_labels_menu_link_is_not_where_its_fee_is_printed():
+    row = _fee("REGISTRATION", 500, "ONE_TIME", "Административна такса за обработка на документи при постъпване")
+    applied = _fee("REGISTRATION", 150, "ONE_TIME", "Административна такса за кандидатстване за прием")
+
+    assert check_price_row(row, UWEKIND_ADMIN, "school") == []
+    assert check_price_row(applied, UWEKIND_ADMIN, "school") == []
+
+
+def test_layout_allowances_keep_other_fees_apart():
+    # The day fee filed as the month's: other lists' labels stand in between.
+    daily_as_monthly = _fee("AFTER_SCHOOL", 50, "MONTHLY", "Месечна такса", "Ученици от 5. клас")
+    assert RULE_AMOUNT_NEAR_LABEL in {f.rule for f in check_price_row(daily_as_monthly, ORFEI_AFTER_SCHOOL, "school")}
+    # Another fee's name in brackets still parts its price from the label.
+    page = "Такса: 300 евро (обучение) / 50 евро (храна)\n"
+    assert RULE_AMOUNT_NEAR_LABEL in {f.rule for f in check_price_row(_fee("TUITION", 50, None, "Такса"), page, "school")}
+    # A link on its price's own line is where that fee is printed.
+    linked = "Такса обучение: 500 евро за година\n\n* [Такса обучение](http://x) - 900 евро\n"
+    assert check_price_row(_fee("TUITION", 900, "YEARLY", "Такса обучение"), linked, "school") == []
+
+
+def test_only_age_ranges_past_kindergarten_clear_a_kindergarten_label():
+    def kindergartens(label):
+        return label_is_another_institutions(label, "school", set())
+
+    assert not kindergartens("деца от 5 до 14 години")
+    assert not kindergartens("5-14 y.o")
+    assert kindergartens("Група 3-4 години, 10 годишни вноски")
+    assert kindergartens("Детска градина 3-6 години и лятна школа 6-12 години")
+    assert kindergartens("Програми за деца от 2 до 12 години\n3-4 години: 500 евро")

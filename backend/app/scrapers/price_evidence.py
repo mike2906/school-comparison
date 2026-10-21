@@ -156,7 +156,11 @@ def _has_words(text: str) -> bool:
 
 
 def label_is_near(
-    text: str, prices: list[tuple[int, int]], amount: tuple[int, int], label: tuple[int, int]
+    text: str,
+    prices: list[tuple[int, int]],
+    amount: tuple[int, int],
+    label: tuple[int, int],
+    own_words: str | None = None,
 ) -> bool:
     """True when the amount is in its label's own run of prices.
 
@@ -164,7 +168,10 @@ def label_is_near(
     separates them from the amount: the fee in another currency ("\u20ac 530 | 1037 \u043b\u0432."),
     or the monthly and yearly column of one row ("650.00 \u20ac 6 792.00 \u20ac"). A price
     followed by more label words belongs to another fee (630's catering row took the
-    \u20ac6,200 printed several fees above its label).
+    \u20ac6,200 printed several fees above its label). The words just before the amount may
+    be the row's own ``own_words`` (its age group): a list under its label gives each
+    item's group first ("Месечна такса:" over "1. Ученици от ПГ до 4. клас: 300 евро" and "2. Ученици
+    от 5. клас: 400 евро", 535).
     """
     before = label[0] < amount[0]
     low, high = (label[1], amount[0]) if before else (amount[1], label[0])
@@ -178,7 +185,36 @@ def label_is_near(
     words = text[stretch[0]: stretch[1]]
     for start, end in reversed([p for p in inner if stretch[0] <= p[0] and p[1] <= stretch[1]]):
         words = words[: start - stretch[0]] + " " + words[end - stretch[0]:]
+    if "\n" not in words:
+        # On one line, a few words in brackets name the option a price is for, not
+        # another fee: 535's "Месечна такса: 400 евро (целодневно) / 300 евро (полудневно)".
+        words = _OPTION_NOTE_RE.sub(" ", words)
+    if own_words and before:
+        last_item = text[inner[-1][1]: amount[0]]
+        # Another list's label in between ("**Дневна такса:**") makes it another fee.
+        other_label = any(
+            line.rstrip(" *_").endswith(":") and not _is_price_line(line)
+            for line in text[label[1]: amount[0]].split("\n")[1:-1]
+        )
+        if not other_label and _label_key(_LIST_MARK_RE.sub(" ", last_item)) == _label_key(own_words):
+            return True
     return not _has_words(words)
+
+
+# How long a day the price is for: one fee's options, not other fees' names.
+_OPTION_NOTE_RE = re.compile(
+    r"\(\s*(?:целодневно|полудневно|цял ден|половин ден|full[- ]day|half[- ]day)\s*\)"
+)
+_LIST_MARK_RE = re.compile(r"(?m)^\s*(?:\d{1,2}\.|[-*+])\s|[*_]+")
+
+
+def _in_link_text(text: str, span: tuple[int, int]) -> bool:
+    """The span is inside a markdown link's text: "[label](url)"."""
+    line_start = text.rfind("\n", 0, span[0]) + 1
+    return bool(
+        re.search(r"\[[^\[\]\n]*\Z", text[line_start: span[0]])
+        and re.match(r"[^\[\]\n]*\]\(", text[span[1]:])
+    )
 
 
 def _line_of(text: str, span: tuple[int, int]) -> str:
@@ -261,7 +297,7 @@ def amount_context(text: str, span: tuple[int, int]) -> str:
         next_line = after_lines[index + 1] if index + 1 < len(after_lines) else ""
         if (
             _is_price_line(following)
-            or following.rstrip().endswith(":")
+            or following.rstrip(" *_").endswith(":")  # "**Дневна такса:**" heads the next list (535)
             or next_line.lstrip().startswith(":")
         ):
             break
@@ -575,13 +611,28 @@ _PRESCHOOL_LABEL_RE = re.compile(
     r"подготв|подготов|предучилищ|pre-?school|preparatory|reception|pre[- ]?k(?:indergarten)?\b"
 )
 # A kindergarten or nursery group: named, or given by the children's age.
+_KINDERGARTEN_NAME = r"детска\s+градина|\bградина\b|ясл|kindergar[td]en|nursery|toddler|maternelle|ранно детско"
+_AGE_UNIT = r"(?:г\.|г\b|годиш|години\b|years?\b|yrs?\b|y\.?o\b)"
 _KINDERGARTEN_LABEL_RE = re.compile(
-    r"детска\s+градина|\bградина\b|ясл|kindergar[td]en|nursery|toddler|maternelle|ранно детско"
+    _KINDERGARTEN_NAME
     # An age is one or two digits; "2026/2027 г." is a year, "за 10 месеца" a payment span,
     # and "IGCSE 2 years in 1" (581) a course's length, also before its price ("in 1 – €738");
     # "3 години за 10 месеца" and "за 1-2 месеца" stay ages.
-    r"|(?<![\d/.-])\d{1,2}\s*(?:г\.|г\b|годиш|години\b|years?\b|yrs?\b|y\.?o\b)(?!\s*(?:in|за)\s+1[ \t]*(?:$|\n|\(|:|[–—-](?![ \t]*\d)))"
+    + rf"|(?<![\d/.-])\d{{1,2}}\s*{_AGE_UNIT}(?!\s*(?:in|за)\s+1[ \t]*(?:$|\n|\(|:|[–—-](?![ \t]*\d)))"
 )
+# An age range of children: "от 5 до 14 години", "3-6 г.", "5-14 y.o".
+_AGE_RANGE_RE = re.compile(
+    rf"(?<![\d/.-])(\d{{1,2}})\s*(?:-|–|—|до|to)\s*(\d{{1,2}})\s*{_AGE_UNIT}"
+)
+KINDERGARTEN_MAX_AGE = 7  # school starts at 7
+
+
+def _only_school_ages(text: str) -> bool:
+    """Every age range named runs past kindergarten age: "деца от 5 до 14 години" is a
+    summer camp's (535), not a kindergarten group's. A label that names a kindergarten
+    outright, or one range within kindergarten age, is not cleared by this."""
+    ranges = _AGE_RANGE_RE.findall(text)
+    return bool(ranges) and all(int(high) > KINDERGARTEN_MAX_AGE for _, high in ranges)
 
 
 def _grade_number(token: str) -> Optional[int]:
@@ -777,7 +828,9 @@ def label_is_another_institutions(
     if school_grades:
         named_itself = bool(own_name and _label_key(own_name) and _label_key(own_name) in _label_key(label))
         return bool(grades) and not (school_grades & grades) and not named_itself
-    return bool(_KINDERGARTEN_LABEL_RE.search(text)) and not preschool
+    if preschool or not _KINDERGARTEN_LABEL_RE.search(text):
+        return False
+    return bool(re.search(_KINDERGARTEN_NAME, text)) or not _only_school_ages(text)
 
 
 def offer_end(context: str) -> Optional[datetime.date]:
@@ -944,7 +997,13 @@ def check_price_row(
             )
             return hits
         spans.extend(in_currency or found)
-    labels = label_spans(text, row.label)
+    # A link's text on a line with no price is a menu or a table of contents, not where the fee is printed (635's
+    # "[Административна такса за обработка на документи при постъпване](...)" above
+    # other fees, while its own heading is folded away).
+    labels = [
+        span for span in label_spans(text, row.label)
+        if not (_in_link_text(text, span) and not _is_price_line(_line_of(text, span)))
+    ]
 
     # The amount occurrence this row is about: the one nearest its label, when found.
     # In a markdown table the label is a column header, so the check says nothing there.
@@ -953,7 +1012,7 @@ def check_price_row(
         prices = price_spans(text)
         best = min(
             (
-                ("|" not in _line_of(text, s) and not label_is_near(text, prices, s, l), _gap(s, l), s, l)
+                ("|" not in _line_of(text, s) and not label_is_near(text, prices, s, l, row.age_group), _gap(s, l), s, l)
                 for s in spans
                 for l in labels  # noqa: E741
             ),
