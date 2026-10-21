@@ -222,7 +222,7 @@ _PERIOD_WORDS = {  # Bulgarian, English, and the French and German some schools 
         # "За цялата учебна година" (300), "изчислена за една учебна година" (635's food and
         # transport) and a "(l'année)" column (505) name the year for what they head; a bare
         # "for the school year" heading does not (_YEAR_ON_AMOUNT_LINE_RE).
-        r"(?<!полу)(?<!дву)годиш|\b(?:year(?:ly)?|annual)\b|цялата учебна година|(?:една|1)\s+учебна\s+година"
+        r"(?<!полу)(?<!дву)годиш|\b(?:year(?:ly)?|annual)\b|цялата учебна година|(?<![\w.])(?:една|1)\s+учебна\s+година"
         r"|annuel|\(l'année\)|par an\b|(?<![a-zäöü])jährlich|pro jahr"
     ),
     PricePeriod.QUARTER: r"тримесеч|\bquarter|vierteljährlich",
@@ -298,8 +298,6 @@ def _names_period(period: PricePeriod, evidence: str, amounts: list[Decimal], ca
     # needs no word for it; a deposit filed as registration is one too. Not when the line
     # calls it recurring and never one-time: "годишна такса за записване" is paid every year.
     # "срок" is left out: "платима в срок до 15 юни" is a deadline, not a term.
-    # Markdown emphasis between the words: 533's "≈ 7.5 ЕUR /** ден".
-    evidence = _EMPHASIS_RE.sub("", evidence)
     amount_lines = [line for line in evidence.splitlines() if set(amounts) & page_numbers(line)]
     evidence = _AGE_RE.sub(" ", evidence)
     amount_lines = [_AGE_RE.sub(" ", line) for line in amount_lines]
@@ -467,7 +465,8 @@ def check_fee(fee: AgentFee, page_text: str) -> CheckedFee:
 
     # The period and deposit rules read the fee's own lines: "9 x € 750 monthly" names the
     # period of a payment option, not of the price paid in one go above it.
-    evidence = _without_option_lines(lines, fee)
+    # Markdown emphasis between the words reads as a space: 533's "≈ 7.5 ЕUR /** ден".
+    evidence = _EMPHASIS_RE.sub(" ", _without_option_lines(lines, fee))
     checks: list[str] = []
     period = fee.period
     if (

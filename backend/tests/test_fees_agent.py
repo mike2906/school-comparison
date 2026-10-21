@@ -2164,6 +2164,7 @@ def test_periods_stated_with_a_school_year_or_a_count_of_one_are_kept(category, 
         ("| 9 месеца | 550 евро на срок |", PricePeriod.YEARLY),
         ("Плаща се 1 седмица преди началото: 550 евро", PricePeriod.WEEKLY),
         ("Занимания по време на учебен ден: 550 евро", PricePeriod.DAILY),
+        ("Месечна такса 550 евро за 2030/2031 учебна година", PricePeriod.YEARLY),
         ("Екскурзия на един ден 550 евро", PricePeriod.DAILY),
         ("Деца на 1 месец: 550 евро", PricePeriod.MONTHLY),
         ("| Възраст | Такса |\n| 12 месеца | 550 |", PricePeriod.YEARLY),  # an age column
