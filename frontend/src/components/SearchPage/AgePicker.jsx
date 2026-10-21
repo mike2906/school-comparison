@@ -10,6 +10,7 @@ import {
   birthYearsFor,
   categoryForGroup,
   enrolmentYears,
+  planningYear,
   preschoolWhere,
   PRESCHOOL_WHERE,
   toSearchSelection,
@@ -80,7 +81,7 @@ function AgePicker({
 
   const groupLabel = (group) => (config ? getAgeGroupLabel(config, group, i18n.language) : t(`ageGroups.${group}`))
   const years = enrolmentYears()
-  const effectiveTarget = targetYear || years[1]
+  const effectiveTarget = targetYear || planningYear()
 
   const apply = (next) => {
     const selection = toSearchSelection({ ageGroup: next.ageGroup, where: next.where })

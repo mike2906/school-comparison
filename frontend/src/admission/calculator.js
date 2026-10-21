@@ -8,6 +8,7 @@ import { schoolCatchmentIds } from './catchments.js'
 import i18next from 'i18next'
 import { usesSofiaKindergartenSystem } from '../utils/admission.js'
 import { formatAmount } from '../utils/format.js'
+import { planningYear } from '../utils/ageSelection.js'
 
 /** Calculator tabs: the rule-file stage and the cut-off stages read with it. */
 export const STAGES = [
@@ -61,7 +62,7 @@ export function campaignEnd(ruleSet) {
  * the next campaign is the open question.
  */
 export function defaultStartYear(now = new Date(), { ruleSets = [], stage = null, today = sofiaToday(now) } = {}) {
-  const next = now.getMonth() >= 9 ? now.getFullYear() + 1 : now.getFullYear()
+  const next = planningYear(now)
   if (!stage) return next
   for (let year = now.getFullYear(); year < next; year += 1) {
     const campaign = `${year}/${year + 1}`
