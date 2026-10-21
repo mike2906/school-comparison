@@ -219,9 +219,10 @@ _PERIOD_WORDS = {  # Bulgarian, English, and the French and German some schools 
         r"|\bmonth(?:ly)?\b|mensuel|par mois|monatlich|pro monat"
     ),
     PricePeriod.YEARLY: (
-        # "За цялата учебна година" (300) and a "(l'année)" column (505) name the year for
-        # what they head; a bare "for the school year" heading does not (_YEAR_ON_AMOUNT_LINE_RE).
-        r"(?<!полу)(?<!дву)годиш|\b(?:year(?:ly)?|annual)\b|цялата учебна година"
+        # "За цялата учебна година" (300), "изчислена за една учебна година" (635's food and
+        # transport) and a "(l'année)" column (505) name the year for what they head; a bare
+        # "for the school year" heading does not (_YEAR_ON_AMOUNT_LINE_RE).
+        r"(?<!полу)(?<!дву)годиш|\b(?:year(?:ly)?|annual)\b|цялата учебна година|(?:една|1)\s+учебна\s+година"
         r"|annuel|\(l'année\)|par an\b|(?<![a-zäöü])jährlich|pro jahr"
     ),
     PricePeriod.QUARTER: r"тримесеч|\bquarter|vierteljährlich",
@@ -285,6 +286,9 @@ _FIRST_INSTALMENT_BEFORE_RE = re.compile(r"(?<!\d)1\s*[xх×]\s*$")  # latin x, 
 _PLUS_N_TIMES_AFTER_RE = re.compile(r"\s*(?:eur|€|евро|лв\.?|лева|bgn)?\s*\+\s*\d+\s*[xх×]")
 
 
+_EMPHASIS_RE = re.compile(r"[*_]+")
+
+
 def _normalized(text: str) -> str:
     return " ".join(text.split()).casefold()
 
@@ -294,6 +298,8 @@ def _names_period(period: PricePeriod, evidence: str, amounts: list[Decimal], ca
     # needs no word for it; a deposit filed as registration is one too. Not when the line
     # calls it recurring and never one-time: "годишна такса за записване" is paid every year.
     # "срок" is left out: "платима в срок до 15 юни" is a deadline, not a term.
+    # Markdown emphasis between the words: 533's "≈ 7.5 ЕUR /** ден".
+    evidence = _EMPHASIS_RE.sub("", evidence)
     amount_lines = [line for line in evidence.splitlines() if set(amounts) & page_numbers(line)]
     evidence = _AGE_RE.sub(" ", evidence)
     amount_lines = [_AGE_RE.sub(" ", line) for line in amount_lines]
