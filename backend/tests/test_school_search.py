@@ -14,6 +14,7 @@ from app.utils.school_search import (
     RANK_NUMBER,
     RANK_PHRASE,
     RANK_PREFIX,
+    RANK_SOUND,
     SAINT_WORDS,
     SCHOOL_NAME_ALIASES,
     TYPE_ABBREVIATIONS,
@@ -188,6 +189,26 @@ def test_address_only_match_ranks_last_and_nonsense_is_empty():
     assert query_tokens(" .,- ") == []
 
 
+@pytest.mark.parametrize(
+    ("query", "name"),
+    [
+        ("Мейпъл Беър", "Maple Bear Sofia"),
+        ("Американ колидж", "American College of Sofia"),
+        ("Линкълн", "Abraham Lincoln School"),
+        ("Кеймбридж", "Cambridge School"),
+    ],
+)
+def test_brands_written_by_ear_in_cyrillic_match_by_sound(query, name):
+    assert _rank(query, name) == RANK_SOUND
+
+
+def test_sound_matching_needs_enough_consonants():
+    # "Лайтхаус" is l-t-s, which Елица also is; "Мейпъл" alone is m-p-l.
+    assert _rank("Лайтхаус", "ДГ №66 Елица") is None
+    assert _rank("Мейпъл", "Maple Bear Sofia") is None
+    assert _rank("Мейпъл Беър", "Канадско мече") is None
+
+
 def test_every_alias_targets_a_normalized_substring():
     for alias, target in SCHOOL_NAME_ALIASES.items():
         assert normalize(alias) == alias
@@ -253,6 +274,7 @@ async def test_search_endpoint_uses_aliases_numbers_and_ranking(seeded_db, seede
     smg = await _add_school(seeded_db, SMG)
     npmg = await _add_school(seeded_db, NPMG)
     aeg_1 = await _add_school(seeded_db, AEG_1, name_en="First English Language School")
+    maple = await _add_school(seeded_db, "Частно основно училище Канадско мече", name_en="Maple Bear Sofia")
     await seeded_db.commit()
 
     async def ids(query: str) -> list[int]:
@@ -269,5 +291,6 @@ async def test_search_endpoint_uses_aliases_numbers_and_ranking(seeded_db, seede
     assert await ids("1 АЕГ") == [aeg_1.id]
     assert await ids("First English") == [aeg_1.id]
     assert await ids("xqzv") == []
+    assert await ids("Мейпъл Беър") == [maple.id]
     # Same tier (word prefix): the shorter registry name comes first.
     assert await ids("математическа") == [smg.id, npmg.id]

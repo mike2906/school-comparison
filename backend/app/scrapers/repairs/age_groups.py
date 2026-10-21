@@ -12,6 +12,7 @@ from urllib.parse import unquote
 from rich.console import Console
 from rich.table import Table
 
+from app.scrapers.sources.bg.school_kinds import is_evening_school
 from app.scrapers.stages import common as stage_common
 from app.scrapers.stages import navigate as navigate_stage
 
@@ -135,6 +136,11 @@ def _allowed_age_group_repairs_for_school(school) -> set[str]:
     # a partner kindergarten or quoted legal text.
     if dict(getattr(school, "attributes", None) or {}).get("moe_detailed_type") in (125, 126):
         return {"grade_5_7", "grade_8_12"}
+
+    # Evening schools take pupils of 16 and over: a page listing grades 1-7 there
+    # describes classes for adults.
+    if is_evening_school(name_bg):
+        return {"grade_8_12"}
 
     if "обединено училище" in name_bg:
         return {"preschool", "grade_1_4", "grade_5_7", "grade_8_12"}

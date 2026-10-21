@@ -749,6 +749,16 @@ class TestMoeRegistryAgeGroupExtraction:
         result = MoeRegistryAdapter._get_age_groups_for_detailed_type(124, 'upper_secondary')
         assert result == ['grade_1_4', 'grade_5_7', 'grade_8_12']
     
+    def test_age_groups_evening_school_is_for_older_pupils(self):
+        """An evening school is registered as средно (1-12) but takes pupils of 16 and over."""
+        from app.scrapers.sources.bg.moe_registry import MoeRegistryAdapter
+
+        for name in ('5. Вечерно средно училище "Пеньо Пенев"', 'IV Сменно-вечерна гимназия " Отец Паисий "'):
+            assert MoeRegistryAdapter._get_age_groups_for_detailed_type(124, 'upper_secondary', name) == ['grade_8_12']
+        assert MoeRegistryAdapter._get_age_groups_for_detailed_type(124, 'upper_secondary', '119 Средно училище') == [
+            'grade_1_4', 'grade_5_7', 'grade_8_12'
+        ]
+
     def test_age_groups_specialized_gymnasium(self):
         """Test age groups for specialized gymnasium (type 125) serving grades 8-12."""
         from app.scrapers.sources.bg.moe_registry import MoeRegistryAdapter

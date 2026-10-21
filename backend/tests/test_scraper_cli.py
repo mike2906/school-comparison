@@ -308,6 +308,19 @@ def test_allowed_age_group_repairs_for_gymnasium_excludes_preschool_and_primary(
     assert "preschool" in age_group_repair._allowed_age_group_repairs_for_school(school)
 
 
+def test_allowed_age_group_repairs_for_evening_school_only_grades_8_12():
+    school = School(
+        name_i18n={"bg": '5. Вечерно средно училище "Пеньо Пенев"'},
+        country_code="bg",
+        school_type="state",
+        education_level="upper_secondary",
+        city="sofia",
+        attributes={"moe_detailed_type": 124},
+    )
+
+    assert age_group_repair._allowed_age_group_repairs_for_school(school) == {"grade_8_12"}
+
+
 def test_allowed_age_group_repairs_for_lower_secondary_excludes_grade_8_12():
     school = School(
         name_i18n={"bg": '124 ОСНОВНО УЧИЛИЩЕ "ВАСИЛ ЛЕВСКИ"'},

@@ -5,7 +5,9 @@ Parents write "СМГ", "1 АЕГ", "119 СУ", "СУ 119", "119-то", "№119"
 "Софийска математическа гимназия ...". This module bridges the two.
 
 The frontend list filter (frontend/src/utils/schoolSearch.js) mirrors these rules and
-tables; tests/test_school_search.py fails when the two tables drift apart.
+tables; tests/test_school_search.py fails when the two tables drift apart. Sound-alike matching
+(RANK_SOUND) is backend only: the list filter falls back to this search's hits when it
+finds nothing itself.
 """
 
 import re
@@ -96,6 +98,24 @@ LOOSE_SPELLINGS = (
 )
 _LOOSE_RES = [(re.compile(pattern), repl) for pattern, repl in LOOSE_SPELLINGS]
 
+# Foreign brands written in Cyrillic by ear: "Мейпъл Беър" for Maple Bear, "Кеймбридж" for
+# Cambridge, "Линкълн" for Lincoln. Transliteration gives "meypal bear", which no spelling
+# rule turns into "maple". Both sides are reduced to their consonants, after rewriting the
+# sounds the two alphabets write differently, and whole words are compared.
+_SOUND_RULES = [
+    (re.compile(pattern), repl)
+    for pattern, repl in (
+        ("ph", "f"), ("ck", "k"), ("dzh", "j"), ("dg", "j"), ("zh", "j"), ("ge$", "j"),
+        ("c(?!h)", "k"), ("q", "k"), ("x", "ks"), ("w", "v"), ("[aeiouyh]", ""), (r"(.)\1+", r"\1"),
+    )
+]
+# A query needs this many consonants in all to be matched by sound: "Лайтхаус" (l-t-s)
+# alone would find Елица, "Мейпъл Беър" (m-p-l b-r) is enough. Words under 2 say nothing.
+_MIN_SOUND_TOTAL = 4
+_MIN_SOUND_WORD = 2
+# More sound-alikes than this means the query is a common word, not a brand.
+MAX_SOUND_MATCHES = 5
+
 # Rank tiers (lower is better).
 RANK_ALIAS = 0
 RANK_NUMBER = 1
@@ -103,6 +123,7 @@ RANK_PHRASE = 2  # the query's words in a row in the name: "Saint Sofia" = „С
 RANK_PREFIX = 3
 RANK_CONTAINS = 4
 RANK_ADDRESS = 5
+RANK_SOUND = 6  # sounds like the name: only when nothing matches better (search_schools)
 
 _NO_MARKER_RE = re.compile(r"(?<![a-z])no\.(?=\s*\d)")
 _NON_WORD_RE = re.compile(r"[\W_]+")
@@ -136,8 +157,15 @@ _ALIASES_LATIN = [
 ]
 
 
+@lru_cache(maxsize=4096)
+def _sound(latin_word: str) -> str:
+    for pattern, repl in _SOUND_RULES:
+        latin_word = pattern.sub(repl, latin_word)
+    return latin_word
+
+
 class _Name:
-    __slots__ = ("norm", "latin", "loose", "words", "has_saint", "word_rows")
+    __slots__ = ("norm", "latin", "loose", "words", "has_saint", "word_rows", "sounds")
 
     def __init__(self, value: object, *, saints: bool = True):
         self.norm = normalize(value)
@@ -147,6 +175,7 @@ class _Name:
         self.has_saint = saints and not SAINT_WORDS.isdisjoint(self.norm.split(" "))
         # Each word as (Cyrillic or source, transliterated, loose); the three line up.
         self.word_rows = list(zip(self.norm.split(" "), self.latin.split(" "), self.loose.split(" ")))
+        self.sounds = {_sound(word) for word in self.latin.split(" ") if not word.isdigit()}
 
 
 def _loose(latin: str) -> str:
@@ -217,6 +246,19 @@ def _tokens_rank(tokens: list[str], names: list[_Name]) -> Optional[int]:
     return best
 
 
+def _sounds_like(tokens: list[str], names: list[_Name]) -> bool:
+    """Every query word sounds like a word of one name, or matches it as usual."""
+    keys = [None if token.isdigit() else _sound(transliterate(token)) for token in tokens]
+    keys = [key if key and len(key) >= _MIN_SOUND_WORD else None for key in keys]
+    if sum(len(key) for key in keys if key) < _MIN_SOUND_TOTAL:
+        return False
+    return any(
+        name.norm
+        and all((key and key in name.sounds) or _token_in(token, name) for token, key in zip(tokens, keys))
+        for name in names
+    )
+
+
 def _alias_remainders(tokens: list[str], registry_name: str) -> list[list[str]]:
     """Query tokens left over after each curated alias that names this school."""
     latin_tokens = [transliterate(token) for token in tokens]
@@ -274,4 +316,6 @@ def rank_prepared(tokens: list[str], school: PreparedSchool) -> Optional[int]:
         return rank
     if _tokens_rank(tokens, school.addresses) is not None:
         return RANK_ADDRESS
+    if _sounds_like(tokens, school.names):
+        return RANK_SOUND
     return None
