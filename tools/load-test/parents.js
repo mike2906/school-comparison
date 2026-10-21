@@ -45,12 +45,25 @@ export const options = {
 // The site's request for these: gzip, as a browser asks.
 const PARAMS = { headers: { 'Accept-Encoding': 'gzip, deflate, br' } }
 
-function get(path, name) {
-  const url = BYPASS ? `${API}${path}${path.includes('?') ? '&' : '?'}load=${__VU}-${__ITER}-${Date.now()}` : `${API}${path}`
-  const response = http.get(url, { ...PARAMS, tags: { name } })
+function url(path) {
+  return BYPASS ? `${API}${path}${path.includes('?') ? '&' : '?'}load=${__VU}-${__ITER}-${Date.now()}` : `${API}${path}`
+}
+
+function record(response, name) {
   check(response, { [`${name} 200`]: (r) => r.status === 200 })
   edgeHit.add(EDGE_SERVED.has(response.headers['Cf-Cache-Status']), { name })
+}
+
+function get(path, name) {
+  const response = http.get(url(path), { ...PARAMS, tags: { name } })
+  record(response, name)
   return response
+}
+
+// Requests the browser starts together, sent in parallel as it does: [path, name] pairs.
+function getAll(requests) {
+  const responses = http.batch(requests.map(([path, name]) => ['GET', url(path), null, { ...PARAMS, tags: { name } }]))
+  responses.forEach((response, i) => record(response, requests[i][1]))
 }
 
 export function setup() {
@@ -85,10 +98,13 @@ function typedQueries(name) {
 
 export default function (data) {
   // Opening the search page; the age picker (counts) is opened by about half.
-  get(`/schools?${SCOPE}`, 'list')
-  get(`/schools/filters?${SCOPE}`, 'filters')
-  get(`/schools/exam-averages?${SCOPE}`, 'exam_averages')
-  if (Math.random() < 0.5) get(`/schools/counts?${SCOPE}`, 'counts')
+  const pageLoad = [
+    [`/schools?${SCOPE}`, 'list'],
+    [`/schools/filters?${SCOPE}`, 'filters'],
+    [`/schools/exam-averages?${SCOPE}`, 'exam_averages'],
+  ]
+  if (Math.random() < 0.5) pageLoad.push([`/schools/counts?${SCOPE}`, 'counts'])
+  getAll(pageLoad)
   sleep(5 + Math.random() * 10)
 
   // Most parents look a school up by name.
