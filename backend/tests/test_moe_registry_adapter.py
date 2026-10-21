@@ -2,6 +2,7 @@
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, patch
 
+import httpx
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -558,6 +559,25 @@ class TestMoeRegistryAdapterIntegration:
         assert school.locations == []
         assert school.attributes["missing_location_data"] is True
         assert school.attributes["missing_location_reason"] == "no_address_and_geojson_miss"
+
+    async def test_discover_names_a_cloudflare_challenge(self, db_session: AsyncSession):
+        """A Cloudflare bot check in front of the register says so instead of a bare 403."""
+        adapter = MoeRegistryAdapter(db=db_session)
+        challenge = httpx.Response(
+            403,
+            headers={"cf-mitigated": "challenge"},
+            text="<title>Just a moment...</title>",
+            request=httpx.Request("POST", adapter.PUBLIC_REGISTER_URL),
+        )
+
+        mock_client = AsyncMock()
+        mock_client.__aenter__.return_value = mock_client
+        mock_client.__aexit__.return_value = None
+        mock_client.post = AsyncMock(return_value=challenge)
+
+        with patch("httpx.AsyncClient", return_value=mock_client):
+            with pytest.raises(RuntimeError, match="Cloudflare challenge"):
+                await adapter.discover(limit=1, fetch_details=False)
 
 
 @pytest.mark.asyncio
