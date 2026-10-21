@@ -281,6 +281,9 @@ def test_deposit_filed_as_registration_publishes():
         ("Първоначален Депозит в размер на 600€ се заплаща при подписване на Договора;", 600, "такса", True),
         ("Ако желаете да запазите своето място при нас се заплаща капаро в размер на 150€", 150, "такса", True),
         ("Заплаща се при подписване на договора: 300 €", 300, "Депозит", True),
+        # 300: a guarantee taken off the last fee is a deposit by another name.
+        ("Договорът се сключва с внасяне на гаранционна вноска в размер на 1500 евро,", 1500, "такса", True),
+        ("Place guarantee: 1000 EUR", 1000, "fee", True),
         # Only the amount the word stands before: the enrolment fee on the deposit's line is a fee.
         ("Такса за записване 200 €, депозит 500 €", 200, "Такса за записване", False),
         ("Такса за записване 200 €, депозит 500 €", 500, "депозит", True),
