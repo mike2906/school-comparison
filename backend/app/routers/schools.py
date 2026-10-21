@@ -496,24 +496,36 @@ async def get_exam_averages(
         ) from e
 
 
+class _PartialDetail(Exception):
+    """A school page built without one of its optional links: shown, but never cached, so a
+    passing failure does not stick (and a refresh keeps the complete page it had)."""
+
+    def __init__(self, body: bytes):
+        super().__init__("a school page link failed")
+        self.body = body
+
+
 async def _build_detail_body(db: AsyncSession, *, school_id: int) -> bytes | None:
     school = await SchoolService(db).get_school_with_details(school_id)
     if not school:
         return None
 
     response = SchoolDetailResponse.model_validate(school)
+    complete = True
     try:
         link = await continues_to(db, school)
     except Exception:
         # The link is optional; fail closed without failing the detail page.
         logger.warning("continues_to failed for school %s", school_id, exc_info=True)
         link = None
+        complete = False
     if link is not None:
         response.continues_to = RelatedSchoolResponse.model_validate(link)
     try:
         response.continued_from = [RelatedSchoolResponse.model_validate(row) for row in await continued_from(db, school)]
     except Exception:
         logger.warning("continued_from failed for school %s", school_id, exc_info=True)
+        complete = False
     try:
         same_place = await _cached_or_build(
             _same_place_cache,
@@ -525,8 +537,12 @@ async def _build_detail_body(db: AsyncSession, *, school_id: int) -> bytes | Non
         response.same_place = [SamePlaceSchoolResponse.model_validate(row) for row in same_place.get(school.id, [])]
     except Exception:
         logger.warning("same_place failed for school %s", school_id, exc_info=True)
+        complete = False
     # As FastAPI would serialize it through response_model (the publish boundary).
-    return gzip.compress(response.model_dump_json(by_alias=True).encode())
+    body = gzip.compress(response.model_dump_json(by_alias=True).encode())
+    if not complete:
+        raise _PartialDetail(body)
+    return body
 
 
 @router.get("/{school_id}", response_model=SchoolDetailResponse)
@@ -537,16 +553,19 @@ async def get_school(
 ):
     """Get detailed information about a specific school."""
     try:
-        gzipped = await _cached_or_build(
-            _detail_cache,
-            (school_id,),
-            partial(_build_detail_body, school_id=school_id),
-            db,
-            _detail_build_locks[school_id % len(_detail_build_locks)],
-            # Not warmed like the list: a page nobody opened for a while is rebuilt, so it
-            # never shows last week's fees or an offer that has ended.
-            max_age=2 * LIST_CACHE_TTL_SECONDS,
-        )
+        try:
+            gzipped = await _cached_or_build(
+                _detail_cache,
+                (school_id,),
+                partial(_build_detail_body, school_id=school_id),
+                db,
+                _detail_build_locks[school_id % len(_detail_build_locks)],
+                # Not warmed like the list: a page nobody opened for a while is rebuilt, so
+                # it never shows last week's fees or an offer that has ended.
+                max_age=2 * LIST_CACHE_TTL_SECONDS,
+            )
+        except _PartialDetail as partial_page:
+            gzipped = partial_page.body
         if gzipped is None:
             raise HTTPException(status_code=404, detail="School not found")
         return _gzipped_json_response(request, gzipped)

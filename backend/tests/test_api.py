@@ -354,10 +354,27 @@ class TestSchoolsEndpoint:
         assert calls == 2
         assert schools_router._background_tasks == set()
 
+        # A page whose optional links failed is shown but not kept, so the next visitor
+        # gets the complete page.
+        from app.routers import schools as schools_router
+
+        async def failing(*args, **kwargs):
+            raise RuntimeError("database hiccup")
+
+        schools_router._detail_cache.clear()
+        working = schools_router.continued_from
+        monkeypatch.setattr(schools_router, "continued_from", failing)
+        assert (await seeded_client.get(f"/schools/{school_id}")).json()["id"] == school_id
+        assert (school_id,) not in schools_router._detail_cache
+        monkeypatch.setattr(schools_router, "continued_from", working)
+        assert (await seeded_client.get(f"/schools/{school_id}")).status_code == 200
+        assert (school_id,) in schools_router._detail_cache
+        calls = 0
+
         # An id with no school is a 404, and stays one without another query.
         assert (await seeded_client.get("/schools/999999")).status_code == 404
         assert (await seeded_client.get("/schools/999999")).status_code == 404
-        assert calls == 3
+        assert calls == 1
 
     @pytest.mark.asyncio
     async def test_list_schools_serializes_exam_results_used_by_school_cards(
