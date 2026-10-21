@@ -247,15 +247,21 @@ describe('a school page', () => {
       ? formatCurrency(fee.min, 'bg', fee.currency)
       : `${formatCurrency(fee.min, 'bg', fee.currency)}–${formatCurrency(fee.max, 'bg', fee.currency)}`)
     const groups = ['nursery', 'first', 'second', 'third', 'preschool', 'grade_1_4', 'grade_5_7', 'grade_8_12']
-    const unnamed = s => (s.pricing || []).some(row => row.category === 'tuition' && rowAgeGroupKeys(row).size === 0)
+    const unnamed = row => rowAgeGroupKeys(row).size === 0
     const schools = (await allSchools()).filter(isPrivate)
-    const picked = schools.filter(unnamed).flatMap(s => groups.map(group => {
+    // An end of the all-ages range is a fee naming no age, and the age's own fee leaves it out.
+    const picked = schools.flatMap(s => groups.map(group => {
       const forGroup = statedTuition(s.pricing, { ageGroup: group })
       const all = statedTuition(s.pricing)
-      return forGroup && all && !shown(forGroup).includes(shown(all)) ? { s, group, forGroup, all } : null
+      const unnamedEnd = [...(all?.ends?.low || []), ...(all?.ends?.high || [])].some(unnamed)
+      return forGroup && unnamedEnd && !shown(forGroup).includes(shown(all)) ? { s, group, forGroup, all } : null
     })).find(Boolean)
-    assert.ok(picked, 'a private school whose fee for an age differs from its all-ages range')
-    const other = schools.find(s => s.id !== picked.s.id && statedTuition(s.pricing, { ageGroup: picked.group }))
+    assert.ok(picked, 'a private school whose all-ages range ends at a fee naming no age')
+    const other = schools.find(s => {
+      const fee = s.id !== picked.s.id && statedTuition(s.pricing, { ageGroup: picked.group })
+      return fee && !shown(fee).includes(shown(picked.all))
+    })
+    assert.ok(other, `a second private school with a fee for ${picked.group}`)
     await open('bg', `/compare?ids=${picked.s.id},${other.id}&age_group=${picked.group}`)
     await page.getByRole('heading', { level: 1, name: t('bg', 'compare.title') }).waitFor()
     await page.getByText(shown(picked.forGroup)).first().waitFor()

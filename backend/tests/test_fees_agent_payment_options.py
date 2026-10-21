@@ -391,6 +391,8 @@ def test_unnamed_fees_alike_take_their_labels():
 
 
 PAGE_305 = """\
+ПЪРВА ГРУПА
+Плащане на две вноски: 2 x 1950 €
 ВТОРА И ТРЕТА ГРУПА
 Плащане наведнъж: 3700 €
 Плащане на две вноски: 2 x 1950 € = 3900 €
@@ -409,7 +411,7 @@ async def test_dated_rows_an_undated_read_lists_as_payment_options_give_way(db_s
         label=group,
         academic_year=None,
         age_group=group,
-        evidence="\n".join(PAGE_305.splitlines()[:3]),
+        evidence="\n".join(PAGE_305.splitlines()[2:5]),
         payment_options=[PaymentOption(label="Плащане на две вноски", total=3900, payments=2, instalment=1950)],
     )
     school = School(
@@ -434,7 +436,8 @@ async def test_dated_rows_an_undated_read_lists_as_payment_options_give_way(db_s
     )
     db_session.add(page)
     await db_session.flush()
-    for amount in (1950, 3900):
+    # The last row is another group's fee at an option's amount: the read missed it, so it stays.
+    for amount, age_group in ((1950, group), (3900, group), (1950, "ПЪРВА ГРУПА")):
         db_session.add(
             Pricing(
                 school_id=school.id,
@@ -442,7 +445,7 @@ async def test_dated_rows_an_undated_read_lists_as_payment_options_give_way(db_s
                 amount=amount,
                 currency="EUR",
                 plan_name="Плащане на две вноски",
-                age_group=group,
+                age_group=age_group,
                 academic_year="2026/2027",
                 source=PriceSource.SCRAPED_WEBSITE,
                 source_url=URL,
@@ -461,4 +464,7 @@ async def test_dated_rows_an_undated_read_lists_as_payment_options_give_way(db_s
     report = await fees_agent.run_school(db_session, school, find=find, read=read, apply=True)
     rows = (await db_session.execute(select(Pricing).where(Pricing.school_id == school.id))).scalars().all()
     assert report["outcome"] == "written" and report["rows_old_kept"] == 0, report
-    assert [(float(r.amount), r.academic_year) for r in rows] == [(3700.0, None)]
+    assert sorted((float(r.amount), r.academic_year, r.age_group) for r in rows) == [
+        (1950.0, "2026/2027", "ПЪРВА ГРУПА"),
+        (3700.0, None, group),
+    ]
