@@ -79,6 +79,11 @@ locations, when an unrelated school is pinned there, or when the school has two 
 location by hand (manual_fix, old address and point kept in `manual_fix.previous`) when the
 evidence is the school's own but no stage can read it. Run it as a named command, never as raw SQL.
 
+`cli move-to-site-campus --location-id N --campus-id M --note "..." [--apply]` moves a shown
+register location to the address and point of the school's own site campus location (M,
+campus-tagged), keeping the register's grades and deleting the campus row: for a register
+address the site gives to someone else (630 Waldorf at its kindergarten's building).
+
 `cli confirm-pins [--apply]` publishes a hidden point that already stands on our building:
 Nominatim's nearest building there is our town, street and exact house number. Not when
 the school's own website maps it only over 300 m away (the address may be stale).

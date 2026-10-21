@@ -71,3 +71,47 @@ async def test_a_hand_pin_on_another_schools_exact_point_is_refused(db_session):
     await set_hand_pin(db_session, other_id, (42.70, 23.13), note="a", address="ул. Друга 1", apply=True)
     report = await set_hand_pin(db_session, location_id, (42.70, 23.13), note="b", apply=True)
     assert report["outcome"] == "point_held" and report["held_by_location_id"] == other_id
+
+
+@pytest.mark.asyncio
+async def test_a_register_location_moves_to_the_sites_campus(db_session):
+    from sqlalchemy import select
+    from sqlalchemy.orm import selectinload
+
+    from app.models.school import SchoolLocationAgeGroupShift
+    from app.scrapers.campus_sync import CAMPUS_TAG, WEBSITE_CONTACT_ADDRESS_TAG
+    from app.scrapers.stages.hand_pin import move_to_site_campus
+
+    # 630: the register gives Waldorf the kindergarten's Горски пътник 44; its site says Хумболт 7.
+    school = School(name_i18n={"bg": "ЧСУ Райнов"}, country_code="bg", school_type="private",
+                    education_level="upper_secondary", city="sofia")
+    db_session.add(school)
+    await db_session.flush()
+    register = SchoolLocation(school_id=school.id, address_i18n={"bg": 'ул. "Горски пътник" № 44'},
+                              lat=42.6726, lng=23.3162, is_primary=True, location_tags=["source=moe_registry"])
+    register.age_group_shifts = [SchoolLocationAgeGroupShift(age_group=g) for g in ("grade_1_4", "grade_8_12")]
+    campus = SchoolLocation(school_id=school.id, address_i18n={"bg": 'ул. "Александър фон Хумболт" № 7'},
+                            lat=42.6785, lng=23.357, is_primary=False,
+                            location_tags=[WEBSITE_CONTACT_ADDRESS_TAG, CAMPUS_TAG])
+    db_session.add_all([register, campus])
+    await db_session.commit()
+    register_id, campus_id, school_id = register.id, campus.id, school.id
+
+    dry = await move_to_site_campus(db_session, register_id, campus_id, note="waldorf.bg/contacts")
+    assert dry["outcome"] == "moved" and dry["point"] == (42.6785, 23.357)
+    assert (await db_session.get(SchoolLocation, campus_id)) is not None  # nothing written
+    # Only toward a site campus.
+    assert (await move_to_site_campus(db_session, campus_id, register_id, note="x"))["outcome"] == "not_a_site_campus"
+
+    await move_to_site_campus(db_session, register_id, campus_id, note="waldorf.bg/contacts", apply=True)
+    db_session.expire_all()
+    rows = (await db_session.execute(
+        select(SchoolLocation).options(selectinload(SchoolLocation.age_group_shifts))
+        .where(SchoolLocation.school_id == school_id)
+    )).scalars().all()
+    [moved] = rows
+    assert moved.id == register_id and moved.is_primary
+    assert moved.address_i18n == {"bg": 'ул. "Александър фон Хумболт" № 7'} and (moved.lat, moved.lng) == (42.6785, 23.357)
+    assert sorted(moved.age_groups) == ["grade_1_4", "grade_8_12"]
+    assert moved.geocode_meta["manual_fix"]["previous"]["address_i18n"] == {"bg": 'ул. "Горски пътник" № 44'}
+    assert has_pinned_point(moved)

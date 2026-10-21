@@ -88,3 +88,101 @@ async def set_hand_pin(
     db.add(location)
     await db.commit()
     return report
+
+
+async def move_to_site_campus(
+    db: AsyncSession,
+    location_id: int,
+    campus_id: int,
+    *,
+    note: str,
+    apply: bool = False,
+) -> dict[str, Any]:
+    """Give a shown register location its school's own site address, the site's campus location.
+
+    For a register address the school's site gives to someone else (630 Waldorf: the register
+    says Горски пътник 44, the kindergarten's building; waldorf.bg/contacts puts the school at
+    Хумболт 7). Mike's rule (2026-10-15): the school's own site wins. The register location
+    takes the campus's address and point as a hand correction (``manual_fix.previous`` keeps
+    the register's, so a re-import finds the row), adds the campus's age groups, and the
+    campus row goes: one building, one location, with the register's grades. Default is a
+    dry run."""
+    from sqlalchemy import select
+    from sqlalchemy.orm import selectinload
+
+    from app.models import SchoolLocationAgeGroupShift
+    from app.scrapers.campus_sync import CAMPUS_TAG
+
+    if not note.strip():
+        raise ValueError("a move needs a note saying where the site gives the address")
+    rows = {
+        row.id: row
+        for row in (
+            await db.execute(
+                select(SchoolLocation)
+                .options(selectinload(SchoolLocation.age_group_shifts))
+                .where(SchoolLocation.id.in_([location_id, campus_id]))
+                .with_for_update()
+            )
+        ).scalars()
+    }
+    location, campus = rows.get(location_id), rows.get(campus_id)
+    report: dict[str, Any] = {"location_id": location_id, "campus_id": campus_id}
+    if location is None or campus is None:
+        outcome = "not_found"
+    elif location.school_id != campus.school_id:
+        outcome = "different_schools"
+    elif CAMPUS_TAG not in (campus.location_tags or []):
+        outcome = "not_a_site_campus"  # the evidence is the site's own address
+    elif CAMPUS_TAG in (location.location_tags or []):
+        outcome = "not_a_register_location"
+    elif campus.lat is None or campus.lng is None or needs_pin(campus):
+        outcome = "campus_not_pinned"
+    else:
+        outcome = "moved"
+    report["outcome"] = outcome
+    if outcome != "moved":
+        await db.rollback()
+        return report
+    report.update(
+        old_address=(location.address_i18n or {}).get("bg"),
+        address=(campus.address_i18n or {}).get("bg"),
+        point=(campus.lat, campus.lng),
+        age_groups=sorted({link.age_group for link in location.age_group_shifts}
+                          | {link.age_group for link in campus.age_group_shifts}),
+    )
+    if not apply:
+        await db.rollback()
+        return report
+    previous = {
+        "address_i18n": dict(location.address_i18n or {}),
+        "district": location.district,
+        "lat": location.lat,
+        "lng": location.lng,
+        "geocode_meta": location.geocode_meta,
+    }
+    have = {link.age_group for link in location.age_group_shifts}
+    for link in campus.age_group_shifts:
+        if link.age_group not in have:
+            db.add(SchoolLocationAgeGroupShift(
+                location_id=location.id, age_group=link.age_group, shift=link.shift,
+                has_organised_groups=link.has_organised_groups,
+            ))
+    location.address_i18n = dict(campus.address_i18n or {})
+    location.district = campus.district
+    location.lat, location.lng = campus.lat, campus.lng
+    location.geocode_meta = {
+        "method": MANUAL_FIX_METHOD,
+        "provider": "manual",
+        "precision": "exact",
+        "formatted_address": (campus.address_i18n or {}).get("bg"),
+        "manual_fix": {"previous": previous, "note": note, "from_campus_location_id": campus.id},
+    }
+    location.location_tags = [
+        tag
+        for tag in location.location_tags or []
+        if not str(tag).startswith("coords_source=") or tag == OFFICIAL_COORDS_TAG
+    ]
+    await db.delete(campus)
+    await db.commit()
+    return report

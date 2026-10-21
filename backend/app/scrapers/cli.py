@@ -735,6 +735,26 @@ def hand_pin_command(location_id, lat, lng, address, note, apply_changes):
         raise SystemExit(1)
 
 
+@cli.command("move-to-site-campus")
+@click.option("--location-id", type=int, required=True, help="The register location the site contradicts")
+@click.option("--campus-id", type=int, required=True, help="The school's site campus location at its real address")
+@click.option("--note", required=True, help="Where the school's site gives the address")
+@click.option("--apply", "apply_changes", is_flag=True, help="Write the move (default is a dry run)")
+def move_to_site_campus_command(location_id, campus_id, note, apply_changes):
+    """Give a register location the address and point its school's own site gives (a manual_fix)."""
+    from app.database import async_session_maker
+    from app.scrapers.stages.hand_pin import move_to_site_campus
+
+    async def _run():
+        async with async_session_maker() as db:
+            return await move_to_site_campus(db, location_id, campus_id, note=note, apply=apply_changes)
+
+    report = asyncio.run(_run())
+    console.print(f"{'Applied' if apply_changes and report['outcome'] == 'moved' else 'Dry run' if not apply_changes else 'Not written'}: {report}")
+    if report["outcome"] != "moved":
+        raise SystemExit(1)
+
+
 @cli.command("register-pins")
 @click.option("--school-id", "school_ids", type=int, multiple=True, help="Run these schools (repeatable)")
 @click.option("--limit", type=int, default=None, help="Maximum schools")
