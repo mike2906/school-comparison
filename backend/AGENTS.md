@@ -103,7 +103,8 @@ Stage 6 also checks each price row against its linked page text
 (`app/scrapers/price_evidence.py`, UF45): a row whose amount is not in its label's run of
 prices, whose label names the other level, priced per day/week/hour in a category that
 cannot be (a "registration" fee per week), or that is a
-deposit or one installment filed as tuition, or an offer whose end date has passed, gets
+deposit or one installment filed as tuition, or an offer whose end date has passed, or a price the page dates "from" a year while
+giving the same fee another price from a later one (574's FAQ kept last year's fee), gets
 an error on `pricing[{id}]` (an offer that still runs has its last day stored as
 `pricing_context.offer_ends_on`, and the row gate withholds it from the next day); a null period the page states, beside the amount or in the
 heading of its table or list, is filled in. On a site a sibling school shares, so does a

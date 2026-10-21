@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { isClosedGroupFee, periodFromLabel, priceTerms, periodUnknown, pricePeriod, rowAgeGroupKeys, rowsForAgeGroup, splitRowsForAgeGroup } from './priceRows.js'
+import { isClosedGroupFee, periodFromLabel, priceCategory, priceTerms, periodUnknown, pricePeriod, rowAgeGroupKeys, rowsForAgeGroup, splitRowsForAgeGroup } from './priceRows.js'
 
 test('periodFromLabel: the period a fee name states', () => {
   const cases = {
@@ -198,4 +198,12 @@ test('priceTerms: the terms a fee name puts a price on, null for the regular pri
     'Целодневна група (първите 2 месеца адаптация)']) {
     assert.equal(priceTerms({ plan_name: name }), null, String(name))
   }
+})
+
+test('a deposit is listed apart from the registration fees it is filed with', () => {
+  assert.equal(priceCategory({ category: 'registration', pricing_context: { deposit: true } }), 'deposit')
+  assert.equal(priceCategory({ category: 'registration', pricing_context: { deposit: false } }), 'registration')
+  assert.equal(priceCategory({ category: 'registration' }), 'registration')
+  // Only a registration row: a deposit filed as tuition is withheld by the API, not relabelled.
+  assert.equal(priceCategory({ category: 'tuition', pricing_context: { deposit: true } }), 'tuition')
 })

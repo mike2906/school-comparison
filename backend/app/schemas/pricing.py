@@ -36,6 +36,9 @@ class PricingContextResponse(BaseModel):
     age_group_bg: Optional[str] = None
     includes: list[str] = Field(default_factory=list)
     excludes: list[str] = Field(default_factory=list)
+    # A registration row that is a deposit, returned or taken off a later fee
+    # (``agent_fees.names_deposit``): the page lists it apart from the fees.
+    deposit: bool = False
 
     # Unknown internal keys are deliberately discarded at serialization.
     model_config = ConfigDict(extra="ignore")

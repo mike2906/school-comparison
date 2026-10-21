@@ -96,6 +96,14 @@ export function priceTerms(row) {
   return isOnePayment(row?.plan_name) ? 'one_payment' : null
 }
 
+/**
+ * The heading a fee goes under: its category, except that a deposit (returned or taken off a
+ * later fee) is listed apart from the registration fees it is filed with.
+ */
+export function priceCategory(row) {
+  return row?.category === 'registration' && row?.pricing_context?.deposit === true ? 'deposit' : row?.category
+}
+
 // Registration fees are paid once and uniform items are bought once, so a missing period is no news.
 const ONE_OFF_CATEGORIES = new Set(['registration', 'uniforms'])
 

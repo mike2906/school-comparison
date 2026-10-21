@@ -15,6 +15,7 @@ from app.scrapers.price_evidence import (
     RULE_EXPIRED,
     RULE_LEVEL,
     RULE_PERIOD_MISSING,
+    RULE_SUPERSEDED,
     PriceRow,
     amount_spans,
     check_price_row,
@@ -482,3 +483,49 @@ def test_a_note_that_prices_change_every_year_names_no_period(text):
     from app.scrapers.price_evidence import period_families
 
     assert period_families(text.casefold()) == set()
+
+
+# --- 2026-10-21 parent check (171, 574) ------------------------------------------------------
+
+
+def test_171_an_offer_whose_terms_wrap_over_three_lines_has_expired():
+    page = (
+        "Период на записване\nТакса обучение\nПри записване в срок до 19.12.2025 г.\n"
+        "Таксата е с Коледна отстъпка и е валидна\nза първите 5 сключени договора за\nобучение.\n4 250 €\n"
+        "При записване в срок до 23.01.2026 г.\n4 500 €\nПри записване след 20.02.2026 г.\n"
+        "При 2 вноски (I вноска при сключване на\nдоговор; II вноска до 20.11.2026 г.)\n4 950 €\n"
+    )
+    assert RULE_EXPIRED in [f.rule for f in check_price_row(row(4250), page, "school", today=TODAY)]
+    assert check_price_row(row(4950), page, "school", today=TODAY) == []
+
+
+PAGE_574 = (
+    "От **септември 2026 г. месечната такса е 590.00 €.** Тази сума включва всичко.\n"
+    "При записване се заплаща еднократен **депозит от 590.00 €,** който се приспада от последния месец.\n"
+    "### Каква е месечната такса?\n"
+    "Месечната такса в ЧДГ „Аника“ от септември 2025 г. е 475.50 € (930 лв.) и включва целодневна грижа.\n"
+    "Храната от януари 2027 г. е 7 € на ден.\n"
+)
+
+
+def test_574_a_fee_the_page_gives_a_later_price_is_superseded():
+    rules = [f.rule for f in check_price_row(row(475.5, period="MONTHLY"), PAGE_574, "kindergarten", today=TODAY)]
+    assert rules == [RULE_SUPERSEDED]
+    assert check_price_row(row(590, period="MONTHLY"), PAGE_574, "kindergarten", today=TODAY) == []
+
+
+@pytest.mark.parametrize(
+    "page",
+    [
+        # Still the latest: 628's page gives only the 2025 price.
+        "От септември 2025 г. месечната ни такса е 475,50 € (930 лв.)\n",
+        # A later price of another fee does not replace it.
+        "Месечната такса от септември 2025 г. е 475.50 €.\nХраната от януари 2026 г. е 7 € на ден.\n",
+        # The same price again from the later year.
+        "Месечната такса от септември 2025 г. е 475.50 €.\nОт септември 2026 г. месечната такса остава 475.50 €.\n",
+    ],
+)
+def test_a_dated_fee_with_no_later_price_stands(page):
+    assert RULE_SUPERSEDED not in [
+        f.rule for f in check_price_row(row(475.5, period="MONTHLY"), page, "kindergarten", today=TODAY)
+    ]

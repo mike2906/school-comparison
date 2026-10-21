@@ -125,7 +125,7 @@ class AgentFees(BaseModel):
 READER_PROMPT = """You read a school's own web pages and list the fees it states. Each page starts with a "=== PAGE <url>" line.
 Rules:
 - Only fees of the named institution. A shared site may also list a sibling school or kindergarten; skip their fees.
-- Only the current or upcoming school year. If several appear, list the most recent: where a page shows one fee for two years side by side, list only the later price. A fee shown once, on a page for the current or upcoming year, counts as that year's even when its column or a note names the previous year: the school still charges it. Skip a page or table that is itself for an earlier year.
+- Only the current or upcoming school year. If several appear, list the most recent: where a page shows one fee for two years side by side, list only the later price. When the site gives a fee from different dates ("от септември 2025 г. ... 475.50 €" in one place, "от септември 2026 г. ... 590 €" in another), list only the latest, and skip any other mention of the same fee at the older amount (an FAQ or summary that was not updated), including a deposit that equals one month's fee. A fee shown once, on a page for the current or upcoming year, counts as that year's even when its column or a note names the previous year: the school still charges it. Skip a page or table that is itself for an earlier year.
 - One entry per fee and group (grade, age group, full or half day). A discounted, prepaid or promotional price the site prints as an amount is its own entry, and its plan_name says on what terms, in the site's words ("Еднократно плащане за 6 месеца", "Промоционална такса за първите 3 месеца").
 - Two entries of the same category and group never share a plan_name, even with different periods: the site's words that tell them apart (half day, full day, paid for 6 months at once, enrolment, yearly registration) are their plan_name.
 - When the site prints a total of a group's fees ("Общо", "Total"), list the total as a tuition entry of its own, with the site's word for it as plan_name ("Общо"); the fees it adds up stay their own entries.
@@ -137,7 +137,7 @@ Rules:
 - Skip a payment schedule. Never invent an amount, and never compute a total the site does not print.
 - A discount the school offers (for siblings, for paying early, for paying the whole year at once, any other stated discount) goes in discounts, never in fees, and only when the page states it with a percentage or an amount. One entry per discount ("5% for a second child, 10% for a third" is two). text_i18n says in bg and en only what the evidence says. A discounted price the site prints as an amount stays a fee entry (see above).
 - currency as printed (EUR or BGN); if both are printed, the EUR figure.
-- category: the monthly kindergarten fee and school tuition are tuition; an enrolment, exam, application or entry-test fee is registration; a deposit (депозит, капаро) is registration, never tuition; learning support, therapy and similar services are activities; optional classes, clubs and sports charged on top are extracurricular; transport, food, uniforms and extended day (after-school care) are their own categories.
+- category: the monthly kindergarten fee and school tuition are tuition; an enrolment, exam, application or entry-test fee is registration; a deposit (депозит, капаро) is registration, never tuition, and its plan_name is the site's word for it ("Депозит", "Капаро"), with notes saying whether it is returned or taken off a later fee when the site says; learning support, therapy and similar services are activities; optional classes, clubs and sports charged on top are extracurricular; transport, food, uniforms and extended day (after-school care) are their own categories.
 - period only when the page states it for THAT amount (per month, per year, per term...); otherwise null. Never guess.
   - "once per school year" or "еднократна такса" for the school year is yearly; a full year's tuition paid in one payment is yearly too.
   - one_time only for a fee charged once ever: enrolment, exam, application, deposit. Never for tuition or materials.
@@ -496,6 +496,27 @@ def check_fee(fee: AgentFee, page_text: str) -> CheckedFee:
     confidence = HELD_CONFIDENCE if held else PUBLISH_CONFIDENCE
     update = {"period": period, "payment_options": options}
     return CheckedFee(fee.model_copy(update=update), confidence, True, checks + option_checks + held)
+
+
+def names_deposit(fee: AgentFee) -> bool:
+    """A registration fee that is a deposit (депозит, капаро): paid ahead, returned or taken
+    off a later fee, so not a cost like an enrolment fee (185, 351, 514, 574).
+
+    Its name says so, or the words just before its amount on an evidence line do: "такса за
+    записване 200 €, депозит 500 €" makes only the 500 a deposit.
+    """
+    if fee.category is not PriceCategory.REGISTRATION:
+        return False
+    if _DEPOSIT_RE.search(_normalized(" ".join(filter(None, (fee.label, fee.plan_name, fee.plan_name_en))))):
+        return True
+    amounts = set(fee_amounts(fee))
+    for line in fee.evidence.casefold().splitlines():
+        start = 0
+        for begin, end, values in number_spans(line):
+            if values & amounts and _DEPOSIT_RE.search(line[start:begin]):
+                return True
+            start = end
+    return False
 
 
 def _without_option_lines(lines: list[str], fee: AgentFee) -> str:

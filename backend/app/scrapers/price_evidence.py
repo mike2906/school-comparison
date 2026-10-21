@@ -13,7 +13,10 @@ audit ``scripts/audit_price_rows_uf45.py``:
                             schema cannot represent (per day/week/hour);
 4. deposit is not tuition - a tuition row whose label/context says deposit; 4b: a
                             non-monthly tuition row whose line says it is one installment;
-5. name is not a sibling's - see :func:`shared_names`.
+5. name is not a sibling's - see :func:`shared_names`;
+7. offer ended            - an amount offered until a date that has passed;
+8. superseded             - an amount the page gives "from" a year, while it gives the same
+                            fee a different amount from a later one (:func:`superseded_by`).
 
 No model is involved: every rule reads the page text.
 """
@@ -379,6 +382,7 @@ PERIOD_KEYWORDS: dict[str, re.Pattern[str]] = {
     "HOURLY": re.compile(r"\bна час\b|/\s*час\b|почасов|per hour|/\s*hour|hourly"),
 }
 _DEPOSIT_RE = re.compile(r"депозит|\bdeposit")
+_EMPHASIS_RE = re.compile(r"[*_]+")  # markdown bold and italics: "От **септември 2026 г.**"
 # One installment of a fee ("I вноска", "1-ва вноска", "first installment"), not the fee
 # itself. A bare number is not an ordinal: "за 1 вноска" is the fee paid in one go.
 # After the word, a numeral names the installment ("вноска II", "вноска №1", "Installment 2")
@@ -696,8 +700,13 @@ def _line_above(text: str, span: tuple[int, int]) -> str:
     return heading.split("\n", 1)[0] if "\n" in heading else ""
 
 
-def _terms_above(text: str, span: tuple[int, int], limit: int = 3) -> str:
-    """The lines just above the amount's, up to the price before it: the terms of its tier."""
+def _terms_above(text: str, span: tuple[int, int], limit: int = 5) -> str:
+    """The lines just above the amount's, up to the price before it: the terms of its tier.
+
+    Five lines, because a tier's terms wrap: 171's "Таксата е с Коледна отстъпка и е валидна
+    / за първите 5 сключени договора за / обучение." pushed its "до 19.12.2025 г." to the
+    fourth line above the amount.
+    """
     lines = text[: text.rfind("\n", 0, span[0]) + 1].split("\n")[:-1]
     terms: list[str] = []
     for line in reversed(lines):
@@ -871,6 +880,58 @@ def offer_end(context: str) -> Optional[datetime.date]:
     return min(deadlines, default=None)
 
 
+# A price given from a date: "Месечната такса ... от септември 2025 г. е 475.50 €" (574),
+# "From September 2026 the monthly fee is". The year is the group.
+_FROM_DATE_RE = re.compile(
+    r"(?<![\w])(?:от|from)\s+(?:\d{1,2}\s*[./]\s*\d{1,2}\s*[./]\s*|(?:\d{1,2}\s+)?(?:%s)\s+)?(20\d{2})(?!\d)"
+    % "|".join(_MONTHS)
+)
+# What kind of fee a sentence speaks of, so a later price of another fee ("от януари 2026 г.
+# храната е 6 €") does not replace this one.
+_FEE_KINDS = {
+    "monthly": re.compile(r"месечн|\bmonthly\b"),
+    "yearly": re.compile(r"годишн|\bannual|\byearly\b"),
+    "tuition": re.compile(r"обучение|\btuition\b"),
+    "food": re.compile(r"хран|\bfood\b|\bmeals?\b"),
+    "transport": re.compile(r"транспорт|\btransport"),
+    "deposit": _DEPOSIT_RE,
+}
+
+
+def _fee_kinds(words: str) -> set[str]:
+    return {kind for kind, pattern in _FEE_KINDS.items() if pattern.search(words)}
+
+
+def superseded_by(text: str, span: tuple[int, int], amounts: Iterable[Any]) -> Optional[str]:
+    """The line giving the same fee from a later year than the amount's own words, or None.
+
+    574's page tells "От септември 2026 г. месечната такса е 590.00 €" at the top and keeps
+    "Месечната такса ... от септември 2025 г. е 475.50 €" in its FAQ: the older price is gone.
+    Only a sentence that dates its own amount ("от <месец> <година>") can be superseded, and
+    only by a line that dates a different price later and names the same kind of fee.
+    """
+    line_start = text.rfind("\n", 0, span[0]) + 1
+    own = _EMPHASIS_RE.sub("", text[line_start: span[0]])
+    dated = list(_FROM_DATE_RE.finditer(own))
+    kinds = _fee_kinds(own)
+    if not dated or not kinds:
+        return None
+    year = int(dated[-1].group(1))
+    own_values = {decimal.Decimal(str(value)) for value in amounts}
+    for line in text.split("\n"):
+        plain = _EMPHASIS_RE.sub("", line)
+        for match in _FROM_DATE_RE.finditer(plain):
+            if int(match.group(1)) <= year:
+                continue
+            after = plain[match.end():]
+            price = _PRICE_RE.search(after)
+            if price is None or not kinds & _fee_kinds(plain[: match.end()] + after[: price.start()]):
+                continue
+            if not any(amount_spans(price.group(), value) for value in own_values):
+                return line
+    return None
+
+
 # ---------------------------------------------------------------------------
 # Rules
 # ---------------------------------------------------------------------------
@@ -885,6 +946,8 @@ RULE_PERIOD_UNFIT = "3_period_unfit"
 RULE_DEPOSIT = "4_deposit_not_tuition"
 RULE_INSTALLMENT = "4_installment_not_tuition"
 RULE_EXPIRED = "7_offer_expired"
+# A price the page gives from a year, replaced by a later one (574's FAQ kept last year's fee).
+RULE_SUPERSEDED = "8_superseded"
 # Not a fault: the offer still runs, and ends on the date in ``offer_ends``. Validation
 # stores it on the row so the publish gate withholds the row once it passes.
 RULE_OFFER_ENDS = "7_offer_ends"
@@ -1102,6 +1165,11 @@ def check_price_row(
             hits.append(PriceFinding(RULE_EXPIRED, f"offered until {end.isoformat()}", contexts[0], offer_ends=end))
         else:
             hits.append(PriceFinding(RULE_OFFER_ENDS, f"offered until {end.isoformat()}", contexts[0], offer_ends=end))
+
+    # Rule 8: a price from a year the page has since replaced with a later one.
+    newer = [superseded_by(text, span, row.amounts) for span in chosen]
+    if all(newer):
+        hit(RULE_SUPERSEDED, "the page gives this fee a later price", newer[0][:160])
     return hits
 
 

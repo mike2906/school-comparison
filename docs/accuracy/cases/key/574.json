@@ -1,0 +1,42 @@
+{
+ "school_id": 574,
+ "website_url": "https://novigradini.com/#dipipopup-27586290#popup_on_load",
+ "pages_read": [
+  "https://novigradini.com/anika/ceni/",
+  "https://novigradini.com/faq/"
+ ],
+ "fetch_failed": [],
+ "blocked": false,
+ "site_states_no_fees": false,
+ "notes": "A targeted case, not a blind key: written 2026-10-21 from the saved pages (backend/evals/fees/pages/574.json) after the fifth parent check found 574 showing 475.50 EUR a month. The prices page gives 590.00 EUR from September 2026 at the top and keeps the 475.50 'from September 2025' price, and a deposit of one month's fee at 475.50, in its FAQ; the shared /faq page still says 475.50. Only the 2026 figures are fees: tuition 590 monthly, and the deposit of 590 (registration, one-time; it comes off the last month). Food is paid per day with no amount; the 281.21 is a municipal compensation, not a fee; the 5% for a second child is a discount.",
+ "site_fees": [
+  {
+   "fid": "f1",
+   "category": "tuition",
+   "amount": 590,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "group": null,
+   "plan": null,
+   "year": null,
+   "url": "https://novigradini.com/anika/ceni/",
+   "quote": "От септември 2026 г. месечната такса е 590.00 €."
+  },
+  {
+   "fid": "f2",
+   "category": "registration",
+   "amount": 590,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "one_time",
+   "group": null,
+   "plan": "депозит",
+   "year": null,
+   "url": "https://novigradini.com/anika/ceni/",
+   "quote": "При записване се заплаща еднократен депозит от 590.00 €, който не е допълнителна такса, а се приспада от последния месец на посещение"
+  }
+ ]
+}

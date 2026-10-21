@@ -187,6 +187,23 @@ describe('a school page', () => {
     assert.equal(await section.getByText(row.plan_name, { exact: true }).count(), 0, `"${row.plan_name}" is not shown`)
   })
 
+  test('a deposit is listed as a deposit, not as a registration fee', async testContext => {
+    // 574's deposit, which comes off the last month, was listed as "Такса за записване".
+    const deposit = row => row.category === 'registration' && row.pricing_context?.deposit === true
+    const listed = (await allSchools()).find(s => isPrivate(s) && (s.pricing || []).some(deposit))
+    if (!listed) {
+      testContext.diagnostic('No school lists a deposit yet; nothing to check.')
+      return
+    }
+    await open('bg', `/schools/${listed.id}`)
+    const section = card(t('bg', 'pricing.title'))
+    await section.getByText(t('bg', 'pricing.deposit'), { exact: true }).first().waitFor()
+    if (!listed.pricing.some(row => row.category === 'registration' && !deposit(row))) {
+      assert.equal(await section.getByText(t('bg', 'pricing.registration'), { exact: true }).count(), 0,
+        'no registration heading for a deposit alone')
+    }
+  })
+
   test("last year's fee is left out once a later year lists it again at that price", async testContext => {
     // 596 showed its 2025-26 bus fees under the 2026-27 ones, which read as two prices.
     const shownYears = school => new Set(groupPricingByAcademicYear(school.pricing).map(group => group.academicYear))

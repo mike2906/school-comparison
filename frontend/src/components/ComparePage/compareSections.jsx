@@ -41,6 +41,7 @@ import {
   YEAR_STATUS,
 } from '../../utils/pricing'
 import { planNameBeside, textLang } from '../../utils/priceLabels'
+import { priceCategory } from '../../utils/priceRows'
 import { safeSourceUrl, sourceSiteName } from '../../utils/priceSources'
 import {
   formatDate,
@@ -598,7 +599,7 @@ export function buildCompareSections({
                   {sortByCategory(group.rows).map((price) => (
                     <div key={price.id} className="space-y-1">
                       <div className="text-sm font-medium text-neutral-900">
-                        {t(`pricing.${price.category}`)}
+                        {t(`pricing.${priceCategory(price)}`)}
                         {[priceAgeGroupLabel(price, t, language)].filter(Boolean).map(label => ` • ${label}`)}
                         {[planNameBeside(price, t, priceAgeGroupLabel(price, t, language), language)].filter(Boolean).map(name => (
                           <span key="plan" lang={textLang(name, language)}>{` • ${name}`}</span>

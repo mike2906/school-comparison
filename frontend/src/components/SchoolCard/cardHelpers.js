@@ -3,7 +3,7 @@ import { getNvoDetail as getSharedNvoDetail } from '../../utils/nvo.js'
 import { getCanonicalAmenityFlags, getOptionLabel, normalizeLanguageFocus } from '../../utils/schoolAttributes.js'
 import { formatPriceLabel } from '../../utils/pricing.js'
 import { planNameLabel } from '../../utils/priceLabels.js'
-import { pricePeriod } from '../../utils/priceRows.js'
+import { priceCategory, pricePeriod } from '../../utils/priceRows.js'
 import { parsePhones } from '../../utils/phone.js'
 import { getAgeGroupShifts } from '../../utils/schoolLocation.js'
 
@@ -309,7 +309,7 @@ export function buildExpandedSections({
 
   if (pricing.length > 0 && school.school_type !== 'state') {
     const pricingLines = pricing.map(item => {
-      const category = t(`pricing.${item.category}`)
+      const category = t(`pricing.${priceCategory(item)}`)
       const period = pricePeriod(item)
       const periodKey = period ? t(`pricing.${period}`) : t('pricing.periodNotStated')
       const planName = planNameLabel(item, t, locale)
