@@ -441,12 +441,11 @@ async def same_place_by_school(db, *, country_code: str, city: Optional[str]) ->
         by_school.setdefault(int(row.id), []).append(row)
 
     def site_elsewhere(row) -> bool:
-        return any(
-            CAMPUS_TAG in (other.location_tags or [])
-            and address(other)
-            and not addresses_equivalent(address(other), address(row))
-            for other in by_school[int(row.id)]
-            if other.location_id != row.location_id
+        """The site gives the school a campus at another address and none at this pin's."""
+        campuses = [other for other in by_school[int(row.id)] if CAMPUS_TAG in (other.location_tags or [])]
+        here = [other for other in campuses if address(other) and addresses_equivalent(address(other), address(row))]
+        return bool(address(row)) and not here and any(
+            address(other) and other.location_id != row.location_id for other in campuses
         )
 
     pins = [

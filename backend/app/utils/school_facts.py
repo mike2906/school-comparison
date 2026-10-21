@@ -243,13 +243,14 @@ def at_a_glance(
             continue
         if tested and "open_entry" in row["types"]:
             row["types"].remove("open_entry")
+        elif "entrance_exam" in row["types"] and SOME_CLASSES_EXAM in graded:
+            # "Entrance exam" for the whole school beside a grade where only some classes sit
+            # one: the subjects may be that class's.
+            row["types"].remove("entrance_exam")
         elif "open_entry" in graded and "entrance_exam" in row["types"]:
             # A school-wide exam the graded rows deny; its subjects are that exam's.
             row["types"].remove("entrance_exam")
             row["subjects"] = []
-        elif "entrance_exam" in row["types"] and SOME_CLASSES_EXAM in graded:
-            # "Entrance exam" for the whole school beside a grade where only some classes sit one.
-            row["types"].remove("entrance_exam")
     for row in admission:
         # "No entrance test" beside an exam, interview or trial day for the same grades.
         if "open_entry" in row["types"] and len(row["types"]) > 1:
@@ -422,7 +423,9 @@ _NO_TEST_RE = re.compile(
 # An exam for one class, profession, specialty or profile of a grade (192: only the Graphic
 # design class of three tests in fine arts), not for the whole grade.
 _ONE_CLASS_RE = re.compile(
-    r"\b(?:profession|specialt(?:y|ies)|speciality|profiles?)\b|(?-i:\b[A-Z][a-z]+) class\b", re.IGNORECASE
+    r"\b(?:profession|specialty|speciality|profile)\b"
+    r"|(?-i:\b(?!(?:The|This|That|Each|Every|Any|One|Our|Your|Per|A|An)\b)[A-Z][a-z]+) class\b",
+    re.IGNORECASE,
 )
 # The ministry's aptitude tests (изпити за проверка на способностите) in all three of art,
 # music and sport: the national calendar a state school copies onto its page (316), not its
@@ -432,9 +435,15 @@ _NATIONAL_APTITUDE_SUBJECTS = (r"\b(?:visual|fine) arts?\b", r"\bmusic\b", r"\bs
 SOME_CLASSES_EXAM = "some_classes_exam"
 
 
+# A line naming another subject or the school's clubs is about more than the calendar.
+_NOT_CALENDAR_RE = re.compile(r"\b(?:maths?|mathematics|Bulgarian|English|clubs?|activities)\b", re.IGNORECASE)
+
+
 def _national_aptitude_calendar(english: str) -> bool:
-    return all(re.search(subject, english, re.IGNORECASE) for subject in _NATIONAL_APTITUDE_SUBJECTS) and not (
-        _ONE_CLASS_RE.search(english)
+    return (
+        all(re.search(subject, english, re.IGNORECASE) for subject in _NATIONAL_APTITUDE_SUBJECTS)
+        and not _ONE_CLASS_RE.search(english)
+        and not _NOT_CALENDAR_RE.search(english)
     )
 
 
@@ -477,9 +486,11 @@ def _one_part(fact: Mapping[str, Any]) -> bool:
 # first grade" is about the kindergarten.
 KINDERGARTEN_LEVELS = frozenset({"kindergarten", "nursery"})
 _SCHOOL_GRADES_RE = re.compile(
-    r"\bgrades?\s*\d|\bclass(?:es)?\s*\d|\b\d+(?:st|nd|rd|th)\s+class"
+    # Not "swimming classes 2 times a week".
+    r"\bgrades?\s*\d|\bclass(?:es)?\s*\d+\b(?!\s*(?:times?|x|hours?|days?|minutes?|per|a\s+week)\b)"
+    r"|\b\d+(?:st|nd|rd|th)\s+class"
     r"|\b(?:\d+(?:st|nd|rd|th)|first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|eleventh|twelfth)"
-    r"[- ]grade|\bIB\b|\bIGCSE\b|\bA[- ]levels?\b|\b(?:lower|upper) secondary"
+    r"[- ]grade|\bIB\b|\bIGCSE\b|(?-i:\bA[- ]levels?\b)|\b(?:lower|upper) secondary"
     r"|\b(?:secondary|school|Bulgarian|two)\s+diplomas?\b|\bmatura|\bNVO\b",
     re.IGNORECASE,
 )
@@ -500,7 +511,7 @@ def _school_grades_fact(fact: Mapping[str, Any]) -> bool:
 # grade, a school-leaving exam or diploma, or a language exam for teenagers is the school's.
 _SCHOOL_ONLY_ITEM_RE = re.compile(
     _SCHOOL_GRADES_RE.pattern
-    + r"|\bIELTS\b|\bTOEFL\b|\bSAT\b|\bdiploma|диплом|матур|\b\d+\.?\s*(?:-?(?:ви|ри|ти|ми)\s+)?клас",
+    + r"|\bIELTS\b|\bTOEFL\b|\bSAT\b|\bdiploma|диплом(?!ир)|матур|\b\d+\.?\s*(?:-?(?:ви|ри|ти|ми)\s+)?клас\b",
     re.IGNORECASE,
 )
 # Where the old extraction keeps the lists a kindergarten page shows or its filters read.

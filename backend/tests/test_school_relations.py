@@ -398,6 +398,17 @@ class TestSamePlaceEndpoints:
         await seeded_db.commit()
         response = await seeded_client.get(f"/schools/{kg.id}")
         assert response.json()["same_place"] == []
+        # A site that also lists the shared building as the school's keeps it one place.
+        seeded_db.add(SchoolLocation(
+            school_id=school.id, address_i18n={"bg": 'ул. "Горски пътник" № 44'}, lat=42.65, lng=23.33,
+            is_primary=False, location_tags=[CAMPUS_TAG],
+        ))
+        await seeded_db.commit()
+        from app.routers.schools import _same_place_cache
+
+        _same_place_cache.clear()
+        response = await seeded_client.get(f"/schools/{kg.id}")
+        assert [entry["id"] for entry in response.json()["same_place"]] == [school.id]
 
     @pytest.mark.asyncio
     async def test_too_far_apart_is_two_places(self, seeded_db, seeded_client):

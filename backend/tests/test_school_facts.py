@@ -1172,6 +1172,11 @@ def test_an_exam_for_one_class_is_shown_as_an_exam_for_some_classes():
     # A whole-grade exam is still an entrance exam.
     whole = [_admission_fact("Grade 5 entrance exam in mathematics and Bulgarian.", ["entrance_exam"], 5)]
     assert [r["types"] for r in at_a_glance(whole)["admission"]] == [["entrance_exam"]]
+    for en in (
+        "Entrance exam in maths. The class size is 22.",
+        "Entrance exam in maths and English; students then choose one of two profiles.",
+    ):
+        assert _admission_fact(en, ["entrance_exam"], 8)["admission"] == ["entrance_exam"]
     # A school-wide exam row goes beside a grade where only some classes sit one.
     school_wide = [*facts, _admission_fact("Admission is by entrance exam.", ["entrance_exam"])]
     assert [(r["grade"], r["types"]) for r in at_a_glance(school_wide)["admission"]] == [(8, [SOME_CLASSES_EXAM])]
@@ -1196,6 +1201,11 @@ def test_the_ministrys_aptitude_test_calendar_is_not_the_schools_exam():
     # One aptitude subject named for a class is the school's own.
     own = _admission_fact("The Music profile class requires an aptitude test in music.", ["entrance_exam"], 8)
     assert own["admission"] == ["some_classes_exam"]
+    # A school's own exam beside its art, music and sports clubs is still its exam.
+    clubs = _admission_fact(
+        "Entrance exam in maths for grade 5; the school offers fine arts, music and sports clubs.", ["entrance_exam"], 5
+    )
+    assert clubs["admission"] == ["entrance_exam"]
 
 
 @pytest.mark.parametrize(
@@ -1218,16 +1228,22 @@ def test_a_kindergarten_shows_no_school_programmes_from_the_old_extraction():
     from app.utils.school_facts import publication_attributes
 
     # 510: the old extraction read Светлина's school pages for its kindergarten.
-    programs = ["IB Diploma", "Cambridge English", "IELTS", "TOEFL", "Preparation for first grade"]
+    programs = [
+        "IB Diploma", "Cambridge English", "IELTS", "TOEFL", "Preparation for first grade",
+        "Swimming classes 2 times a week", "Learning at a level suited to each child",
+    ]
     attributes = {
         "extracted": {"programs": programs, "summary_source": {"canonical_tags": ["IB", "Montessori"]}},
-        "extracted_i18n": {"bg": {"programs": ["IB диплома", "Кеймбридж", "Подготовка за 1. клас"]}},
+        "extracted_i18n": {"bg": {"programs": ["IB диплома", "Кеймбридж", "Подготовка за 1. клас", "Дипломирани педагози", "4 класни стаи"]}},
         "data_validation": {"_schema_version": 1, "status": "ok", "issues": [], "issue_counts": {"error": 0}},
     }
     kindergarten = publication_attributes(attributes, "summarized", None, "kindergarten")
     _, localized = build_display_attributes(kindergarten)
-    assert localized["en"]["special_programs"] == ["Cambridge English", "Preparation for first grade"]
-    assert localized["bg"]["special_programs"] == ["Кеймбридж", "Подготовка за 1. клас"]
+    assert localized["en"]["special_programs"] == [
+        "Cambridge English", "Preparation for first grade", "Swimming classes 2 times a week",
+        "Learning at a level suited to each child",
+    ]
+    assert localized["bg"]["special_programs"] == ["Кеймбридж", "Подготовка за 1. клас", "Дипломирани педагози", "4 класни стаи"]
     assert "ib_program" not in compute_filter_tags(kindergarten)["teaching_approach"]
     assert attributes["extracted"]["programs"] == programs  # the stored JSON is untouched
     # The school keeps them.

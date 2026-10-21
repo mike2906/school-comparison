@@ -223,11 +223,19 @@ async def test_re_reading_the_site_keeps_site_grades_bands(db_session):
         ("Children aged 3 to 7 in four groups", False),
         ("Afternoon activities run from 2 to 4 pm", False),
         ("The school day runs to 18:00", False),
+        ("Discount for children of one family", False),
+        ("We take children from 36 months", False),
+        ("2-годишна програма по английски", False),
     ],
 )
 def test_site_nursery_reads_an_age_under_three(text, nursery):
     fact = SimpleNamespace(text_i18n={"en": text, "bg": ""})
     assert stage.site_nursery([], [fact]) is nursery
+
+
+def test_site_nursery_skips_minor_facts():
+    fact = SimpleNamespace(text_i18n={"en": "Children aged 2 to 7"}, rank="minor")
+    assert not stage.site_nursery([], [fact])
 
 
 def test_site_nursery_reads_a_nursery_fee():

@@ -42,7 +42,7 @@ from app.scrapers.campus_sync import (
     site_hidden_tag,
 )
 from app.scrapers.price_evidence import PRESCHOOL_GRADE, label_grades
-from app.utils.school_facts import SITE_ACCEPTED_STATUSES
+from app.utils.school_facts import KINDERGARTEN_LEVELS, SITE_ACCEPTED_STATUSES
 
 logger = logging.getLogger(__name__)
 
@@ -82,15 +82,20 @@ def fee_label_grades(label: Optional[str]) -> set[int]:
     return grades
 
 
+def _fee_labels(row: Any) -> tuple[Any, ...]:
+    """A fee row's age group, plan name and the published English age group."""
+    context = row.pricing_context
+    english = context.get("age_group_en") if isinstance(context, dict) else getattr(context, "age_group_en", None)
+    return row.age_group, row.plan_name, english
+
+
 def site_grades(pricing: Iterable[Any], at_a_glance: Optional[dict[str, Any]]) -> tuple[set[int], Optional[int]]:
     """The grades the published site data names, and the highest grade its facts state."""
     named: set[int] = set()
     for row in pricing:
         if str(getattr(row.category, "value", row.category)) != "tuition":
             continue
-        context = row.pricing_context
-        english = context.get("age_group_en") if isinstance(context, dict) else getattr(context, "age_group_en", None)
-        for label in (row.age_group, row.plan_name, english):
+        for label in _fee_labels(row):
             named |= fee_label_grades(label)
     glance = at_a_glance or {}
     for admission in glance.get("admission") or []:
@@ -107,12 +112,13 @@ NURSERY = "nursery"
 _KINDERGARTEN_GROUPS = frozenset({"first", "second", "third", "preschool", NURSERY})
 _UNDER_THREE = r"(?:1(?:[.,]5)?|2|one|two)"
 _NURSERY_RE = re.compile(
-    # An age, not a time of day ("activities from 2 to 4 pm"): an age word or a year unit.
-    rf"\b(?:aged?|ages|age of|children (?:of|from))\s+{_UNDER_THREE}\b"
+    # An age, not a time of day ("activities from 2 to 4 pm") or a family ("children of one
+    # family"): an age word, or a number with a year unit.
+    rf"\b(?:aged?|ages|age of)\s+{_UNDER_THREE}\b|\bchildren (?:of|from)\s+(?:1(?:[.,]5)?|2)\b(?!\s*famil)"
     rf"|\b{_UNDER_THREE}\s*(?:-|–|to)\s*\d\s*(?:-?\s*years?|-year-olds?|y\.?\s*o\b)"
-    r"|\bfrom\s+(?:the\s+age\s+of\s+)?\d{1,2}\s+months\b"
+    r"|\bfrom\s+(?:the\s+age\s+of\s+)?(?:[1-9]|[12]\d|3[0-5])\s+months\b"
     r"|\bnursery\s+groups?\b|\btoddler\s+groups?\b"
-    r"|\bот\s+(?:1[.,]5|2)\s*(?:до|-|–)\s*\d\s*г|\b(?:1[.,]5|2)-годишн|ясл",
+    r"|\bот\s+(?:1[.,]5|2)\s*(?:до|-|–)\s*\d\s*г|\b(?:1[.,]5|2)-годишн\w*\s+(?:деца|дете)|ясл",
     re.IGNORECASE,
 )
 
@@ -120,11 +126,11 @@ _NURSERY_RE = re.compile(
 def site_nursery(pricing: Iterable[Any], facts: Iterable[Any]) -> bool:
     """Whether the published site data says the kindergarten takes children under three."""
     for row in pricing:
-        context = row.pricing_context
-        english = context.get("age_group_en") if isinstance(context, dict) else getattr(context, "age_group_en", None)
-        if any(_NURSERY_RE.search(str(label or "")) for label in (row.age_group, row.plan_name, english)):
+        if any(_NURSERY_RE.search(str(label or "")) for label in _fee_labels(row)):
             return True
     for fact in facts:
+        if getattr(fact, "rank", None) == "minor":
+            continue  # never shown, as in the schools' at_a_glance
         text = getattr(fact, "text_i18n", None) or {}
         if any(_NURSERY_RE.search(str(text.get(lang) or "")) for lang in ("en", "bg")):
             return True
@@ -182,7 +188,7 @@ async def run_site_grades(
     changes: list[dict[str, Any]] = []
     for school_id in ids:
         school = await service.get_school_with_details(school_id)
-        kindergarten = school.education_level == "kindergarten"
+        kindergarten = str(school.education_level or "").casefold() in KINDERGARTEN_LEVELS
         # A kindergarten's site can only add its nursery group; a school's sets its grade bands.
         bands = {NURSERY} if kindergarten else set(BANDS)
         locations = [
