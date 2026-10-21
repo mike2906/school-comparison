@@ -16,13 +16,15 @@ function Spinner() {
 /**
  * "Near: <address>" above the results. Setting a location (my location, an address
  * submitted with Enter / Search, or a point picked on the map) adds distances, the
- * nearest-first sort and the distance filter.
+ * nearest-first sort and the distance filter. `onUseSavedHome` (set while the
+ * calculator holds a saved home that is not the current location) offers that address.
  */
 function LocationControl({
   userLocation,
   addressInput,
   onAddressInputChange,
   onUseMyLocation,
+  onUseSavedHome = null,
   onAddressSearch,
   onStartMapPick,
   onClear,
@@ -78,7 +80,7 @@ function LocationControl({
       >
         <span aria-hidden="true">📍</span>
         <span className="truncate">
-          {userLocation ? t('location.nearShort', { address: shortAddress }) : t('location.setShort')}
+          {userLocation ? t('location.nearShort', { address: shortAddress }) : t(onUseSavedHome ? 'location.setShortSaved' : 'location.setShort')}
         </span>
       </button>
       {userLocation && (
@@ -144,6 +146,17 @@ function LocationControl({
           ) : (
             <p className="text-sm text-neutral-600">{t('location.whyShort')}</p>
           )}
+          {onUseSavedHome && (
+            <button
+              type="button"
+              onClick={onUseSavedHome}
+              disabled={Boolean(isGeocoding)}
+              className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-primary-300 bg-primary-50 px-3 text-sm font-medium text-primary-800 hover:bg-primary-100 disabled:opacity-60"
+            >
+              {isGeocoding === 'saved' && <Spinner />}
+              {t('location.useSavedHome')}
+            </button>
+          )}
           <button
             type="button"
             onClick={onUseMyLocation}
@@ -174,7 +187,7 @@ function LocationControl({
               disabled={isGeocoding || !addressInput.trim()}
               className="inline-flex h-11 items-center gap-2 rounded-lg bg-neutral-900 px-3 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-60"
             >
-              {isGeocoding && <Spinner />}
+              {isGeocoding === 'address' && <Spinner />}
               {t('common.search')}
             </button>
           </form>

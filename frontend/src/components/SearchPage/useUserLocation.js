@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
 import { geocodeAddress, reverseGeocode, cancelGeocode } from '../../utils/geocoding.js'
+import { mapSearchQuery } from '../../admission/catchments.js'
+import { loadAddresses } from '../../admission/loadCatchments.js'
+import { useSavedAdmission } from '../../hooks/useSavedAdmission.js'
 
 function readStoredUserLocation(fallbackAddress) {
   try {
     const parsed = JSON.parse(localStorage.getItem('userLocation') || 'null')
     if (typeof parsed?.lat === 'number' && typeof parsed?.lng === 'number') {
-      return { lat: parsed.lat, lng: parsed.lng, address: parsed.address || fallbackAddress }
+      return { lat: parsed.lat, lng: parsed.lng, address: parsed.address || fallbackAddress, savedHome: parsed.savedHome }
     }
   } catch {
     // Corrupt or blocked storage: start without a location.
@@ -24,6 +27,7 @@ export function useUserLocation({ t, geocodingConfig }) {
   const [addressInput, setAddressInput] = useState('')
   const [locationError, setLocationError] = useState(null)
   const [isLocating, setIsLocating] = useState(false)
+  // false, or which lookup runs: 'address' (typed or from the name search) or 'saved'.
   const [isGeocoding, setIsGeocoding] = useState(false)
   const errorTimeoutRef = useRef(null)
 
@@ -52,6 +56,8 @@ export function useUserLocation({ t, geocodingConfig }) {
   // address lookup) must not overwrite a location the parent has since set another way.
   const locationRequestRef = useRef(0)
   const startLocationRequest = () => {
+    // Also stops a lookup still waiting to send its second request.
+    cancelGeocode()
     locationRequestRef.current += 1
     return locationRequestRef.current
   }
@@ -97,29 +103,37 @@ export function useUserLocation({ t, geocodingConfig }) {
     )
   }
 
-  const searchAddress = async () => {
-    const trimmedAddress = addressInput.trim()
-    if (!trimmedAddress) return
-
+  // One address lookup: `lookup(isCurrent)` resolves to a geocoding result, `extra` is kept
+  // with it. Resolves to true when the location was set, false when the lookup failed and
+  // null when another request replaced it.
+  const runLookup = async (lookup, extra = {}, kind = 'address') => {
     const request = startLocationRequest()
     setIsLocating(false)
-    setIsGeocoding(true)
+    setIsGeocoding(kind)
     setLocationError(null)
 
     try {
-      const result = await geocodeAddress(trimmedAddress, geocodingConfig)
-      if (request !== locationRequestRef.current) return
+      const result = await lookup(() => request === locationRequestRef.current)
+      if (request !== locationRequestRef.current) return null
       const newLocation = {
         lat: result.lat,
         lng: result.lng,
         address: result.address,
+        ...extra,
       }
       setUserLocation(newLocation)
       persistLocation(newLocation)
+      return true
     } catch (err) {
-      if (err?.code === 'CANCELED' || request !== locationRequestRef.current) return
-      if (err?.code === 'NO_RESULTS') {
+      if (err?.code === 'CANCELED' || request !== locationRequestRef.current) return null
+      if (kind === 'saved' && ['NO_RESULTS', 'OUTSIDE_AREA'].includes(err?.code)) {
+        // Not something the parent typed here, so no typing advice.
+        showLocationError(t('location.errorSavedHome'))
+      } else if (err?.code === 'NO_RESULTS') {
         showLocationError(t('location.errorNotFound'))
+      } else if (err?.code === 'OUTSIDE_AREA') {
+        const place = String(err.place || '').split(',').slice(0, 3).join(',').trim()
+        showLocationError(t('location.errorOutsideCity', { place }))
       } else if (err?.code === 'RATE_LIMIT') {
         showLocationError(t('location.errorRateLimited'))
       } else if (err?.code === 'TOO_FAST') {
@@ -127,9 +141,49 @@ export function useUserLocation({ t, geocodingConfig }) {
       } else if (err?.code !== 'EMPTY') {
         showLocationError(t('location.errorUnableToGeocode'))
       }
+      return false
     } finally {
       if (request === locationRequestRef.current) setIsGeocoding(false)
     }
+  }
+
+  const searchAddress = async (text = addressInput) => {
+    const trimmedAddress = text.trim()
+    if (!trimmedAddress) return false
+    if (text !== addressInput) setAddressInput(text)
+    return runLookup(() => geocodeAddress(trimmedAddress, geocodingConfig))
+  }
+
+  // The home address saved in the admission calculator (street id and number from the
+  // official address table). Finding it on the map sends it to OpenStreetMap's search, so
+  // it runs only when the parent taps, like the calculator's own "show on the map".
+  const savedHome = useSavedAdmission().home
+  const savedHomeKey = savedHome ? `${savedHome.streetId}|${savedHome.number}` : null
+  const locateSavedHome = () => {
+    if (!savedHome) return Promise.resolve(false)
+    setAddressInput('')
+    return runLookup(async isCurrent => {
+      const { streets } = await loadAddresses()
+      // Replaced while the address table loaded: send nothing.
+      if (!isCurrent()) {
+        const error = new Error('Canceled')
+        error.code = 'CANCELED'
+        throw error
+      }
+      const street = streets.find(s => s.id === savedHome.streetId)
+      if (!street) {
+        const error = new Error('Saved street not in the address table')
+        error.code = 'NO_RESULTS'
+        throw error
+      }
+      return geocodeAddress(mapSearchQuery(street, savedHome.number), {
+        ...geocodingConfig,
+        city_suffix: '',
+        remember: false,
+        // OpenStreetMap lacks many house numbers; the street is close enough for distances.
+        fallback: mapSearchQuery(street, '').replace(/\s+,/, ','),
+      })
+    }, { savedHome: savedHomeKey }, 'saved')
   }
 
   const clearLocation = () => {
@@ -187,6 +241,9 @@ export function useUserLocation({ t, geocodingConfig }) {
     clearLocationError: () => setLocationError(null),
     locateMe,
     searchAddress,
+    // Offered only while the location is not already the saved home.
+    canUseSavedHome: Boolean(savedHomeKey) && userLocation?.savedHome !== savedHomeKey,
+    locateSavedHome,
     clearLocation,
     setLocationFromMap,
   }
