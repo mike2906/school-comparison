@@ -150,10 +150,10 @@ function LocationControl({
             <button
               type="button"
               onClick={onUseSavedHome}
-              disabled={isGeocoding}
+              disabled={Boolean(isGeocoding)}
               className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-primary-300 bg-primary-50 px-3 text-sm font-medium text-primary-800 hover:bg-primary-100 disabled:opacity-60"
             >
-              {isGeocoding && <Spinner />}
+              {isGeocoding === 'saved' && <Spinner />}
               {t('location.useSavedHome')}
             </button>
           )}
@@ -187,7 +187,7 @@ function LocationControl({
               disabled={isGeocoding || !addressInput.trim()}
               className="inline-flex h-11 items-center gap-2 rounded-lg bg-neutral-900 px-3 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-60"
             >
-              {isGeocoding && <Spinner />}
+              {isGeocoding === 'address' && <Spinner />}
               {t('common.search')}
             </button>
           </form>

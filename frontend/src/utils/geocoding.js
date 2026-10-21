@@ -9,10 +9,23 @@ const NOMINATIM_USER_AGENT = 'SchoolFinder/1.0 (contact: contact@schooldecider.c
 
 let lastRequestAt = 0
 let pendingReject = null
+// Bumped by cancelGeocode: a lookup that needs a second request stops before sending it.
+let generation = 0
 
 const normalizeAddress = (address) => address.trim().toLowerCase()
 
 // v2: entries before the quarter and city checks may hold a wrong town ("Люлин 5").
+// The old ones are never read again, so they are dropped once.
+try {
+  const stale = []
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i)
+    if (key?.startsWith('geocode_')) stale.push(key)
+  }
+  stale.forEach(key => localStorage.removeItem(key))
+} catch {
+  // No storage (tests, blocked): nothing to drop.
+}
 const getCacheKey = (address, countryCodes) => `geocode2_${normalizeAddress(address)}_${countryCodes || 'any'}`
 const getReverseCacheKey = (lat, lng, countryCodes) => {
   const latKey = Number(lat).toFixed(5)
@@ -88,6 +101,8 @@ const quarterKey = (text) => String(text || '')
  */
 export function quarterQuery(address) {
   const trimmed = String(address || '').trim()
+  // Estate names in OpenStreetMap are Cyrillic, so a Latin name could never match.
+  if (!/\p{Script=Cyrillic}/u.test(trimmed)) return null
   if (trimmed.includes(',') || STREET_TYPE_RE.test(trimmed) || !QUARTER_SHAPE_RE.test(trimmed)) return null
   return `ж.к. ${trimmed}`
 }
@@ -112,9 +127,14 @@ export function pickInBounds(results, bounds) {
   return (results || []).find(r => inBounds(parseFloat(r.lat), parseFloat(r.lon), bounds)) || null
 }
 
-const waitForSlot = async () => {
+const waitForSlot = async (startedIn) => {
   const wait = lastRequestAt + MIN_REQUEST_INTERVAL_MS - Date.now()
   if (wait > 0) await new Promise(resolve => setTimeout(resolve, wait))
+  if (startedIn !== generation) {
+    const error = new Error('Canceled')
+    error.code = 'CANCELED'
+    throw error
+  }
   lastRequestAt = Date.now()
 }
 
@@ -147,6 +167,24 @@ const searchRequest = async (text, citySuffix, countryCodes, bounds) => {
   return (await response.json()) || []
 }
 
+const plainSearch = async (text, citySuffix, countryCodes, bounds) => {
+  const data = await searchRequest(text, citySuffix, countryCodes, bounds)
+  if (data.length === 0) {
+    const error = new Error('No results')
+    error.code = 'NO_RESULTS'
+    throw error
+  }
+  const result = pickInBounds(data, bounds)
+  if (!result) {
+    // Every match is outside the city: a wrong guess, not the parent's home.
+    const error = new Error('Outside the city')
+    error.code = 'OUTSIDE_AREA'
+    error.place = data[0].display_name
+    throw error
+  }
+  return result
+}
+
 const fetchGeocode = async (address, geocodingConfig = {}) => {
   const countryCodes = geocodingConfig.country_codes || 'bg'
   const citySuffix = geocodingConfig.city_suffix ?? ', Sofia, Bulgaria'
@@ -173,27 +211,24 @@ const fetchGeocode = async (address, geocodingConfig = {}) => {
 
   lastRequestAt = now
 
+  const startedIn = generation
   let result = null
   const asQuarter = quarterQuery(address)
   if (asQuarter) {
-    const quarter = (await searchRequest(asQuarter, citySuffix, countryCodes, bounds))[0]
-    if (isQuarterMatch(quarter, address) && inBounds(parseFloat(quarter.lat), parseFloat(quarter.lon), bounds)) result = quarter
-    else await waitForSlot()
+    // A failed estate request falls through to the plain search.
+    const quarters = await searchRequest(asQuarter, citySuffix, countryCodes, bounds).catch(() => [])
+    result = quarters.find(r => isQuarterMatch(r, address) && inBounds(parseFloat(r.lat), parseFloat(r.lon), bounds)) || null
+    if (!result) await waitForSlot(startedIn)
   }
   if (!result) {
-    const data = await searchRequest(address, citySuffix, countryCodes, bounds)
-    if (data.length === 0) {
-      const error = new Error('No results')
-      error.code = 'NO_RESULTS'
-      throw error
-    }
-    result = pickInBounds(data, bounds)
-    if (!result) {
-      // Every match is outside the city: a wrong guess, not the parent's home.
-      const error = new Error('Outside the city')
-      error.code = 'OUTSIDE_AREA'
-      error.place = data[0].display_name
-      throw error
+    try {
+      result = await plainSearch(address, citySuffix, countryCodes, bounds)
+    } catch (error) {
+      // `fallback`: a looser query for when the exact one finds nothing in the city
+      // (a saved address whose house number OpenStreetMap lacks).
+      if (!geocodingConfig.fallback || !['NO_RESULTS', 'OUTSIDE_AREA'].includes(error.code)) throw error
+      await waitForSlot(startedIn)
+      result = await plainSearch(geocodingConfig.fallback, citySuffix, countryCodes, bounds)
     }
   }
 
@@ -273,6 +308,8 @@ const debouncedFetch = debounce((address, geocodingConfig, resolve, reject) => {
 }, DEBOUNCE_MS)
 
 export const geocodeAddress = (address, geocodingConfig = {}) => {
+  // A new lookup replaces any earlier one, including its pending second request.
+  generation += 1
   const trimmed = address.trim()
   if (!trimmed) {
     const error = new Error('Empty address')
@@ -316,6 +353,7 @@ export const geocodeAddress = (address, geocodingConfig = {}) => {
 }
 
 export const cancelGeocode = () => {
+  generation += 1
   debouncedFetch.cancel()
   if (pendingReject) {
     const error = new Error('Canceled')

@@ -27,6 +27,7 @@ export function useUserLocation({ t, geocodingConfig }) {
   const [addressInput, setAddressInput] = useState('')
   const [locationError, setLocationError] = useState(null)
   const [isLocating, setIsLocating] = useState(false)
+  // false, or which lookup runs: 'address' (typed or from the name search) or 'saved'.
   const [isGeocoding, setIsGeocoding] = useState(false)
   const errorTimeoutRef = useRef(null)
 
@@ -55,6 +56,8 @@ export function useUserLocation({ t, geocodingConfig }) {
   // address lookup) must not overwrite a location the parent has since set another way.
   const locationRequestRef = useRef(0)
   const startLocationRequest = () => {
+    // Also stops a lookup still waiting to send its second request.
+    cancelGeocode()
     locationRequestRef.current += 1
     return locationRequestRef.current
   }
@@ -102,10 +105,10 @@ export function useUserLocation({ t, geocodingConfig }) {
 
   // One address lookup: `lookup` resolves to a geocoding result, `extra` is kept with it.
   // Resolves to whether the location was set.
-  const runLookup = async (lookup, extra = {}) => {
+  const runLookup = async (lookup, extra = {}, kind = 'address') => {
     const request = startLocationRequest()
     setIsLocating(false)
-    setIsGeocoding(true)
+    setIsGeocoding(kind)
     setLocationError(null)
 
     try {
@@ -163,17 +166,14 @@ export function useUserLocation({ t, geocodingConfig }) {
         error.code = 'NO_RESULTS'
         throw error
       }
-      const config = { ...geocodingConfig, city_suffix: '', remember: false }
-      try {
-        return await geocodeAddress(mapSearchQuery(street, savedHome.number), config)
-      } catch (error) {
-        if (error?.code !== 'NO_RESULTS') throw error
+      return geocodeAddress(mapSearchQuery(street, savedHome.number), {
+        ...geocodingConfig,
+        city_suffix: '',
+        remember: false,
         // OpenStreetMap lacks many house numbers; the street is close enough for distances.
-        // The map search allows one request a second.
-        await new Promise(resolve => setTimeout(resolve, 1100))
-        return geocodeAddress(mapSearchQuery(street, '').replace(/\s+,/, ','), config)
-      }
-    }, { savedHome: savedHomeKey })
+        fallback: mapSearchQuery(street, '').replace(/\s+,/, ','),
+      })
+    }, { savedHome: savedHomeKey }, 'saved')
   }
 
   const clearLocation = () => {

@@ -16,6 +16,7 @@ test('quarterQuery tries the housing estate for a bare name and number', () => {
   assert.equal(quarterQuery('Шипка 6, София'), null)
   assert.equal(quarterQuery('Младост'), null)
   assert.equal(quarterQuery('Иван Щерев 125'), null)
+  assert.equal(quarterQuery('Lyulin 5'), null)
 })
 
 test('isQuarterMatch needs a quarter of exactly the typed name', () => {

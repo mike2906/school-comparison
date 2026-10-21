@@ -1383,9 +1383,12 @@ function SearchPage() {
                     <p className="text-sm text-neutral-400 mt-1">{t('schools.tryDifferentFilters')}</p>
                     <AreaHint
                       nameQuery={nameQuery}
-                      onSearchNear={async () => {
+                      onSearchNear={async place => {
                         setIsPickingLocation(false)
-                        if (await searchAddress(nameQuery)) setNameQuery('')
+                        const found = await searchAddress(place)
+                        // Text typed meanwhile stays.
+                        if (found) setNameQuery(current => (current.trim() === place ? '' : current))
+                        return found
                       }}
                       isGeocoding={isGeocoding}
                       locationError={locationError}
