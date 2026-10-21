@@ -8,7 +8,9 @@
  * side by side, the exam heading naming the years its chart plots, exam results with a decimal
  * comma on the Bulgarian page, no pin for a school whose location is
  * only approximate (the page says the address is not on the map yet), and a nursery
- * called a nursery with an address that names its district.
+ * called a nursery with an address that names its district. A school page also rides out a
+ * dropped connection while the API restarts, and says it could not load rather than "not
+ * found" when it cannot.
  */
 import assert from 'node:assert/strict'
 import { describe, test } from 'node:test'
@@ -18,7 +20,7 @@ import { rowAgeGroupKeys, splitRowsForAgeGroup } from '../../src/utils/priceRows
 import { getAvailableExamTypes, prepareNvoTimelineData } from '../../src/utils/nvo.js'
 import { formatCurrency, groupPricingByAcademicYear, rangeEndLabels, statedTuition } from '../../src/utils/pricing.js'
 import { upcomingOpenDays } from '../../src/utils/schoolFacts.js'
-import { NoSchoolError, PHONE, address, allSchools, findSchool, open, page, schoolName, t, liveBrowser } from './live.js'
+import { API, NoSchoolError, PHONE, address, allSchools, findSchool, open, page, schoolName, t, liveBrowser } from './live.js'
 
 liveBrowser(PHONE)
 
@@ -338,5 +340,35 @@ describe('a school page', () => {
     const shown = address(nursery.locations[0], 'en')
     assert.match(shown, / district$|district,/, 'the address names a district')
     await page.getByText(shown).first().waitFor()
+  })
+})
+
+describe('a school page while the API restarts', () => {
+  // A deploy or publish restarts the API for a few seconds: dropped connections there.
+  const dropDetail = async (id, times) => {
+    let dropped = 0
+    await page.route(url => url.href.startsWith(API) && new URL(url).pathname === `/schools/${id}`, route => {
+      if (dropped >= times) return route.continue()
+      dropped += 1
+      return route.abort('connectionreset')
+    })
+    return () => dropped
+  }
+
+  test('a dropped request is asked again and the school shows', async () => {
+    const school = (await allSchools())[0]
+    const dropped = await dropDetail(school.id, 1)
+    await open('bg', `/schools/${school.id}`)
+    await page.getByRole('heading', { level: 1, name: schoolName(school, 'bg'), exact: true }).waitFor()
+    assert.ok(dropped() >= 1, 'the school request was dropped once')
+  })
+
+  test('a school that cannot load says so, not that it is gone', async () => {
+    const school = (await allSchools())[0]
+    await dropDetail(school.id, Infinity)
+    await open('bg', `/schools/${school.id}`)
+    await page.getByRole('heading', { name: t('bg', 'schools.loadFailed'), exact: true }).waitFor()
+    await page.getByRole('button', { name: t('bg', 'common.tryAgain'), exact: true }).waitFor()
+    assert.equal(await page.getByText(t('bg', 'schools.notFound'), { exact: true }).count(), 0)
   })
 })

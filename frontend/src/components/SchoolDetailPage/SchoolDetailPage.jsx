@@ -120,7 +120,8 @@ function SchoolDetailPage({ schoolId = null, embedded = false, onClose = null })
           )
         }
       } catch (err) {
-        setError(err.message)
+        // Only a 404 means the school is gone; anything else is a failed load.
+        setError(err.status === 404 ? 'not_found' : 'failed')
       } finally {
         setLoading(false)
       }
@@ -170,13 +171,17 @@ function SchoolDetailPage({ schoolId = null, embedded = false, onClose = null })
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
               </svg>
             </div>
-            <h2 className="text-2xl font-bold text-neutral-900 mb-2">{t('schools.notFound')}</h2>
-            <p className="text-neutral-600 mb-6">{error || t('schools.notFoundDesc')}</p>
+            <h2 className="text-2xl font-bold text-neutral-900 mb-2">
+              {t(error === 'failed' ? 'schools.loadFailed' : 'schools.notFound')}
+            </h2>
+            <p className="text-neutral-600 mb-6">
+              {t(error === 'failed' ? 'schools.loadFailedDesc' : 'schools.notFoundDesc')}
+            </p>
             <button
-              onClick={handleBack}
+              onClick={error === 'failed' ? () => window.location.reload() : handleBack}
               className="px-6 py-3 bg-primary-700 text-white rounded-lg hover:bg-primary-800 transition-colors"
             >
-              {t('common.goBack')}
+              {t(error === 'failed' ? 'common.tryAgain' : 'common.goBack')}
             </button>
           </div>
         </div>

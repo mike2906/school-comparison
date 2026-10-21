@@ -43,3 +43,36 @@ test('cachedJson refetches after the TTL', async () => {
   await cachedJson('/c', 'x', { fetchImpl, now })
   assert.equal(calls, 2)
 })
+
+test('cachedJson asks again while the API restarts', async () => {
+  clearJsonCache()
+  const answers = [
+    () => { throw new TypeError('Failed to fetch') },
+    () => ({ ok: false, status: 502, statusText: 'Bad Gateway' }),
+    () => okResponse({ id: 1 }),
+  ]
+  const waits = []
+  const fetchImpl = async () => answers.shift()()
+  const data = await cachedJson('/d', 'x', { fetchImpl, sleep: async ms => { waits.push(ms) } })
+  assert.deepEqual(data, { id: 1 })
+  assert.deepEqual(waits, [1000, 2000])
+})
+
+test('cachedJson gives up after three retries and keeps the status', async () => {
+  clearJsonCache()
+  let calls = 0
+  const fetchImpl = async () => { calls += 1; return { ok: false, status: 503, statusText: 'Unavailable' } }
+  await assert.rejects(
+    cachedJson('/e', 'Failed', { fetchImpl, sleep: async () => {} }),
+    err => err.status === 503
+  )
+  assert.equal(calls, 4)
+})
+
+test('cachedJson does not retry a 404', async () => {
+  clearJsonCache()
+  let calls = 0
+  const fetchImpl = async () => { calls += 1; return { ok: false, status: 404, statusText: 'Not Found' } }
+  await assert.rejects(cachedJson('/f', 'Failed', { fetchImpl, sleep: async () => {} }), err => err.status === 404)
+  assert.equal(calls, 1)
+})
