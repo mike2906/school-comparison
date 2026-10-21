@@ -219,9 +219,10 @@ _PERIOD_WORDS = {  # Bulgarian, English, and the French and German some schools 
         r"|\bmonth(?:ly)?\b|mensuel|par mois|monatlich|pro monat"
     ),
     PricePeriod.YEARLY: (
-        # "За цялата учебна година" (300) and a "(l'année)" column (505) name the year for
-        # what they head; a bare "for the school year" heading does not (_YEAR_ON_AMOUNT_LINE_RE).
-        r"(?<!полу)(?<!дву)годиш|\b(?:year(?:ly)?|annual)\b|цялата учебна година"
+        # "За цялата учебна година" (300), "изчислена за една учебна година" (635's food and
+        # transport) and a "(l'année)" column (505) name the year for what they head; a bare
+        # "for the school year" heading does not (_YEAR_ON_AMOUNT_LINE_RE).
+        r"(?<!полу)(?<!дву)годиш|\b(?:year(?:ly)?|annual)\b|цялата учебна година|(?<![\w.])(?:една|1)\s+учебна\s+година"
         r"|annuel|\(l'année\)|par an\b|(?<![a-zäöü])jährlich|pro jahr"
     ),
     PricePeriod.QUARTER: r"тримесеч|\bquarter|vierteljährlich",
@@ -283,6 +284,9 @@ _RANGE_CURRENCY = r"(?:eur|€|евро|лв\.?|лева|bgn)?"
 _RANGE_JOIN_RE = re.compile(rf"{_RANGE_CURRENCY}\s*(?:[–—-]|до|to)\s*{_RANGE_CURRENCY}", re.IGNORECASE)
 _FIRST_INSTALMENT_BEFORE_RE = re.compile(r"(?<!\d)1\s*[xх×]\s*$")  # latin x, cyrillic х, ×
 _PLUS_N_TIMES_AFTER_RE = re.compile(r"\s*(?:eur|€|евро|лв\.?|лева|bgn)?\s*\+\s*\d+\s*[xх×]")
+
+
+_EMPHASIS_RE = re.compile(r"[*_]+")
 
 
 def _normalized(text: str) -> str:
@@ -461,7 +465,8 @@ def check_fee(fee: AgentFee, page_text: str) -> CheckedFee:
 
     # The period and deposit rules read the fee's own lines: "9 x € 750 monthly" names the
     # period of a payment option, not of the price paid in one go above it.
-    evidence = _without_option_lines(lines, fee)
+    # Markdown emphasis between the words reads as a space: 533's "≈ 7.5 ЕUR /** ден".
+    evidence = _EMPHASIS_RE.sub(" ", _without_option_lines(lines, fee))
     checks: list[str] = []
     period = fee.period
     if (

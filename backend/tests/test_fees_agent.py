@@ -2133,6 +2133,9 @@ def test_no_gh_leaves_the_run_alone(monkeypatch):
         (PriceCategory.CAMP, "## Учебен период\n1 седмица\n170", 170, PricePeriod.WEEKLY),  # 541's summer school
         (PriceCategory.TUITION, "Такса за учебната година 8110 евро, платима в срок до 15 юни", 8110, PricePeriod.YEARLY),
         (PriceCategory.TUITION, "месечни такси\n| 11 месеца |\nТаксата за учебната 2026/2027 г. е 8110 евро", 8110, PricePeriod.YEARLY),
+        # Trial 4 (2026-10-21): bold markers inside the period, a sentence naming one school year.
+        (PriceCategory.FOOD, "| Храна (опционално)  |  **≈ 7.5 ЕUR /** ден  |", 7.5, PricePeriod.DAILY),  # 533
+        (PriceCategory.FOOD, "Таксата за храна също е изчислена за една учебна година и не е включена в такса “Образователни услуги”.\nХрана обяд – **1620 €**", 1620, PricePeriod.YEARLY),  # 635
         (PriceCategory.FOOD, "Храна – 8 Евро за присъствен ден", 8, PricePeriod.DAILY),  # 569
         (PriceCategory.TRANSPORT, "Транспорт в посока – 179 Евро за 1 месец", 179, PricePeriod.MONTHLY),  # 569
     ],
@@ -2161,6 +2164,7 @@ def test_periods_stated_with_a_school_year_or_a_count_of_one_are_kept(category, 
         ("| 9 месеца | 550 евро на срок |", PricePeriod.YEARLY),
         ("Плаща се 1 седмица преди началото: 550 евро", PricePeriod.WEEKLY),
         ("Занимания по време на учебен ден: 550 евро", PricePeriod.DAILY),
+        ("Месечна такса 550 евро за 2030/2031 учебна година", PricePeriod.YEARLY),
         ("Екскурзия на един ден 550 евро", PricePeriod.DAILY),
         ("Деца на 1 месец: 550 евро", PricePeriod.MONTHLY),
         ("| Възраст | Такса |\n| 12 месеца | 550 |", PricePeriod.YEARLY),  # an age column
