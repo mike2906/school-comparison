@@ -890,13 +890,16 @@ def osm_check_command(city, country, report_path, issue_path):
 @click.option("--url", required=True, help="The site to check, e.g. one search does not find")
 @click.option("--country", default="bg", show_default=True, help="Country code")
 @click.option("--apply", "apply_changes", is_flag=True, help="Store the site if it is valid (default writes nothing)")
-def check_website_command(school_id, url, country, apply_changes):
+@click.option("--replace", is_flag=True, help="Let a valid site replace the school's accepted one")
+def check_website_command(school_id, url, country, apply_changes, replace):
     """Validate a given site for a school with the usual checks; with --apply a valid one is stored."""
     from app.database import async_session_maker
 
     async def _run():
         async with async_session_maker() as db:
-            return await website_stage.run_validate_url(db, school_id, country, url=url, apply=apply_changes)
+            return await website_stage.run_validate_url(
+                db, school_id, country, url=url, apply=apply_changes, replace=replace
+            )
 
     asyncio.run(_run())
 
