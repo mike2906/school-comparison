@@ -946,6 +946,8 @@
     "preparatoryLink": "Изчислете точките за подготвителна група",
     "startYear": "Постъпване през септември",
     "startYearOption": "{{year}} (учебна {{year}}/{{next}} г.)",
+    "stillRanking": "Класирането за {{year}}/{{next}} още тече за свободните места.",
+    "useStillRanking": "Сметнете за {{year}}/{{next}}",
     "forSchool": "За",
     "anySchool": "всяко училище",
     "noRules": "Все още няма правила за този етап.",

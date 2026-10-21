@@ -946,6 +946,8 @@
     "preparatoryLink": "Calculate preparatory-group points",
     "startYear": "Starting in September of",
     "startYearOption": "{{year}} (school year {{year}}/{{next}})",
+    "stillRanking": "The {{year}}/{{next}} ranking is still running for free places.",
+    "useStillRanking": "Calculate for {{year}}/{{next}}",
     "forSchool": "For",
     "anySchool": "any school",
     "noRules": "There are no rules for this stage yet.",
