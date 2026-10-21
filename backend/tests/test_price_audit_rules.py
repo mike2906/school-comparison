@@ -521,11 +521,17 @@ def test_574_a_fee_the_page_gives_a_later_price_is_superseded():
         "От септември 2025 г. месечната ни такса е 475,50 € (930 лв.)\n",
         # A later price of another fee does not replace it.
         "Месечната такса от септември 2025 г. е 475.50 €.\nХраната от януари 2026 г. е 7 € на ден.\n",
+        # Both monthly, but the later one is tuition and this one food.
+        "От септември 2025 г. месечната такса за храна е 475.50 €.\n"
+        "От септември 2026 г. месечната такса за обучение е 500 €.\n",
+        # A bare monthly fee is not replaced by a later food price.
+        "Месечната такса от септември 2025 г. е 475.50 €.\nОт септември 2026 г. месечната такса за храна е 120 €.\n",
         # The same price again from the later year.
         "Месечната такса от септември 2025 г. е 475.50 €.\nОт септември 2026 г. месечната такса остава 475.50 €.\n",
     ],
 )
 def test_a_dated_fee_with_no_later_price_stands(page):
+    """628's page, another fee's later price, and the same price again."""
     assert RULE_SUPERSEDED not in [
         f.rule for f in check_price_row(row(475.5, period="MONTHLY"), page, "kindergarten", today=TODAY)
     ]

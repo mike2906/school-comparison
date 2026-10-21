@@ -886,20 +886,29 @@ _FROM_DATE_RE = re.compile(
     r"(?<![\w])(?:от|from)\s+(?:\d{1,2}\s*[./]\s*\d{1,2}\s*[./]\s*|(?:\d{1,2}\s+)?(?:%s)\s+)?(20\d{2})(?!\d)"
     % "|".join(_MONTHS)
 )
-# What kind of fee a sentence speaks of, so a later price of another fee ("от януари 2026 г.
-# храната е 6 €") does not replace this one.
-_FEE_KINDS = {
-    "monthly": re.compile(r"месечн|\bmonthly\b"),
-    "yearly": re.compile(r"годишн|\bannual|\byearly\b"),
+# What fee a sentence speaks of, so a later price of another fee ("от януари 2026 г. храната
+# е 6 €") does not replace this one. The subject decides when either sentence names one; a
+# period alone ("месечната такса") only matches between sentences that name no subject.
+_FEE_SUBJECTS = {
     "tuition": re.compile(r"обучение|\btuition\b"),
     "food": re.compile(r"хран|\bfood\b|\bmeals?\b"),
     "transport": re.compile(r"транспорт|\btransport"),
     "deposit": _DEPOSIT_RE,
 }
+_FEE_PERIODS = {
+    "monthly": re.compile(r"месечн|\bmonthly\b"),
+    "yearly": re.compile(r"годишн|\bannual|\byearly\b"),
+}
 
 
-def _fee_kinds(words: str) -> set[str]:
-    return {kind for kind, pattern in _FEE_KINDS.items() if pattern.search(words)}
+def _same_fee(words: str, other: str) -> bool:
+    def named(kinds: dict[str, re.Pattern[str]], text: str) -> set[str]:
+        return {kind for kind, pattern in kinds.items() if pattern.search(text)}
+
+    subjects = named(_FEE_SUBJECTS, words)
+    if subjects or named(_FEE_SUBJECTS, other):
+        return subjects == named(_FEE_SUBJECTS, other)
+    return bool(named(_FEE_PERIODS, words) & named(_FEE_PERIODS, other))
 
 
 def superseded_by(text: str, span: tuple[int, int], amounts: Iterable[Any]) -> Optional[str]:
@@ -908,13 +917,12 @@ def superseded_by(text: str, span: tuple[int, int], amounts: Iterable[Any]) -> O
     574's page tells "От септември 2026 г. месечната такса е 590.00 €" at the top and keeps
     "Месечната такса ... от септември 2025 г. е 475.50 €" in its FAQ: the older price is gone.
     Only a sentence that dates its own amount ("от <месец> <година>") can be superseded, and
-    only by a line that dates a different price later and names the same kind of fee.
+    only by a line that dates a different price later and names the same fee (:func:`_same_fee`).
     """
     line_start = text.rfind("\n", 0, span[0]) + 1
     own = _EMPHASIS_RE.sub("", text[line_start: span[0]])
     dated = list(_FROM_DATE_RE.finditer(own))
-    kinds = _fee_kinds(own)
-    if not dated or not kinds:
+    if not dated:
         return None
     year = int(dated[-1].group(1))
     own_values = {decimal.Decimal(str(value)) for value in amounts}
@@ -925,7 +933,7 @@ def superseded_by(text: str, span: tuple[int, int], amounts: Iterable[Any]) -> O
                 continue
             after = plain[match.end():]
             price = _PRICE_RE.search(after)
-            if price is None or not kinds & _fee_kinds(plain[: match.end()] + after[: price.start()]):
+            if price is None or not _same_fee(own, plain[: match.end()] + after[: price.start()]):
                 continue
             if not any(amount_spans(price.group(), value) for value in own_values):
                 return line
