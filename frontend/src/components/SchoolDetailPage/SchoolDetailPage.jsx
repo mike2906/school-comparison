@@ -65,6 +65,12 @@ function SchoolDetailPage({ schoolId = null, embedded = false, onClose = null })
   // ?group= the card's link passes to the full page. It picks which NVO exam leads, the
   // headline fee, and which fees the fee list shows before the other ages.
   const preferredAgeGroup = searchParams.get('age_group') || searchParams.get('group')
+  // The enrolment year a birth year gave that group for: the search's own (side panel, only
+  // with a birth year) or the link's ?year=. A group picked without a birth year has none.
+  const searchYear = searchParams.get('birth_year') ? searchParams.get('target_year') : null
+  const targetYear = preferredAgeGroup
+    ? Number.parseInt(searchYear || searchParams.get('year') || '', 10) || null
+    : null
   const id = schoolId ?? params.id
   const navigate = useNavigate()
   const Shell = embedded ? EmbeddedShell : Layout
@@ -86,6 +92,7 @@ function SchoolDetailPage({ schoolId = null, embedded = false, onClose = null })
   const [rawSchool, setRawSchool] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [attempt, setAttempt] = useState(0)
   const [activeExamType, setActiveExamType] = useState(null)
   const [selectedSubjects, setSelectedSubjects] = useState(['math', 'bulgarian'])
   const [examAverages, setExamAverages] = useState(null)
@@ -120,14 +127,15 @@ function SchoolDetailPage({ schoolId = null, embedded = false, onClose = null })
           )
         }
       } catch (err) {
-        setError(err.message)
+        // Only a 404 means the school is gone; anything else is a failed load.
+        setError(err.status === 404 ? 'not_found' : 'failed')
       } finally {
         setLoading(false)
       }
     }
 
     loadSchool()
-  }, [id])
+  }, [id, attempt])
 
   const school = useMemo(
     () => normalizeSchool(rawSchool, i18n.language),
@@ -170,13 +178,17 @@ function SchoolDetailPage({ schoolId = null, embedded = false, onClose = null })
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
               </svg>
             </div>
-            <h2 className="text-2xl font-bold text-neutral-900 mb-2">{t('schools.notFound')}</h2>
-            <p className="text-neutral-600 mb-6">{error || t('schools.notFoundDesc')}</p>
+            <h2 className="text-2xl font-bold text-neutral-900 mb-2">
+              {t(error === 'failed' ? 'schools.loadFailed' : 'schools.notFound')}
+            </h2>
+            <p className="text-neutral-600 mb-6">
+              {t(error === 'failed' ? 'schools.loadFailedDesc' : 'schools.notFoundDesc')}
+            </p>
             <button
-              onClick={handleBack}
+              onClick={error === 'failed' ? () => setAttempt(n => n + 1) : handleBack}
               className="px-6 py-3 bg-primary-700 text-white rounded-lg hover:bg-primary-800 transition-colors"
             >
-              {t('common.goBack')}
+              {t(error === 'failed' ? 'common.tryAgain' : 'common.goBack')}
             </button>
           </div>
         </div>
@@ -425,10 +437,10 @@ function SchoolDetailPage({ schoolId = null, embedded = false, onClose = null })
           </div>
         </div>
 
-        <KeyFacts school={school} examAverages={examAverages} nvoExamType={keyFactsExamType} ageGroup={preferredAgeGroup} />
+        <KeyFacts school={school} examAverages={examAverages} nvoExamType={keyFactsExamType} ageGroup={preferredAgeGroup} targetYear={targetYear} />
 
         {/* Price is what a private-school parent decides on first. */}
-        {hasPricing && <PricingSection pricing={pricing} discounts={school.fee_discounts} ageGroup={preferredAgeGroup} />}
+        {hasPricing && <PricingSection pricing={pricing} discounts={school.fee_discounts} ageGroup={preferredAgeGroup} targetYear={targetYear} />}
 
         <WebsiteFacts school={school} />
 

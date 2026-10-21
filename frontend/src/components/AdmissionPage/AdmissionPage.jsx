@@ -6,6 +6,7 @@ import { fetchSchool } from '../../api/schools'
 import { getSchoolName } from '../../utils/i18n'
 import { RULE_SETS } from '../../admission/ruleSets'
 import {
+  campaignStillRanking,
   defaultStartYear,
   ruleSetFor,
   sameRules,
@@ -83,7 +84,8 @@ function AdmissionPage() {
     return startYearChoices().includes(year) ? year : null
   }
   const [chosenYear, setChosenYear] = useState(() => savedYear(stage.id))
-  const startYear = chosenYear ?? defaultStartYear(new Date(), { ruleSets: RULE_SETS, stage, today })
+  const startYear = chosenYear ?? defaultStartYear()
+  const stillRanking = campaignStillRanking(new Date(), { ruleSets: RULE_SETS, stage, today })
 
   useEffect(() => {
     const previous = document.title
@@ -184,6 +186,14 @@ function AdmissionPage() {
               </select>
             )}
           </Field>
+          {stillRanking != null && stillRanking !== startYear && (
+            <p className="text-sm text-neutral-700">
+              {t('admissionCalc.stillRanking', { year: stillRanking, next: stillRanking + 1 })}{' '}
+              <button type="button" onClick={() => setChosenYear(stillRanking)} className="font-medium text-primary-700 underline">
+                {t('admissionCalc.useStillRanking', { year: stillRanking, next: stillRanking + 1 })}
+              </button>
+            </p>
+          )}
           {schoolContext && (
             <div className="text-sm text-neutral-700">
               {t('admissionCalc.forSchool')}{' '}

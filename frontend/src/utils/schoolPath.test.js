@@ -8,3 +8,8 @@ test('schoolPath: carries the searched age group, else the bare page', () => {
   assert.equal(schoolPath(12), '/schools/12')
   assert.equal(schoolPath(12, null), '/schools/12')
 })
+
+test('schoolPath: carries the enrolment year only with an age group', () => {
+  assert.equal(schoolPath(12, 'third', 2027), '/schools/12?group=third&year=2027')
+  assert.equal(schoolPath(12, null, 2027), '/schools/12')
+})

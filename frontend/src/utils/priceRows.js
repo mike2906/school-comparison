@@ -81,7 +81,8 @@ const PRICE_TERMS = [
   // monthly fee "платима авансово" (paid at the start of the month) is the regular price.
   ['prepaid', /(?:предплащ|авансов|еднократно|наведнъж|prepa(?:id|y)|in advance|at once)[^/]*?(?:за|for) (?:\d+|цял|целия|една|един|a whole|the whole|a full|the full|one) ?(?:\p{L}+ )?(?:месец|месеца|година|срок|семест|months?|year|term|semester)|(?:за|for) (?:\d+|цял\p{L}*|a whole|the whole) (?:учебна )?(?:месеца|година|months|year)[^/]*?(?:at once|наведнъж|предварително|in advance)/iu],
   ['instalments', /разсроч|deferred|(?<![\p{L}])(?:на|в|in)\s+(?:[2-9]|1\d|две|три|четири|пет|шест|девет|десет|two|three|four|five|six|nine|ten)\s+(?:равни\s+|equal\s+|месечни\s+|monthly\s+)?(?:вноски|instal+ments|payments)|(?<![\p{L}])(?:на|in)\s+(?:вноски|instal+ments)/iu],
-  ['one_payment', /еднократно плащане|one-time payment|paid in full/iu],
+  // 199's "Такса / годишно плащане" column beside its monthly fee: the year paid at once.
+  ['one_payment', /еднократно плащане|one-time payment|paid in full|(?<![\p{L}])годишно плащане|annual payment/iu],
 ]
 
 /**
@@ -96,6 +97,19 @@ export function priceTerms(row) {
   return isOnePayment(row?.plan_name) ? 'one_payment' : null
 }
 
+// Care for part of the day: "Полудневен престой", "половин ден", "Half day", a day that ends by
+// 14:00 (286's "до 13:00 часа", 330's "8:00 – 13 часа"). Not "целодневно" (full day), nor a
+// deadline's "до 12.10".
+const HALF_DAY_RE = /полудн|половин ден|half[- ]day|(?<![\p{L}])до обяд|(?<![\p{L}\p{N}])до 1[1-4](?::\d\d|(?:[.]\d\d)?\s*(?:ч|h))|\d[:.]\d\d\s*[–-]\s*1[1-4](?::\d\d|(?:[.]\d\d)?\s*(?:ч|h))/iu
+const FULL_DAY_RE = /целодн|цял ден|full[- ]day/iu
+
+/** True for a fee whose own words say it is for half a day. */
+export function isHalfDay(row) {
+  const words = [row?.plan_name, row?.age_group, row?.pricing_context?.plan_name_en].filter(Boolean)
+  // "Целодневна група, обяд до 12 ч." is a full day that names a time.
+  return words.some(text => HALF_DAY_RE.test(text)) && !words.some(text => FULL_DAY_RE.test(text))
+}
+
 /**
  * The heading a fee goes under: its category, except that a deposit (returned or taken off a
  * later fee) is listed apart from the registration fees it is filed with.
@@ -104,7 +118,9 @@ export function priceCategory(row) {
   return row?.category === 'registration' && row?.pricing_context?.deposit === true ? 'deposit' : row?.category
 }
 
-// Registration fees are paid once and uniform items are bought once, so a missing period is no news.
+// Admission fees (enrolment, application, an entry exam or contest: the `registration` category,
+// shown as "Admission fee" so 555's exam fee is not called a registration) are paid once and
+// uniform items are bought once, so a missing period is no news.
 const ONE_OFF_CATEGORIES = new Set(['registration', 'uniforms'])
 
 /** True when a row's period is unknown and a parent could misread how often it is paid. */
@@ -130,7 +146,8 @@ const ORDINAL_TOKEN_RE = new RegExp(`(?<![\\p{L}\\p{N}])(${ORDINAL})(?![\\p{L}\\
 // "Ясла", "Яслена група"; but "ДГ и ясла" or "Детска ясла и градина" name both, so neither.
 const NURSERY_RE = /яслен|nursery|cr[eè]che|(?<![\p{L}])ясл(?:а|и|ата)(?![\p{L}])/u
 const BOTH_RE = /ясл(?:а|и)\s*(?:и|\/|,)\s*(?:детск[аи] )?(?:градин|дг(?![\p{L}]))|(?:градин[аи]|(?<![\p{L}])дг)\s*(?:и|\/|,)\s*(?:детска )?ясл|яслена и градинска/u
-const PRESCHOOL_NAME_RE = /подготвителн[аи] груп|предучилищн[аи] груп|подготвителен клас|(?<![\p{L}])п[гк]у?(?![\p{L}])|pre-?school/u
+// 555's English "PREPARATORY GROUP | YEAR 2" too.
+const PRESCHOOL_NAME_RE = /подготвителн[аи] груп|предучилищн[аи] груп|подготвителен клас|(?<![\p{L}])п[гк]у?(?![\p{L}])|pre-?school|preparatory (?:group|class|year)/u
 
 const AGE_GROUP_KEYS = new Set([
   'nursery', 'first', 'second', 'third', 'preschool', 'grade_1_4', 'grade_5_7', 'grade_8_12',

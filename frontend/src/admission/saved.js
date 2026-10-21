@@ -5,8 +5,9 @@
  * official address table, which the catchment maps reuse.
  *
  * Shape: { version, home: { streetId, number } | null,
- *          kindergarten: { startYear, answers, savedOn } | null,
- *          grade_1: { startYear, addresses, answers, savedOn } | null }
+ *          kindergarten: { startYear, answers, siblings?, savedOn } | null,
+ *          grade_1: { startYear, addresses, answers, siblings?, savedOn } | null }
+ * `siblings` maps a school id to that school's sibling answers (see siblingsWith).
  */
 
 const STORAGE_KEY = 'admissionAnswers'
@@ -93,6 +94,25 @@ export function saveStage(stage, entry, { home } = {}) {
   const next = { ...read(), [stage]: { ...entry, savedOn: new Date().toISOString().slice(0, 10) } }
   if (home !== undefined) next.home = home
   write(next)
+}
+
+/**
+ * The schools where a sibling attends, from answers given on that school's own calculator
+ * page: the list counts a sibling only there. `entry` is the saved entry; its siblings
+ * stand for its own start year only (a sibling's age is checked against it). With a school
+ * on the page, `place` is its sibling answers for a yes and null otherwise (forgets it).
+ */
+export function siblingsWith(entry, startYear, schoolId, place) {
+  const next = { ...(entry?.startYear === startYear ? entry.siblings : null) }
+  if (schoolId == null) return next
+  if (place) next[schoolId] = place
+  else delete next[schoolId]
+  return next
+}
+
+/** `entry` with its siblings, left out when there are none. */
+export function withSiblings(entry, siblings) {
+  return Object.keys(siblings).length > 0 ? { ...entry, siblings } : entry
 }
 
 export function saveHome(home) {

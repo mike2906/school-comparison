@@ -8,7 +8,7 @@ import {
 } from '../../utils/keyFacts'
 import { calculateDistance } from '../../utils/distance'
 import { formatAmount, formatKm, intlLocale } from '../../utils/format'
-import { feeRangeNotes, statedTuition, YEAR_STATUS } from '../../utils/pricing'
+import { feeRangeNotes, statedTuition, YEAR_STATUS, yearStartOf } from '../../utils/pricing'
 import { getLastAdmittedPoints, getMinNvoScore, hasKindergartenCutoffs } from '../../utils/admission'
 import {
   getLanguageLabel,
@@ -46,7 +46,7 @@ const listValue = (items) => items.map((item, index) => (
  * the school type (price first for private schools, NVO / admission for state ones), and
  * facts a school does not have are left out rather than shown as "unavailable".
  */
-function KeyFacts({ school, examAverages, nvoExamType, ageGroup = null }) {
+function KeyFacts({ school, examAverages, nvoExamType, ageGroup = null, targetYear = null }) {
   const { t, i18n } = useTranslation()
   const { config: countryConfig } = useCountry()
   const locale = intlLocale(i18n.language)
@@ -92,6 +92,11 @@ function KeyFacts({ school, examAverages, nvoExamType, ageGroup = null }) {
         : tuition.yearStatus === YEAR_STATUS.NEXT
           ? `${tuition.academicYear} · ${t('pricing.nextYear')}`
           : tuition.academicYear
+    // The searched group is the child's group in the year they enrol; a fee set for an
+    // earlier year is that group's fee then, and the school may change it.
+    const laterYear = targetYear && tuition.academicYear && yearStartOf(tuition) !== -1 && yearStartOf(tuition) < targetYear
+      ? t('pricing.targetYearNotPublished', { year: `${targetYear}/${targetYear + 1}` })
+      : null
     // The fee in the period the school states it in: never annualised, since schools
     // bill over 9, 10 or 12 months.
     const priceText = (fee) => {
@@ -117,7 +122,7 @@ function KeyFacts({ school, examAverages, nvoExamType, ageGroup = null }) {
         key="tuition"
         label={t(tuition.total ? 'pricing.totalFees' : 'pricing.tuition')}
         value={priceText(tuition)}
-        detail={[tuition.period ? null : t('pricing.periodNotStated'), yearDetail].filter(Boolean).join(' · ')}
+        detail={[tuition.period ? null : t('pricing.periodNotStated'), yearDetail, laterYear].filter(Boolean).join(' · ')}
         note={notes.length > 0 ? notes.map((line, index) => <div key={index}>{line}</div>) : null}
       />
     )

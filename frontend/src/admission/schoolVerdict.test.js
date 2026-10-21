@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url'
 import { catchmentUrl, indexAddresses, indexCatchments } from './catchments.js'
 import { evaluateKindergarten, GRADE1_INITIAL, KINDERGARTEN_INITIAL } from './inputs.js'
 import { ruleSetFor, stageById } from './calculator.js'
+import { siblingsWith } from './saved.js'
 import { clearlyBelowIds, compareRows, kindergartenDistrict, KINDERGARTEN_ASSUMED, savedVerdictsFor } from './schoolVerdict.js'
 
 const savedVerdictFor = (...args) => savedVerdictsFor(...args)[0] ?? null
@@ -64,6 +65,27 @@ test('a saved kindergarten result is compared with each kindergarten, counting i
   assert.equal(savedVerdictFor(kindergarten(home, []), saved, null, data).verdict, 'noCutoff')
   // Another birth year's row ranks other children.
   assert.equal(savedVerdictFor(kindergarten(home, [{ ...kgRow(1), birth_year: 2022 }]), saved, null, data).verdict, 'noCutoff')
+})
+
+test('a sibling named on a kindergarten\'s own calculator counts there only', () => {
+  const ruleSet = ruleSetFor(ruleSets, stageById('kindergarten'), 2026, today).ruleSet
+  const total = place => evaluateKindergarten(ruleSet, kgAnswers, 2026, { ...KINDERGARTEN_ASSUMED, district: home.code, ...place }, today).total.min
+  const bonus = total({ siblingThere: true }) - total({})
+  assert.ok(bonus > 0, 'a sibling there earns points')
+  const saved = { kindergarten: { startYear: 2026, answers: kgAnswers, siblings: { 1: { siblingThere: true } } } }
+  // The last admitted child had exactly the points without a sibling.
+  const cutoff = [kgRow(total({}))]
+  assert.equal(savedVerdictFor(kindergarten(home, cutoff), saved, null, data).verdict, 'above', 'the sibling\'s kindergarten (id 1)')
+  assert.equal(savedVerdictFor({ ...kindergarten(home, cutoff), id: 2 }, saved, null, data).verdict, 'tie', 'another kindergarten')
+})
+
+test('siblingsWith keeps, adds and forgets one school, for the saved start year only', () => {
+  const entry = { startYear: 2026, siblings: { 3: { siblingThere: true } } }
+  assert.deepEqual(siblingsWith(entry, 2026, 5, { siblingThere: true }), { 3: { siblingThere: true }, 5: { siblingThere: true } })
+  assert.deepEqual(siblingsWith(entry, 2026, 3, null), {}, 'a no or "not sure" forgets it')
+  assert.deepEqual(siblingsWith(entry, 2026, null, null), { 3: { siblingThere: true } }, 'no school on the page keeps them')
+  assert.deepEqual(siblingsWith(entry, 2027, null, null), {}, 'another start year starts over')
+  assert.deepEqual(siblingsWith(undefined, 2026, null, null), {})
 })
 
 test('a child starting next year is compared with the last campaign rows for the same group', () => {

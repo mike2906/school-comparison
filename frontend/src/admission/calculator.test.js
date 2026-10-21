@@ -12,6 +12,7 @@ import {
   compareWithCutoff,
   laterEasierRound,
   laterHarder,
+  campaignStillRanking,
   defaultStartYear,
   formatRange,
   measuredOnFor,
@@ -39,11 +40,11 @@ const RULE_SETS = ruleFiles(fileURLToPath(new URL('./rules', import.meta.url)))
 test('from October the next September is the default start year', () => {
   assert.equal(defaultStartYear(new Date(2026, 8, 30)), 2026)
   assert.equal(defaultStartYear(new Date(2026, 9, 1)), 2027)
-  // A tab whose campaign is still ranking stays on it: kindergartens until 27 November.
+  // A campaign still ranking is offered, not the default: kindergartens until 27 November.
   const kg = stageById('kindergarten')
-  assert.equal(defaultStartYear(new Date(2026, 9, 15), { ruleSets: RULE_SETS, stage: kg, today: '2026-10-15' }), 2026)
-  assert.equal(defaultStartYear(new Date(2026, 10, 28), { ruleSets: RULE_SETS, stage: kg, today: '2026-11-28' }), 2027)
-  assert.equal(defaultStartYear(new Date(2026, 9, 15), { ruleSets: RULE_SETS, stage: stageById('grade_1'), today: '2026-10-15' }), 2027)
+  assert.equal(campaignStillRanking(new Date(2026, 9, 15), { ruleSets: RULE_SETS, stage: kg, today: '2026-10-15' }), 2026)
+  assert.equal(campaignStillRanking(new Date(2026, 10, 28), { ruleSets: RULE_SETS, stage: kg, today: '2026-11-28' }), null)
+  assert.equal(campaignStillRanking(new Date(2026, 9, 15), { ruleSets: RULE_SETS, stage: stageById('grade_1'), today: '2026-10-15' }), null)
   assert.equal(campaignEnd(RULE_SETS.find(r => r.id === 'bg/sofia/kindergarten/2026-2027')), '2026-11-27')
   assert.deepEqual(startYearChoices(new Date(2026, 9, 14)), [2026, 2027, 2028])
   assert.deepEqual(startYearChoices(new Date(2026, 2, 1)), [2026, 2027])

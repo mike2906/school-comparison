@@ -8,6 +8,7 @@ import { schoolCatchmentIds } from './catchments.js'
 import i18next from 'i18next'
 import { usesSofiaKindergartenSystem } from '../utils/admission.js'
 import { formatAmount } from '../utils/format.js'
+import { planningYear } from '../utils/ageSelection.js'
 
 /** Calculator tabs: the rule-file stage and the cut-off stages read with it. */
 export const STAGES = [
@@ -54,15 +55,21 @@ export function campaignEnd(ruleSet) {
 }
 
 /**
- * The September a parent is most likely planning for. With a tab, it is the earliest
- * campaign from this year on that is still taking applications or ranking on `today`
- * (Sofia kindergartens rank for this school year until late November), so the rules
- * shown are the ones a parent applying now is ranked under. Otherwise, from October on
- * the next campaign is the open question.
+ * The September a parent is most likely planning for, the same as the search's: from
+ * October on, next year's (Mike, 2026-10-21; the tab used to stay on a campaign still
+ * ranking, so the calculator and the list disagreed on the child's group).
  */
-export function defaultStartYear(now = new Date(), { ruleSets = [], stage = null, today = sofiaToday(now) } = {}) {
-  const next = now.getMonth() >= 9 ? now.getFullYear() + 1 : now.getFullYear()
-  if (!stage) return next
+export function defaultStartYear(now = new Date()) {
+  return planningYear(now)
+}
+
+/**
+ * An earlier campaign than the default that is still taking applications or ranking on
+ * `today` (Sofia kindergartens rank free places for this school year until late
+ * November), or null. The calculator offers it with one tap.
+ */
+export function campaignStillRanking(now = new Date(), { ruleSets = [], stage, today = sofiaToday(now) } = {}) {
+  const next = planningYear(now)
   for (let year = now.getFullYear(); year < next; year += 1) {
     const campaign = `${year}/${year + 1}`
     // The same file the tab would show, and only if it was written for that campaign.
@@ -70,7 +77,7 @@ export function defaultStartYear(now = new Date(), { ruleSets = [], stage = null
     const end = ruleSet?.campaign === campaign ? campaignEnd(ruleSet) : null
     if (end && today <= end) return year
   }
-  return next
+  return null
 }
 
 /** Start years to offer: this calendar year's campaign, the default and the one after. */

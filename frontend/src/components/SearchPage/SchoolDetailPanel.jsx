@@ -57,7 +57,7 @@ function SchoolDetailPanel({ schoolId, onClose, beside = false }) {
           {t('detailPanel.backToResults')}
         </button>
         <Link
-          to={schoolPath(schoolId, searchParams.get('age_group'))}
+          to={schoolPath(schoolId, searchParams.get('age_group'), searchParams.get('birth_year') ? searchParams.get('target_year') : null)}
           className="inline-flex h-10 items-center gap-1 rounded-lg px-2 text-sm font-medium text-primary-700 hover:bg-primary-50"
         >
           {t('detailPanel.openFullPage')}

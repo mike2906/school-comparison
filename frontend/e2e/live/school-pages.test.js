@@ -4,11 +4,15 @@
  * from its website (with open days), its Facebook and Instagram links, fees with their
  * payment plans, last year's fees left out once this year lists them again, fees for the
  * searched age first with the other ages folded away, a headline fee range that says what
- * each end is, compare for an age showing that age's fee, comparing fees
+ * each end is, the cheapest-first kindergarten list comparing full days, a fee for an
+ * earlier year than the searched one saying so, required extras named under the fee,
+ * compare for an age showing that age's fee, comparing fees
  * side by side, the exam heading naming the years its chart plots, exam results with a decimal
  * comma on the Bulgarian page, no pin for a school whose location is
  * only approximate (the page says the address is not on the map yet), and a nursery
- * called a nursery with an address that names its district.
+ * called a nursery with an address that names its district. A school page also rides out a
+ * dropped connection while the API restarts, and says it could not load rather than "not
+ * found" when it cannot.
  */
 import assert from 'node:assert/strict'
 import { describe, test } from 'node:test'
@@ -16,9 +20,9 @@ import { describe, test } from 'node:test'
 import { planNameLabel } from '../../src/utils/priceLabels.js'
 import { rowAgeGroupKeys, splitRowsForAgeGroup } from '../../src/utils/priceRows.js'
 import { getAvailableExamTypes, prepareNvoTimelineData } from '../../src/utils/nvo.js'
-import { formatCurrency, groupPricingByAcademicYear, rangeEndLabels, statedTuition } from '../../src/utils/pricing.js'
+import { feeRangeNotes, formatCurrency, groupPricingByAcademicYear, intakeYearStart, rangeEndLabels, statedTuition, tuitionSortValue } from '../../src/utils/pricing.js'
 import { upcomingOpenDays } from '../../src/utils/schoolFacts.js'
-import { NoSchoolError, PHONE, address, allSchools, findSchool, open, page, schoolName, t, liveBrowser } from './live.js'
+import { API, NoSchoolError, PHONE, address, allSchools, findSchool, open, page, schoolName, t, liveBrowser } from './live.js'
 
 liveBrowser(PHONE)
 
@@ -258,6 +262,57 @@ describe('a school page', () => {
     await page.getByText(new RegExp(`^${escape(low)}: .+ · ${escape(high)}: `)).first().waitFor()
   })
 
+  test('the cheapest-first kindergarten list compares a full day, cheapest first', async () => {
+    // 527's and 542's half-day prices put them first; 199 ranked third on a pay-at-once price.
+    // A child born five years before the intake year is in the third group.
+    const year = intakeYearStart()
+    await open('bg', `/search?age_group=third&birth_year=${year - 5}&target_year=${year}&sort=price`)
+    const links = page.locator('a[href*="/schools/"][href*="group=third"]')
+    await links.first().waitFor()
+    const hrefs = (await links.evaluateAll(anchors => anchors.map(a => a.getAttribute('href')))).slice(0, 12)
+    assert.ok(hrefs.every(href => href.includes(`year=${year}`)), 'a card link carries the enrolment year of the birth-year search')
+    const byId = new Map((await allSchools()).map(school => [school.id, school]))
+    const ids = [...new Set(hrefs.map(href => Number(href.match(/\/schools\/(\d+)/)[1])))]
+    const values = ids.map(id => tuitionSortValue(byId.get(id)?.pricing, { ageGroup: 'third' })).filter(value => value != null)
+    assert.ok(values.length >= 5, `only ${values.length} priced kindergartens at the top`)
+    assert.deepEqual(values, [...values].sort((a, b) => a - b), `not cheapest first: ${values.map(Math.round).join(', ')}`)
+  })
+
+  test("a fee set for an earlier year than the one searched says the searched year's is not out yet", async () => {
+    // A child born in 2022 is in the third group in 2027/28; the 2026/27 table's third
+    // group is for children born in 2021 (St George, Британика).
+    const year = intakeYearStart()
+    const earlier = school => {
+      const fee = isPrivate(school) && statedTuition(school.pricing, { ageGroup: 'third' })
+      const { forGroup, otherAges } = splitRowsForAgeGroup(school.pricing || [], 'third')
+      return fee?.academicYear && Number(fee.academicYear.split('/')[0]) < year &&
+        forGroup.some(row => rowAgeGroupKeys(row).has('third')) && otherAges.length > 0
+    }
+    const listed = (await allSchools()).find(earlier)
+    assert.ok(listed, 'a private kindergarten with a third-group fee for an earlier year')
+    await open('bg', `/schools/${listed.id}?group=third&year=${year}`)
+    const span = `${year}/${year + 1}`
+    await page.getByText(t('bg', 'pricing.targetYearNotPublished', { year: span }), { exact: false }).first().waitFor()
+    const group = t('bg', 'ageGroups.third')
+    await card(t('bg', 'pricing.title'))
+      .getByText(t('bg', 'pricing.forAgeGroupInYear', { group: group.charAt(0).toLocaleLowerCase('bg') + group.slice(1), year: span }))
+      .waitFor()
+  })
+
+  test('extras the school says every child pays are named under the headline fee', async testContext => {
+    // 634's 6,820 € left out 1,410 € of required food, materials and a club.
+    const listed = (await allSchools()).find(s => isPrivate(s) && statedTuition(s.pricing)?.required?.length > 0)
+    if (!listed) {
+      testContext.diagnostic('No school states a required extra; nothing to check.')
+      return
+    }
+    await open('bg', `/schools/${listed.id}`)
+    const line = feeRangeNotes(statedTuition(listed.pricing), (key, vars) => t('bg', key, vars), 'bg', () => 'PRICE')
+      .find(text => text.startsWith(t('bg', 'pricing.alsoRequired', { fees: '' })))
+    assert.ok(line, 'the required extras line')
+    await page.getByText(t('bg', 'pricing.alsoRequired', { fees: '' }), { exact: false }).first().waitFor()
+  })
+
   test('compare for an age shows that age\'s fee, not a fee naming no age', async () => {
     // 271 read "7,200–7,950" for grade 1: 7,950 was its kindergarten fee, stored with no age.
     const shown = fee => (fee.min === fee.max
@@ -338,5 +393,40 @@ describe('a school page', () => {
     const shown = address(nursery.locations[0], 'en')
     assert.match(shown, / district$|district,/, 'the address names a district')
     await page.getByText(shown).first().waitFor()
+  })
+})
+
+describe('a school page while the API restarts', () => {
+  // A deploy or publish restarts the API for a few seconds: dropped connections there.
+  const dropDetail = async (id, times) => {
+    const seen = { dropped: 0, passed: 0 }
+    await page.route(url => url.href.startsWith(API) && new URL(url).pathname === `/schools/${id}`, route => {
+      if (seen.dropped >= times) {
+        seen.passed += 1
+        return route.continue()
+      }
+      seen.dropped += 1
+      return route.abort('connectionreset')
+    })
+    return seen
+  }
+
+  test('a dropped request is asked again and the school shows', async () => {
+    const school = (await allSchools())[0]
+    // Two drops: the page's preload (index.html) and the app's own first request, so only
+    // the app asking again can show the school.
+    const seen = await dropDetail(school.id, 2)
+    await open('bg', `/schools/${school.id}`)
+    await page.getByRole('heading', { level: 1, name: schoolName(school, 'bg'), exact: true }).waitFor()
+    assert.deepEqual(seen, { dropped: 2, passed: 1 })
+  })
+
+  test('a school that cannot load says so, not that it is gone', async () => {
+    const school = (await allSchools())[0]
+    await dropDetail(school.id, Infinity)
+    await open('bg', `/schools/${school.id}`)
+    await page.getByRole('heading', { name: t('bg', 'schools.loadFailed'), exact: true }).waitFor()
+    await page.getByRole('button', { name: t('bg', 'common.tryAgain'), exact: true }).waitFor()
+    assert.equal(await page.getByText(t('bg', 'schools.notFound'), { exact: true }).count(), 0)
   })
 })

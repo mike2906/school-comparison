@@ -130,7 +130,12 @@ function SearchPage() {
     locateSavedHome,
     clearLocation,
     setLocationFromMap,
-  } = useUserLocation({ t, geocodingConfig })
+  } = useUserLocation({
+    t,
+    geocodingConfig,
+    arriveNearSavedHome: Boolean(location.state?.nearSavedHome),
+    onArrivalHandled: () => navigate(`${location.pathname}${location.search}`, { replace: true, state: { ...location.state, nearSavedHome: undefined } }),
+  })
   const [isPickingLocation, setIsPickingLocation] = useState(false)
   const [distanceFilter, setDistanceFilter] = useState(initialView.within)
   // With a saved location, nearest-first is the default, as it was before sort lived in the URL.
@@ -183,6 +188,9 @@ function SearchPage() {
   const rawSchoolType = searchParams.get('school_type')
 
   const { filters, handleFilterChange } = useUrlFilters({ searchParams, locationSearch: location.search, navigate })
+  // The enrolment year a birth year gave the age group for; school links carry it so the page
+  // can say when its fees are for an earlier year. A group picked without a birth year has none.
+  const childYear = filters.birthYear ? filters.targetYear : null
   const { availableFilters, examAverages } = useFilterData(countryCode)
 
   const effectiveEducationLevel =
@@ -404,7 +412,7 @@ function SearchPage() {
     if (isDesktopViewport()) {
       handleOpenDetails(school)
     } else {
-      navigate(schoolPath(school.id, filters.ageGroup))
+      navigate(schoolPath(school.id, filters.ageGroup, childYear))
     }
   })
 
@@ -1417,6 +1425,7 @@ function SearchPage() {
                     onHoverEnd={handleSchoolHoverEnd}
                     ageGroupOrder={ageGroupOrder}
                     activeAgeGroup={filters.ageGroup}
+                    targetYear={childYear}
                     nvoExamType={activeSort === 'nvo' ? nvoSortExamType : null}
                     isLocationsOpen={openLocationsId === school.id}
                     locationOverlay={locationOverlay}
@@ -1456,6 +1465,7 @@ function SearchPage() {
                 <SchoolMap
                   schools={filteredSchools}
                   activeAgeGroup={filters.ageGroup}
+                  targetYear={childYear}
                   selectedSchoolId={detailSchoolId || selectedSchoolId}
                   hoveredSchoolId={hoveredSchoolId}
                   onOpenDetails={handleOpenDetails}

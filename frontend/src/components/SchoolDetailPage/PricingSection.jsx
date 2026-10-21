@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { displayPrice, groupPricingByAcademicYear, groupRowsByAgeGroup, priceAgeGroupLabel, YEAR_STATUS } from '../../utils/pricing'
+import { displayPrice, groupPricingByAcademicYear, groupRowsByAgeGroup, isSingleInstalment, priceAgeGroupLabel, YEAR_STATUS } from '../../utils/pricing'
 import { sharedPriceSource, sourceSiteName } from '../../utils/priceSources'
 import { groupPricingByCategory } from './helpers'
 import { formatAmount } from '../../utils/format'
@@ -16,9 +16,11 @@ import { feeDiscountLines } from '../../utils/feeDiscounts'
  * page, otherwise on each row.
  * With the parent's `ageGroup` (from the search they came from), fees that name only other
  * ages fold under "Fees for other ages"; fees naming no age stay in view, since they may
- * apply.
+ * apply. With the `targetYear` the group was worked out for, the line above the fees says
+ * so: a child born in 2022 is in the third group in 2027/28, but in the second in a
+ * 2026/27 fee table.
  */
-function PricingSection({ pricing, discounts, ageGroup = null }) {
+function PricingSection({ pricing, discounts, ageGroup = null, targetYear = null }) {
   const { t, i18n } = useTranslation()
   const { forGroup, otherAges, namesGroup, otherCount } = useMemo(() => {
     const split = splitRowsForAgeGroup(pricing, ageGroup)
@@ -74,8 +76,11 @@ function PricingSection({ pricing, discounts, ageGroup = null }) {
         </div>
         <div className="flex flex-wrap items-baseline gap-x-2 sm:block sm:text-right sm:shrink-0">
           <div className="text-lg font-bold text-neutral-900 whitespace-nowrap">{amountText}</div>
-          {/* A fee with no period stands out, so it is not read as the monthly fee beside it. */}
-          {pricePeriod(price) ? (
+          {/* One instalment of a fee says so, never "per year" (300's "вноска I, до 31.08.26").
+              A fee with no period stands out, so it is not read as the monthly fee beside it. */}
+          {isSingleInstalment(price) ? (
+            <div className="text-sm text-neutral-500">{t('pricing.oneInstalment')}</div>
+          ) : pricePeriod(price) ? (
             <div className="text-sm text-neutral-500">{t(`pricing.${pricePeriod(price)}`)}</div>
           ) : periodUnknown(price) && (
             <div className="text-sm text-amber-700">{t('pricing.periodNotStated')}</div>
@@ -158,7 +163,9 @@ function PricingSection({ pricing, discounts, ageGroup = null }) {
       )}
       {groupName && (
         <p className="mb-6 text-sm text-neutral-600">
-          {t(namesGroup ? 'pricing.forAgeGroup' : 'pricing.noneForAgeGroup', { group: groupName })}
+          {namesGroup && targetYear
+            ? t('pricing.forAgeGroupInYear', { group: groupName, year: `${targetYear}/${targetYear + 1}` })
+            : t(namesGroup ? 'pricing.forAgeGroup' : 'pricing.noneForAgeGroup', { group: groupName })}
         </p>
       )}
       {forGroup.length > 0 && renderYears(forGroup)}

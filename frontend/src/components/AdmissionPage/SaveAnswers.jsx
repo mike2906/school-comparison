@@ -13,7 +13,8 @@ export const saveBoxId = stage => `save-answers-${stage}`
  */
 function SaveAnswers({ stage, onSave, dirty, listUrl, blockedReason = null }) {
   const { t } = useTranslation()
-  const saved = useSavedAdmission()[stage]
+  const savedAnswers = useSavedAdmission()
+  const saved = savedAnswers[stage]
   return (
     <div id={saveBoxId(stage)} className="mt-4 rounded-lg border border-neutral-200 p-3 text-sm">
       {saved && !dirty ? (
@@ -23,6 +24,12 @@ function SaveAnswers({ stage, onSave, dirty, listUrl, blockedReason = null }) {
             <Link to={listUrl} className="font-medium text-primary-700 underline">
               {t('savedAdmission.seeList')}
             </Link>
+            {/* Finding the address sends it to OpenStreetMap, so it is its own link (decision 7). */}
+            {savedAnswers.home && (
+              <Link to={listUrl} state={{ nearSavedHome: true }} className="font-medium text-primary-700 underline">
+                {t('savedAdmission.seeListNear')}
+              </Link>
+            )}
             <button type="button" onClick={() => forgetSaved(stage)} className="text-neutral-600 underline">{t('savedAdmission.forget')}</button>
           </div>
         </>
