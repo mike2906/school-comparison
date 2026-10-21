@@ -118,8 +118,9 @@ resource "cloudflare_ruleset" "redirects" {
 
 # API answers are public and change only when a snapshot is published: let the edge keep
 # them for the time the API's own Cache-Control allows (backend/app/main.py, a few
-# minutes), so most visits never reach the VPS. Errors and /health carry no-store or no
-# header, and Cloudflare does not cache POSTs.
+# minutes), so most visits never reach the VPS. Every other GET answer (errors, /health,
+# docs) carries no-store; an unhandled 500 has no header, and Cloudflare keeps no 5xx by
+# default. POSTs are never cached.
 resource "cloudflare_ruleset" "cache" {
   zone_id = var.zone_id
   name    = "Cache"

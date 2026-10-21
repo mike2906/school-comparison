@@ -45,10 +45,19 @@ async def test_list_is_served_from_its_stored_gzip(seeded_client):
 
     plain = await seeded_client.get("/schools", headers={"Accept-Encoding": "identity"})
     assert "content-encoding" not in plain.headers
-    (_, (body, gzipped)), = schools_router._list_cache.values()
-    assert gzip.decompress(gzipped) == body
+    (_, gzipped), = schools_router._list_cache.values()
+    body = gzip.decompress(gzipped)
+    assert "Accept-Encoding" in plain.headers["vary"]
 
     compressed = await seeded_client.get("/schools", headers={"Accept-Encoding": "gzip"})
     assert compressed.headers["content-encoding"] == "gzip"
     assert "Accept-Encoding" in compressed.headers["vary"]
     assert compressed.json() == plain.json() == json.loads(body)
+
+
+@pytest.mark.asyncio
+async def test_other_gets_are_not_public(seeded_client):
+    response = await seeded_client.get("/openapi.json", headers={"Origin": "https://schooldecider.com"})
+    assert response.status_code == 200
+    assert response.headers["cache-control"] == "no-store"
+    assert response.headers.get("access-control-allow-origin") != "*"

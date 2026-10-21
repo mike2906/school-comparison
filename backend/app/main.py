@@ -6,9 +6,9 @@ from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
-from starlette.datastructures import MutableHeaders
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.datastructures import MutableHeaders
 
 from app.config import get_settings
 from app.database import get_db
@@ -25,11 +25,13 @@ READINESS_TIMEOUT_SECONDS = 3.0
 # visits never reach the server. After a publish the edge serves the old answer for at
 # most `s-maxage`; the site build asks past it (scripts/prerender.js).
 EDGE_CACHE_CONTROL = "public, max-age=60, s-maxage=300"
-UNCACHED_PATHS = frozenset({"/health", "/ready"})
+# Only these routes' answers are public data; any other GET (health, docs, a later route)
+# is marked no-store.
+PUBLIC_PATH_PREFIXES = ("/schools", "/countries", "/compare")
 
 
 class PublicCacheHeaders:
-    """Cache headers on public GET answers; errors and health checks are marked no-store.
+    """Cache headers on public GET answers; errors and every other GET are marked no-store.
 
     The edge does not key its cache on the Origin header, so a kept answer must suit every
     origin: it allows any origin instead of echoing the request's. The data is public and
@@ -43,7 +45,8 @@ class PublicCacheHeaders:
         if scope["type"] != "http" or scope["method"] not in ("GET", "HEAD"):
             await self.app(scope, receive, send)
             return
-        cacheable = scope["path"] not in UNCACHED_PATHS
+        path = scope["path"]
+        cacheable = any(path == prefix or path.startswith(prefix + "/") for prefix in PUBLIC_PATH_PREFIXES)
 
         async def send_with_cache_headers(message):
             if message["type"] == "http.response.start":
@@ -54,7 +57,12 @@ class PublicCacheHeaders:
                     headers["Access-Control-Allow-Origin"] = "*"
                     if "access-control-allow-credentials" in headers:
                         del headers["Access-Control-Allow-Credentials"]
-                    vary = [v.strip() for v in headers.get("vary", "").split(",") if v.strip().lower() not in ("", "origin")]
+                    vary = [
+                        value.strip()
+                        for line in headers.getlist("vary")
+                        for value in line.split(",")
+                        if value.strip().lower() not in ("", "origin")
+                    ]
                     if "vary" in headers:
                         del headers["Vary"]
                     if vary:
@@ -64,6 +72,7 @@ class PublicCacheHeaders:
             await send(message)
 
         await self.app(scope, receive, send_with_cache_headers)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

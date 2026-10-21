@@ -41,7 +41,7 @@ router = APIRouter()
 # task rebuilds it for the next request.
 LIST_CACHE_TTL_SECONDS = 600
 LIST_CACHE_MAX_ENTRIES = 64
-_list_cache: dict[tuple, tuple[float, tuple[bytes, bytes]]] = {}
+_list_cache: dict[tuple, tuple[float, bytes]] = {}  # gzipped bodies
 _filters_cache: dict[tuple, tuple[float, dict[str, list[str]]]] = {}
 # Name search and the school page also need the whole city (every school's names; the
 # schools sharing a building), so those are kept the same way, per country and city.
@@ -142,10 +142,15 @@ async def _build_list_body(db: AsyncSession, **filters) -> bytes:
     return await asyncio.to_thread(_serialize_list, schools)
 
 
-async def _build_list_entry(db: AsyncSession, **filters) -> tuple[bytes, bytes]:
-    """The list body and its gzip, compressed once here instead of on every request."""
+async def _build_list_entry(db: AsyncSession, **filters) -> bytes:
+    """The list body gzipped, once here instead of on every request (~4 MB of JSON)."""
     body = await _build_list_body(db, **filters)
-    return body, await asyncio.to_thread(gzip.compress, body)
+    return await asyncio.to_thread(gzip.compress, body)
+
+
+def _accepts_gzip(request: Request) -> bool:
+    # The same test GZipMiddleware uses for every other response.
+    return "gzip" in request.headers.get("accept-encoding", "")
 
 
 def _preschool_location_ids(school) -> set[int]:
@@ -270,19 +275,21 @@ async def list_schools(
                 teaching_approach=teaching_approach,
             )
         else:
-            body, gzipped = await _cached_or_build(
+            gzipped = await _cached_or_build(
                 _list_cache,
                 _list_key(**filters),
                 partial(_build_list_entry, **filters),
                 db,
             )
             # GZipMiddleware passes a response that already has a Content-Encoding.
-            if "gzip" in request.headers.get("accept-encoding", ""):
+            if _accepts_gzip(request):
                 return Response(
                     content=gzipped,
                     media_type="application/json",
                     headers={"Content-Encoding": "gzip", "Vary": "Accept-Encoding"},
                 )
+            # Rare: the edge always asks for gzip. GZipMiddleware adds the Vary.
+            body = gzip.decompress(gzipped)
         return Response(content=body, media_type="application/json")
     except Exception as e:
         logger.error(f"Error listing schools: {e}", exc_info=True)
