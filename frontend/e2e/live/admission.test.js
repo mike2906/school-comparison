@@ -297,8 +297,13 @@ describe('admission from a school page', () => {
     await page.getByTestId('saved-admission-banner').waitFor()
     await page.getByTestId('saved-verdict-line').first().waitFor()
     await page.waitForFunction(() => JSON.parse(localStorage.getItem('userLocation') || 'null')?.savedHome, null, { timeout: 30_000 })
+    // Used once: a reload or Back must not send the address again without a tap.
+    assert.ok(!(await page.evaluate(() => history.state?.usr?.nearSavedHome)), 'the arrival flag stays in history')
     await page.getByRole('button', { name: t('bg', 'location.clear'), exact: true }).first().click()
     await page.waitForFunction(() => !localStorage.getItem('userLocation'))
+    await page.reload()
+    await page.getByTestId('saved-admission-banner').waitFor()
+    assert.equal(await page.evaluate(() => localStorage.getItem('userLocation')), null, 'a reload looked the saved address up again')
     // The list itself offers the saved home as its location too.
     await page.getByRole('button', { name: t('bg', 'location.setShortSaved') }).first().click()
     await page.getByRole('button', { name: t('bg', 'location.useSavedHome') }).click()

@@ -130,7 +130,12 @@ function SearchPage() {
     locateSavedHome,
     clearLocation,
     setLocationFromMap,
-  } = useUserLocation({ t, geocodingConfig, arriveNearSavedHome: Boolean(location.state?.nearSavedHome) })
+  } = useUserLocation({
+    t,
+    geocodingConfig,
+    arriveNearSavedHome: Boolean(location.state?.nearSavedHome),
+    onArrivalHandled: () => navigate(`${location.pathname}${location.search}`, { replace: true, state: { ...location.state, nearSavedHome: undefined } }),
+  })
   const [isPickingLocation, setIsPickingLocation] = useState(false)
   const [distanceFilter, setDistanceFilter] = useState(initialView.within)
   // With a saved location, nearest-first is the default, as it was before sort lived in the URL.

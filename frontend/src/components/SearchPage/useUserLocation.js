@@ -22,7 +22,7 @@ const persistLocation = (location) => {
 
 // The parent's location: GPS, an address lookup or a point picked on the map, kept in
 // localStorage. View changes around picking on the map stay with the page.
-export function useUserLocation({ t, geocodingConfig, arriveNearSavedHome = false }) {
+export function useUserLocation({ t, geocodingConfig, arriveNearSavedHome = false, onArrivalHandled = () => {} }) {
   const [userLocation, setUserLocation] = useState(() => readStoredUserLocation(t('location.currentLocation')))
   const [addressInput, setAddressInput] = useState('')
   const [locationError, setLocationError] = useState(null)
@@ -233,13 +233,17 @@ export function useUserLocation({ t, geocodingConfig, arriveNearSavedHome = fals
 
   // Arriving from the calculator's "schools near your saved address" link: that tap is the
   // parent's go to look the address up, once the map config (the city's bounds) is here.
+  // The flag is then dropped from the history entry, so a reload or Back does not repeat it.
   const canUseSaved = Boolean(savedHomeKey) && userLocation?.savedHome !== savedHomeKey
   const arrivalDoneRef = useRef(false)
+  const hasBounds = Boolean(geocodingConfig?.bounds)
   useEffect(() => {
-    if (arrivalDoneRef.current || !arriveNearSavedHome || !geocodingConfig?.bounds) return
+    if (arrivalDoneRef.current || !arriveNearSavedHome || !hasBounds) return
     arrivalDoneRef.current = true
+    onArrivalHandled()
     if (canUseSaved) locateSavedHome()
-  })
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once, on arrival
+  }, [arriveNearSavedHome, hasBounds])
 
   return {
     userLocation,
