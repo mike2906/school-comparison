@@ -86,6 +86,7 @@ function SchoolDetailPage({ schoolId = null, embedded = false, onClose = null })
   const [rawSchool, setRawSchool] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [attempt, setAttempt] = useState(0)
   const [activeExamType, setActiveExamType] = useState(null)
   const [selectedSubjects, setSelectedSubjects] = useState(['math', 'bulgarian'])
   const [examAverages, setExamAverages] = useState(null)
@@ -128,7 +129,7 @@ function SchoolDetailPage({ schoolId = null, embedded = false, onClose = null })
     }
 
     loadSchool()
-  }, [id])
+  }, [id, attempt])
 
   const school = useMemo(
     () => normalizeSchool(rawSchool, i18n.language),
@@ -178,7 +179,7 @@ function SchoolDetailPage({ schoolId = null, embedded = false, onClose = null })
               {t(error === 'failed' ? 'schools.loadFailedDesc' : 'schools.notFoundDesc')}
             </p>
             <button
-              onClick={error === 'failed' ? () => window.location.reload() : handleBack}
+              onClick={error === 'failed' ? () => setAttempt(n => n + 1) : handleBack}
               className="px-6 py-3 bg-primary-700 text-white rounded-lg hover:bg-primary-800 transition-colors"
             >
               {t(error === 'failed' ? 'common.tryAgain' : 'common.goBack')}

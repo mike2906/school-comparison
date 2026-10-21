@@ -346,21 +346,26 @@ describe('a school page', () => {
 describe('a school page while the API restarts', () => {
   // A deploy or publish restarts the API for a few seconds: dropped connections there.
   const dropDetail = async (id, times) => {
-    let dropped = 0
+    const seen = { dropped: 0, passed: 0 }
     await page.route(url => url.href.startsWith(API) && new URL(url).pathname === `/schools/${id}`, route => {
-      if (dropped >= times) return route.continue()
-      dropped += 1
+      if (seen.dropped >= times) {
+        seen.passed += 1
+        return route.continue()
+      }
+      seen.dropped += 1
       return route.abort('connectionreset')
     })
-    return () => dropped
+    return seen
   }
 
   test('a dropped request is asked again and the school shows', async () => {
     const school = (await allSchools())[0]
-    const dropped = await dropDetail(school.id, 1)
+    // Two drops: the page's preload (index.html) and the app's own first request, so only
+    // the app asking again can show the school.
+    const seen = await dropDetail(school.id, 2)
     await open('bg', `/schools/${school.id}`)
     await page.getByRole('heading', { level: 1, name: schoolName(school, 'bg'), exact: true }).waitFor()
-    assert.ok(dropped() >= 1, 'the school request was dropped once')
+    assert.deepEqual(seen, { dropped: 2, passed: 1 })
   })
 
   test('a school that cannot load says so, not that it is gone', async () => {
