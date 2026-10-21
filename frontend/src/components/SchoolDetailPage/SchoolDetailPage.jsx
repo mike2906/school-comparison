@@ -65,6 +65,12 @@ function SchoolDetailPage({ schoolId = null, embedded = false, onClose = null })
   // ?group= the card's link passes to the full page. It picks which NVO exam leads, the
   // headline fee, and which fees the fee list shows before the other ages.
   const preferredAgeGroup = searchParams.get('age_group') || searchParams.get('group')
+  // The enrolment year a birth year gave that group for: the search's own (side panel, only
+  // with a birth year) or the link's ?year=. A group picked without a birth year has none.
+  const searchYear = searchParams.get('birth_year') ? searchParams.get('target_year') : null
+  const targetYear = preferredAgeGroup
+    ? Number.parseInt(searchYear || searchParams.get('year') || '', 10) || null
+    : null
   const id = schoolId ?? params.id
   const navigate = useNavigate()
   const Shell = embedded ? EmbeddedShell : Layout
@@ -425,10 +431,10 @@ function SchoolDetailPage({ schoolId = null, embedded = false, onClose = null })
           </div>
         </div>
 
-        <KeyFacts school={school} examAverages={examAverages} nvoExamType={keyFactsExamType} ageGroup={preferredAgeGroup} />
+        <KeyFacts school={school} examAverages={examAverages} nvoExamType={keyFactsExamType} ageGroup={preferredAgeGroup} targetYear={targetYear} />
 
         {/* Price is what a private-school parent decides on first. */}
-        {hasPricing && <PricingSection pricing={pricing} discounts={school.fee_discounts} ageGroup={preferredAgeGroup} />}
+        {hasPricing && <PricingSection pricing={pricing} discounts={school.fee_discounts} ageGroup={preferredAgeGroup} targetYear={targetYear} />}
 
         <WebsiteFacts school={school} />
 
