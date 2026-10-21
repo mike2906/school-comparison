@@ -406,23 +406,26 @@ def _one_part(fact: Mapping[str, Any]) -> bool:
 # first grade" is about the kindergarten.
 KINDERGARTEN_LEVELS = frozenset({"kindergarten", "nursery"})
 _SCHOOL_GRADES_RE = re.compile(
-    r"\bgrades?\s*\d|\b(?:\d+(?:st|nd|rd|th)|first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth"
-    r"|eleventh|twelfth)[- ]grade|\bIB\b|\bIGCSE\b|\bA[- ]levels?\b|\b(?:lower|upper) secondary|\bdiploma\b"
-    r"|\bmatura|\bNVO\b",
+    r"\bgrades?\s*\d|\bclass(?:es)?\s*\d|\b\d+(?:st|nd|rd|th)\s+class"
+    r"|\b(?:\d+(?:st|nd|rd|th)|first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|eleventh|twelfth)"
+    r"[- ]grade|\bIB\b|\bIGCSE\b|\bA[- ]levels?\b|\b(?:lower|upper) secondary"
+    r"|\b(?:secondary|school|Bulgarian|two)\s+diplomas?\b|\bmatura|\bNVO\b",
     re.IGNORECASE,
 )
+# Only the phrase is left out, so a school grade named elsewhere in the fact still counts.
 _BEFORE_SCHOOL_RE = re.compile(
-    r"(?:until|before|enter(?:s|ing)?|start(?:s|ing)?|ready for|readiness for|prepar\w* for|up to)\s+"
-    r"(?:the\s+)?(?:\w+\s+){0,2}first grade|first[- ]grade readiness",
+    r"(?:until|before|ready for|readiness for|prepar\w* (?:\w+ )?for|up to)\s+(?:the\s+)?(?:\w+\s+){0,2}"
+    r"(?:first grade|1st grade|grade 1\b)|first[- ]grade readiness",
     re.IGNORECASE,
 )
 
 
 def _school_grades_fact(fact: Mapping[str, Any]) -> bool:
-    if _int_in(fact.get("admission_grade"), 1, 12) is not None or _int_in(fact.get("highest_grade"), 1, 12):
+    if any(_int_in(fact.get(key), 1, 12) is not None for key in ("admission_grade", "admission_grade_to")):
         return True
-    english = _english(fact)
-    return bool(_SCHOOL_GRADES_RE.search(english)) and not _BEFORE_SCHOOL_RE.search(english)
+    if _int_in(fact.get("highest_grade"), 1, 12) is not None:
+        return True
+    return bool(_SCHOOL_GRADES_RE.search(_BEFORE_SCHOOL_RE.sub(" ", _english(fact))))
 
 
 def publishable_school_facts(
@@ -438,7 +441,7 @@ def publishable_school_facts(
     Facts show only while ``website_url`` is still the site they were read from: a school
     whose site was found wrong, replaced or removed stops showing them until it is re-read.
     A kindergarten shows none about school grades (``_school_grades_fact``)."""
-    kindergarten = education_level in KINDERGARTEN_LEVELS
+    kindergarten = str(education_level or "").casefold() in KINDERGARTEN_LEVELS
     block = attributes.get(ATTRIBUTE_KEY) if isinstance(attributes, Mapping) else None
     if not isinstance(block, Mapping) or block.get("_schema_version") != SCHEMA_VERSION:
         return None

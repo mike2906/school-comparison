@@ -1074,18 +1074,24 @@ def test_a_kindergarten_on_its_schools_site_shows_no_school_grade_facts():
         row("Upper secondary follows the Cambridge IGCSE programme."),
         row("Children start learning English and German in first grade."),
         row("An interview with the pupil.", admission_grade=1),
+        row("Children start English in first grade."),
+        row("Children are prepared for first grade; the IB Diploma is offered in grades 11-12."),
+        row("Admission to 5th class is by an exam in mathematics."),
+        row("Admission from the preparatory group on.", admission_grade=0, admission_grade_to=4),
     ]
     kindergarten_facts = [
         row("The kindergarten accepts children from about age 2 until they enter first grade."),
         row("Admission includes a trial day for the child.", admission_grade=0),
         row("Kindergarten admission is open year-round when places are available."),
+        row("Children are prepared for school up to grade 1 readiness."),
+        row("Graduating children receive a diploma at the end-of-year celebration."),
     ]
     block = {
         "_schema_version": 1, "read_at": "2026-10-20T09:00:00+00:00", "website_url": "https://www.school.example",
         "facts": school_facts + kindergarten_facts,
     }
-    shown = publishable_school_facts({"school_facts": block}, HOME, "kindergarten")
+    shown = publishable_school_facts({"school_facts": block}, HOME, "Kindergarten")
     assert [fact["text_i18n"]["en"] for fact in shown["facts"]] == [
         fact["text_i18n"]["en"] for fact in kindergarten_facts
     ]
-    assert len(publishable_school_facts({"school_facts": block}, HOME, "secondary")["facts"]) == 8
+    assert len(publishable_school_facts({"school_facts": block}, HOME, "secondary")["facts"]) == 14
