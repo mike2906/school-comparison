@@ -1119,6 +1119,7 @@ async def clear_website_derived_locations(
 
     from app.models import SchoolLocation
     from app.scrapers.campus_sync import CAMPUS_TAG, remove_website_campus_data
+    from app.scrapers.stages.site_phones import PHONE_TAG, restore_register_phone
     from app.services.geocoding.write_gate import OFFICIAL_COORDS_TAG
 
     # Campus locations and age groups added from the site go entirely (UF42b).
@@ -1137,8 +1138,18 @@ async def clear_website_derived_locations(
     )
     changed: list[dict] = []
     for location in locations:
+        # site-phones' number goes too
+        phone_change = (
+            {"phone_before": location.phone, "restores_phone": True}
+            if PHONE_TAG in (location.location_tags or [])
+            else {}
+        )
+        if phone_change and not preview and restore_register_phone(location):
+            db.add(location)
         tags = [str(tag) for tag in (location.location_tags or [])]
         if CAMPUS_TAG in tags:
+            if phone_change:
+                changed.append({"location_id": location.id, "school_id": school_id, **phone_change})
             continue
         website_address = "address_source=website_contact" in tags
         if website_address and keep_officially_confirmed_addresses and OFFICIAL_COORDS_TAG in tags:
@@ -1153,11 +1164,14 @@ async def clear_website_derived_locations(
             or meta.get("method") == "site_address"
         )
         if not (website_address or website_coords):
+            if phone_change:
+                changed.append({"location_id": location.id, "school_id": school_id, **phone_change})
             continue
         changed.append(
             {
                 "location_id": location.id,
                 "school_id": school_id,
+                **phone_change,
                 "address_before": dict(location.address_i18n or {}),
                 "lat_before": location.lat,
                 "lng_before": location.lng,
