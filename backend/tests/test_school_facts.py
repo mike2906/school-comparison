@@ -1178,7 +1178,7 @@ def test_an_exam_for_one_class_is_shown_as_an_exam_for_some_classes():
     ):
         assert _admission_fact(en, ["entrance_exam"], 8)["admission"] == ["entrance_exam"]
     # A school-wide exam row goes beside a grade where only some classes sit one.
-    school_wide = [*facts, _admission_fact("Admission is by entrance exam.", ["entrance_exam"])]
+    school_wide = [*facts, _admission_fact("Admission is by entrance exam.", ["entrance_exam"], subjects=art)]
     assert [(r["grade"], r["types"]) for r in at_a_glance(school_wide)["admission"]] == [(8, [SOME_CLASSES_EXAM])]
 
 

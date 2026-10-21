@@ -245,8 +245,9 @@ def at_a_glance(
             row["types"].remove("open_entry")
         elif "entrance_exam" in row["types"] and SOME_CLASSES_EXAM in graded:
             # "Entrance exam" for the whole school beside a grade where only some classes sit
-            # one: the subjects may be that class's.
+            # one: the graded row says it, with its subjects.
             row["types"].remove("entrance_exam")
+            row["subjects"] = []
         elif "open_entry" in graded and "entrance_exam" in row["types"]:
             # A school-wide exam the graded rows deny; its subjects are that exam's.
             row["types"].remove("entrance_exam")
