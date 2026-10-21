@@ -350,3 +350,20 @@ async def test_a_shown_register_address_a_hand_pin_or_a_near_pin_is_left_alone(d
     page = "<p>ул. Петър Бонев №3</p>" + _iframe(42.710605, 23.187756)
     report = await stage.run_site_address(db_session, register=ROSICA, fetch=_fetcher({HOME: page}))
     assert report["outcomes"] == {}
+
+
+@pytest.mark.asyncio
+async def test_an_official_pin_keeps_its_point_and_takes_the_address_its_site_names_there(db_session):
+    from app.services.geocoding.write_gate import OFFICIAL_COORDS_TAG
+
+    location = _at("гр. София, ул. 315 - III м. р.", (42.71012, 23.25512), method="municipal_point")
+    location.location_tags = [OFFICIAL_COORDS_TAG]
+    await _school(db_session, location)
+    page = "<p>кв. Люлин, ул.Петър Бонев №3</p>"
+    report = await stage.run_site_address(db_session, register=ROSICA, fetch=_fetcher({HOME: page}), apply=True)
+    assert report["outcomes"] == {"relabelled": 1}
+    row = (await db_session.execute(select(SchoolLocation))).scalar_one()
+    assert (row.lat, row.lng) == (42.71012, 23.25512)
+    assert row.address_i18n == {"bg": "гр. София, ул. Петър Бонев 3"}
+    assert row.geocode_meta["method"] == "municipal_point"
+    assert row.geocode_meta["evidence"]["previous_address_i18n"] == {"bg": "гр. София, ул. 315 - III м. р."}

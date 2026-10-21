@@ -666,6 +666,14 @@ def translate_texts_command(school_ids, city, country, max_usd, apply_changes, p
     report = asyncio.run(_run())
     if plan_only:
         console.print(f"Plan: {report['schools_to_change']} schools to change, to ask {report['asked']}")
+        from app.ai.client import missing_key
+
+        asked = report["asked"]
+        if (sum(asked.values()) if isinstance(asked, dict) else asked) and (key := missing_key("translation")):
+            # A checkout whose .env lacks the key (a stale worktree copy) must not publish
+            # untranslated text quietly.
+            console.print(f"[red]{key} is not set in this checkout's backend/.env[/red]")
+            raise SystemExit(78)
         raise SystemExit(10 if report["schools_to_change"] else 0)
     mode = "Applied" if apply_changes else "Dry run"
     console.print(

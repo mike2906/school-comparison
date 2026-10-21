@@ -138,3 +138,15 @@ def test_create_agent_uses_native_openrouter_exact_usage_settings(monkeypatch):
     assert captured["agent_kwargs"]["model_settings"] == {
         "openrouter_usage": {"include": True}
     }
+
+
+def test_missing_key_names_the_setting_a_tier_lacks(monkeypatch):
+    from types import SimpleNamespace
+
+    from app.ai import client
+
+    monkeypatch.setattr(client, "get_model", lambda tier: "anthropic/claude-haiku-5-5")
+    monkeypatch.setattr(client, "get_settings", lambda: SimpleNamespace(anthropic_api_key="", openrouter_api_key="x"))
+    assert client.missing_key("translation") == "ANTHROPIC_API_KEY"
+    monkeypatch.setattr(client, "get_settings", lambda: SimpleNamespace(anthropic_api_key="k", openrouter_api_key=""))
+    assert client.missing_key("translation") is None
