@@ -39,6 +39,7 @@ from app.scrapers.shared_site_check import (
     level_family,
     site_id,
 )
+from app.scrapers.sources.bg.school_kinds import EVENING_SCHOOL_BANDS, is_evening_school
 from app.utils.transliteration import transliterate_bulgarian
 
 logger = logging.getLogger(__name__)
@@ -456,15 +457,22 @@ def plan_campus_sync(
     education_config: Mapping[str, Any] | None,
     existing: Sequence[ExistingLocation],
     other_institution_addresses: Sequence[tuple[int, str]],
+    name_bg: str = "",
 ) -> dict[str, Any]:
     plan: dict[str, Any] = {"new_locations": [], "age_groups": [], "skipped": []}
     if not payload:
         return plan
     family = level_family(education_level)
     defs = age_group_defs(education_config)
+    # An evening school's "от 1 до 12 клас" includes classes for adults.
+    evening = family != "kindergarten" and is_evening_school(name_bg)
+
+    def groups_for(diff_range) -> list[str]:
+        groups = groups_for_range(diff_range, family, defs)
+        return [g for g in groups if g in EVENING_SCHOOL_BANDS] if evening else groups
 
     def add_groups(location: ExistingLocation, diff_range, evidence) -> None:
-        missing = [g for g in groups_for_range(diff_range, family, defs) if g not in location.age_groups]
+        missing = [g for g in groups_for(diff_range) if g not in location.age_groups]
         if missing:
             plan["age_groups"].append({"location_id": location.location_id, "address": location.address,
                                        "add": missing, "evidence": evidence})
@@ -492,7 +500,7 @@ def plan_campus_sync(
             # A single contact address is the primary sync's job, not a new campus.
             plan["skipped"].append({"address": address, "reason": "single_address_not_a_new_campus"})
             continue
-        groups = groups_for_range(campus["diff_range"], family, defs) if campus.get("diff_range") else []
+        groups = groups_for(campus["diff_range"]) if campus.get("diff_range") else []
         plan["new_locations"].append({"address": address, "label": campus.get("label"), "age_groups": groups,
                                       "evidence": campus.get("context"), "range_evidence": campus.get("range_evidence"),
                                       "source_url": campus.get("source_url")})
@@ -547,6 +555,7 @@ async def plan_for_school(db, school) -> dict[str, Any]:
         education_config=config,
         existing=existing,
         other_institution_addresses=other_addresses,
+        name_bg=(school.name_i18n or {}).get("bg") or "",
     )
 
 
@@ -582,6 +591,7 @@ async def apply_campus_sync(db, school) -> dict[str, Any]:
         education_config=config,
         existing=existing,
         other_institution_addresses=other_addresses,
+        name_bg=(school.name_i18n or {}).get("bg") or "",
     )
     by_id = {loc.id: loc for loc in locations}
     for change in plan["age_groups"]:

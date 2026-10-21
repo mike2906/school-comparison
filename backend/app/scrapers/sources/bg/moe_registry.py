@@ -23,7 +23,7 @@ from app.schemas.scraping import DiscoveredLocation, DiscoveredSchool
 from app.scrapers.base import BaseScraper
 from app.scrapers.sources import register_adapter
 from app.scrapers.sources.base_adapter import BaseSourceAdapter
-from app.scrapers.sources.bg.school_kinds import is_evening_school
+from app.scrapers.sources.bg.school_kinds import EVENING_SCHOOL_BANDS, is_evening_school
 from app.services.geocoding.base import GeocodingResult
 from app.services.geocoding.bg import GeoJSONProvider, city_storage_value
 from app.services.geocoding.nominatim import NominatimProvider
@@ -168,8 +168,8 @@ class MoeRegistryAdapter(BaseSourceAdapter):
         """
         # Evening schools (вечерно / сменно-вечерно) teach pupils of 16 and over: grades
         # 1-7 there are for adults, so they are no school for a child starting 1st grade.
-        if is_evening_school(name_bg):
-            return ['grade_8_12']
+        if education_level != 'kindergarten' and is_evening_school(name_bg):
+            return sorted(EVENING_SCHOOL_BANDS)
         # Try detailed type mapping first (more accurate for multi-grade schools)
         if detailed_type and detailed_type in MoeRegistryAdapter.DETAILED_TYPE_AGE_GROUPS:
             return MoeRegistryAdapter.DETAILED_TYPE_AGE_GROUPS[detailed_type]

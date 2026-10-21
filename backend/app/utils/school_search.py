@@ -105,7 +105,7 @@ _LOOSE_RES = [(re.compile(pattern), repl) for pattern, repl in LOOSE_SPELLINGS]
 _SOUND_RULES = [
     (re.compile(pattern), repl)
     for pattern, repl in (
-        ("ph", "f"), ("ck", "k"), ("dzh", "j"), ("dg", "j"), ("zh", "j"), ("ge$", "j"),
+        ("ph", "f"), ("sch", "sk"), ("ck", "k"), ("dzh", "j"), ("dg", "j"), ("zh", "j"), ("g(?=e[aeiou])", "j"), ("ge$", "j"),
         ("c(?!h)", "k"), ("q", "k"), ("x", "ks"), ("w", "v"), ("[aeiouyh]", ""), (r"(.)\1+", r"\1"),
     )
 ]
@@ -123,7 +123,7 @@ RANK_PHRASE = 2  # the query's words in a row in the name: "Saint Sofia" = „С
 RANK_PREFIX = 3
 RANK_CONTAINS = 4
 RANK_ADDRESS = 5
-RANK_SOUND = 6  # sounds like the name: only when nothing matches better (search_schools)
+RANK_SOUND = 6  # sounds like the name (sounds_like): search_schools' last resort only
 
 _NO_MARKER_RE = re.compile(r"(?<![a-z])no\.(?=\s*\d)")
 _NON_WORD_RE = re.compile(r"[\W_]+")
@@ -167,7 +167,7 @@ def _sound(latin_word: str) -> str:
 class _Name:
     __slots__ = ("norm", "latin", "loose", "words", "has_saint", "word_rows", "sounds")
 
-    def __init__(self, value: object, *, saints: bool = True):
+    def __init__(self, value: object, *, saints: bool = True, sounds: bool = True):
         self.norm = normalize(value)
         self.latin = transliterate(self.norm)
         self.loose = _loose(self.latin)
@@ -175,7 +175,7 @@ class _Name:
         self.has_saint = saints and not SAINT_WORDS.isdisjoint(self.norm.split(" "))
         # Each word as (Cyrillic or source, transliterated, loose); the three line up.
         self.word_rows = list(zip(self.norm.split(" "), self.latin.split(" "), self.loose.split(" ")))
-        self.sounds = {_sound(word) for word in self.latin.split(" ") if not word.isdigit()}
+        self.sounds = {_sound(word) for word in self.latin.split(" ") if not word.isdigit()} if sounds else set()
 
 
 def _loose(latin: str) -> str:
@@ -246,16 +246,20 @@ def _tokens_rank(tokens: list[str], names: list[_Name]) -> Optional[int]:
     return best
 
 
-def _sounds_like(tokens: list[str], names: list[_Name]) -> bool:
-    """Every query word sounds like a word of one name, or matches it as usual."""
+def sound_keys(tokens: list[str]) -> Optional[list[Optional[str]]]:
+    """Each query word's sound key (None for numbers and words too short to say anything),
+    or None when the query as a whole is too short to match by sound."""
     keys = [None if token.isdigit() else _sound(transliterate(token)) for token in tokens]
     keys = [key if key and len(key) >= _MIN_SOUND_WORD else None for key in keys]
-    if sum(len(key) for key in keys if key) < _MIN_SOUND_TOTAL:
-        return False
+    return keys if sum(len(key) for key in keys if key) >= _MIN_SOUND_TOTAL else None
+
+
+def sounds_like(tokens: list[str], keys: list[Optional[str]], school: "PreparedSchool") -> bool:
+    """Every query word sounds like a word of one name, or matches it as usual."""
     return any(
         name.norm
         and all((key and key in name.sounds) or _token_in(token, name) for token, key in zip(tokens, keys))
-        for name in names
+        for name in school.names
     )
 
 
@@ -286,7 +290,7 @@ class PreparedSchool:
     def __init__(self, *, registry_name: object, names: Iterable[object], addresses: Iterable[object] = ()):
         self.registry = normalize(registry_name)
         self.names = [_Name(value) for value in names]
-        self.addresses = [_Name(value, saints=False) for value in addresses]
+        self.addresses = [_Name(value, saints=False, sounds=False) for value in addresses]
 
 
 def rank_school(
@@ -316,6 +320,4 @@ def rank_prepared(tokens: list[str], school: PreparedSchool) -> Optional[int]:
         return rank
     if _tokens_rank(tokens, school.addresses) is not None:
         return RANK_ADDRESS
-    if _sounds_like(tokens, school.names):
-        return RANK_SOUND
     return None

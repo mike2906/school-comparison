@@ -14,13 +14,15 @@ from app.utils.school_search import (
     RANK_NUMBER,
     RANK_PHRASE,
     RANK_PREFIX,
-    RANK_SOUND,
     SAINT_WORDS,
     SCHOOL_NAME_ALIASES,
     TYPE_ABBREVIATIONS,
+    PreparedSchool,
     normalize,
     query_tokens,
     rank_school,
+    sound_keys,
+    sounds_like,
 )
 
 SU_119 = '119 Средно училище "Академик Михаил Арнаудов"'
@@ -199,14 +201,22 @@ def test_address_only_match_ranks_last_and_nonsense_is_empty():
     ],
 )
 def test_brands_written_by_ear_in_cyrillic_match_by_sound(query, name):
-    assert _rank(query, name) == RANK_SOUND
+    assert _rank(query, name) is None  # not by spelling
+    assert _sounds(query, name)
+
+
+def _sounds(query: str, name: str) -> bool:
+    tokens = query_tokens(query)
+    keys = sound_keys(tokens)
+    return keys is not None and sounds_like(tokens, keys, PreparedSchool(registry_name=name, names=[name]))
 
 
 def test_sound_matching_needs_enough_consonants():
     # "Лайтхаус" is l-t-s, which Елица also is; "Мейпъл" alone is m-p-l.
-    assert _rank("Лайтхаус", "ДГ №66 Елица") is None
-    assert _rank("Мейпъл", "Maple Bear Sofia") is None
-    assert _rank("Мейпъл Беър", "Канадско мече") is None
+    assert not _sounds("Лайтхаус", "ДГ №66 Елица")
+    assert not _sounds("Мейпъл", "Maple Bear Sofia")
+    assert not _sounds("Мейпъл Беър", "Канадско мече")
+    assert _sounds("Джордж Скул", "St. George School")
 
 
 def test_every_alias_targets_a_normalized_substring():
