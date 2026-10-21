@@ -625,3 +625,28 @@ async def test_readdressed_location_is_geocoded_again_and_keeps_its_point_if_tha
     assert geocoder.geocode_location.await_args.kwargs["force"] is True
     assert (location.lat, location.lng) == (42.65, 23.25)
     assert location.location_tags == ["address_source=website_contact"]
+
+
+NEMO_CONTACT = """Контакти
+София кв. Драгалевци ул. "Маточина" № 2 а
+nemocenter@nemo-bg.com
++359 889 599 118
+Вижте карта
+ЧДГ НЕМО-Бояна
+кв. Бояна, бул. "Александър Пушкин" 63
+0898 790 549
+nemoboyana@nemo-bg.com
+"""
+
+
+def test_a_quarter_named_with_a_branch_address_counts_as_the_city_on_a_sofia_only_page():
+    # ЧДГ НЕМО: the Бояна branch names its quarter, and the city only on the main address.
+    payload = extract(
+        [SitePage("https://nemo-bg.com/contacti/", NEMO_CONTACT, "contact")], "https://nemo-bg.com/", "kindergarten"
+    )
+    assert [c["address"] for c in payload["campuses"]][-1] == 'кв. Бояна, бул. "Александър Пушкин" 63'
+    # A page that names another town keeps asking for the city.
+    other = NEMO_CONTACT + "Филиал Пловдив\nПловдив\n"
+    payload = extract([SitePage("https://nemo-bg.com/contacti/", other, "contact")], "https://nemo-bg.com/", "kindergarten")
+    skipped = {c["address"]: c["reason"] for c in payload["skipped"]}
+    assert skipped['кв. Бояна, бул. "Александър Пушкин" 63'] == "city_not_stated"
