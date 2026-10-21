@@ -1,0 +1,59 @@
+name: Load test
+
+# Simulated parents against the live API (tools/load-test/README.md). Manual only: it puts
+# real load on production. Do not start it while a data publish runs.
+on:
+  workflow_dispatch:
+    inputs:
+      peak:
+        description: "Parents at the peak (the test holds half of it first)"
+        default: "1000"
+        required: true
+
+concurrency:
+  group: load-test
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  K6_VERSION: v1.0.0
+  K6_SHA256: 5eb2236bc76a3c5cced12aaf0fd76c4b1ceac5ea040c70388a3d272b46595b59
+
+jobs:
+  load:
+    name: Parents on the live API
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Install k6
+        run: |
+          curl -fsSL -o k6.tgz "https://github.com/grafana/k6/releases/download/$K6_VERSION/k6-$K6_VERSION-linux-amd64.tar.gz"
+          echo "$K6_SHA256  k6.tgz" | sha256sum -c -
+          tar xzf k6.tgz
+          sudo install "k6-$K6_VERSION-linux-amd64/k6" /usr/local/bin/k6
+
+      - name: Run
+        env:
+          PEAK: ${{ inputs.peak }}
+        run: |
+          # Many virtual users: raise the open-file limit for their connections.
+          ulimit -n 65536
+          k6 run --summary-export summary.json tools/load-test/parents.js
+
+      # Annotations, so the result can be read without the log (also from a cloud session).
+      - name: Report
+        if: always()
+        run: |
+          [ -f summary.json ] || { echo "::error::k6 wrote no summary"; exit 0; }
+          jq -r '
+            .metrics as $m
+            | ($m | to_entries[] | select(.key | startswith("http_req_duration{name:")) |
+                "\(.key | sub("http_req_duration\\{name:"; "") | sub("\\}"; "")): med \(.value.med | floor) ms, p95 \(.value["p(95)"] | floor) ms, max \(.value.max | floor) ms, \(.value.count) requests"),
+            "all: med \($m.http_req_duration.med | floor) ms, p95 \($m.http_req_duration["p(95)"] | floor) ms, \($m.http_reqs.count) requests, failed \($m.http_req_failed.value * 100 | floor)%",
+            "edge hits: \(($m.edge_hit.value // 0) * 100 | floor)%, peak parents: \($m.vus_max.max)"
+          ' summary.json | while IFS= read -r line; do echo "::notice title=Load test::$line"; done
