@@ -98,15 +98,21 @@ export function saveStage(stage, entry, { home } = {}) {
 
 /**
  * The schools where a sibling attends, from answers given on that school's own calculator
- * page: the list counts a sibling only there. `place` is the school's sibling answers for
- * a yes, null for a no (forgets the school) and undefined for no answer (keeps it as saved).
+ * page: the list counts a sibling only there. `entry` is the saved entry; its siblings
+ * stand for its own start year only (a sibling's age is checked against it). With a school
+ * on the page, `place` is its sibling answers for a yes and null otherwise (forgets it).
  */
-export function siblingsWith(siblings, schoolId, place) {
-  const next = { ...siblings }
-  if (schoolId == null || place === undefined) return next
+export function siblingsWith(entry, startYear, schoolId, place) {
+  const next = { ...(entry?.startYear === startYear ? entry.siblings : null) }
+  if (schoolId == null) return next
   if (place) next[schoolId] = place
   else delete next[schoolId]
   return next
+}
+
+/** `entry` with its siblings, left out when there are none. */
+export function withSiblings(entry, siblings) {
+  return Object.keys(siblings).length > 0 ? { ...entry, siblings } : entry
 }
 
 export function saveHome(home) {

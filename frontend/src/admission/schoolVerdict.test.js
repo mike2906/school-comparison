@@ -79,11 +79,13 @@ test('a sibling named on a kindergarten\'s own calculator counts there only', ()
   assert.equal(savedVerdictFor({ ...kindergarten(home, cutoff), id: 2 }, saved, null, data).verdict, 'tie', 'another kindergarten')
 })
 
-test('siblingsWith keeps, adds and forgets one school', () => {
-  assert.deepEqual(siblingsWith({ 3: { siblingThere: true } }, 5, { siblingThere: true }), { 3: { siblingThere: true }, 5: { siblingThere: true } })
-  assert.deepEqual(siblingsWith({ 3: { siblingThere: true } }, 3, null), {})
-  assert.deepEqual(siblingsWith({ 3: { siblingThere: true } }, 3, undefined), { 3: { siblingThere: true } })
-  assert.deepEqual(siblingsWith(undefined, null, { siblingThere: true }), {}, 'no school on the page')
+test('siblingsWith keeps, adds and forgets one school, for the saved start year only', () => {
+  const entry = { startYear: 2026, siblings: { 3: { siblingThere: true } } }
+  assert.deepEqual(siblingsWith(entry, 2026, 5, { siblingThere: true }), { 3: { siblingThere: true }, 5: { siblingThere: true } })
+  assert.deepEqual(siblingsWith(entry, 2026, 3, null), {}, 'a no or "not sure" forgets it')
+  assert.deepEqual(siblingsWith(entry, 2026, null, null), { 3: { siblingThere: true } }, 'no school on the page keeps them')
+  assert.deepEqual(siblingsWith(entry, 2027, null, null), {}, 'another start year starts over')
+  assert.deepEqual(siblingsWith(undefined, 2026, null, null), {})
 })
 
 test('a child starting next year is compared with the last campaign rows for the same group', () => {

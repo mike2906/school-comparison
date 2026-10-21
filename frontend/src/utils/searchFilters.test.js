@@ -57,3 +57,9 @@ test('normalizeAvailableFilters fills missing groups', () => {
   assert.deepEqual(result.special_programs, [])
   assert.deepEqual(result.language_focus_pairs, [])
 })
+
+test('planningYear is this September until the end of September, then next year', () => {
+  assert.equal(planningYear(new Date(2027, 2, 1)), 2027)
+  assert.equal(planningYear(new Date(2026, 8, 30)), 2026)
+  assert.equal(planningYear(new Date(2026, 9, 1)), 2027)
+})

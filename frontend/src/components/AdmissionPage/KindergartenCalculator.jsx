@@ -1,9 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { formatRange, measuredOnFor, rowFitsChild, sofiaToday } from '../../admission/calculator'
 import { districtLabel, sortedDistricts } from '../../admission/catchments'
 import { evaluateKindergarten, KINDERGARTEN_GROUPS, KINDERGARTEN_INITIAL, kindergartenAgeGroup, SOCIAL_FLAGS } from '../../admission/inputs'
-import { getSaved, saveStage, siblingsWith } from '../../admission/saved'
+import { getSaved, saveStage, siblingsWith, withSiblings } from '../../admission/saved'
 import { useSavedAdmission } from '../../hooks/useSavedAdmission'
 import { birthYearsFor } from '../../utils/ageSelection'
 import { Choice, DateField, Field, INPUT_CLASS, MobileTotal, Section, YesNo } from './fields'
@@ -31,6 +31,17 @@ function KindergartenCalculator({ selected, startYear, kindergarten, districts, 
   })
   const saved = useSavedAdmission().kindergarten
   const set = (key, value) => setA(prev => ({ ...prev, [key]: value }))
+  // The kindergarten loads after the form: put back the sibling saved for it, and clear
+  // an answer given for another one.
+  const placeId = kindergarten?.id ?? null
+  const placeRef = useRef(placeId)
+  useEffect(() => {
+    const before = placeRef.current
+    placeRef.current = placeId
+    if (placeId == null || before === placeId) return
+    if (getSaved().kindergarten?.siblings?.[placeId]) setA(prev => ({ ...prev, siblingThere: true }))
+    else if (before != null) setA(prev => ({ ...prev, siblingThere: null }))
+  }, [placeId])
   const { ruleSet } = selected
   const params = ruleSet.params
 
@@ -46,9 +57,8 @@ function KindergartenCalculator({ selected, startYear, kindergarten, districts, 
     ? evaluateKindergarten(ruleSet, a, startYear, { district: knownDistrict, siblingThere: a.siblingThere, wishRank: a.wishRank }, today)
     : null
   // A sibling answered for this kindergarten is kept for it, so the list counts it there.
-  const siblingPlace = { true: { siblingThere: true }, false: null }[a.siblingThere]
-  const siblings = siblingsWith(saved?.siblings, kindergarten?.id, siblingPlace)
-  const save = () => saveStage('kindergarten', { startYear, answers: withoutPlace(a), siblings })
+  const siblings = siblingsWith(saved, startYear, placeId, a.siblingThere === true ? { siblingThere: true } : null)
+  const save = () => saveStage('kindergarten', withSiblings({ startYear, answers: withoutPlace(a) }, siblings))
   const dirty = !saved || saved.startYear !== startYear ||
     JSON.stringify({ ...KINDERGARTEN_INITIAL, ...saved.answers }) !== JSON.stringify(withoutPlace(a)) ||
     JSON.stringify(saved.siblings || {}) !== JSON.stringify(siblings)
