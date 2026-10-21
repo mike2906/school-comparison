@@ -140,6 +140,8 @@ function History({ row, rounds }) {
       <summary className="cursor-pointer select-none text-primary-700 hover:text-primary-800">
         {t('cutoffs.history', { count: rounds.length })}
       </summary>
+      {/* Read in date order, a later, higher cut-off looks like the bar went up (2026-10-21 trial: 364, 377). */}
+      <p className="mt-1 pl-4">{t('cutoffs.historyNote')}</p>
       <ol className="mt-1 space-y-1 pl-4">
         {rounds.map((round, index) => (
           <li key={round.round_id}>

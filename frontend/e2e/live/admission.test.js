@@ -154,6 +154,8 @@ describe('admission from a school page', () => {
       const row = rows.nth(several)
       await row.locator('summary').click()
       assert.ok(await row.locator('ol > li').count() >= 2, 'one line per ranking')
+      // A later, higher cut-off is explained where the rankings are listed.
+      await row.getByText(t('bg', 'cutoffs.historyNote')).waitFor()
     }
     await page.getByRole('heading', { name: t('bg', 'admissionArea.districtTitle') }).waitFor()
 
