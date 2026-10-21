@@ -65,9 +65,11 @@ function SchoolDetailPage({ schoolId = null, embedded = false, onClose = null })
   // ?group= the card's link passes to the full page. It picks which NVO exam leads, the
   // headline fee, and which fees the fee list shows before the other ages.
   const preferredAgeGroup = searchParams.get('age_group') || searchParams.get('group')
-  // The enrolment year that group is for (the search's own, or the link's ?year=).
+  // The enrolment year a birth year gave that group for: the search's own (side panel, only
+  // with a birth year) or the link's ?year=. A group picked without a birth year has none.
+  const searchYear = searchParams.get('birth_year') ? searchParams.get('target_year') : null
   const targetYear = preferredAgeGroup
-    ? Number.parseInt(searchParams.get('target_year') || searchParams.get('year') || '', 10) || null
+    ? Number.parseInt(searchYear || searchParams.get('year') || '', 10) || null
     : null
   const id = schoolId ?? params.id
   const navigate = useNavigate()

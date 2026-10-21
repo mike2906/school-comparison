@@ -1,7 +1,7 @@
 /**
  * A school page's path, carrying the age group the parent searched for (`?group=`), so the
- * page leads with that age's exam results and fees, and the enrolment year that group is for
- * (`&year=`), so the page can say when the school's fees are for an earlier year.
+ * page leads with that age's exam results and fees, and the enrolment year a birth year gave
+ * that group for (`&year=`), so the page can say when the school's fees are for an earlier year.
  */
 export function schoolPath(id, ageGroup = null, targetYear = null) {
   if (!ageGroup) return `/schools/${id}`

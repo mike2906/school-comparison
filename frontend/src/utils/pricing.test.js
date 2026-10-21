@@ -6,6 +6,7 @@ import {
   groupPricingByAcademicYear,
   monthlyEquivalent,
   isInstallmentPlan,
+  isSingleInstalment,
   YEAR_STATUS,
   toEur,
   formatPriceLabel,
@@ -816,4 +817,35 @@ test('feeRangeNotes: extras the school says every child pays are named under the
   // Only extras for the chosen group (or naming none).
   const forGroup = [...uwekind, current({ id: 7, category: 'food', amount: 900, age_group: '8-12 клас', pricing_context: { notes: 'Mandatory' } })]
   assert.equal(statedTuition(forGroup, { ageGroup: 'third' }).required.length, 2)
+})
+
+test('tuitionSortValue: a half day gives way only to a full day that converts to a month', () => {
+  const semester = [
+    row({ id: 1, amount: 2400, period: 'semester', plan_name: 'Целодневно' }),
+    row({ id: 2, amount: 300, period: 'monthly', plan_name: 'Полудневно' }),
+  ]
+  assert.equal(tuitionSortValue(semester), 300)
+})
+
+test('selectPricingCohort: a fee this year naming no group covers every group, so no undated fee joins', () => {
+  const rows = [current({ id: 1, amount: 500, period: 'monthly' }), row({ id: 2, amount: 700, period: 'monthly', age_group: '8-12 клас' })]
+  const fee = statedTuition(rows)
+  assert.deepEqual([fee.min, fee.max, fee.otherYears], [500, 500, false])
+})
+
+test('isSingleInstalment: an instalment named by its place, not a plan of several', () => {
+  assert.equal(isSingleInstalment({ plan_name: 'вноска I, до 31.08.26 г.' }), true)
+  assert.equal(isSingleInstalment({ plan_name: 'Годишна такса на 2 вноски' }), false)
+  assert.equal(isSingleInstalment({ plan_name: 'Плащане на 1 вноска' }), false)
+})
+
+test('requiredExtras: "no prepayment required" is no required fee, and with no age only fees naming none count', () => {
+  const rows = [
+    current({ id: 1, amount: 6000 }),
+    current({ id: 2, category: 'food', amount: 120, period: 'monthly', pricing_context: { notes: 'Lunch; no prepayment required.' } }),
+    current({ id: 3, category: 'food', amount: 900, age_group: 'Ясла', pricing_context: { notes: 'Задължителна' } }),
+    current({ id: 4, category: 'materials', amount: 300, pricing_context: { notes: 'Compulsory for all pupils.' } }),
+  ]
+  assert.deepEqual(statedTuition(rows).required.map(r => r.id), [4])
+  assert.deepEqual(statedTuition(rows, { ageGroup: 'nursery' }).required.map(r => r.id), [3, 4])
 })

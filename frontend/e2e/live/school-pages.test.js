@@ -262,11 +262,13 @@ describe('a school page', () => {
 
   test('the cheapest-first kindergarten list compares a full day, cheapest first', async () => {
     // 527's and 542's half-day prices put them first; 199 ranked third on a pay-at-once price.
-    await open('bg', '/search?age_group=third&sort=price')
+    // A child born five years before the intake year is in the third group.
+    const year = intakeYearStart()
+    await open('bg', `/search?age_group=third&birth_year=${year - 5}&target_year=${year}&sort=price`)
     const links = page.locator('a[href*="/schools/"][href*="group=third"]')
     await links.first().waitFor()
     const hrefs = (await links.evaluateAll(anchors => anchors.map(a => a.getAttribute('href')))).slice(0, 12)
-    assert.ok(hrefs.every(href => /[?&]year=\d{4}/.test(href)), 'a card link carries the enrolment year')
+    assert.ok(hrefs.every(href => href.includes(`year=${year}`)), 'a card link carries the enrolment year of the birth-year search')
     const byId = new Map((await allSchools()).map(school => [school.id, school]))
     const ids = [...new Set(hrefs.map(href => Number(href.match(/\/schools\/(\d+)/)[1])))]
     const values = ids.map(id => tuitionSortValue(byId.get(id)?.pricing, { ageGroup: 'third' })).filter(value => value != null)

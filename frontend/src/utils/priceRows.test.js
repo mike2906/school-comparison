@@ -209,10 +209,10 @@ test('a deposit is listed apart from the registration fees it is filed with', ()
 })
 
 test('isHalfDay: part-day care by its words or its hours, never a full day or a date', () => {
-  for (const name of ['Полудневен престой', 'посещението на половин ден', 'Half-day Program', 'до 13:00 часа', 'ПЪРВИ ВАРИАНТ — 8:00 – 13 часа']) {
+  for (const name of ['Полудневен престой', 'посещението на половин ден', 'Half-day Program', 'до 13:00 часа', 'до 13.00 ч.', 'ПЪРВИ ВАРИАНТ — 8:00 – 13 часа']) {
     assert.equal(isHalfDay({ plan_name: name }), true, name)
   }
-  for (const name of ['Целодневен престой', 'Full day', 'ВТОРИ ВАРИАНТ — 8:00 – 15.00 часа', 'Записване до 12.05.2026', null]) {
+  for (const name of ['Целодневен престой', 'Full day', 'ВТОРИ ВАРИАНТ — 8:00 – 15.00 часа', 'Записване до 12.05.2026', 'Месечна такса, платима до 12.10', null]) {
     assert.equal(isHalfDay({ plan_name: name }), false, String(name))
   }
 })

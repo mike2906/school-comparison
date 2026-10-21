@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { displayPrice, groupPricingByAcademicYear, groupRowsByAgeGroup, isInstallmentPlan, priceAgeGroupLabel, YEAR_STATUS } from '../../utils/pricing'
+import { displayPrice, groupPricingByAcademicYear, groupRowsByAgeGroup, isSingleInstalment, priceAgeGroupLabel, YEAR_STATUS } from '../../utils/pricing'
 import { sharedPriceSource, sourceSiteName } from '../../utils/priceSources'
 import { groupPricingByCategory } from './helpers'
 import { formatAmount } from '../../utils/format'
@@ -78,7 +78,7 @@ function PricingSection({ pricing, discounts, ageGroup = null, targetYear = null
           <div className="text-lg font-bold text-neutral-900 whitespace-nowrap">{amountText}</div>
           {/* One instalment of a fee says so, never "per year" (300's "вноска I, до 31.08.26").
               A fee with no period stands out, so it is not read as the monthly fee beside it. */}
-          {isInstallmentPlan(price) ? (
+          {isSingleInstalment(price) ? (
             <div className="text-sm text-neutral-500">{t('pricing.oneInstalment')}</div>
           ) : pricePeriod(price) ? (
             <div className="text-sm text-neutral-500">{t(`pricing.${pricePeriod(price)}`)}</div>

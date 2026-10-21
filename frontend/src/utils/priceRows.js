@@ -98,8 +98,9 @@ export function priceTerms(row) {
 }
 
 // Care for part of the day: "Полудневен престой", "половин ден", "Half day", a day that ends by
-// 14:00 (286's "до 13:00 часа", 330's "8:00 – 13 часа"). Not "целодневно" (full day).
-const HALF_DAY_RE = /полудн|половин ден|half[- ]day|(?<![\p{L}])до обяд|(?<![\p{L}\p{N}])до 1[1-4][:.]\d\d(?![./]\d)|\d[:.]\d\d\s*[–-]\s*1[1-4](?:[:.]00)?\s*(?:ч|h)/iu
+// 14:00 (286's "до 13:00 часа", 330's "8:00 – 13 часа"). Not "целодневно" (full day), nor a
+// deadline's "до 12.10".
+const HALF_DAY_RE = /полудн|половин ден|half[- ]day|(?<![\p{L}])до обяд|(?<![\p{L}\p{N}])до 1[1-4](?::\d\d|(?:[.]\d\d)?\s*(?:ч|h)(?![\p{L}]))|\d[:.]\d\d\s*[–-]\s*1[1-4](?:[:.]00)?\s*(?:ч|h)/iu
 
 /** True for a fee whose own words say it is for half a day. */
 export function isHalfDay(row) {

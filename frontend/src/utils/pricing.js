@@ -44,7 +44,8 @@ function isIntakeYear(entry, today) {
     : false
 }
 
-function yearStartOf(row) {
+/** The first calendar year of a row's or cohort's academic year (2026 for 2026/2027), else -1. */
+export function yearStartOf(row) {
   const canonical = row?.academic_year_canonical ?? row?.academicYear
   if (!canonical) return -1
   const start = Number(String(canonical).split('/')[0])
@@ -90,9 +91,11 @@ export function selectPricingCohort(pricing = [], { ageGroup = null, intake = tr
 
   // Groups the chosen year does not price, from the school's undated prices. Rows naming no
   // group never join: they may be the chosen year's fee read without its year.
-  const covered = namedGroups(tuitionRows(chosen.rows))
+  const chosenTuition = tuitionRows(chosen.rows)
+  const covered = namedGroups(chosenTuition)
   const added = []
-  if (chosen.yearStatus === YEAR_STATUS.CURRENT) {
+  // A fee this year that names no group covers every group: nothing joins it.
+  if (chosen.yearStatus === YEAR_STATUS.CURRENT && chosenTuition.every(row => rowAgeGroupKeys(row).size > 0)) {
     const undated = cohorts.find(cohort => cohort.yearStatus === YEAR_STATUS.NOT_STATED)
     tuitionRows(undated?.rows || []).forEach(row => {
       const keys = [...rowAgeGroupKeys(row)]
@@ -223,6 +226,14 @@ const INSTALLMENT_PLAN_NAME_RE = /(\d+\s*(installment|monthly|вноск)|(insta
 // "2-ра вноска", "Вноска № 1". Not "Месечна вноска" or "Еднократна вноска", which are the
 // whole fee.
 const ONE_INSTALLMENT_RE = /(?<![\p{L}\p{N}])(?:първа|втора|трета|четвърта|последна|(?:i{1,3}|iv|\d{1,2})(?:-?(?:ва|ра|та|ма))?)\s+вноска(?![\p{L}])|вноска\s*(?:№\s*)?(?:i{1,3}|iv|\d{1,2})(?![\p{L}\p{N}])|(?:first|second|third|final) instal+ment/iu
+
+/**
+ * True for a row that is one instalment named by its place ("вноска I, до 31.08.26"), so its
+ * amount is that instalment's. Not "на 2 вноски", whose amount may be the plan's total.
+ */
+export function isSingleInstalment(item) {
+  return Boolean(item?.plan_name) && !isOnePayment(item.plan_name) && ONE_INSTALLMENT_RE.test(item.plan_name)
+}
 
 /** True for a row describing one instalment of a fee rather than the whole fee. */
 export function isInstallmentPlan(item) {
@@ -543,19 +554,22 @@ function optionalInTotal(totals, rows) {
 
 // A fee the school says every child pays: 634's "Задължителна услуга" food, its materials
 // fee "задължителна за всяка учебна година", its "задължителен избор на едно занимание".
-const REQUIRED_RE = /задължител|mandatory|compulsory|required|obligatory/iu
-const NOT_REQUIRED_RE = /незадължит|не (?:е|са) задължит|not (?:mandatory|compulsory|required|obligatory)/iu
+// Not a bare "required": "no prepayment required" says nothing about the fee.
+const REQUIRED_RE = /задължител|mandatory|compulsory|obligatory/iu
+const NOT_REQUIRED_RE = /незадължит|не (?:е|са) задължит|not (?:mandatory|compulsory|obligatory)/iu
 // Paid once (on enrolment, a deposit, a uniform), so not part of what a year costs.
 const ONE_OFF = new Set(['registration', 'deposit', 'uniforms'])
 
 /**
  * The extras the school says every child pays on top of tuition (food, materials, a club),
- * for `ageGroup` when given, so the headline does not read as the whole cost: 634's 6,820 €
- * leaves out 1,410 € of required food. Only by the fee's own words (name or notes), never
- * by guess; enrolment fees and deposits are left out.
+ * so the headline does not read as the whole cost: 634's 6,820 € leaves out 1,410 € of
+ * required food. Only by the fee's own words (name or notes), never by guess; enrolment
+ * fees and deposits are left out. With `ageGroup`, that group's extras and those naming no
+ * group; with none, only those naming no group, as one group's food is not every group's.
  */
 export function requiredExtras(rows = [], ageGroup = null) {
-  return sortByCategory(rowsForAgeGroup(rows, ageGroup)).filter((row) => {
+  const scoped = ageGroup ? rowsForAgeGroup(rows, ageGroup) : rows.filter(row => rowAgeGroupKeys(row).size === 0)
+  return sortByCategory(scoped).filter((row) => {
     if (row.category === 'tuition' || ONE_OFF.has(priceCategory(row)) || priceBase(row) == null) return false
     const context = row.pricing_context || {}
     const words = [row.plan_name, context.plan_name_en, context.notes].filter(Boolean).join(' / ')
@@ -652,9 +666,10 @@ function withoutHalfDay(rows) {
 export function tuitionSortValue(pricing = [], { ageGroup = null, intake = true, today = new Date() } = {}) {
   const cohort = selectPricingCohort(pricing, { ageGroup, intake, today })
   if (!cohort) return null
-  const values = withoutHalfDay(tuitionRows(cohort.rows, ageGroup))
-    .map(row => toEur(monthlyEquivalent(row), row.currency))
-    .filter(value => value != null)
+  // Half days give way only to a full day that converts: a full day priced per semester
+  // must not leave the school with no figure at all.
+  const converting = tuitionRows(cohort.rows, ageGroup).filter(row => toEur(monthlyEquivalent(row), row.currency) != null)
+  const values = withoutHalfDay(converting).map(row => toEur(monthlyEquivalent(row), row.currency))
   if (values.length > 0) return Math.min(...values)
   // Next year's fee has no monthly figure (a term fee): sort by this year's instead.
   return cohort.yearStatus === YEAR_STATUS.NEXT

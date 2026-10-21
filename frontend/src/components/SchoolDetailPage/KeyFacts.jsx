@@ -8,7 +8,7 @@ import {
 } from '../../utils/keyFacts'
 import { calculateDistance } from '../../utils/distance'
 import { formatAmount, formatKm, intlLocale } from '../../utils/format'
-import { feeRangeNotes, statedTuition, YEAR_STATUS } from '../../utils/pricing'
+import { feeRangeNotes, statedTuition, YEAR_STATUS, yearStartOf } from '../../utils/pricing'
 import { getLastAdmittedPoints, getMinNvoScore, hasKindergartenCutoffs } from '../../utils/admission'
 import {
   getLanguageLabel,
@@ -94,7 +94,7 @@ function KeyFacts({ school, examAverages, nvoExamType, ageGroup = null, targetYe
           : tuition.academicYear
     // The searched group is the child's group in the year they enrol; a fee set for an
     // earlier year is that group's fee then, and the school may change it.
-    const laterYear = targetYear && tuition.academicYear && Number(tuition.academicYear.split('/')[0]) < targetYear
+    const laterYear = targetYear && tuition.academicYear && yearStartOf(tuition) !== -1 && yearStartOf(tuition) < targetYear
       ? t('pricing.targetYearNotPublished', { year: `${targetYear}/${targetYear + 1}` })
       : null
     // The fee in the period the school states it in: never annualised, since schools
