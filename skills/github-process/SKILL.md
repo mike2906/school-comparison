@@ -112,8 +112,10 @@ While the site has no users, agents may change the launch DB and publish without
 ### Jobs on Mike's PC
 
 Routine refreshes (fees monthly, facts twice a year, the register import and pins monthly,
-open days, cut-offs) run from cron on the PC and need no go: `docs/SCHEDULED_JOBS.md`. To get a
-fix into them, update the PC checkout to main (one go). Other launch-DB runs and publishes
+open days, cut-offs) run from cron on the PC and need no go: `docs/SCHEDULED_JOBS.md`. The
+fees, facts and register jobs pull main before each run, so a merged fix reaches them by
+itself; a change to the job scripts or caps stops them until the PC checkout is updated with
+one go. Other launch-DB runs and publishes
 happen in a Remote Control session on Mike's PC. A thread can only start one from a message Mike typed in that thread (a platform rule). So a job
 needs one message from him, and that message should cover the whole job:
 

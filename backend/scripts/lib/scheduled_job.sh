@@ -41,8 +41,8 @@ take_lock() {
 
 # Cron runs whatever is checked out, so only merged code may run: no local edits to tracked
 # files, no untracked file under backend/ that git does not ignore (a sitecustomize.py would
-# run with every command), and HEAD on main as last fetched. Nothing here pulls main; a thread updates the
-# checkout with Mike's go.
+# run with every command), and HEAD on main as last fetched. update_checkout then brings it up
+# to main before a run.
 check_checkout() {
 	git -C "$repo_root" diff --quiet HEAD -- ||
 		stop "the checkout at $repo_root has local changes; scheduled jobs run merged code only"
@@ -50,6 +50,38 @@ check_checkout() {
 		stop "the checkout at $repo_root has untracked files under backend/; scheduled jobs run merged code only"
 	git -C "$repo_root" merge-base --is-ancestor HEAD origin/main 2> /dev/null ||
 		stop "the checkout at $repo_root ($(git -C "$repo_root" rev-parse --short HEAD)) is not on main"
+}
+
+# The scheduled jobs themselves, with their caps, and the DB migrations (a pull does not
+# apply them, so the new code would fail on the old schema): a change to them waits for a go.
+job_files=(
+	backend/alembic
+	backend/scripts/lib/scheduled_job.sh
+	backend/scripts/refresh_fees.sh
+	backend/scripts/refresh_facts.sh
+	backend/scripts/refresh_register.sh
+	backend/scripts/refresh_pins.sh
+	backend/scripts/publish_snapshot.sh
+	backend/scripts/watch_open_days.sh
+	backend/scripts/publish_cutoffs.sh
+)
+
+# Before a run, fast-forward the checkout to origin/main, so merged fixes reach the schedule
+# without a thread's go (Mike, 2026-10-21). Stops instead when the checkout is not on the
+# main branch, cannot fast-forward, or when main changes job_files: a new job, cap, interval
+# or migration still needs a go. Called after claim_day, so a failed fetch stops the job once
+# a day, not every hour.
+update_checkout() {
+	[ "$(git -C "$repo_root" symbolic-ref -q --short HEAD)" = main ] ||
+		stop "the checkout at $repo_root is not on the main branch; scheduled jobs update main only"
+	git -C "$repo_root" fetch -q origin main || stop "git fetch origin main failed"
+	local changed
+	changed="$(git -C "$repo_root" diff --name-only HEAD origin/main -- "${job_files[@]}" | tr '\n' ' ')"
+	[ -z "$changed" ] ||
+		stop "main changes the scheduled jobs or migrations (${changed% }); update the checkout at $repo_root with Mike's go"
+	git -C "$repo_root" merge -q --ff-only origin/main ||
+		stop "the checkout at $repo_root cannot fast-forward to origin/main"
+	log "checkout at $(git -C "$repo_root" rev-parse --short HEAD)"
 }
 
 # The first run after install only records the current cycle, so installing starts nothing:
