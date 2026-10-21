@@ -26,8 +26,8 @@ test('596: each plan reads as its schedule and what it costs in all', () => {
 })
 
 test('170: a printed total of a plan says it is the total, with its count of payments when known', () => {
-  const price = { currency: 'EUR', pricing_context: { payment_options: [{ label: 'На два пъти', total: 4200 }, { total: 7000, payments: 2 }] } }
-  assert.deepEqual(paymentOptionTexts(price, money, t), ['4200 EUR in total', '2 payments, 7000 EUR in total'])
+  const price = { currency: 'EUR', pricing_context: { payment_options: [{ label: 'На два пъти', total: 4200 }, { total: 7000, payments: 2 }, { total: 6800, payments: 1 }] } }
+  assert.deepEqual(paymentOptionTexts(price, money, t), ['4200 EUR in total', '2 payments, 7000 EUR in total', '6800 EUR in total'])
 })
 
 test('lev amounts are shown in euro, and a row without options has none', () => {

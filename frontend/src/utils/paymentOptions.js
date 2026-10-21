@@ -24,7 +24,7 @@ export function paymentOptionText(option, currency, money, t) {
   // The total of a plan, said to be one: 170's "4,200 EUR in instalments" read as the size of
   // each instalment.
   if (total == null) return null
-  return option.payments != null
+  return option.payments > 1
     ? t('pricing.paymentOptionPaymentsTotal', { count: option.payments, total: shown(total) })
     : t('pricing.paymentOptionTotal', { total: shown(total) })
 }

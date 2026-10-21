@@ -270,6 +270,7 @@
     "priceOnRequest": "Цена при запитване",
     "currency": "EUR",
     "yearNotStated": "Учебната година не е посочена от училището",
+    "yearsMixed": "{{year}} и без година",
     "notCurrentYear": "не е за текущата учебна година",
     "nextYear": "следващата учебна година",
     "yearPrice": "{{year}}: {{price}}",

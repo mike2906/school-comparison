@@ -270,6 +270,7 @@
     "priceOnRequest": "Price on request",
     "currency": "EUR",
     "yearNotStated": "Academic year not stated by the school",
+    "yearsMixed": "{{year}} and undated",
     "notCurrentYear": "not for the current academic year",
     "nextYear": "next academic year",
     "yearPrice": "{{year}}: {{price}}",

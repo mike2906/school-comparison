@@ -849,3 +849,22 @@ test('requiredExtras: "no prepayment required" is no required fee, and with no a
   assert.deepEqual(statedTuition(rows).required.map(r => r.id), [4])
   assert.deepEqual(statedTuition(rows, { ageGroup: 'nursery' }).required.map(r => r.id), [3, 4])
 })
+
+test('tuitionSortValue: a group named for its half day is the full-day group\'s half day', () => {
+  const rows = [
+    row({ id: 1, amount: 300, period: 'monthly', age_group: 'Полудневна група' }),
+    row({ id: 2, amount: 500, period: 'monthly', age_group: 'Целодневна група' }),
+  ]
+  assert.equal(tuitionSortValue(rows), 500)
+})
+
+test('requiredExtras: a payment deadline is no requirement, a printed total holds its extras, a short own name is used', () => {
+  const rows = [
+    current({ id: 1, amount: 6000 }),
+    current({ id: 2, category: 'food', amount: 150, period: 'monthly', pricing_context: { notes: 'Заплаща се задължително до 5-то число.' } }),
+    current({ id: 3, category: 'other', amount: 200, plan_name: 'Клуб', pricing_context: { notes: 'Задължителен' } }),
+  ]
+  assert.deepEqual(feeRangeNotes(statedTuition(rows), tNotes, 'en', price), ['Also required: Клуб 200 EUR / year'])
+  const total = [...rows, current({ id: 4, amount: 6200, plan_name: 'Общо' })]
+  assert.deepEqual(statedTuition(total).required, [])
+})

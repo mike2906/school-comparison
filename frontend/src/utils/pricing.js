@@ -509,8 +509,10 @@ export function statedTuition(pricing = [], { ageGroup = null, intake = true, to
     const periodRows = rows.filter(row => pricePeriod(row) === period)
     if (periodRows.length === 0) continue
 
-    // Totals say so on the page: a parent reads "Total fees", not "Tuition".
+    // Totals say so on the page: a parent reads "Total fees", not "Tuition". A printed total
+    // may already hold the required extras, so none are named on top of it.
     meta.total = periodRows.every(isStatedTotal)
+    if (meta.total) meta.required = []
     meta.optionalIncluded = meta.total ? optionalInTotal(periodRows, cohort.rows) : []
     const toEuro = (value, row) => toEur(value, row.currency)
     const euro = rangeOf(periodRows, toEuro)
@@ -556,7 +558,8 @@ function optionalInTotal(totals, rows) {
 // fee "задължителна за всяка учебна година", its "задължителен избор на едно занимание".
 // Not a bare "required": "no prepayment required" says nothing about the fee.
 const REQUIRED_RE = /задължител|mandatory|compulsory|obligatory/iu
-const NOT_REQUIRED_RE = /незадължит|не (?:е|са) задължит|not (?:mandatory|compulsory|obligatory)/iu
+// Nor a payment term: "заплаща се задължително до 5-то число" says when, not whether.
+const NOT_REQUIRED_RE = /незадължит|не (?:е|са) задължит|not (?:mandatory|compulsory|obligatory)|задължително (?:до|в срок)/iu
 // Paid once (on enrolment, a deposit, a uniform), so not part of what a year costs.
 const ONE_OFF = new Set(['registration', 'deposit', 'uniforms'])
 
@@ -605,6 +608,9 @@ export function rangeEndLabels(fee, t, language) {
   return null
 }
 
+// Longer fee names ("задължителен избор на едно занимание в рамките на …") give way to the category.
+const REQUIRED_NAME_MAX = 30
+
 // The periods `pricing.per` names ("/ month"); a one-off has none.
 const PER_PERIODS = new Set(['monthly', 'quarter', 'term', 'semester', 'daily', 'weekly', 'hourly', 'yearly'])
 
@@ -630,7 +636,9 @@ export function feeRangeNotes(fee, t, language, formatPrice) {
     const price = formatPrice(shown.value, shown.currency)
     const period = pricePeriod(row)
     const amount = PER_PERIODS.has(period) ? `${price} / ${t(`pricing.per.${period}`)}` : price
-    return `${t(`pricing.${priceCategory(row)}`)} ${amount}`
+    // The fee's own name when it is short ("Lunch"), else its category.
+    const own = planNameLabel(row, t, language)
+    return `${own && own.length <= REQUIRED_NAME_MAX ? own : t(`pricing.${priceCategory(row)}`)} ${amount}`
   })
   return [
     ends ? t('pricing.rangeEnds', {
@@ -649,7 +657,9 @@ export function feeRangeNotes(fee, t, language, formatPrice) {
 // compares a day's care, and 527's and 542's half-day fees put them first in the kindergarten
 // list. A group (or a school) with only a half-day price keeps it.
 function withoutHalfDay(rows) {
-  const group = row => row.age_group?.trim() || ''
+  // By the groups we can read, not the text: "Полудневна група" and "Целодневна група" are
+  // one group's half and full day.
+  const group = row => [...rowAgeGroupKeys(row)].sort().join(',')
   const fullDay = new Set(rows.filter(row => !isHalfDay(row)).map(group))
   return rows.filter(row => !isHalfDay(row) || !(fullDay.has(group(row)) || fullDay.has('')))
 }

@@ -100,12 +100,14 @@ export function priceTerms(row) {
 // Care for part of the day: "Полудневен престой", "половин ден", "Half day", a day that ends by
 // 14:00 (286's "до 13:00 часа", 330's "8:00 – 13 часа"). Not "целодневно" (full day), nor a
 // deadline's "до 12.10".
-const HALF_DAY_RE = /полудн|половин ден|half[- ]day|(?<![\p{L}])до обяд|(?<![\p{L}\p{N}])до 1[1-4](?::\d\d|(?:[.]\d\d)?\s*(?:ч|h)(?![\p{L}]))|\d[:.]\d\d\s*[–-]\s*1[1-4](?:[:.]00)?\s*(?:ч|h)/iu
+const HALF_DAY_RE = /полудн|половин ден|half[- ]day|(?<![\p{L}])до обяд|(?<![\p{L}\p{N}])до 1[1-4](?::\d\d|(?:[.]\d\d)?\s*(?:ч|h))|\d[:.]\d\d\s*[–-]\s*1[1-4](?::\d\d|(?:[.]\d\d)?\s*(?:ч|h))/iu
+const FULL_DAY_RE = /целодн|цял ден|full[- ]day/iu
 
 /** True for a fee whose own words say it is for half a day. */
 export function isHalfDay(row) {
-  const words = [row?.plan_name, row?.age_group, row?.pricing_context?.plan_name_en]
-  return words.some(text => text && HALF_DAY_RE.test(text))
+  const words = [row?.plan_name, row?.age_group, row?.pricing_context?.plan_name_en].filter(Boolean)
+  // "Целодневна група, обяд до 12 ч." is a full day that names a time.
+  return words.some(text => HALF_DAY_RE.test(text)) && !words.some(text => FULL_DAY_RE.test(text))
 }
 
 /**

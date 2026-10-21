@@ -146,6 +146,8 @@ const SchoolCard = memo(function SchoolCard({
     if (pricingCohort.yearStatus === YEAR_STATUS.NOT_STATED) {
       return t('pricing.yearNotStated')
     }
+    // Some groups' fees come from an undated page (593): the badge does not date them all.
+    if (pricingCohort.otherYears) return t('pricing.yearsMixed', { year: pricingCohort.academicYear })
     return pricingCohort.academicYear
   }, [pricingCohort, t])
   // Only a current-year price, or next year's for families enrolling now, wears the
