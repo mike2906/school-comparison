@@ -1076,3 +1076,38 @@ def test_append_line_writes_one_json_line_per_school(tmp_path):
     append_line(path, {"school_id": 1, "outcome": "Ünï"})
     append_line(path, {"school_id": 2, "outcome": "error"})
     assert [line.split('"school_id": ')[1][0] for line in path.read_text(encoding="utf-8").splitlines()] == ["1", "2"]
+
+
+def test_a_kindergarten_on_its_schools_site_shows_no_school_grade_facts():
+    """515, 555, 587, 634 share their school's site: its grades' facts are the school's."""
+
+    def row(en, **labels):
+        return _fact_row(topic="admissions", text_i18n={"bg": "Факт.", "en": en}, **labels)
+
+    school_facts = [
+        row("Admission to grade 5 is by interview and an exam in mathematics."),
+        row("The IB Diploma Programme is offered in Grade 11-12."),
+        row("Upper secondary follows the Cambridge IGCSE programme."),
+        row("Children start learning English and German in first grade."),
+        row("Children start English in first grade."),
+        row("Children are prepared for first grade; the IB Diploma is offered in grades 11-12."),
+        row("Admission to 5th class is by an exam in mathematics."),
+    ]
+    kindergarten_facts = [
+        row("The kindergarten accepts children from about age 2 until they enter first grade."),
+        row("Admission includes a trial day for the child.", admission_grade=0),
+        row("Kindergarten admission is open year-round when places are available."),
+        row("Children are prepared for school up to grade 1 readiness."),
+        row("Graduating children receive a diploma at the end-of-year celebration."),
+        row("Admission to the preparatory groups for 5- and 6-year-olds.", admission_grade=5, admission_grade_to=6),
+    ]
+    block = {
+        "_schema_version": 1, "read_at": "2026-10-20T09:00:00+00:00", "website_url": "https://www.school.example",
+        "facts": school_facts + kindergarten_facts,
+    }
+    shown = publishable_school_facts({"school_facts": block}, HOME, "Kindergarten")
+    assert [fact["text_i18n"]["en"] for fact in shown["facts"]] == [
+        fact["text_i18n"]["en"] for fact in kindergarten_facts
+    ]
+    assert shown["facts"][-1]["admission_grade"] is None and shown["facts"][-1]["admission_grade_to"] is None
+    assert len(publishable_school_facts({"school_facts": block}, HOME, "secondary")["facts"]) == 13

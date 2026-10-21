@@ -401,7 +401,32 @@ def _one_part(fact: Mapping[str, Any]) -> bool:
     return bool(_ONE_PART_RE.search(english)) and not _ALL_GRADES_RE.search(english)
 
 
-def publishable_school_facts(attributes: Any, website_url: Optional[str]) -> Optional[dict[str, Any]]:
+# A kindergarten on its school's website (515, 555, 587, 634) is read the school's facts too:
+# a fact naming a school grade or a school-only programme is the school's. "Until they enter
+# first grade" is about the kindergarten.
+KINDERGARTEN_LEVELS = frozenset({"kindergarten", "nursery"})
+_SCHOOL_GRADES_RE = re.compile(
+    r"\bgrades?\s*\d|\bclass(?:es)?\s*\d|\b\d+(?:st|nd|rd|th)\s+class"
+    r"|\b(?:\d+(?:st|nd|rd|th)|first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|eleventh|twelfth)"
+    r"[- ]grade|\bIB\b|\bIGCSE\b|\bA[- ]levels?\b|\b(?:lower|upper) secondary"
+    r"|\b(?:secondary|school|Bulgarian|two)\s+diplomas?\b|\bmatura|\bNVO\b",
+    re.IGNORECASE,
+)
+# Only the phrase is left out, so a school grade named elsewhere in the fact still counts.
+_BEFORE_SCHOOL_RE = re.compile(
+    r"(?:until|before|ready for|readiness for|prepar\w* (?:\w+ )?for|up to)\s+(?:the\s+)?(?:\w+\s+){0,2}"
+    r"(?:first grade|1st grade|grade 1\b)|first[- ]grade readiness",
+    re.IGNORECASE,
+)
+
+
+def _school_grades_fact(fact: Mapping[str, Any]) -> bool:
+    return bool(_SCHOOL_GRADES_RE.search(_BEFORE_SCHOOL_RE.sub(" ", _english(fact))))
+
+
+def publishable_school_facts(
+    attributes: Any, website_url: Optional[str], education_level: Optional[str] = None
+) -> Optional[dict[str, Any]]:
     """``{"read_at", "facts": [...], "at_a_glance": {...}, "languages_read"}``, or None when none can show.
 
     Each fact is ``{"topic", "text_i18n", "source_url", "rank"}`` plus its labels
@@ -410,7 +435,9 @@ def publishable_school_facts(attributes: Any, website_url: Optional[str]) -> Opt
     show as ``more``.
 
     Facts show only while ``website_url`` is still the site they were read from: a school
-    whose site was found wrong, replaced or removed stops showing them until it is re-read."""
+    whose site was found wrong, replaced or removed stops showing them until it is re-read.
+    A kindergarten shows none about school grades (``_school_grades_fact``)."""
+    kindergarten = str(education_level or "").casefold() in KINDERGARTEN_LEVELS
     block = attributes.get(ATTRIBUTE_KEY) if isinstance(attributes, Mapping) else None
     if not isinstance(block, Mapping) or block.get("_schema_version") != SCHEMA_VERSION:
         return None
@@ -434,9 +461,17 @@ def publishable_school_facts(attributes: Any, website_url: Optional[str]) -> Opt
             continue
         if _HEARSAY_RE.search(_english(fact)):
             continue
+        if kindergarten and _school_grades_fact(fact):
+            continue
         if fact.get("topic") == "admissions" and _past_school_years_only(_english(fact), today):
             continue  # "14 places for 2025/2026" is a past campaign's
         labels = _labels(fact)
+        if kindergarten:
+            # A school grade on a kindergarten's fact is the reader's slip ("preparatory groups
+            # for 5- and 6-year-olds" as grades 5-6, 587): 0 is the kindergarten's grade.
+            for key in ("admission_grade", "admission_grade_to", "highest_grade"):
+                if labels.get(key):
+                    labels[key] = None
         if labels.get("open_days") and max(labels["open_days"]) < today and not (
             labels.get("applications_close") and labels["applications_close"] >= today
         ):
@@ -474,7 +509,9 @@ def publishable_school_facts(attributes: Any, website_url: Optional[str]) -> Opt
     }
 
 
-def shown_school_facts(attributes: Any, scrape_status: Any, website_url: Optional[str]) -> Optional[dict[str, Any]]:
+def shown_school_facts(
+    attributes: Any, scrape_status: Any, website_url: Optional[str], education_level: Optional[str] = None
+) -> Optional[dict[str, Any]]:
     """The facts that may cross the API boundary (``publishable_school_facts``), or None.
 
     Facts carry their own page checks, so they do not wait for a Stage 6 report; a
@@ -484,15 +521,17 @@ def shown_school_facts(attributes: Any, scrape_status: Any, website_url: Optiona
         return None
     if str(scrape_status or "").strip().lower() not in SITE_ACCEPTED_STATUSES:
         return None
-    return publishable_school_facts(attributes, website_url)
+    return publishable_school_facts(attributes, website_url, education_level)
 
 
-def publication_attributes(attributes: Any, scrape_status: Any, website_url: Optional[str]) -> dict[str, Any]:
+def publication_attributes(
+    attributes: Any, scrape_status: Any, website_url: Optional[str], education_level: Optional[str] = None
+) -> dict[str, Any]:
     """``attributes_for_publication``, plus the shown facts under ``PUBLISHED_KEY`` so the
     display and filter projections can use their tags, languages and class size, and the
     shown website name for the English name (``app.utils.i18n_resolver``)."""
     attrs = attributes_for_publication(attributes, scrape_status)
-    facts = shown_school_facts(attributes, scrape_status, website_url)
+    facts = shown_school_facts(attributes, scrape_status, website_url, education_level)
     if facts:
         attrs[PUBLISHED_KEY] = facts
     if website_name := shown_website_name(attributes, scrape_status, website_url):

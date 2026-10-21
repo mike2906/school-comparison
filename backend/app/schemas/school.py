@@ -172,7 +172,9 @@ class SchoolAttributesMixin(BaseModel):
         # Shown school facts ride along so their tags, languages and class size reach the
         # display and filter projections.
         website_url = getattr(self, "website_url", None) or getattr(self, "raw_website_url", None)
-        return publication_attributes(self.raw_attributes, self.raw_scrape_status, website_url)
+        return publication_attributes(
+            self.raw_attributes, self.raw_scrape_status, website_url, getattr(self, "education_level", None)
+        )
 
     @cached_property
     def display_projection(self) -> tuple[dict[str, Any], dict[str, dict[str, Any]]]:
@@ -547,7 +549,9 @@ class SchoolResponse(SchoolBase, SchoolPricingMixin):
     def school_facts(self) -> Optional[SchoolFacts]:
         # ``shown_school_facts`` is the gate (withholding marker, accepted website, same
         # site). "minor" facts are not shown; they only feed the filters.
-        shown = shown_school_facts(self.raw_attributes, self.raw_scrape_status, self.website_url)
+        shown = shown_school_facts(
+            self.raw_attributes, self.raw_scrape_status, self.website_url, getattr(self, "education_level", None)
+        )
         facts = [fact for fact in (shown or {}).get("facts", []) if fact["rank"] != "minor"]
         return SchoolFacts.model_validate(shown | {"facts": facts}) if facts else None
 
