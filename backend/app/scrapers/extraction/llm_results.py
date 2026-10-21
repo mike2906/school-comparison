@@ -136,7 +136,11 @@ def _coerce_price_period(raw: Optional[str | PricePeriod]) -> Optional[PricePeri
         if normalized_tail in rules._PERIOD_ALIASES:
             return rules._PERIOD_ALIASES[normalized_tail]
     normalized = _normalize_key(raw)
-    return rules._PERIOD_ALIASES.get(normalized)
+    if normalized in rules._PERIOD_ALIASES:
+        return rules._PERIOD_ALIASES[normalized]
+    # Any stored period by its own name: the aliases predate daily, weekly and hourly (#339), so
+    # the fees agent's weekly camp (541) and daily food (569) were dropped as unknown periods.
+    return next((period for period in PricePeriod if period.value == normalized), None)
 
 
 def _format_price_value_text(
