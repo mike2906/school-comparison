@@ -7,10 +7,15 @@ import { Rate } from 'k6/metrics'
 
 const API = (__ENV.API_URL || 'https://api.schooldecider.com').replace(/\/+$/, '')
 const PEAK = Number(__ENV.PEAK || 1000)
+if (!Number.isInteger(PEAK) || PEAK < 1) throw new Error(`PEAK must be a whole number above 0, got ${__ENV.PEAK}`)
+// BYPASS_CACHE=1: every request asks past Cloudflare's copy, as right after a publish,
+// so the test measures the server alone.
+const BYPASS = Boolean(__ENV.BYPASS_CACHE)
 const SCOPE = 'country_code=bg&city=sofia'
 
-// Share of answers Cloudflare served from its copy.
+// Share of answers Cloudflare served from its copy (also a stale one while it refreshes).
 const edgeHit = new Rate('edge_hit')
+const EDGE_SERVED = new Set(['HIT', 'UPDATING', 'STALE', 'REVALIDATED'])
 
 export const options = {
   // Half the peak, hold, then the full peak, hold. QUICK=1: a short check of the script.
@@ -29,7 +34,6 @@ export const options = {
     'http_req_duration{name:list}': ['p(95)<2000'],
     'http_req_duration{name:filters}': ['p(95)<2000'],
     'http_req_duration{name:counts}': ['p(95)<2000'],
-    'http_req_duration{name:country}': ['p(95)<2000'],
     'http_req_duration{name:exam_averages}': ['p(95)<2000'],
     'http_req_duration{name:search}': ['p(95)<2000'],
     'http_req_duration{name:school}': ['p(95)<2000'],
@@ -42,9 +46,10 @@ export const options = {
 const PARAMS = { headers: { 'Accept-Encoding': 'gzip, deflate, br' } }
 
 function get(path, name) {
-  const response = http.get(`${API}${path}`, { ...PARAMS, tags: { name } })
+  const url = BYPASS ? `${API}${path}${path.includes('?') ? '&' : '?'}load=${__VU}-${__ITER}-${Date.now()}` : `${API}${path}`
+  const response = http.get(url, { ...PARAMS, tags: { name } })
   check(response, { [`${name} 200`]: (r) => r.status === 200 })
-  edgeHit.add(response.headers['Cf-Cache-Status'] === 'HIT', { name })
+  edgeHit.add(EDGE_SERVED.has(response.headers['Cf-Cache-Status']), { name })
   return response
 }
 
@@ -61,6 +66,17 @@ function pick(items) {
   return items[Math.floor(Math.random() * items.length)]
 }
 
+function pickDistinct(items, count) {
+  const picked = new Set()
+  while (picked.size < Math.min(count, items.length)) picked.add(pick(items))
+  return [...picked]
+}
+
+// As the site's URLSearchParams writes it (a space is "+"), so the edge cache keys match.
+function queryValue(text) {
+  return encodeURIComponent(text).replace(/%20/g, '+')
+}
+
 // What the search box sends while a parent types a name: one request per pause.
 function typedQueries(name) {
   const text = name.replace(/["„“]/g, '').trim()
@@ -68,27 +84,24 @@ function typedQueries(name) {
 }
 
 export default function (data) {
-  // Opening the search page.
+  // Opening the search page; the age picker (counts) is opened by about half.
   get(`/schools?${SCOPE}`, 'list')
   get(`/schools/filters?${SCOPE}`, 'filters')
-  get(`/schools/counts?${SCOPE}`, 'counts')
-  get('/countries/bg', 'country')
   get(`/schools/exam-averages?${SCOPE}`, 'exam_averages')
+  if (Math.random() < 0.5) get(`/schools/counts?${SCOPE}`, 'counts')
   sleep(5 + Math.random() * 10)
 
   // Most parents look a school up by name.
   if (Math.random() < 0.6) {
     for (const q of typedQueries(pick(data.names))) {
-      get(`/schools/search?q=${encodeURIComponent(q)}&${SCOPE}`, 'search')
+      get(`/schools/search?q=${queryValue(q)}&${SCOPE}`, 'search')
       sleep(0.5 + Math.random())
     }
   }
 
   // A few school pages, read for a while.
-  const opened = []
-  for (let i = 0; i < 2 + Math.floor(Math.random() * 3); i += 1) {
-    const id = pick(data.ids)
-    opened.push(id)
+  const opened = pickDistinct(data.ids, 2 + Math.floor(Math.random() * 3))
+  for (const id of opened) {
     get(`/schools/${id}`, 'school')
     sleep(15 + Math.random() * 30)
   }

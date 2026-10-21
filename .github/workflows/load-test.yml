@@ -7,8 +7,13 @@ on:
     inputs:
       peak:
         description: "Parents at the peak (the test holds half of it first)"
-        default: "1000"
+        type: number
+        default: 1000
         required: true
+      bypass_cache:
+        description: "Ask past Cloudflare's copy (the server alone, as right after a publish)"
+        type: boolean
+        default: false
 
 concurrency:
   group: load-test
@@ -16,6 +21,7 @@ concurrency:
 
 permissions:
   contents: read
+  actions: read
 
 env:
   K6_VERSION: v1.0.0
@@ -30,6 +36,17 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v7
 
+      # A deploy or publish restarts the API: its errors would read as a capacity limit.
+      - name: No deploy running
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          running="$(gh run list -R "$GITHUB_REPOSITORY" --workflow deploy.yml --limit 20 --json status -q '[.[] | select(.status != "completed")] | length')"
+          if [ "$running" != 0 ]; then
+            echo "::error::A deploy or publish is running; start the load test after it."
+            exit 1
+          fi
+
       - name: Install k6
         run: |
           curl -fsSL -o k6.tgz "https://github.com/grafana/k6/releases/download/$K6_VERSION/k6-$K6_VERSION-linux-amd64.tar.gz"
@@ -40,6 +57,7 @@ jobs:
       - name: Run
         env:
           PEAK: ${{ inputs.peak }}
+          BYPASS_CACHE: ${{ inputs.bypass_cache && '1' || '' }}
         run: |
           # Many virtual users: raise the open-file limit for their connections.
           ulimit -n 65536
@@ -49,11 +67,12 @@ jobs:
       - name: Report
         if: always()
         run: |
+          set -o pipefail
           [ -f summary.json ] || { echo "::error::k6 wrote no summary"; exit 0; }
           jq -r '
             .metrics as $m
-            | ($m | to_entries[] | select(.key | startswith("http_req_duration{name:")) |
+            | ($m | to_entries[] | select(.key | startswith("http_req_duration{name:")) | select((.value.count // 0) > 0) |
                 "\(.key | sub("http_req_duration\\{name:"; "") | sub("\\}"; "")): med \(.value.med | floor) ms, p95 \(.value["p(95)"] | floor) ms, max \(.value.max | floor) ms, \(.value.count) requests"),
             "all: med \($m.http_req_duration.med | floor) ms, p95 \($m.http_req_duration["p(95)"] | floor) ms, \($m.http_reqs.count) requests, failed \($m.http_req_failed.value * 100 | floor)%",
-            "edge hits: \(($m.edge_hit.value // 0) * 100 | floor)%, peak parents: \($m.vus_max.max)"
+            "edge hits: \(($m.edge_hit.value // 0) * 100 | floor)%, most parents at once: \($m.vus.max)"
           ' summary.json | while IFS= read -r line; do echo "::notice title=Load test::$line"; done
