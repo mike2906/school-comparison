@@ -10,8 +10,15 @@ map's feature for the school gives too (two sources agreeing; ``map_feature_addr
 the school's one hidden location takes that address and point. Held back when the site gives several addresses, when the address is one of the
 school's shown locations already (the hidden one is then an old address), when an unrelated
 school is pinned there (or another school's site gives the same address), or when the
-school has more than one hidden location (which one moved is unclear). No model calls.
-Default is a dry run. Sofia only. Run after ``register-pins``.
+school has more than one hidden location (which one moved is unclear).
+
+The site also settles a location by itself (``site_fixes``), shown or hidden: a site map
+point at the register point of the location's own address places a hidden one there, or
+moves a shown one pinned far away (ЧДГ Росица's "Кирил и Методий 70" was pinned in
+Оборище; the site maps the one in Иваняне); a shown location whose address is no street and number or
+block at all takes the register address the site names at our pin (ЧДГ Христо Ботев's "ул. 315
+- III м. р." is "ул. Петър Бонев 3"). Official and hand pins are never changed. No model
+calls. Default is a dry run. Sofia only. Run after ``register-pins``.
 """
 
 from __future__ import annotations
@@ -34,6 +41,7 @@ from app.scrapers.stages.website_pins import _address, _distance_m, needs_pin, r
 from app.services.geocoding.bg import sofia_address_register as register_lib
 from app.services.geocoding.bg.geojson import GEOJSON_NAME_MATCH
 from app.services.geocoding.bounds import get_city_bounds
+from app.services.geocoding.write_gate import has_pinned_point
 from app.utils.school_facts import SITE_ACCEPTED_STATUSES
 
 logger = logging.getLogger(__name__)
@@ -41,6 +49,7 @@ logger = logging.getLogger(__name__)
 PIN_TAG = "coords_source=school_site_address"
 # A site's map point this close to a register point is at that address.
 NEAR_M = 40
+FIXED = ("placed", "moved", "readdressed")
 
 
 def _address_key(point: register_lib.RegisterPoint) -> tuple[str, ...]:
@@ -86,6 +95,57 @@ def _same_address(a: register_lib.Parsed, b: register_lib.Parsed) -> bool:
     return False
 
 
+def site_fixes(
+    locations: Sequence[SchoolLocation],
+    points: list[tuple[float, float]],
+    page: register_lib.PageText,
+    register: register_lib.Register,
+) -> dict[int, tuple[str, register_lib.RegisterPoint]]:
+    """``{location id: (outcome, register point)}`` for the locations the site settles by
+    itself: "placed" or "moved" (a site map point at the register point of the location's
+    own address; moved when a shown pin is over ``ELSEWHERE_M`` from it), "readdressed" (a
+    shown location whose address is no street and number or block, at a register address the site
+    names within ``NEAR_M`` of our pin)."""
+    fixes: dict[int, tuple[str, register_lib.RegisterPoint]] = {}
+    for location in locations:
+        if has_pinned_point(location):
+            continue
+        ours = register_lib.parse(_address(location))
+        at_map = {
+            _address_key(candidate): candidate
+            for point in points
+            for candidate in register.near(point, NEAR_M)
+            if _same_address(ours, register_lib.parse(candidate.label))
+        }
+        hidden = needs_pin(location)
+        fix: Optional[tuple[str, register_lib.RegisterPoint]] = None
+        if len(at_map) == 1:
+            (candidate,) = at_map.values()
+            if hidden:
+                fix = ("placed", candidate)
+            elif _distance_m((location.lat, location.lng), (candidate.lat, candidate.lng)) > ELSEWHERE_M:
+                fix = ("moved", candidate)
+        elif (
+            not hidden
+            and not ours.near  # "до бл. 12" is a real address beside the register's
+            # Not an address at all; a well-formed one the register lacks may be new and right.
+            and register_lib.match(ours, register).outcome == "no_address"
+        ):
+            at_pin = site_addresses([(location.lat, location.lng)], page, register)
+            if len(at_pin) == 1:
+                ((candidate, _),) = at_pin.values()
+                fix = ("readdressed", candidate)
+        # Another of our locations there already: this one is an old address of it.
+        if fix and not any(
+            other.id != location.id
+            and not needs_pin(other)
+            and _distance_m((fix[1].lat, fix[1].lng), (other.lat, other.lng)) <= NEAR_M
+            for other in locations
+        ):
+            fixes[location.id] = fix
+    return fixes
+
+
 def map_feature_address(location: SchoolLocation) -> Optional[tuple[str, tuple[float, float]]]:
     """The address and point of the EU education map's feature our hidden point was matched
     to by name, when its address is not ours. It is often the school's current address where
@@ -120,7 +180,8 @@ async def run_site_address(
     fetch: Optional[Fetch] = None,
     fetch_script: Optional[Fetch] = None,
 ) -> dict[str, Any]:
-    """Run over the city's schools with an accepted website and a hidden location."""
+    """Run over the city's schools with an accepted website and a location that is not an
+    official or hand pin."""
     if (country, (city or "").casefold()) != ("bg", "sofia"):
         raise ValueError(f"site-address has Sofia's address register only, not {city!r}")
     bounds = get_city_bounds(country, city)
@@ -155,8 +216,9 @@ async def run_site_address(
     async def _run(fetch: Fetch, fetch_script: Optional[Fetch]) -> list[dict[str, Any]]:
         nonlocal register
         results: list[dict[str, Any]] = []
+        read = 0  # schools whose site was read
         for school_id in ids:
-            if limit is not None and len({r["school_id"] for r in results}) >= limit:
+            if limit is not None and read >= limit:
                 break
             school = await db.get(School, school_id)
             locations = (
@@ -165,19 +227,21 @@ async def run_site_address(
                 .all()
             )
             hidden = [loc for loc in locations if needs_pin(loc)]
-            if not hidden:
+            if all(has_pinned_point(loc) for loc in locations):
                 continue
             if register is None:
                 register = await download_register()
-            rows = [
-                {
+
+            def _row(loc: SchoolLocation, school_id: int = school_id) -> dict[str, Any]:
+                return {
                     "school_id": school_id,
                     "location_id": loc.id,
                     "address": _address(loc),
                     "old_point": (loc.lat, loc.lng) if loc.lat is not None and loc.lng is not None else None,
                 }
-                for loc in hidden
-            ]
+
+            rows = [_row(loc) for loc in hidden]
+            read += 1
             try:
                 site = await read_site(school, fetch, fetch_script=fetch_script, bounds=bounds)
             except Exception:
@@ -187,9 +251,40 @@ async def run_site_address(
                 results += [{**row, "outcome": "site_not_read"} for row in rows]
                 continue
             points, text = site
+            page = register_lib.page_text(text)
+            fixes = site_fixes(locations, points, page, register)
+            for loc in locations:
+                if loc.id not in fixes:
+                    continue
+                outcome, address = fixes[loc.id]
+                row = {
+                    **_row(loc),
+                    "site_address": address.label,
+                    "point": (address.lat, address.lng),
+                    "site_points": points,
+                    "outcome": outcome,
+                }
+                if row["old_point"]:
+                    row["moved_m"] = round(_distance_m(row["old_point"], row["point"]))
+                if any(
+                    other != school_id
+                    and not (names.get(other, set()) & names.get(school_id, set()))
+                    and _distance_m(row["point"], spot) <= SAME_BUILDING_M
+                    for other, spot in pinned
+                ):
+                    row["outcome"] = "other_school_here"
+                results.append(row)
+            hidden = [loc for loc in hidden if loc.id not in fixes]
+            rows = [row for row in rows if row["location_id"] not in fixes]
+            if not hidden:
+                continue
             listed = [a for loc in hidden if (a := map_feature_address(loc))]
-            found = site_addresses(points, register_lib.page_text(text), register, listed)
-            shown = [(loc.lat, loc.lng) for loc in locations if not needs_pin(loc) and loc.lat is not None]
+            found = site_addresses(points, page, register, listed)
+            shown = [
+                (fixes[loc.id][1].lat, fixes[loc.id][1].lng) if loc.id in fixes else (loc.lat, loc.lng)
+                for loc in locations
+                if loc.id in fixes or (not needs_pin(loc) and loc.lat is not None)
+            ]
             outcome, extra = "placed", {}
             if not found:
                 outcome = "no_site_address"
@@ -217,7 +312,7 @@ async def run_site_address(
                     row["moved_m"] = round(_distance_m(row["old_point"], extra["point"]))
                 results.append({**row, **extra, "outcome": outcome})
         # Two unrelated schools whose sites give one address: which one is there is unclear.
-        placed = [r for r in results if r["outcome"] == "placed"]
+        placed = [r for r in results if r["outcome"] in FIXED]
         for row in placed:
             if any(
                 other["school_id"] != row["school_id"]
@@ -240,7 +335,8 @@ async def run_site_address(
         results = await _run(fetch, fetch_script)
     if apply:
         for result in results:
-            if result["outcome"] == "placed":
+            if result["outcome"] in FIXED:
+                fixed = result["outcome"]
                 result["outcome"] = await write_pin(
                     db,
                     result["location_id"],
@@ -258,7 +354,10 @@ async def run_site_address(
                     # The address is the site's: shared-site checks must not count it as
                     # registry evidence. Not READDRESSED_TAG: that re-geocodes the location.
                     extra_tags=(WEBSITE_CONTACT_ADDRESS_TAG,),
+                    shown=fixed != "placed",
                 )
+                if result["outcome"] == "placed":
+                    result["outcome"] = fixed
     outcomes: dict[str, int] = {}
     for result in results:
         outcomes[result["outcome"]] = outcomes.get(result["outcome"], 0) + 1

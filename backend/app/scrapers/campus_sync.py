@@ -240,6 +240,31 @@ def addresses_equivalent(first: str, second: str) -> bool:
     return False
 
 
+# "кв. Бояна", "ж.к. Люлин 3", "м. Гърдова глава", "с. Иваняне": a quarter or village named
+# with its address. Sofia branch addresses often give it in place of the city. Only Sofia's
+# own villages (Столична община, as in its address register) count: "с. Гурмазово" is not.
+_SOFIA_VILLAGES = (
+    "Балша", "Бистрица", "Бусманци", "Владая", "Войнеговци", "Волуяк", "Герман", "Горни Богров",
+    "Доброславци", "Долни Богров", "Долни Пасарел", "Железница", "Желява", "Житен", "Иваняне",
+    "Казичене", "Клисура", "Кокаляне", "Кривина", "Кубратово", "Кътина", "Лозен", "Локорско",
+    "Мало Бучино", "Мировяне", "Мрамор", "Мърчаево", "Негован", "Панчарево", "Плана", "Подгумер",
+    "Световрачене", "Чепинци", "Яна",
+)
+_QUARTER_RE = re.compile(
+    r"(?<![^\W\d_])(?:(?i:кв|ж\.?\s*к|жк)\.?\s*|м\.\s*)[А-Я]"
+    rf"|(?<![^\W\d_])с\.\s*(?:{'|'.join(_SOFIA_VILLAGES)})(?![^\W\d_])"
+)
+
+
+def _only_our_city(text: str, city: str) -> bool:
+    """A page that names the school's city and no other known town: there a quarter or
+    village named with an address is one of the city's (ЧДГ НЕМО: "ЧДГ НЕМО-Бояна / кв.
+    Бояна, бул. "Александър Пушкин" 63", the city only in the footer)."""
+    from app.scrapers.site_city import known_towns_in
+
+    return _names_city(text, city) and not known_towns_in(text)
+
+
 def _names_city(text: str, city: str) -> bool:
     city_key = (city or "").casefold().strip()
     if not city_key:
@@ -281,6 +306,7 @@ def _campus_candidates(pages: Sequence[SitePage], *, city: str, family: str) -> 
     for page in pages:
         if not _is_contact_page(page):
             continue
+        only_our_city = _only_our_city(page.text or "", city)
         lines = [line.strip() for line in (page.text or "").splitlines() if line.strip()]
         for index, line in enumerate(lines):
             address = contact_details._normalize_contact_address_candidate(line)
@@ -296,7 +322,7 @@ def _campus_candidates(pages: Sequence[SitePage], *, city: str, family: str) -> 
                 reason = "not_a_street_address"
             elif any(words and words <= set(key.words) for words in entrance_streets):
                 reason = "entrance_of_existing_location"
-            elif not _names_city(nearby, city):
+            elif not _names_city(nearby, city) and not (only_our_city and _QUARTER_RE.search(nearby)):
                 reason = "city_not_stated"
             elif _NOT_CAMPUS_RE.search(" ".join([*before, line, *after[:1]])):
                 reason = "office_or_partner_address"

@@ -283,3 +283,70 @@ def test_a_rejected_or_overwritten_map_feature_is_not_a_source():
     moved.geocode_meta = {**moved.geocode_meta, "status": "accepted", "candidate": {"lat": 42.0, "lng": 23.0}}
     assert stage.map_feature_address(moved) is None
     assert stage.map_feature_address(_old_address()) == ("УЛ. ЛИДИЦЕ 14, 1000 СТОЛИЧНА", (42.67838, 23.36281))
+
+
+ROSICA = reg.read_register(
+    """rn;region;settlement;lareaunit;block;street;streetnum;entrance;n;e
+62102;Нови Искър;с. Иваняне;"";"";ул. Св. св. Кирил и Методий;70;"";42.710562;23.187797
+5501;Оборище;гр. София;"";"";ул. Св. св. Кирил и Методий;70;"";42.702660;23.325270
+33030;Студентски;гр. София;"";"";бул. Св. Климент Охридски;49;"";42.647790;23.356500
+110113;Люлин;гр. София;"";"";ул. Петър Бонев;3;"";42.710100;23.255100
+110114;Люлин;гр. София;"";"";ул. Петър Бонев;5;"";42.710400;23.255400
+"""
+)
+
+
+def _iframe(lat, lng):
+    return f'<iframe src="https://maps.google.com/maps?q={lat},{lng}&z=16&output=embed"></iframe>'
+
+
+def _at(address, point, method="nominatim_fallback", **meta):
+    return SchoolLocation(
+        address_i18n={"bg": address},
+        lat=point[0],
+        lng=point[1],
+        geocode_meta={"precision": "exact", "method": method, **meta},
+        location_tags=[],
+    )
+
+
+@pytest.mark.asyncio
+async def test_a_site_map_at_our_own_address_elsewhere_moves_a_shown_pin_and_places_a_hidden_one(db_session):
+    # ЧДГ Росица: "Кирил и Методий 70" was pinned in Оборище; the site maps the one in Иваняне.
+    await _school(
+        db_session,
+        _at('ул. "Св. Св. Кирил и Методий" № 70', (42.7026617, 23.3252662)),
+        _hidden('бул. "Св. Климент Охридски" № 49'),
+        name_i18n={"bg": "ЧДГ Росица"},
+    )
+    page = "<p>кв. Иваняне</p>" + _iframe(42.710605, 23.187756) + _iframe(42.64779160424871, 23.356343120771477)
+    report = await stage.run_site_address(db_session, register=ROSICA, fetch=_fetcher({HOME: page}), apply=True)
+    assert report["outcomes"] == {"moved": 1, "placed": 1}
+    rows = (await db_session.execute(select(SchoolLocation).order_by(SchoolLocation.id))).scalars().all()
+    assert (rows[0].lat, rows[0].lng) == (42.710562, 23.187797)
+    assert rows[0].address_i18n == {"bg": "с. Иваняне, ул. Св. св. Кирил и Методий 70"}
+    assert (rows[1].lat, rows[1].lng) == (42.64779, 23.3565)
+
+
+@pytest.mark.asyncio
+async def test_a_shown_address_not_in_the_register_takes_the_one_the_site_names_at_our_pin(db_session):
+    # ЧДГ Христо Ботев: the register's "ул. 315 - III м. р." is ул. Петър Бонев 3.
+    await _school(db_session, _at("гр. София, ул. 315 - III м. р.", (42.71012, 23.25512), method="agent_pick"))
+    page = "<p>кв. Люлин, ул.Петър Бонев №3</p>"
+    report = await stage.run_site_address(db_session, register=ROSICA, fetch=_fetcher({HOME: page}), apply=True)
+    assert report["outcomes"] == {"readdressed": 1}
+    row = (await db_session.execute(select(SchoolLocation))).scalar_one()
+    assert row.address_i18n == {"bg": "гр. София, ул. Петър Бонев 3"}
+    assert row.geocode_meta["evidence"]["previous_address_i18n"] == {"bg": "гр. София, ул. 315 - III м. р."}
+
+
+@pytest.mark.asyncio
+async def test_a_shown_register_address_a_hand_pin_or_a_near_pin_is_left_alone(db_session):
+    await _school(
+        db_session,
+        _at("ул. Петър Бонев 5", (42.71012, 23.25512)),  # the register's own address: kept
+        _at('ул. "Св. Св. Кирил и Методий" № 70', (42.7026617, 23.3252662), method="manual_fix"),
+    )
+    page = "<p>ул. Петър Бонев №3</p>" + _iframe(42.710605, 23.187756)
+    report = await stage.run_site_address(db_session, register=ROSICA, fetch=_fetcher({HOME: page}))
+    assert report["outcomes"] == {}

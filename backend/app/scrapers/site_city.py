@@ -101,6 +101,16 @@ def _towns_in(text: str) -> list[str]:
 _OWN_KEYS = {spelling for towns in OWN_TOWNS.values() for town in towns for spelling in _spellings(town)}
 
 
+def known_towns_in(text: str) -> list[str]:
+    """The known towns (not the Sofia ones) a page's lines name."""
+    return [
+        _KNOWN_TOWNS.get(key) or _PATRON_TOWNS[key]
+        for line in (text or "").splitlines()
+        for key in _towns_in(" ".join(line.split()))
+        if key in _KNOWN_TOWNS or key in _PATRON_TOWNS
+    ]
+
+
 def other_town_named(texts: Iterable[Optional[str]], city: Optional[str]) -> Optional[str]:
     """The other town a site's identity texts (:func:`identity_texts`) name, or None.
 

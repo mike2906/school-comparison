@@ -74,6 +74,11 @@ views wider than about 5 km or zoomed out below 15 are not points.
 The location's address becomes the register's (old one kept in `geocode_meta.evidence`). Held
 back when the site gives several addresses, when the address is already one of the school's shown
 locations, when an unrelated school is pinned there, or when the school has two hidden locations.
+It also settles any location that is not an official or hand pin by itself: a site map point at
+the register point of the location's own address places a hidden one or moves a shown one pinned
+over 300 m away (ЧДГ Росица's "Кирил и Методий 70" pinned in Оборище, the site maps Иваняне), and a
+shown location whose address is no street and number or block at all takes the register address the site names
+within 40 m of our pin ("ул. 315 - III м. р." → "ул. Петър Бонев 3").
 
 `cli hand-pin --location-id N --lat --lng [--address] --note "..." [--apply]` pins one hidden
 location by hand (manual_fix, old address and point kept in `manual_fix.previous`) when the

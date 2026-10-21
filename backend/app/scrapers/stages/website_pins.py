@@ -426,6 +426,7 @@ async def write_pin(
     unchanged_from: Optional[tuple[float, float]] = None,
     address: Optional[str] = None,
     extra_tags: Sequence[str] = (),
+    shown: bool = False,
 ) -> str:
     """Pin a still-hidden location at ``point`` (exact), under a short row lock, and commit.
 
@@ -433,11 +434,12 @@ async def write_pin(
     "rejected" (the write gate refused it; the old point is kept). With ``unchanged_from``,
     a location whose point moved since the read is left alone ("moved_meanwhile"). With
     ``address``, the location's address becomes it (the old one is kept in the evidence).
-    ``extra_tags`` are added in the same commit."""
+    ``extra_tags`` are added in the same commit. With ``shown``, a shown location is moved
+    too (never an official or hand pin)."""
     location = await db.get(SchoolLocation, location_id)
     # Another stage may have pinned it since the read; the lock waits for one still writing.
     await db.refresh(location, with_for_update=True)
-    if not needs_pin(location):
+    if has_pinned_point(location) if shown else not needs_pin(location):
         await db.rollback()
         return "pinned_meanwhile"
     if unchanged_from is not None and (location.lat, location.lng) != tuple(unchanged_from):
