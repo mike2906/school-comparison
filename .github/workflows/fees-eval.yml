@@ -2,8 +2,8 @@
 # (backend/scripts/fees_eval.py). Runs on a PR that touches the reader, its checks, the
 # publish gate or the model choice when it is opened, reopened or marked ready, and again when the
 # `fees-eval` label is added; not on every push. About $0.15 a run (3 trials). At most
-# MAX_RUNS_PER_DAY PR runs a day (UTC), about $1: past that a PR run fails without calling the
-# model, and adding the label the next day runs it. A run by hand is not capped.
+# MAX_RUNS_PER_DAY PR runs a day (UTC), each stopped at $0.30 (about $1 a day, $1.80 at most): past that a PR
+# run fails without calling the model, and the label runs it the next day. A run by hand is not capped.
 name: Fees eval
 
 on:
@@ -76,17 +76,22 @@ jobs:
           fi
 
       - name: Daily cap
+        id: cap
         if: steps.key.outputs.skip != 'true' && github.event_name == 'pull_request'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          # Earlier runs today that reached the eval (skipped and cancelled runs don't count).
-          ran="$(gh run list -R "$GITHUB_REPOSITORY" -w fees-eval.yml --created ">=$(date -u +%F)" -L 100 \
-            --json databaseId,conclusion,status \
-            -q "[.[] | select(.databaseId != $GITHUB_RUN_ID) | select(.status != \"completed\" or .conclusion == \"success\" or .conclusion == \"failure\")] | length")"
-          echo "Fees eval runs today before this one: $ran of $MAX_RUNS_PER_DAY"
+          # PR runs started today (UTC), each attempt of a re-run counted; this one left out.
+          # Skipped runs (a draft, another label) called no model; cancelled ones may have, so
+          # they count. A run that failed before the model counts too: the cap errs toward less spend.
+          ran="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/fees-eval.yml/runs?event=pull_request&per_page=100" \
+            -q "[.workflow_runs[] | select(.id != $GITHUB_RUN_ID and .conclusion != \"skipped\")
+                 | select(.run_started_at >= \"$(date -u +%F)\") | .run_attempt] | add // 0")"
+          echo "Fees eval PR runs today before this one: $ran of $MAX_RUNS_PER_DAY"
           if [ "$ran" -ge "$MAX_RUNS_PER_DAY" ]; then
-            echo "::error::The fees eval ran $ran times today (UTC), its daily cap: not run. Add the fees-eval label tomorrow to run it on this PR."
+            msg="The fees eval already ran $ran times today (UTC), its daily cap, so it did not run. To run it on this PR tomorrow, remove the fees-eval label if it is on, then add it."
+            echo "::error::$msg"
+            echo "$msg" >> "$GITHUB_STEP_SUMMARY"
             exit 1
           fi
 
@@ -105,18 +110,21 @@ jobs:
         run: uv sync --locked
 
       - name: Run the eval
+        id: eval
         if: steps.key.outputs.skip != 'true'
         env:
           TRIALS: ${{ inputs.trials || '3' }}
+          # A PR run costs about $0.15; a run by hand may use more trials.
+          MAX_USD: ${{ github.event_name == 'pull_request' && '0.30' || '1.00' }}
         run: |
           set -o pipefail
           check=""
           if [ -n "$MODEL_TIER_PRICING" ]; then check="--no-check"; fi  # the baseline is the default model's
-          uv run python scripts/fees_eval.py --trials "$TRIALS" --max-usd 1.00 $check \
+          uv run python scripts/fees_eval.py --trials "$TRIALS" --max-usd "$MAX_USD" $check \
             --out "$RUNNER_TEMP/fees-eval.json" | tee "$RUNNER_TEMP/fees-eval.txt"
 
       - name: Summary
-        if: always() && steps.key.outputs.skip != 'true'
+        if: always() && steps.eval.outcome != 'skipped' && steps.key.outputs.skip != 'true'
         run: |
           { echo '```'; cat "$RUNNER_TEMP/fees-eval.txt" 2>/dev/null; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
 
