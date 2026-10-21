@@ -42,6 +42,7 @@ from app.scrapers.campus_sync import (
     site_hidden_tag,
 )
 from app.scrapers.price_evidence import PRESCHOOL_GRADE, label_grades
+from app.scrapers.sources.bg.school_kinds import child_bands
 from app.utils.school_facts import KINDERGARTEN_LEVELS, SITE_ACCEPTED_STATUSES
 
 logger = logging.getLogger(__name__)
@@ -216,7 +217,10 @@ async def run_site_grades(
             glance = facts.at_a_glance.model_dump() if facts and facts.at_a_glance else None
             named, highest = site_grades(published.pricing, glance)
             add, hide = planned_bands(register_bands, named, highest)
-        desired = (register_bands | add | (website & bands)) - hide
+        # An evening school's "1-12 клас" includes classes for adults.
+        name_bg = (school.name_i18n or {}).get("bg")
+        add = set(child_bands(add, name_bg, school.education_level))
+        desired = set(child_bands((register_bands | add | (website & bands)) - hide, name_bg, school.education_level))
         # Tags alone can match while a band came back another way (a campus sync, an import).
         if add == added and hide == hidden and desired == current & bands:
             continue

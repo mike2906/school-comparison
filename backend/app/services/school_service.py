@@ -420,6 +420,19 @@ class SchoolService:
             rank = school_search.rank_prepared(tokens, school)
             if rank is not None:
                 ranked.append((rank, len(school.registry), school_id))
+        # A sound-alike ("Мейпъл Беър" for Maple Bear) is a last resort: tried only when no
+        # name matches (after any address matches), and kept only when it picks out a
+        # handful ("Гардън" sounds like every "градина").
+        named = any(rank < school_search.RANK_ADDRESS for rank, _, _ in ranked)
+        keys = school_search.sound_keys(tokens) if not named else None
+        if keys is not None:
+            sounds = [
+                (school_search.RANK_SOUND, len(school.registry), school_id)
+                for school_id, school in index.items()
+                if school_search.sounds_like(tokens, keys, school)
+            ]
+            if len(sounds) <= school_search.MAX_SOUND_MATCHES:
+                ranked += sounds
         matched_ids = [school_id for _, _, school_id in sorted(ranked)[:limit]]
         if not matched_ids:
             return []

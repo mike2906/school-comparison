@@ -23,6 +23,7 @@ from app.schemas.scraping import DiscoveredLocation, DiscoveredSchool
 from app.scrapers.base import BaseScraper
 from app.scrapers.sources import register_adapter
 from app.scrapers.sources.base_adapter import BaseSourceAdapter
+from app.scrapers.sources.bg.school_kinds import child_bands
 from app.services.geocoding.base import GeocodingResult
 from app.services.geocoding.bg import GeoJSONProvider, city_storage_value
 from app.services.geocoding.nominatim import NominatimProvider
@@ -151,23 +152,28 @@ class MoeRegistryAdapter(BaseSourceAdapter):
             )
 
     @staticmethod
-    def _get_age_groups_for_detailed_type(detailed_type: Optional[int], education_level: str) -> list[str]:
+    def _get_age_groups_for_detailed_type(
+        detailed_type: Optional[int], education_level: str, name_bg: str = ""
+    ) -> list[str]:
         """
         Derive age groups from detailed school type or education level.
 
         Args:
             detailed_type: MoE detailedSchoolType code (e.g., 122 for основно)
             education_level: Fallback education level if detailed type not recognized
+            name_bg: Registry name; an evening school is registered as средно (1-12)
 
         Returns:
             List of age group codes
         """
         # Try detailed type mapping first (more accurate for multi-grade schools)
         if detailed_type and detailed_type in MoeRegistryAdapter.DETAILED_TYPE_AGE_GROUPS:
-            return MoeRegistryAdapter.DETAILED_TYPE_AGE_GROUPS[detailed_type]
-
-        # Fall back to education level mapping
-        return MoeRegistryAdapter.EDUCATION_LEVEL_AGE_GROUPS.get(education_level, [])
+            bands = MoeRegistryAdapter.DETAILED_TYPE_AGE_GROUPS[detailed_type]
+        else:
+            # Fall back to education level mapping
+            bands = MoeRegistryAdapter.EDUCATION_LEVEL_AGE_GROUPS.get(education_level, [])
+        # Evening schools are registered as средно (1-12) but teach pupils of 16 and over.
+        return child_bands(bands, name_bg, education_level)
 
     @staticmethod
     def _get_age_groups_for_education_level(education_level: str) -> list[str]:
@@ -575,7 +581,7 @@ class MoeRegistryAdapter(BaseSourceAdapter):
                 return None
 
         detailed_type = inst_data.get("detailedSchoolType")
-        age_groups = self._get_age_groups_for_detailed_type(detailed_type, school.education_level)
+        age_groups = self._get_age_groups_for_detailed_type(detailed_type, school.education_level, school_name_bg)
         recovered_address = (geo_result.formatted_address or address_hint or "София").strip()
 
         logger.info(
@@ -845,7 +851,7 @@ class MoeRegistryAdapter(BaseSourceAdapter):
                         district=None,  # Will need to parse from address or enrich later
                         phone=phone_number,
                         is_primary=True,
-                        age_groups=self._get_age_groups_for_detailed_type(detailed_type, education_level),
+                        age_groups=self._get_age_groups_for_detailed_type(detailed_type, education_level, name_bg),
                         shifts={},
                         has_organised_groups={},
                     )
@@ -864,7 +870,7 @@ class MoeRegistryAdapter(BaseSourceAdapter):
                             district=None,
                             phone=None,  # Departments don't have separate phone numbers in API
                             is_primary=False,
-                            age_groups=self._get_age_groups_for_detailed_type(detailed_type, education_level),
+                            age_groups=self._get_age_groups_for_detailed_type(detailed_type, education_level, name_bg),
                             shifts={},
                             has_organised_groups={},
                         )
