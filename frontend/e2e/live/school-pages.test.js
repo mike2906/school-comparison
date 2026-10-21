@@ -4,7 +4,7 @@
  * from its website (with open days), its Facebook and Instagram links, fees with their
  * payment plans, last year's fees left out once this year lists them again, fees for the
  * searched age first with the other ages folded away, a headline fee range that says what
- * each end is, comparing fees
+ * each end is, compare for an age showing that age's fee, comparing fees
  * side by side, the exam heading naming the years its chart plots, exam results with a decimal
  * comma on the Bulgarian page, no pin for a school whose location is
  * only approximate (the page says the address is not on the map yet), and a nursery
@@ -16,7 +16,7 @@ import { describe, test } from 'node:test'
 import { planNameLabel } from '../../src/utils/priceLabels.js'
 import { rowAgeGroupKeys, splitRowsForAgeGroup } from '../../src/utils/priceRows.js'
 import { getAvailableExamTypes, prepareNvoTimelineData } from '../../src/utils/nvo.js'
-import { groupPricingByAcademicYear, rangeEndLabels, statedTuition } from '../../src/utils/pricing.js'
+import { formatCurrency, groupPricingByAcademicYear, rangeEndLabels, statedTuition } from '../../src/utils/pricing.js'
 import { upcomingOpenDays } from '../../src/utils/schoolFacts.js'
 import { NoSchoolError, PHONE, address, allSchools, findSchool, open, page, schoolName, t, liveBrowser } from './live.js'
 
@@ -239,6 +239,33 @@ describe('a school page', () => {
     await open('bg', `/schools/${listed.id}`)
     const escape = text => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
     await page.getByText(new RegExp(`^${escape(low)}: .+ · ${escape(high)}: `)).first().waitFor()
+  })
+
+  test('compare for an age shows that age\'s fee, not a fee naming no age', async () => {
+    // 271 read "7,200–7,950" for grade 1: 7,950 was its kindergarten fee, stored with no age.
+    const shown = fee => (fee.min === fee.max
+      ? formatCurrency(fee.min, 'bg', fee.currency)
+      : `${formatCurrency(fee.min, 'bg', fee.currency)}–${formatCurrency(fee.max, 'bg', fee.currency)}`)
+    const groups = ['nursery', 'first', 'second', 'third', 'preschool', 'grade_1_4', 'grade_5_7', 'grade_8_12']
+    const unnamed = row => rowAgeGroupKeys(row).size === 0
+    const schools = (await allSchools()).filter(isPrivate)
+    // An end of the all-ages range is a fee naming no age, and the age's own fee leaves it out.
+    const picked = schools.flatMap(s => groups.map(group => {
+      const forGroup = statedTuition(s.pricing, { ageGroup: group })
+      const all = statedTuition(s.pricing)
+      const unnamedEnd = [...(all?.ends?.low || []), ...(all?.ends?.high || [])].some(unnamed)
+      return forGroup && unnamedEnd && !shown(forGroup).includes(shown(all)) ? { s, group, forGroup, all } : null
+    })).find(Boolean)
+    assert.ok(picked, 'a private school whose all-ages range ends at a fee naming no age')
+    const other = schools.find(s => {
+      const fee = s.id !== picked.s.id && statedTuition(s.pricing, { ageGroup: picked.group })
+      return fee && !shown(fee).includes(shown(picked.all))
+    })
+    assert.ok(other, `a second private school with a fee for ${picked.group}`)
+    await open('bg', `/compare?ids=${picked.s.id},${other.id}&age_group=${picked.group}`)
+    await page.getByRole('heading', { level: 1, name: t('bg', 'compare.title') }).waitFor()
+    await page.getByText(shown(picked.forGroup)).first().waitFor()
+    assert.ok(!(await page.locator('body').innerText()).includes(shown(picked.all)), `${picked.s.id} shows its all-ages range`)
   })
 
   test('two private schools with fees compare side by side', async () => {

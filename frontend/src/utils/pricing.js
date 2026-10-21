@@ -259,7 +259,15 @@ export function isStatedTotal(row) {
 // pays: tuition alone would show one line of it (633's 3,140 of 7,850 €).
 function tuitionRows(rows, ageGroup = null) {
   const whole = rows.filter(row => row.category === 'tuition' && !isInstallmentPlan(row) && !isClosedGroupFee(row))
-  const forGroup = rowsForAgeGroup(whole, ageGroup)
+  // A regular price naming the chosen group is that group's; one naming no group gives way
+  // to it, as it may be another group's fee read without its group: 271's undated
+  // kindergarten fee made grade 1 read "7,200–7,950". The fee list still shows it. A
+  // printed total naming no group still covers every group (below).
+  const candidates = rowsForAgeGroup(whole, ageGroup)
+  const namesGroup = row => ageGroup != null && rowAgeGroupKeys(row).has(ageGroup)
+  const forGroup = candidates.some(row => namesGroup(row) && !priceTerms(row))
+    ? candidates.filter(row => namesGroup(row) || isStatedTotal(row))
+    : candidates
   // A total that names no age group covers every group.
   const totalled = new Set(forGroup.filter(isStatedTotal).map(row => row.age_group || ''))
   const shown = forGroup.filter(row => isStatedTotal(row) || !(totalled.has('') || totalled.has(row.age_group || '')))

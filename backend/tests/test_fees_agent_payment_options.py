@@ -388,3 +388,83 @@ def test_unnamed_fees_alike_take_their_labels():
     b = tuition(plan_name=None, label="Plan 3", payment_options=[], amount=9400)
     rows, _ = fees_agent._build_rows(_school(), [(check_fee(a, PAGE_596), page), (check_fee(b, PAGE_596), page)])
     assert sorted(row.plan_name for row in rows) == ["Plan 2", "Plan 3"]
+
+
+PAGE_305 = """\
+ПЪРВА ГРУПА
+Плащане на две вноски: 2 x 1950 €
+ВТОРА И ТРЕТА ГРУПА
+Плащане наведнъж: 3700 €
+Плащане на две вноски: 2 x 1950 € = 3900 €
+Плащане на месец: 410 €
+"""
+
+
+async def test_dated_rows_an_undated_read_lists_as_payment_options_give_way(db_session, frozen_today):
+    """305: an earlier read stored the two-instalment total and one half as dated fees. The
+    re-read gives them as payment options of an undated fee, and the dated rows stayed and
+    led the headline ("1950–3900, period not stated" for a fee of 410 a month)."""
+    group = "ВТОРА И ТРЕТА ГРУПА"
+    at_once = tuition(
+        amount=3700,
+        plan_name=None,
+        label=group,
+        academic_year=None,
+        age_group=group,
+        evidence="\n".join(PAGE_305.splitlines()[2:5]),
+        payment_options=[PaymentOption(label="Плащане на две вноски", total=3900, payments=2, instalment=1950)],
+    )
+    school = School(
+        name_i18n={"bg": "Частна детска градина"},
+        country_code="bg",
+        school_type="private",
+        education_level="kindergarten",
+        city="sofia",
+        website_url="https://school.example",
+        scrape_status="extracted",
+    )
+    db_session.add(school)
+    await db_session.flush()
+    page = SourcePage(
+        school_id=school.id,
+        scrape_type=ScrapeType.WEBSITE,
+        source_url=URL,
+        content_hash="old",
+        page_category="pricing",
+        is_valid=True,
+        raw_markdown=PAGE_305,
+    )
+    db_session.add(page)
+    await db_session.flush()
+    # The last row is another group's fee at an option's amount: the read missed it, so it stays.
+    for amount, age_group in ((1950, group), (3900, group), (1950, "ПЪРВА ГРУПА")):
+        db_session.add(
+            Pricing(
+                school_id=school.id,
+                category=PriceCategory.TUITION,
+                amount=amount,
+                currency="EUR",
+                plan_name="Плащане на две вноски",
+                age_group=age_group,
+                academic_year="2026/2027",
+                source=PriceSource.SCRAPED_WEBSITE,
+                source_url=URL,
+                source_page_id=page.id,
+                pricing_context={"confidence": 0.9},
+            )
+        )
+    await db_session.commit()
+
+    async def find(_school):
+        return [PageRead(URL, PAGE_305, True)]
+
+    async def read(_school, _pages, _missed):
+        return [at_once]
+
+    report = await fees_agent.run_school(db_session, school, find=find, read=read, apply=True)
+    rows = (await db_session.execute(select(Pricing).where(Pricing.school_id == school.id))).scalars().all()
+    assert report["outcome"] == "written" and report["rows_old_kept"] == 0, report
+    assert sorted((float(r.amount), r.academic_year, r.age_group) for r in rows) == [
+        (1950.0, "2026/2027", "ПЪРВА ГРУПА"),
+        (3700.0, None, group),
+    ]
