@@ -24,6 +24,7 @@ from app.scrapers.shared_site_check import level_family
 from app.services.country_service import get_valid_keys
 from app.services.school_relations import continued_from, continues_to, same_place_by_school
 from app.services.school_service import SchoolService
+from app.utils import school_search
 from app.utils.display_gating import NVO_MIN_PUPILS
 
 logger = logging.getLogger(__name__)
@@ -46,6 +47,10 @@ _filters_cache: dict[tuple, tuple[float, dict[str, list[str]]]] = {}
 _search_index_cache: dict[tuple, tuple[float, dict]] = {}
 _same_place_cache: dict[tuple, tuple[float, dict[int, list[dict]]]] = {}
 _build_lock = asyncio.Lock()
+# The search index and same-place map are quick to build (a query and well under a second
+# of projection): their cold builds take their own lock, so a search or school page never
+# waits behind a list build.
+_city_build_lock = asyncio.Lock()
 _refreshing: set[tuple] = set()
 _background_tasks: set[asyncio.Task] = set()
 _session_factory = async_session_maker
@@ -73,13 +78,13 @@ async def _refresh(cache: dict, key: tuple, build) -> None:
         _refreshing.discard((id(cache), key))
 
 
-async def _cached_or_build(cache: dict, key: tuple, build, db: AsyncSession):
+async def _cached_or_build(cache: dict, key: tuple, build, db: AsyncSession, lock: asyncio.Lock = _build_lock):
     """The cached value for `key`, building it with `build(db)` only when there is none."""
     entry = cache.get(key)
     if entry is None:
         # One build at a time, so a burst of visitors on a cold entry waits for a single
         # build instead of each running its own.
-        async with _build_lock:
+        async with lock:
             entry = cache.get(key)
             if entry is None:
                 value = await build(db)
@@ -341,11 +346,14 @@ async def search_schools(
 ):
     """Search schools by name."""
     try:
+        if not school_search.query_tokens(q):
+            return []
         index = await _cached_or_build(
             _search_index_cache,
             _filters_key(country_code, city),
             partial(_build_search_index, country_code=country_code, city=city),
             db,
+            _city_build_lock,
         )
         service = SchoolService(db)
         schools = await service.search_schools(
@@ -477,6 +485,7 @@ async def get_school(
                 _filters_key(school.country_code, school.city),
                 partial(_build_same_place, country_code=school.country_code, city=school.city),
                 db,
+                _city_build_lock,
             )
             response.same_place = [SamePlaceSchoolResponse.model_validate(row) for row in same_place.get(school.id, [])]
         except Exception:

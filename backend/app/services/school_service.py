@@ -424,7 +424,17 @@ class SchoolService:
         if not matched_ids:
             return []
 
-        result = await self.db.execute(self._list_query().where(School.id.in_(matched_ids)))
+        # The same scope as the index, on current rows: a cached index can be minutes old.
+        query = (
+            self._list_query()
+            .where(School.id.in_(matched_ids))
+            .where(School.country_code == country_code)
+            .where(self._has_listable_location(city))
+        )
+        city_clause = self._city_clause(city)
+        if city_clause is not None:
+            query = query.where(city_clause)
+        result = await self.db.execute(query)
         schools_by_id = {school.id: school for school in result.scalars().unique().all()}
         return [schools_by_id[school_id] for school_id in matched_ids if school_id in schools_by_id]
 
