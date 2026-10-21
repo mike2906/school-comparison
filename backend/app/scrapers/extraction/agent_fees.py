@@ -137,7 +137,7 @@ Rules:
 - Skip a payment schedule. Never invent an amount, and never compute a total the site does not print.
 - A discount the school offers (for siblings, for paying early, for paying the whole year at once, any other stated discount) goes in discounts, never in fees, and only when the page states it with a percentage or an amount. One entry per discount ("5% for a second child, 10% for a third" is two). text_i18n says in bg and en only what the evidence says. A discounted price the site prints as an amount stays a fee entry (see above).
 - currency as printed (EUR or BGN); if both are printed, the EUR figure.
-- category: the monthly kindergarten fee and school tuition are tuition; an enrolment, exam, application or entry-test fee is registration; a deposit (депозит, капаро) is registration, never tuition, and its plan_name is the site's word for it ("Депозит", "Капаро"), with notes saying whether it is returned or taken off a later fee when the site says; learning support, therapy and similar services are activities; optional classes, clubs and sports charged on top are extracurricular; transport, food, uniforms and extended day (after-school care) are their own categories.
+- category: the monthly kindergarten fee and school tuition are tuition, and so is the main fee of an institution that charges no other tuition, even when the fee is named for a subject or the classes are held in another school's building; a subject's fee charged on top of the institution's own tuition is extracurricular; an enrolment, exam, application or entry-test fee is registration; a deposit (депозит, капаро) is registration, never tuition, and its plan_name is the site's word for it ("Депозит", "Капаро"), with notes saying whether it is returned or taken off a later fee when the site says; learning support, therapy and similar services are activities; optional classes, clubs and sports charged on top are extracurricular; transport, food, uniforms and extended day (after-school care) are their own categories.
 - period only when the page states it for THAT amount (per month, per year, per term...); otherwise null. Never guess.
   - "once per school year" or "еднократна такса" for the school year is yearly; a full year's tuition paid in one payment is yearly too.
   - one_time only for a fee charged once ever: enrolment, exam, application, deposit. Never for tuition or materials.
@@ -230,10 +230,11 @@ _PERIOD_WORDS = {  # Bulgarian, English, and the French and German some schools 
     PricePeriod.SEMESTER: r"семест|\bsemester|semestre|halbj[aä]hr",
     PricePeriod.ONE_TIME: r"еднократ|\bonce\b|при записване",
     # Not "целодневна" (a full-day group).
-    # "за присъствен ден" (569's food: per day attended); not "за целия ден" (a full day),
+    # "за присъствен ден" (569's food: per day attended) and "Цена за 1 ден" (609's summer
+    # school, not a "курс за 1 ден"); not "за целия ден" (a full day),
     # "по време на учебен ден" (a programme's hours) or "екскурзия на един ден" (a day trip).
     PricePeriod.DAILY: (
-        r"(?<![а-я])дневн(?![а-я]*\s+(?:форм|режим))|(?:на|за|/)\s*ден\b|(?<![а-я])за\s+присъствен\s+ден\b"
+        r"(?<![а-я])дневн(?![а-я]*\s+(?:форм|режим))|(?:на|за|/)\s*ден\b|(?<![а-я])за\s+присъствен\s+ден\b|(?:цена|такса)\s+за\s+(?:един|1)\s+ден\b"
         r"|\b(?:daily|per day|a day)\b|par jour|pro tag"
     ),
     PricePeriod.WEEKLY: (
@@ -291,6 +292,15 @@ _EMPHASIS_RE = re.compile(r"[*_]+")
 
 def _normalized(text: str) -> str:
     return " ".join(text.split()).casefold()
+
+
+# Spaces inside and around brackets: 609's heading reads "01.09.2026г.( ПГ-3 клас)" and the
+# reader quotes it "01.09.2026г. (ПГ-3 клас)", which dropped every fee of that table.
+_BRACKET_SPACE_RE = re.compile(r"\s*([()\[\]])\s*")
+
+
+def _tight(text: str) -> str:
+    return _BRACKET_SPACE_RE.sub(r"\1", text)
 
 
 def _names_period(period: PricePeriod, evidence: str, amounts: list[Decimal], category: PriceCategory) -> bool:
@@ -609,6 +619,9 @@ def _line_on_page(line: str, page: str, page_lines: list[str]) -> bool:
     places do not make a line.
     """
     if line in page:
+        return True
+    # Within one page line, so a quote cannot join the end of one line to the next.
+    if any(_tight(line) in _tight(text) for text in page_lines):
         return True
     where = {}
     for index, text in enumerate(page_lines):

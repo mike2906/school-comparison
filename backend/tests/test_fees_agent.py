@@ -2228,3 +2228,30 @@ def test_the_deposit_mark_reaches_the_response_and_the_evidence_does_not():
 
     context = PricingContextResponse.model_validate({"deposit": True, "evidence": "депозит от 590.00 €"}).model_dump()
     assert context["deposit"] is True and "evidence" not in context
+
+
+def test_a_quote_spaced_differently_around_brackets_is_on_the_page():
+    """609's heading "01.09.2026г.( ПГ-3 клас)", quoted "01.09.2026г. (ПГ-3 клас)": every fee of the table was dropped."""
+    page = "### Такса за 2026/2027 г. в сила от 01.09.2026г.( ПГ-3 клас)\n| 1 КЛАС  | 1395 €  | 697 €  |\n"
+    evidence = "Такса за 2026/2027 г. в сила от 01.09.2026г. (ПГ-3 клас)\n| 1 КЛАС | 1395 € | 697 € |"
+    assert published(check_fee(fee(PriceCategory.TUITION, evidence, amount=1395), page))
+    # The words must still be the page's.
+    other = "Такса за 2026/2027 г. в сила от 01.09.2026г. (ПГ-4 клас)\n| 1 КЛАС | 1395 € | 697 € |"
+    assert not check_fee(fee(PriceCategory.TUITION, other, amount=1395), page).kept
+
+
+def test_a_price_for_one_day_is_daily():
+    line = "| Цена за 1 ден с включен/обяд, следобедна закуска, плод/   | 35€/ 68,45 лв.  |"
+    result = check_fee(fee(PriceCategory.CAMP, line, amount=35, period=PricePeriod.DAILY), line)
+    assert published(result) and result.fee.period is PricePeriod.DAILY
+
+
+@pytest.mark.parametrize("line", ["Екскурзия за един ден до Рилския манастир – 60 €", "Подготвителен курс за 1 ден преди изпита – 50 €"])
+def test_a_one_day_trip_or_course_is_not_daily(line):
+    result = check_fee(fee(PriceCategory.EXTRACURRICULAR, line, amount=60 if "60" in line else 50, period=PricePeriod.DAILY), line)
+    assert result.fee.period is None
+
+
+def test_a_bracket_quote_does_not_join_two_page_lines():
+    page = "Такса (5 клас)\n300 €\n"
+    assert not check_fee(fee(PriceCategory.TUITION, "Такса(5 клас) 300 €", amount=300), page).kept
