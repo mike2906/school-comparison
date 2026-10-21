@@ -138,3 +138,41 @@ async def test_replace_with_the_same_site_changes_nothing(db_session):
             db_session, school.id, "bg", url="drujba.org/bg", apply=True, replace=True
         ) is None
     validate.assert_not_awaited()
+
+
+async def test_section_replaces_a_group_home_with_the_schools_own_section(db_session):
+    """574's stored site was its group's home page; its own pages are under /anika/."""
+    school = School(
+        country_code="bg", city="sofia", name_i18n={"bg": "ЧДГ Аника"}, school_type="private",
+        education_level="kindergarten", website_url="https://novigradini.com/#dipipopup-27586290#popup_on_load",
+        scrape_status="extracted",
+    )
+    db_session.add(school)
+    await db_session.commit()
+    update = AsyncMock()
+    with patch.object(
+        url_validator, "validate_school_url",
+        AsyncMock(return_value=(ValidationResult.VALID, "https://novigradini.com/anika/", "match")),
+    ), patch.object(url_validator, "_update_validation_result", update):
+        await website_stage.run_validate_url(
+            db_session, school.id, "bg", url="https://novigradini.com/anika/", apply=True, replace=True, section=True
+        )
+    await db_session.refresh(school)
+    assert school.website_url == "https://novigradini.com/anika/"
+    assert update.await_count == 1
+
+
+async def test_section_with_the_same_path_changes_nothing(db_session):
+    school = School(
+        country_code="bg", city="sofia", name_i18n={"bg": "ЧДГ Приказка без край"}, school_type="private",
+        education_level="kindergarten", website_url="https://novigradini.com/pbk/#dipipopup-27586290",
+        scrape_status="extracted",
+    )
+    db_session.add(school)
+    await db_session.commit()
+    validate = AsyncMock()
+    with patch.object(url_validator, "validate_school_url", validate):
+        assert await website_stage.run_validate_url(
+            db_session, school.id, "bg", url="novigradini.com/pbk", apply=True, replace=True, section=True
+        ) is None
+    validate.assert_not_awaited()

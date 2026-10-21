@@ -106,8 +106,11 @@ PICK_COST_ESTIMATE_USD = 0.002
 READ_MAX_OUTPUT_TOKENS = 32_000
 PICK_MAX_OUTPUT_TOKENS = 1_000
 MAX_PICK_INPUT_CHARS = 40_000
-# When the picker returns nothing, follow links whose URL or text names fees or admissions.
-_FEE_LINK_RE = re.compile(r"такс|цени|цена|прием|fee|tuition|pric|admission", re.IGNORECASE)
+# When the picker returns nothing, follow links whose URL or text names fees or admissions,
+# in Latin slugs too (574's /anika/ceni/).
+_FEE_LINK_RE = re.compile(
+    r"такс|цени|цена|прием|(?<![a-z])(?:taks|ceni|tseni|priem)|fee|tuition|pric|admission", re.IGNORECASE
+)
 _SKIPPED = (".jpg", ".jpeg", ".png", ".gif", ".svg", ".webp", ".css", ".js", ".zip", ".mp4", ".mp3", ".doc", ".docx")
 
 PICK_PROMPT = """You help find the pages of a school website that state its fees (tuition, monthly fee,

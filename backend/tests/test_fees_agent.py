@@ -2255,3 +2255,19 @@ def test_a_one_day_trip_or_course_is_not_daily(line):
 def test_a_bracket_quote_does_not_join_two_page_lines():
     page = "Такса (5 клас)\n300 €\n"
     assert not check_fee(fee(PriceCategory.TUITION, "Такса(5 клас) 300 €", amount=300), page).kept
+
+
+@pytest.mark.parametrize(
+    "link,follows",
+    [
+        ("https://novigradini.com/anika/ceni/ ТАКСИТЕ", True),  # 574
+        ("https://example.bg/taksi/ Fees", True),
+        ("https://example.bg/priem-2026/ Admission", True),
+        ("https://example.bg/ocenki/ Results", False),  # "otsenki"/"ocenki" is grades, not prices
+        ("https://example.bg/za-nas/ About", False),
+    ],
+)
+def test_fee_link_fallback_reads_latin_slugs(link, follows):
+    from app.scrapers.stages.fees_agent import _FEE_LINK_RE
+
+    assert bool(_FEE_LINK_RE.search(link)) is follows
