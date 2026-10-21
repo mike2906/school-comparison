@@ -4,18 +4,23 @@ import { useTranslation } from 'react-i18next'
 /**
  * Under an empty list while a name is typed: "Младост" or "Студентски град" in the name
  * search most likely means the area, so the typed text is offered as the location.
- * `onSearchNear(place)` resolves to whether the location was set.
+ * `active` is false when the name matches schools in the list (the list is then empty only
+ * because of other filters such as distance).
  */
-function AreaHint({ nameQuery, onSearchNear, isGeocoding, locationError }) {
+function AreaHint({ nameQuery, active, searchAddress, setNameQuery, isGeocoding, locationError }) {
   const { t } = useTranslation()
   const place = nameQuery.trim()
   // Only this button's own failed lookup shows its error here.
   const [failedFor, setFailedFor] = useState(null)
   useEffect(() => setFailedFor(null), [place])
-  if (!place) return null
+  if (!place || !active) return null
   const search = async () => {
     setFailedFor(null)
-    if (!(await onSearchNear(place))) setFailedFor(place)
+    const found = await searchAddress(place)
+    // Text typed meanwhile stays.
+    if (found) setNameQuery(current => (current.trim() === place ? '' : current))
+    // null: replaced by another lookup, whose error is not this button's.
+    else if (found === false) setFailedFor(place)
   }
   return (
     <div className="mt-4 text-sm">

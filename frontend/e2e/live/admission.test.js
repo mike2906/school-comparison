@@ -300,7 +300,8 @@ describe('admission from a school page', () => {
     await page.getByRole('button', { name: t('bg', 'location.useSavedHome') }).click()
     await page.waitForFunction(() => JSON.parse(localStorage.getItem('userLocation') || 'null')?.savedHome, null, { timeout: 30_000 })
     // The rest of the flow as a parent without a location (drive times would load too).
-    await page.evaluate(() => localStorage.removeItem('userLocation'))
+    await page.getByRole('button', { name: t('bg', 'location.clear'), exact: true }).first().click()
+    await page.waitForFunction(() => !localStorage.getItem('userLocation'))
     // Hiding schools where the saved result is below the last admitted child.
     await page.getByTestId('hide-below').check()
     await page.getByTestId('hidden-count').waitFor()

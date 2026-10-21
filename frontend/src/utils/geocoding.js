@@ -17,12 +17,15 @@ const normalizeAddress = (address) => address.trim().toLowerCase()
 // v2: entries before the quarter and city checks may hold a wrong town ("Люлин 5").
 // The old ones are never read again, so they are dropped once.
 try {
-  const stale = []
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i)
-    if (key?.startsWith('geocode_')) stale.push(key)
+  if (!localStorage.getItem('geocodeCacheV2')) {
+    const stale = []
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i)
+      if (key?.startsWith('geocode_')) stale.push(key)
+    }
+    stale.forEach(key => localStorage.removeItem(key))
+    localStorage.setItem('geocodeCacheV2', '1')
   }
-  stale.forEach(key => localStorage.removeItem(key))
 } catch {
   // No storage (tests, blocked): nothing to drop.
 }
@@ -216,7 +219,10 @@ const fetchGeocode = async (address, geocodingConfig = {}) => {
   const asQuarter = quarterQuery(address)
   if (asQuarter) {
     // A failed estate request falls through to the plain search.
-    const quarters = await searchRequest(asQuarter, citySuffix, countryCodes, bounds).catch(() => [])
+    const quarters = await searchRequest(asQuarter, citySuffix, countryCodes, bounds).catch(error => {
+      if (error?.code === 'RATE_LIMIT') throw error
+      return []
+    })
     result = quarters.find(r => isQuarterMatch(r, address) && inBounds(parseFloat(r.lat), parseFloat(r.lon), bounds)) || null
     if (!result) await waitForSlot(startedIn)
   }
@@ -342,11 +348,15 @@ export const geocodeAddress = (address, geocodingConfig = {}) => {
       pendingReject(error)
     }
     pendingReject = reject
+    // A superseded lookup that settles late must not clear the newer one's handle.
+    const settle = () => {
+      if (pendingReject === reject) pendingReject = null
+    }
     debouncedFetch(trimmed, geocodingConfig, (result) => {
-      pendingReject = null
+      settle()
       resolve(result)
     }, (error) => {
-      pendingReject = null
+      settle()
       reject(error)
     })
   })

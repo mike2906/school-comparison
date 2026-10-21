@@ -103,8 +103,9 @@ export function useUserLocation({ t, geocodingConfig }) {
     )
   }
 
-  // One address lookup: `lookup` resolves to a geocoding result, `extra` is kept with it.
-  // Resolves to whether the location was set.
+  // One address lookup: `lookup(isCurrent)` resolves to a geocoding result, `extra` is kept
+  // with it. Resolves to true when the location was set, false when the lookup failed and
+  // null when another request replaced it.
   const runLookup = async (lookup, extra = {}, kind = 'address') => {
     const request = startLocationRequest()
     setIsLocating(false)
@@ -112,8 +113,8 @@ export function useUserLocation({ t, geocodingConfig }) {
     setLocationError(null)
 
     try {
-      const result = await lookup()
-      if (request !== locationRequestRef.current) return false
+      const result = await lookup(() => request === locationRequestRef.current)
+      if (request !== locationRequestRef.current) return null
       const newLocation = {
         lat: result.lat,
         lng: result.lng,
@@ -124,8 +125,11 @@ export function useUserLocation({ t, geocodingConfig }) {
       persistLocation(newLocation)
       return true
     } catch (err) {
-      if (err?.code === 'CANCELED' || request !== locationRequestRef.current) return false
-      if (err?.code === 'NO_RESULTS') {
+      if (err?.code === 'CANCELED' || request !== locationRequestRef.current) return null
+      if (kind === 'saved' && ['NO_RESULTS', 'OUTSIDE_AREA'].includes(err?.code)) {
+        // Not something the parent typed here, so no typing advice.
+        showLocationError(t('location.errorSavedHome'))
+      } else if (err?.code === 'NO_RESULTS') {
         showLocationError(t('location.errorNotFound'))
       } else if (err?.code === 'OUTSIDE_AREA') {
         const place = String(err.place || '').split(',').slice(0, 3).join(',').trim()
@@ -158,8 +162,14 @@ export function useUserLocation({ t, geocodingConfig }) {
   const locateSavedHome = () => {
     if (!savedHome) return Promise.resolve(false)
     setAddressInput('')
-    return runLookup(async () => {
+    return runLookup(async isCurrent => {
       const { streets } = await loadAddresses()
+      // Replaced while the address table loaded: send nothing.
+      if (!isCurrent()) {
+        const error = new Error('Canceled')
+        error.code = 'CANCELED'
+        throw error
+      }
       const street = streets.find(s => s.id === savedHome.streetId)
       if (!street) {
         const error = new Error('Saved street not in the address table')
