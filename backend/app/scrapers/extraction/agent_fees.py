@@ -713,6 +713,11 @@ def _percent_printed(value: Decimal, text: str) -> bool:
 
 # A fee waived outright: 595's "се освобождават от такса кандидатстване и такса регистрация".
 _WAIVER_RE = re.compile(r"освобожд\w* от\s+такс|не се (?:дължи|заплаща)|waived|exempt(?:ed)? from", re.IGNORECASE)
+# "cannot be waived", "не се освобождават от такса": a waiver denied.
+_NO_WAIVER_RE = re.compile(
+    r"(?:not|never|cannot|can't|no)\s+(?:be\s+)?(?:waived|exempt)|не\s+се\s+освобожд|не\s+(?:са|е)\s+освобод",
+    re.IGNORECASE,
+)
 
 
 def check_discount(discount: AgentDiscount, page_text: str) -> Optional[AgentDiscount]:
@@ -736,12 +741,12 @@ def check_discount(discount: AgentDiscount, page_text: str) -> Optional[AgentDis
     value = _decimal(number)
     evidence = "\n".join(lines)
     texts = [discount.text_i18n.bg, discount.text_i18n.en]
-    if discount.percent == 100 and _WAIVER_RE.search(evidence):
+    if discount.child in _CHILD_WORDS and not re.search(_CHILD_WORDS[discount.child], evidence, re.IGNORECASE):
+        return None
+    if discount.percent == 100 and _WAIVER_RE.search(evidence) and not _NO_WAIVER_RE.search(evidence):
         return discount.model_copy(update={"currency": None}) if all(text.strip() for text in texts) else None
     # "до 15 май – 10% отстъпка": 15 is a date, so a percent must be printed as one.
     if not (_percent_printed(value, evidence) if discount.percent is not None else value in page_numbers(evidence)):
-        return None
-    if discount.child in _CHILD_WORDS and not re.search(_CHILD_WORDS[discount.child], evidence, re.IGNORECASE):
         return None
     if any(not text.strip() or value not in page_numbers(text) for text in texts):
         return None

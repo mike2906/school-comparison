@@ -324,3 +324,17 @@ def test_a_waived_fee_is_kept_as_a_full_discount():
     # A 100% with no waiving words, or a waiver at another percent, still needs its number.
     assert check_discount(waiver.model_copy(update={"evidence": SIBLING_EN}), PAGE) is None
     assert check_discount(waiver.model_copy(update={"percent": 50}), PAGE + WAIVER + "\n") is None
+
+
+def test_a_denied_waiver_or_the_wrong_child_is_dropped():
+    waiver = discount(
+        kind="other",
+        percent=100,
+        child=None,
+        evidence="Tuition cannot be waived.",
+        text_i18n={"bg": "Без такса.", "en": "No fee."},
+    )
+    assert check_discount(waiver, PAGE + "Tuition cannot be waived.\n") is None
+    third = waiver.model_copy(update={"kind": "sibling", "child": 2, "evidence": "The third child's tuition is waived."})
+    assert check_discount(third, PAGE + "The third child's tuition is waived.\n") is None
+    assert check_discount(third.model_copy(update={"child": 3}), PAGE + "The third child's tuition is waived.\n") is not None
