@@ -41,6 +41,10 @@ LIST_CACHE_TTL_SECONDS = 600
 LIST_CACHE_MAX_ENTRIES = 64
 _list_cache: dict[tuple, tuple[float, bytes]] = {}
 _filters_cache: dict[tuple, tuple[float, dict[str, list[str]]]] = {}
+# Name search and the school page also need the whole city (every school's names; the
+# schools sharing a building), so those are kept the same way, per country and city.
+_search_index_cache: dict[tuple, tuple[float, dict]] = {}
+_same_place_cache: dict[tuple, tuple[float, dict[int, list[dict]]]] = {}
 _build_lock = asyncio.Lock()
 _refreshing: set[tuple] = set()
 _background_tasks: set[asyncio.Task] = set()
@@ -163,16 +167,16 @@ def _filters_key(country_code, city) -> tuple:
 
 
 async def warm_cache(country_code: str = "bg", city: str = "sofia") -> None:
-    """Build what the search page asks for first: the list, its filters, each age group."""
+    """Build what the search page asks for first: the list, its filters, each age group,
+    the name search index and the shared buildings the school page shows."""
     try:
         async with _session_factory() as db:
             country = await db.get(Country, country_code)
         age_groups = get_valid_keys(country.education_config, "age_groups") if country else []
-        await _refresh(
-            _filters_cache,
-            _filters_key(country_code, city),
-            partial(_build_filters, country_code=country_code, city=city),
-        )
+        place_key = _filters_key(country_code, city)
+        await _refresh(_filters_cache, place_key, partial(_build_filters, country_code=country_code, city=city))
+        await _refresh(_search_index_cache, place_key, partial(_build_search_index, country_code=country_code, city=city))
+        await _refresh(_same_place_cache, place_key, partial(_build_same_place, country_code=country_code, city=city))
         variants = [{"age_group": age_group} for age_group in [None, *age_groups]]
         if "preschool" in age_groups:
             # The preschool view also asks "where": kindergarten, school, or both.
@@ -204,6 +208,14 @@ async def keep_cache_warm() -> None:
 
 async def _build_filters(db: AsyncSession, *, country_code, city) -> dict[str, list[str]]:
     return await SchoolService(db).get_available_filters(country_code=country_code, city=city)
+
+
+async def _build_search_index(db: AsyncSession, *, country_code, city) -> dict:
+    return await SchoolService(db).search_index(country_code=country_code, city=city)
+
+
+async def _build_same_place(db: AsyncSession, *, country_code, city) -> dict[int, list[dict]]:
+    return await same_place_by_school(db, country_code=country_code, city=city)
 
 
 @router.get("", response_model=list[SchoolListResponse])
@@ -329,8 +341,16 @@ async def search_schools(
 ):
     """Search schools by name."""
     try:
+        index = await _cached_or_build(
+            _search_index_cache,
+            _filters_key(country_code, city),
+            partial(_build_search_index, country_code=country_code, city=city),
+            db,
+        )
         service = SchoolService(db)
-        schools = await service.search_schools(search_query=q, country_code=country_code, city=city, limit=10)
+        schools = await service.search_schools(
+            search_query=q, country_code=country_code, city=city, limit=10, index=index
+        )
         return schools
     except Exception as e:
         logger.error(f"Error searching schools: {e}", exc_info=True)
@@ -452,7 +472,12 @@ async def get_school(
         except Exception:
             logger.warning("continued_from failed for school %s", school_id, exc_info=True)
         try:
-            same_place = await same_place_by_school(db, country_code=school.country_code, city=school.city)
+            same_place = await _cached_or_build(
+                _same_place_cache,
+                _filters_key(school.country_code, school.city),
+                partial(_build_same_place, country_code=school.country_code, city=school.city),
+                db,
+            )
             response.same_place = [SamePlaceSchoolResponse.model_validate(row) for row in same_place.get(school.id, [])]
         except Exception:
             logger.warning("same_place failed for school %s", school_id, exc_info=True)
