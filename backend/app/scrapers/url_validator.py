@@ -1138,10 +1138,14 @@ async def clear_website_derived_locations(
     )
     changed: list[dict] = []
     for location in locations:
-        if PHONE_TAG in (location.location_tags or []):  # site-phones' number goes too
-            changed.append({"location_id": location.id, "school_id": school_id, "phone_before": location.phone, "restores_phone": True})
-            if not preview and restore_register_phone(location):
-                db.add(location)
+        # site-phones' number goes too
+        phone_change = (
+            {"phone_before": location.phone, "restores_phone": True}
+            if PHONE_TAG in (location.location_tags or [])
+            else {}
+        )
+        if phone_change and not preview and restore_register_phone(location):
+            db.add(location)
         tags = [str(tag) for tag in (location.location_tags or [])]
         if CAMPUS_TAG in tags:
             continue
@@ -1158,11 +1162,14 @@ async def clear_website_derived_locations(
             or meta.get("method") == "site_address"
         )
         if not (website_address or website_coords):
+            if phone_change:
+                changed.append({"location_id": location.id, "school_id": school_id, **phone_change})
             continue
         changed.append(
             {
                 "location_id": location.id,
                 "school_id": school_id,
+                **phone_change,
                 "address_before": dict(location.address_i18n or {}),
                 "lat_before": location.lat,
                 "lng_before": location.lng,

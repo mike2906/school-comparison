@@ -340,6 +340,7 @@ class BaseSourceAdapter(ABC):
                             ]
                         else:
                             locations_to_add = []
+                site_phones: dict[str, str] = {}
                 if locations_to_add:
                     # For simplicity, delete old locations and recreate
                     # (In production, might want smarter diffing, but locations rarely change)
@@ -349,6 +350,15 @@ class BaseSourceAdapter(ABC):
                                 select(SchoolLocation).where(SchoolLocation.school_id == school_id)
                             )
                         ).scalars().all()
+                        from app.scrapers.stages.site_phones import PHONE_TAG
+
+                        # A recreated row keeps the phone site-phones gave it.
+                        site_phones = {
+                            key: loc.phone
+                            for loc in existing_locations
+                            if PHONE_TAG in (loc.location_tags or [])
+                            for key in _address_keys(loc)
+                        }
                         # Official and hand-corrected points are not recreated: the rows
                         # stay, and a source location that is one of them only refreshes
                         # its source fields. So do exact pins a pin stage checked, while
@@ -429,15 +439,20 @@ class BaseSourceAdapter(ABC):
                                 ]
                         locations_to_add = new_locations
 
+                    from app.scrapers.stages.site_phones import carry_site_phone
+
                     for loc in locations_to_add:
+                        phone, tags = carry_site_phone(
+                            loc.phone, loc.location_tags or [], site_phones.get(_address_key(loc.address_i18n))
+                        )
                         new_location = SchoolLocation(
                             school_id=school_id,
                             address_i18n=loc.address_i18n,
                             district=loc.district,
                             lat=loc.lat,
                             lng=loc.lng,
-                            phone=loc.phone,
-                            location_tags=loc.location_tags,
+                            phone=phone,
+                            location_tags=tags,
                             geocode_meta=loc.geocode_meta,
                             is_primary=loc.is_primary,
                         )
@@ -511,9 +526,10 @@ class BaseSourceAdapter(ABC):
         from app.models import SchoolLocationAgeGroupShift
 
         row.district = incoming.district or row.district
-        from app.scrapers.stages.site_phones import keep_site_phone
+        from app.scrapers.stages.site_phones import PHONE_TAG, note_register_phone
 
-        if not keep_site_phone(row, incoming.phone):  # the school's own site wins
+        site_phone = PHONE_TAG in (row.location_tags or [])
+        if not site_phone:  # the school's own site's phone wins (site-phones)
             row.phone = incoming.phone or row.phone
         if incoming.location_tags:
             # Replace only this source's own tags; other stages keep markers here
@@ -525,6 +541,8 @@ class BaseSourceAdapter(ABC):
                 tag for tag in row.location_tags or [] if not tag.startswith(source_prefixes)
             ]
             row.location_tags = sorted(set(kept_tags) | set(incoming.location_tags))
+        if site_phone:
+            note_register_phone(row, incoming.phone)
         shifts = (
             await self.db.execute(
                 select(SchoolLocationAgeGroupShift).where(

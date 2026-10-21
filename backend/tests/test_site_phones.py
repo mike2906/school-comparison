@@ -141,5 +141,33 @@ def test_two_numbers_in_a_row_stay_two_and_the_next_buildings_number_is_not_ours
 
 
 def test_a_host_of_many_sites_is_not_one_shared_site():
-    assert stage._site_key("https://sites.google.com/view/dg12/home") == "sites.google.com/dg12"
+    assert stage._site_key("https://sites.google.com/view/dg12/home") == "sites.google.com/view/dg12"
     assert stage._site_key("https://www.tzarsimeon.bg/dgrosica/home") == "tzarsimeon.bg"
+
+
+def test_a_recreated_location_carries_the_sites_phone():
+    phone, tags = stage.carry_site_phone("02/111 22 33", ["source=moe"], "02 987 6543")
+    assert phone == "02 987 6543"
+    assert tags == ["source=moe", stage.PHONE_TAG, "phone_was=02/111 22 33"]
+    assert stage.carry_site_phone("02/111 22 33", ["source=moe"], None) == ("02/111 22 33", ["source=moe"])
+
+
+@pytest.mark.asyncio
+async def test_a_one_school_run_holds_a_page_number_for_the_full_run(db_session):
+    school = await _school(db_session)
+    report = await stage.run_site_phones(
+        db_session, school_ids=[school.id], fetch=_fetcher({HOME: "<p>Тел.: 02 987 65 43</p>"}), apply=True
+    )
+    assert report["outcomes"] == {"needs_full_run": 1}
+    row = (await db_session.execute(select(SchoolLocation))).scalar_one()
+    assert row.phone == "02/824 11 70"
+
+
+@pytest.mark.asyncio
+async def test_another_schools_number_is_skipped_but_our_second_one_counts(db_session):
+    await _school(db_session, phone="02 987 6543", website="https://other.example/", name="СУ Друго")
+    await _school(db_session)
+    pages = {HOME: "<p>Тел.: 02 987 65 43, 0888 123 456</p>", "https://other.example/": "<p>Пишете ни</p>"}
+    report = await stage.run_site_phones(db_session, fetch=_fetcher(pages))
+    ours = next(r for r in report["results"] if r["phone"] == "02/824 11 70")
+    assert ours["outcome"] == "replace" and ours["new_phone"] == "0888 123 456"
