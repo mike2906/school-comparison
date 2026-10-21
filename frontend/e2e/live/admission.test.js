@@ -291,11 +291,20 @@ describe('admission from a school page', () => {
     const start = Number((await campaign()).slice(0, 4))
     await page.getByLabel(g1('since')).first().fill(`${start - 5}-01-15`)
     await page.getByRole('button', { name: t('bg', 'savedAdmission.save') }).click()
-    await page.getByRole('link', { name: t('bg', 'savedAdmission.seeList') }).click()
+    // "Near your saved address" opens the list already placed at the saved home.
+    await page.getByRole('link', { name: t('bg', 'savedAdmission.seeListNear') }).click()
     await page.waitForURL(url => url.pathname === '/search' && url.searchParams.get('age_group') === 'grade_1_4')
     await page.getByTestId('saved-admission-banner').waitFor()
     await page.getByTestId('saved-verdict-line').first().waitFor()
-    // The saved home is offered as the list's location, so the parent need not type it again.
+    await page.waitForFunction(() => JSON.parse(localStorage.getItem('userLocation') || 'null')?.savedHome, null, { timeout: 30_000 })
+    // Used once: a reload or Back must not send the address again without a tap.
+    assert.ok(!(await page.evaluate(() => history.state?.usr?.nearSavedHome)), 'the arrival flag stays in history')
+    await page.getByRole('button', { name: t('bg', 'location.clear'), exact: true }).first().click()
+    await page.waitForFunction(() => !localStorage.getItem('userLocation'))
+    await page.reload()
+    await page.getByTestId('saved-admission-banner').waitFor()
+    assert.equal(await page.evaluate(() => localStorage.getItem('userLocation')), null, 'a reload looked the saved address up again')
+    // The list itself offers the saved home as its location too.
     await page.getByRole('button', { name: t('bg', 'location.setShortSaved') }).first().click()
     await page.getByRole('button', { name: t('bg', 'location.useSavedHome') }).click()
     await page.waitForFunction(() => JSON.parse(localStorage.getItem('userLocation') || 'null')?.savedHome, null, { timeout: 30_000 })
