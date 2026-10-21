@@ -1,8 +1,8 @@
 """Intensive languages from the official 8th-grade class names."""
 
+from app.utils.class_languages import official_intensive_languages
 from app.utils.school_attributes import build_localized_attributes
 from app.utils.school_facts import publication_attributes
-from app.utils.class_languages import official_intensive_languages
 
 
 def _admission(*names, stage="grade_8"):
