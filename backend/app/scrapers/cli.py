@@ -59,6 +59,7 @@ from rich.console import Console
 from rich.table import Table
 
 from app.scrapers.repairs import age_groups as age_group_repair
+from app.scrapers.repairs import deposits as deposit_repair
 from app.scrapers.repairs import display_names as display_name_audit_cmd
 from app.scrapers.repairs import geocodes as geocode_repair
 from app.scrapers.repairs import i18n as i18n_repair
@@ -955,6 +956,13 @@ def check_website_command(school_id, url, country, apply_changes, replace):
             )
 
     asyncio.run(_run())
+
+
+@cli.command("flag-deposits")
+@click.option("--apply", "apply_changes", is_flag=True, help="Flag the rows (default is a dry run that writes nothing)")
+def flag_deposits_command(apply_changes):
+    """Flag stored registration fees whose own words name a deposit, as a new read would."""
+    asyncio.run(deposit_repair.flag_deposits_command(apply=apply_changes))
 
 
 @cli.command("site-city")

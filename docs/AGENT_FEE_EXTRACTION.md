@@ -104,6 +104,8 @@ For one school, with its `website_url`:
      deposit), by its label or by the words just before its amount, is stored with
      `pricing_context.deposit`, and the page lists it under "Депозит" / "Deposit", not as a
      registration fee: it is returned or taken off a later fee (185, 351, 514, 574).
+     Rows written before that, or kept by rule 6 (351), get the flag from their stored words
+     with `uv run python -m app.scrapers.cli flag-deposits --apply` (no model call).
    - **0.9** for everything else that passes step 3.
 
    The amount check in step 3 only guards against invented numbers. On the fresh sample, every
