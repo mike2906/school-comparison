@@ -18,7 +18,7 @@ or marked ready for review, not on every push. After the last push that changes 
 behaviour (prompt, schema, checks, gate, model), run it once more on the final code by adding
 the `fees-eval` label (remove it first if it is already on): `gh pr edit <n> --remove-label
 fees-eval; gh pr edit <n> --add-label fees-eval`. Pushes that only fix tests or wording don't need it.
-PR runs are capped at 6 a day (UTC), each stopped at $0.30 (about $1 a day): past that the check
+PR runs are capped at 6 a day (UTC), about $1: past that the check
 fails without calling the model, and the label (removed, then added) runs it the next day. Group reader changes into fewer PRs where you can;
 each PR's run costs the same.
 The reader is noisy on identical pages, so smaller moves are not detectable with 3 trials;

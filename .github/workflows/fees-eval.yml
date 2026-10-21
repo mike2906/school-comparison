@@ -2,8 +2,9 @@
 # (backend/scripts/fees_eval.py). Runs on a PR that touches the reader, its checks, the
 # publish gate or the model choice when it is opened, reopened or marked ready, and again when the
 # `fees-eval` label is added; not on every push. About $0.15 a run (3 trials). At most
-# MAX_RUNS_PER_DAY PR runs a day (UTC), each stopped at $0.30 (about $1 a day, $1.80 at most): past that a PR
-# run fails without calling the model, and the label runs it the next day. A run by hand is not capped.
+# MAX_RUNS_PER_DAY PR runs a day (UTC), about $1: past that a PR run fails without calling the
+# model, and the label runs it the next day. A run by hand is not capped. The cap counts runs, not
+# dollars; a daily limit on the CI key in OpenRouter is what caps the dollars.
 name: Fees eval
 
 on:
@@ -84,7 +85,7 @@ jobs:
           # PR runs started today (UTC), each attempt of a re-run counted; this one left out.
           # Skipped runs (a draft, another label) called no model; cancelled ones may have, so
           # they count. A run that failed before the model counts too: the cap errs toward less spend.
-          ran="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/fees-eval.yml/runs?event=pull_request&per_page=100" \
+          ran="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/fees-eval.yml/runs?event=pull_request&created=>=$(date -u +%F)&per_page=100" \
             -q "[.workflow_runs[] | select(.id != $GITHUB_RUN_ID and .conclusion != \"skipped\")
                  | select(.run_started_at >= \"$(date -u +%F)\") | .run_attempt] | add // 0")"
           echo "Fees eval PR runs today before this one: $ran of $MAX_RUNS_PER_DAY"
@@ -114,13 +115,11 @@ jobs:
         if: steps.key.outputs.skip != 'true'
         env:
           TRIALS: ${{ inputs.trials || '3' }}
-          # A PR run costs about $0.15; a run by hand may use more trials.
-          MAX_USD: ${{ github.event_name == 'pull_request' && '0.30' || '1.00' }}
         run: |
           set -o pipefail
           check=""
           if [ -n "$MODEL_TIER_PRICING" ]; then check="--no-check"; fi  # the baseline is the default model's
-          uv run python scripts/fees_eval.py --trials "$TRIALS" --max-usd "$MAX_USD" $check \
+          uv run python scripts/fees_eval.py --trials "$TRIALS" --max-usd 1.00 $check \
             --out "$RUNNER_TEMP/fees-eval.json" | tee "$RUNNER_TEMP/fees-eval.txt"
 
       - name: Summary
