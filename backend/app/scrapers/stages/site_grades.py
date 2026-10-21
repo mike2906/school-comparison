@@ -111,8 +111,7 @@ def site_grades(pricing: Iterable[Any], at_a_glance: Optional[dict[str, Any]]) -
 # group (351, 185: "children aged 2 to 7"), while the register lists groups from age 3 only.
 NURSERY = "nursery"
 _KINDERGARTEN_GROUPS = frozenset({"first", "second", "third", "preschool", NURSERY})
-# Not 2.7 years: a child of 2.7 in September is in the first group, not the nursery (330).
-_UNDER_THREE = r"(?:1(?:[.,]\d)?|2(?![.,]\d)|one|two)"
+_UNDER_THREE = r"(?:1(?:[.,]\d)?|2|one|two)"
 _NURSERY_RE = re.compile(
     # An age, not a time of day ("children from 2 pm") or a family ("children of one family"):
     # an age word, or a number with a year unit.
@@ -125,29 +124,32 @@ _NURSERY_RE = re.compile(
 )
 
 
-# "The kindergarten has no nursery group" (515) says the opposite.
+# "The kindergarten has no nursery group" (515): the school's own denial wins over any age
+# it names elsewhere. Only a negation of the nursery itself, not one nearby ("we do not
+# charge a fee, nursery groups from 18 months").
 _NO_NURSERY_RE = re.compile(
-    r"\b(?:no|not|without|nor)\b[^.;]{0,40}?\b(?:nursery|toddler|under\s+(?:3|three))|\b(?:няма|без)\s+ясл",
+    r"\b(?:no|without)\s+(?:a\s+)?(?:nursery|toddler)\b"
+    r"|\b(?:does\s+not|doesn't|do\s+not|don't)\s+(?:have|run|offer)\s+(?:a\s+)?(?:nursery|toddler)\b"
+    r"|\b(?:няма|нямаме|без)\s+ясл|не\s+(?:разполага|разполагаме)\s+с\s+ясл",
     re.IGNORECASE,
 )
 
 
-def _says_nursery(text: str) -> bool:
-    return bool(_NURSERY_RE.search(text)) and not _NO_NURSERY_RE.search(text)
-
-
 def site_nursery(pricing: Iterable[Any], facts: Iterable[Any]) -> bool:
     """Whether the published site data says the kindergarten takes children under three."""
-    for row in pricing:
-        if str(getattr(row.category, "value", row.category)) != "tuition":
-            continue  # "Swimming for ages 2-3" is an activity, not a group
-        if any(_says_nursery(str(label or "")) for label in _fee_labels(row)):
-            return True
+    texts = [
+        str(label or "")
+        for row in pricing
+        # "Swimming for ages 2-3" is an activity, not a group.
+        if str(getattr(row.category, "value", row.category)) == "tuition"
+        for label in _fee_labels(row)
+    ]
     for fact in facts:  # the published facts: minor ones never reach them
         text = getattr(fact, "text_i18n", None) or {}
-        if any(_says_nursery(str(text.get(lang) or "")) for lang in ("en", "bg")):
-            return True
-    return False
+        texts += [str(text.get(lang) or "") for lang in ("en", "bg")]
+    if any(_NO_NURSERY_RE.search(text) for text in texts):
+        return False
+    return any(_NURSERY_RE.search(text) for text in texts)
 
 
 def _band(grade: int) -> Optional[str]:

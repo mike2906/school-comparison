@@ -228,15 +228,28 @@ async def test_re_reading_the_site_keeps_site_grades_bands(db_session):
         ("2-годишна програма по английски", False),
         ("Pick up children from 2 pm", False),
         ("Children from 1 September attend", False),
-        ("Children aged 2.7 to 7 are accepted if places are available", False),  # 330
+        ("Children aged 2.7 to 7 are accepted if places are available", True),  # 330: born early in the year
+        ("Children aged 2,5 to 7", True),
         ("The kindergarten has no nursery group and does not accept children born after 2024", False),  # 515
-        ("Nursery groups accept children from 1 year 6 months", True),
-        ("Children aged 1.6 to 3 in the nursery group", True),
+        ("Детската градина няма яслена група", False),
+        ("Нямаме яслена група", False),
+        ("We do not charge an enrolment fee; nursery groups take children from 18 months", True),
+        ("Kindergarten No 12 has a nursery group for children aged 1-3", True),
+        ("Accepts children aged 1.6 to 3", True),
     ],
 )
 def test_site_nursery_reads_an_age_under_three(text, nursery):
     fact = SimpleNamespace(text_i18n={"en": text, "bg": ""})
     assert stage.site_nursery([], [fact]) is nursery
+
+
+def test_a_denial_anywhere_wins():
+    # 515: one fact denies a nursery group, another names an age of two.
+    facts = [
+        SimpleNamespace(text_i18n={"en": "The kindergarten has no nursery group.", "bg": ""}),
+        SimpleNamespace(text_i18n={"en": "Admission for children aged 2 to 7", "bg": ""}),
+    ]
+    assert not stage.site_nursery([], facts)
 
 
 def test_site_nursery_reads_a_nursery_fee():
