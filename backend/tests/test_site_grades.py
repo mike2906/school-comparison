@@ -342,3 +342,40 @@ async def test_dry_run_reports_what_an_evening_school_loses(db_session):
         assert report["changes"][0]["hide"] == [] and report["changes"][0]["remove"] == ["grade_1_4", "grade_5_7"]
         await stage.run_site_grades(db_session, apply=True)
     assert (await _bands(db_session, school_id))[0] == ["grade_8_12"]
+
+
+def test_municipal_preschool_reads_the_latest_campaign():
+    row = lambda stage_, campaign: {"stage": stage_, "campaign": campaign}  # noqa: E731
+    assert stage.municipal_preschool({"cutoff_summary": [row("grade_1", "2026/2027"), row("preparatory", "2026/2027")]})
+    # A group the municipality last listed in an older campaign is gone.
+    assert not stage.municipal_preschool({"cutoff_summary": [row("grade_1", "2026/2027"), row("preparatory", "2025/2026")]})
+    assert not stage.municipal_preschool({"cutoff_summary": [row("grade_1", "2026/2027")]})
+    assert not stage.municipal_preschool(None)
+
+
+async def test_municipal_preschool_rounds_add_the_band_without_a_website(db_session):
+    # 161 (5. ОУ): kg.sofia.bg runs its preparatory-group admission; the register says 1-7.
+    def school(name, website, admission_info):
+        row = School(
+            country_code="bg", city="sofia", name_i18n={"bg": name}, school_type="state",
+            education_level="lower_secondary", website_url=website, scrape_status="navigated" if website else None,
+            admission_info=admission_info,
+        )
+        location = SchoolLocation(school=row, address_i18n={"bg": "ул. 1"}, location_tags=[])
+        location.age_group_shifts = [SchoolLocationAgeGroupShift(age_group=band) for band in ("grade_1_4", "grade_5_7")]
+        db_session.add(row)
+        return row
+
+    rounds = {"cutoff_summary": [{"stage": "grade_1", "campaign": "2026/2027"}, {"stage": "preparatory", "campaign": "2026/2027"}]}
+    with_rounds = school("5 ОУ", None, rounds)
+    school("6 ОУ", None, {"cutoff_summary": [{"stage": "grade_1", "campaign": "2026/2027"}]})
+    await db_session.commit()
+    school_id = with_rounds.id
+
+    report = await stage.run_site_grades(db_session, apply=True)
+    assert report["checked"] == 1 and [change["school_id"] for change in report["changes"]] == [school_id]
+    assert await _bands(db_session, school_id) == (
+        ["grade_1_4", "grade_5_7", "preschool"],
+        [SITE_GRADES_ADDED_PREFIX + "preschool"],
+    )
+    assert (await stage.run_site_grades(db_session, apply=True))["changes"] == []

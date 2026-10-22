@@ -16,6 +16,13 @@ import keeps both (``base_adapter._sync_source_location``). Each run recomputes 
 bands, so a band the site stops naming goes back. One location with school bands only
 (several are left as they are). No model calls; the default is a dry run.
 
+A school's preschool group also comes from the municipality's admission rounds for a
+preparatory group there (``municipal_preschool``: the ПГУ rows ``import_cutoffs.py`` matched
+to it, in the school's latest campaign; 25 Sofia schools showed grades 1-7 only on
+2026-10-22). That holds with no website, so a school with cut-off rounds is checked even when
+it has none. Fact wording alone is not enough: "подготвителна група" is also the city's
+admissions system, a judo club's group and the certificate a first-grader brings.
+
 A kindergarten gets only its nursery group: the register lists private kindergartens' groups
 from age 3, while their sites take children from two (351, 185; parent trial 2026-10-21).
 The stage adds ``nursery`` when the published facts or fee names say so (``site_nursery``),
@@ -88,6 +95,14 @@ def _fee_labels(row: Any) -> tuple[Any, ...]:
     context = row.pricing_context
     english = context.get("age_group_en") if isinstance(context, dict) else getattr(context, "age_group_en", None)
     return row.age_group, row.plan_name, english
+
+
+def municipal_preschool(admission_info: Any) -> bool:
+    """Whether the municipality's admission rounds have a preparatory group at the school in
+    its latest campaign (kg.sofia.bg ПГУ rows; ``docs/ADMISSION_CUTOFFS.md``)."""
+    rows = [row for row in (admission_info or {}).get("cutoff_summary") or [] if isinstance(row, dict)]
+    latest = max((str(row.get("campaign") or "") for row in rows), default="")
+    return any(row.get("stage") == "preparatory" and str(row.get("campaign") or "") == latest for row in rows)
 
 
 def site_grades(pricing: Iterable[Any], at_a_glance: Optional[dict[str, Any]]) -> tuple[set[int], Optional[int]]:
@@ -232,11 +247,8 @@ async def run_site_grades(
     from app.schemas.school import SchoolDetailResponse
     from app.services.school_service import SchoolService
 
-    query = select(School.id).where(
-        School.country_code == country,
-        School.website_url.isnot(None),
-        School.scrape_status.in_(SITE_ACCEPTED_STATUSES),
-    )
+    # Schools with no accepted website too: their cut-off rounds can name a preschool group.
+    query = select(School.id).where(School.country_code == country)
     if school_ids:
         query = query.where(School.id.in_(list(school_ids)))
     if city:
@@ -246,9 +258,15 @@ async def run_site_grades(
     service = SchoolService(db)
     sibling_bands = await _same_site_school_bands(db, country)
     changes: list[dict[str, Any]] = []
+    checked = 0
     for school_id in ids:
         school = await service.get_school_with_details(school_id)
         kindergarten = str(school.education_level or "").casefold() in KINDERGARTEN_LEVELS
+        site = bool(school.website_url) and school.scrape_status in SITE_ACCEPTED_STATUSES
+        municipal = not kindergarten and municipal_preschool(school.admission_info)
+        if not site and not municipal:
+            continue
+        checked += 1
         # A kindergarten's site can only add its nursery group; a school's sets its grade bands.
         bands = {NURSERY} if kindergarten else set(BANDS)
         locations = [
@@ -280,6 +298,8 @@ async def run_site_grades(
             # Zlatarski: the site's grade-8 admissions are the gymnasium's, its grade-5 ones
             # the primary's).
             add -= sibling_bands(school_id, school.website_url)
+            if municipal:  # the municipality names this school, not a site it shares
+                add |= {"preschool"} - register_bands
         # An evening school's "1-12 клас" includes classes for adults.
         name_bg = (school.name_i18n or {}).get("bg")
         add = set(child_bands(add, name_bg, school.education_level))
@@ -318,4 +338,4 @@ async def run_site_grades(
         )
         await db.commit()
         change["applied"] = True
-    return {"checked": len(ids), "changes": changes, "applied": apply}
+    return {"checked": checked, "changes": changes, "applied": apply}
