@@ -149,10 +149,10 @@ resource "cloudflare_ruleset" "cache" {
 # seconds. The API slows past about 20 uncached requests a second, and new query strings
 # miss the edge cache, so without this one machine could keep it busy. The free plan
 # allows one rule: 10-second windows, block only, and an expression on the path and the
-# verified-bot flag only (no host, so the site's own /schools pages count too; one per
-# navigation). Edge-cached answers count as well. Well above a parent's pace, and above
-# the site build (prerender, about 13 a second) and the UI scan (about 10). It does block
-# the load test (tools/load-test/README.md).
+# verified-bot flag only (no host, so a full load of a site page under /schools or
+# /compare counts as well as the API calls it makes). Edge-cached answers count too. Well
+# above a parent's pace, and above the site build (prerender, about 7 a second) and the
+# UI scan (about 10). It does block the load test (tools/load-test/README.md).
 resource "cloudflare_ruleset" "rate_limit" {
   zone_id = var.zone_id
   name    = "Rate limit"

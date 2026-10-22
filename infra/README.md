@@ -77,7 +77,10 @@ restart the firewall and Caddy (`deploy/README.md`).
 `main.tf` gives the limits). Blocked requests get a 429 and show under Security → Events.
 Raise the number if parents start to share an address in large numbers (mobile carriers
 put many phones behind one), or if a build or scan starts tripping it. The site build
-waits out a 429 and retries; the load test from one runner cannot stay under it.
+waits out a 429 and retries; the load test from one runner cannot stay under it. A
+rate-limit rule made by hand in the dashboard makes the first apply fail (one ruleset per
+phase): delete it there first, or import it with
+`terraform import cloudflare_ruleset.rate_limit zones/<zone id>/<ruleset id>`.
 
 ## Crawler settings
 
