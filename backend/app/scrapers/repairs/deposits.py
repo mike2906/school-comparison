@@ -32,6 +32,7 @@ def stored_row_names_deposit(row: Pricing) -> bool:
         plan_name_en=context.get("plan_name_en"),
         label=context.get("label") or "",
         evidence=context.get("evidence") or "",
+        notes=context.get("notes"),
     )
     return names_deposit(fee)
 

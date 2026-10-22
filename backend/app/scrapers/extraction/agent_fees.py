@@ -274,9 +274,11 @@ _HOW_OFTEN_RE = re.compile(
     r"|седмичн\w*\s+(?:програм|разпис|график)|weekly (?:schedule|timetable)"
 )
 _DEPOSIT_RE = re.compile(r"депозит|капаро|deposit")
-# A deposit's names, a guarantee payment too: 300's "гаранционна вноска" is taken off the last
-# fee (not "гарантира място", which an enrolment fee may also say).
-_DEPOSIT_NAME_RE = re.compile(_DEPOSIT_RE.pattern + r"|гаранционн")
+# A guarantee payment is a deposit only when the site says it comes back or off a later fee:
+# 300's "гаранционна вноска ... се приспада от последната дължима такса" is, 569's
+# "Гаранционна такса записване" (paid once, never returned) is an enrolment fee.
+_GUARANTEE_RE = re.compile(r"гаранционн")
+_RETURNED_RE = re.compile(r"възстанов|приспад|връща|refund|deduct|offset|returned")
 # An age, not a period: "6-годишни деца", "5 годишни", "6-месечни бебета" (564's "такса за
 # обследване" for 5-year-olds lost its one-off period to the "годиш" of the age). Like Stage 6's
 # (price_evidence._AGE_RE), but spaced only before a child word: "€ 3000 годишно" and
@@ -513,24 +515,28 @@ def check_fee(fee: AgentFee, page_text: str) -> CheckedFee:
 
 def names_deposit(fee: AgentFee) -> bool:
     """A registration fee that is a deposit (депозит, капаро): paid ahead, returned or taken
-    off a later fee, so not a cost like an enrolment fee (185, 351, 514, 574; 300's
-    guarantee).
+    off a later fee, so not a cost like an enrolment fee (185, 351, 514, 574).
 
     Its name says so, or the words just before its amount on an evidence line do: "такса за
-    записване 200 €, депозит 500 €" makes only the 500 a deposit.
+    записване 200 €, депозит 500 €" makes only the 500 a deposit. A guarantee payment
+    ("гаранционна вноска") counts only when the evidence or notes say it is returned or
+    taken off a later fee (300, not 569).
     """
     if fee.category is not PriceCategory.REGISTRATION:
         return False
-    if _DEPOSIT_NAME_RE.search(_normalized(" ".join(filter(None, (fee.label, fee.plan_name, fee.plan_name_en))))):
-        return True
+    names = _normalized(" ".join(filter(None, (fee.label, fee.plan_name, fee.plan_name_en))))
+    before_amount = []
     amounts = set(fee_amounts(fee))
     for line in fee.evidence.casefold().splitlines():
         start = 0
         for begin, end, values in number_spans(line):
-            if values & amounts and _DEPOSIT_NAME_RE.search(line[start:begin]):
-                return True
+            if values & amounts:
+                before_amount.append(line[start:begin])
             start = end
-    return False
+    if _DEPOSIT_RE.search(names) or any(_DEPOSIT_RE.search(words) for words in before_amount):
+        return True
+    guarantee = _GUARANTEE_RE.search(names) or any(_GUARANTEE_RE.search(words) for words in before_amount)
+    return bool(guarantee and _RETURNED_RE.search(f"{fee.evidence} {fee.notes or ''}".casefold()))
 
 
 def _without_option_lines(lines: list[str], fee: AgentFee) -> str:
