@@ -279,6 +279,10 @@ _DEPOSIT_RE = re.compile(r"депозит|капаро|deposit")
 # "Гаранционна такса записване" (paid once, never returned) is an enrolment fee.
 _GUARANTEE_RE = re.compile(r"гаранционн")
 _RETURNED_RE = re.compile(r"възстанов|приспад|връща|refund|deduct|offset|returned")
+# ...not a negation of it: "невъзстановима", "non-refundable", "не се връща".
+_NOT_RETURNED_RE = re.compile(
+    r"не\s*(?:се\s+)?(?:възстанов|приспад|връща)\w*|non-?\s*refund\w*|not\s+(?:be\s+)?(?:refund|return|deduct)\w*"
+)
 # An age, not a period: "6-годишни деца", "5 годишни", "6-месечни бебета" (564's "такса за
 # обследване" for 5-year-olds lost its one-off period to the "годиш" of the age). Like Stage 6's
 # (price_evidence._AGE_RE), but spaced only before a child word: "€ 3000 годишно" and
@@ -536,7 +540,8 @@ def names_deposit(fee: AgentFee) -> bool:
     if _DEPOSIT_RE.search(names) or any(_DEPOSIT_RE.search(words) for words in before_amount):
         return True
     guarantee = _GUARANTEE_RE.search(names) or any(_GUARANTEE_RE.search(words) for words in before_amount)
-    return bool(guarantee and _RETURNED_RE.search(f"{fee.evidence} {fee.notes or ''}".casefold()))
+    said = _NOT_RETURNED_RE.sub(" ", f"{fee.evidence} {fee.notes or ''}".casefold())
+    return bool(guarantee and _RETURNED_RE.search(said))
 
 
 def _without_option_lines(lines: list[str], fee: AgentFee) -> str:
