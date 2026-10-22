@@ -32,6 +32,13 @@ QUICK=1 PEAK=3 k6 run tools/load-test/parents.js           # BYPASS_CACHE=1 for 
 
 `API_URL` points it at another API (default `https://api.schooldecider.com`).
 
+## Edge rate limit
+
+The API's rate limit (`infra/main.tf`, `cloudflare_ruleset.rate_limit`) blocks one address
+past 200 requests in 10 seconds, and every virtual user here shares the runner's address.
+So a run above a few dozen users is now blocked within seconds and stops on its error
+threshold. To measure capacity again, the rule needs an exception for the test first.
+
 ## What it does not cover
 
 The site's own files (Cloudflare Pages), map tiles (CARTO) and address lookups

@@ -49,10 +49,14 @@ function freshUrl(url) {
 
 async function fetchJson(url) {
   let lastError
-  for (const delaySeconds of [0, 1, 2]) {
-    if (delaySeconds) await new Promise((resolve) => setTimeout(resolve, delaySeconds * 1000))
+  let waitSeconds = 0
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    if (waitSeconds) await new Promise((resolve) => setTimeout(resolve, waitSeconds * 1000))
+    waitSeconds = attempt
     try {
       const response = await fetch(freshUrl(url), { signal: AbortSignal.timeout(30_000) })
+      // The edge rate limit (infra/main.tf) blocks an address for 10 seconds.
+      if (response.status === 429) waitSeconds = 11
       if (!response.ok) throw new Error(`HTTP ${response.status}`)
       return await response.json()
     } catch (error) {
