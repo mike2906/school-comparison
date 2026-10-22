@@ -9,7 +9,12 @@ from sqlalchemy.orm import selectinload
 
 from app.models import School
 from app.models.school import SchoolLocation, SchoolLocationAgeGroupShift
-from app.scrapers.campus_sync import SITE_GRADES_ADDED_PREFIX, SITE_GRADES_HIDDEN_PREFIX, remove_website_campus_data
+from app.scrapers.campus_sync import (
+    MUNICIPAL_ADDED_PREFIX,
+    SITE_GRADES_ADDED_PREFIX,
+    SITE_GRADES_HIDDEN_PREFIX,
+    remove_website_campus_data,
+)
 from app.scrapers.stages import site_grades as stage
 from app.scrapers.stages.site_grades import fee_label_grades, planned_bands, site_grades
 
@@ -376,6 +381,52 @@ async def test_municipal_preschool_rounds_add_the_band_without_a_website(db_sess
     assert report["checked"] == 1 and [change["school_id"] for change in report["changes"]] == [school_id]
     assert await _bands(db_session, school_id) == (
         ["grade_1_4", "grade_5_7", "preschool"],
-        [SITE_GRADES_ADDED_PREFIX + "preschool"],
+        [MUNICIPAL_ADDED_PREFIX + "preschool"],
     )
     assert (await stage.run_site_grades(db_session, apply=True))["changes"] == []
+
+    # The next campaign has no preparatory round: the marked school is revisited and the band goes.
+    school_row = await db_session.get(School, school_id)
+    school_row.admission_info = {"cutoff_summary": [{"stage": "grade_1", "campaign": "2027/2028"}]}
+    await db_session.commit()
+    await stage.run_site_grades(db_session, apply=True)
+    assert await _bands(db_session, school_id) == (["grade_1_4", "grade_5_7"], [])
+
+
+async def test_withholding_the_website_keeps_the_municipal_preschool_band(db_session):
+    school = School(
+        country_code="bg", city="sofia", name_i18n={"bg": "70 ОУ"}, school_type="state",
+        education_level="lower_secondary", website_url="https://70ou.com/", scrape_status="navigated",
+        admission_info={"cutoff_summary": [{"stage": "preparatory", "campaign": "2026/2027"}]},
+    )
+    location = SchoolLocation(school=school, address_i18n={"bg": "ул. 1"}, location_tags=[])
+    location.age_group_shifts = [SchoolLocationAgeGroupShift(age_group=band) for band in ("grade_1_4", "grade_5_7")]
+    db_session.add(school)
+    await db_session.commit()
+    school_id = school.id
+
+    # The site names preschool too: the municipality's mark wins, so the band outlives the site.
+    with patch.object(stage, "site_grades", return_value=({0, 1, 5}, None)):
+        await stage.run_site_grades(db_session, apply=True)
+        assert await _bands(db_session, school_id) == (
+            ["grade_1_4", "grade_5_7", "preschool"],
+            [MUNICIPAL_ADDED_PREFIX + "preschool"],
+        )
+        assert (await stage.run_site_grades(db_session, apply=True))["changes"] == []
+    await remove_website_campus_data(db_session, school_id)
+    await db_session.commit()
+    assert (await _bands(db_session, school_id))[0] == ["grade_1_4", "grade_5_7", "preschool"]
+
+    # The register import (1-7 only) keeps it as well.
+    from app.schemas.scraping import DiscoveredLocation
+    from app.scrapers.sources.base_adapter import BaseSourceAdapter
+
+    class RegistryAdapter(BaseSourceAdapter):
+        async def discover(self, limit=None, sample_ratio=0.0):
+            return []
+
+    location = (await db_session.execute(select(SchoolLocation).where(SchoolLocation.school_id == school_id))).scalar_one()
+    incoming = DiscoveredLocation(address_i18n={"bg": "ул. 1"}, age_groups=["grade_1_4", "grade_5_7"])
+    await RegistryAdapter(db=db_session)._sync_source_location(location, incoming)
+    await db_session.commit()
+    assert (await _bands(db_session, school_id))[0] == ["grade_1_4", "grade_5_7", "preschool"]

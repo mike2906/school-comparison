@@ -555,6 +555,7 @@ class BaseSourceAdapter(ABC):
             return
         from app.scrapers.campus_sync import (
             AGE_GROUP_TAG_PREFIX,
+            MUNICIPAL_ADDED_PREFIX,
             SITE_GRADES_ADDED_PREFIX,
             site_hidden_band,
             site_hidden_bands,
@@ -564,14 +565,18 @@ class BaseSourceAdapter(ABC):
         # it added stay, and a register band it hid is not put back. The stage re-plans
         # from the register's bands on its next run.
         tags = row.location_tags or []
-        site_added = {t[len(SITE_GRADES_ADDED_PREFIX):] for t in tags if t.startswith(SITE_GRADES_ADDED_PREFIX)}
+        site_added = {
+            t[len(prefix):] for prefix in (SITE_GRADES_ADDED_PREFIX, MUNICIPAL_ADDED_PREFIX) for t in tags if t.startswith(prefix)
+        }
         site_hidden = set(site_hidden_bands(tags))
         # The registry now states these age groups itself: they are no longer only the
         # website's claim, so a later website withhold must not delete them (UF42b). The
         # same for a band the site added, and a band the register no longer states has
         # nothing left to hide.
         confirmed = {AGE_GROUP_TAG_PREFIX + age_group for age_group in wanted}
-        confirmed |= {SITE_GRADES_ADDED_PREFIX + age_group for age_group in wanted & site_added}
+        confirmed |= {
+            prefix + age_group for prefix in (SITE_GRADES_ADDED_PREFIX, MUNICIPAL_ADDED_PREFIX) for age_group in wanted & site_added
+        }
         gone = site_hidden - wanted
         cleaned = [tag for tag in tags if tag not in confirmed and site_hidden_band(tag) not in gone]
         if cleaned != tags:
