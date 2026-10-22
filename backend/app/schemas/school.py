@@ -9,6 +9,7 @@ from pydantic import (
     JsonValue,
     PrivateAttr,
     computed_field,
+    field_serializer,
     field_validator,
     model_validator,
 )
@@ -37,6 +38,7 @@ from app.utils.text_translations import stored as stored_translations
 from app.utils.text_translations import translate_cutoffs, translate_price_context
 from app.utils.website_data import (
     agent_fees_publishable,
+    public_website_url,
     website_data_is_publishable,
     website_data_withheld_reasons,
 )
@@ -423,6 +425,11 @@ class SchoolBase(SchoolAttributesMixin):
     )
     num_pupils: Optional[int] = None
     model_config = ConfigDict(populate_by_name=True)
+
+    @field_serializer("website_url")
+    def _public_website_url(self, value: Optional[str]) -> Optional[str]:
+        # The publish gates read the stored address; only the wire copy is withheld.
+        return public_website_url(value, self.raw_attributes, self.raw_scrape_status)
 
     @computed_field(return_type=Optional[SummaryI18n])
     @property

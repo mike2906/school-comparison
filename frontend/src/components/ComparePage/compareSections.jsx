@@ -42,7 +42,7 @@ import {
 } from '../../utils/pricing'
 import { planNameBeside, textLang } from '../../utils/priceLabels'
 import { priceCategory } from '../../utils/priceRows'
-import { safeSourceUrl, sourceSiteName } from '../../utils/priceSources'
+import { safeWebsiteUrl, sourceSiteName } from '../../utils/priceSources'
 import {
   formatDate,
   getLanguageLabel,
@@ -677,14 +677,14 @@ export function buildCompareSections({
     const contactRows = [
       {
         label: t('schools.website'),
-        getValue: (school) => safeSourceUrl(school.website_url) ? (
+        getValue: (school) => safeWebsiteUrl(school.website_url) ? (
           <a
-            href={safeSourceUrl(school.website_url)}
+            href={safeWebsiteUrl(school.website_url)}
             target="_blank"
             rel="noopener noreferrer"
             className="text-primary-600 hover:text-primary-700 text-sm underline"
           >
-            {sourceSiteName(school.website_url) || school.website_url}
+            {sourceSiteName(safeWebsiteUrl(school.website_url)) || school.website_url}
           </a>
         ) : renderPlaceholder(),
         getCompare: (school) => school.website_url || null,

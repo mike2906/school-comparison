@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { formatCheckedDate, safeSourceUrl, sharedPriceSource, sourceSiteName } from './priceSources.js'
+import { formatCheckedDate, safeSourceUrl, safeWebsiteUrl, sharedPriceSource, sourceSiteName } from './priceSources.js'
 
 const PAGE = 'https://roerich-school.org/%d1%82%d0%b0%d0%ba%d1%81%d0%b8/'
 
@@ -10,6 +10,17 @@ test('safeSourceUrl: only http(s) links', () => {
   assert.equal(safeSourceUrl('javascript:alert(1)'), null)
   assert.equal(safeSourceUrl('not a url'), null)
   assert.equal(safeSourceUrl(null), null)
+})
+
+test('safeWebsiteUrl: http(s) or a bare host, never another scheme', () => {
+  assert.equal(safeWebsiteUrl('https://school.bg/'), 'https://school.bg/')
+  assert.equal(safeWebsiteUrl(' www.school.bg '), 'https://www.school.bg/')
+  assert.equal(safeWebsiteUrl('школа.бг/за-нас'), new URL('https://школа.бг/за-нас').href)
+  assert.equal(safeWebsiteUrl('javascript:alert(1)'), null)
+  assert.equal(safeWebsiteUrl('JavaScript:alert(1)'), null)
+  assert.equal(safeWebsiteUrl('data:text/html,x'), null)
+  assert.equal(safeWebsiteUrl('not a url'), null)
+  assert.equal(safeWebsiteUrl(null), null)
 })
 
 test('sourceSiteName: the site without www', () => {

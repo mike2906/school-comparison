@@ -224,6 +224,21 @@ class TestSchoolsEndpoint:
         }
 
     @pytest.mark.asyncio
+    async def test_one_off_keys_never_evict_a_warm_entry(self, seeded_client, monkeypatch):
+        from app.routers import schools as schools_router
+
+        monkeypatch.setattr(schools_router, "LIST_CACHE_MAX_ENTRIES", 2)
+        default_key = ("bg", "sofia", None, None, None, False)
+
+        await seeded_client.get("/schools")
+        schools_router._warm_keys.add((id(schools_router._list_cache), default_key))
+        for n in range(4):  # made-up values, each a cold key
+            await seeded_client.get(f"/schools?education_level=junk-{n}")
+
+        assert default_key in schools_router._list_cache
+        assert len(schools_router._list_cache) == 2
+
+    @pytest.mark.asyncio
     async def test_failed_refresh_keeps_the_cached_body(self, seeded_client, monkeypatch):
         from app.routers import schools as schools_router
 
@@ -297,6 +312,21 @@ class TestSchoolsEndpoint:
         response = await seeded_client.get("/schools?facilities=pool")
         assert response.status_code == 200
         assert schools_router._list_cache == {}
+
+    @pytest.mark.asyncio
+    async def test_advanced_filter_builds_take_their_own_lock(self, seeded_client, monkeypatch):
+        from app.routers import schools as schools_router
+
+        seen = []
+        real_build = schools_router._build_list_body
+
+        async def watched(db, **kwargs):
+            seen.append((schools_router._uncached_build_lock.locked(), schools_router._build_lock.locked()))
+            return await real_build(db, **kwargs)
+
+        monkeypatch.setattr(schools_router, "_build_list_body", watched)
+        assert (await seeded_client.get("/schools?facilities=pool")).status_code == 200
+        assert seen == [(True, False)]
 
     @pytest.mark.asyncio
     async def test_filters_are_cached_per_city(self, seeded_client, monkeypatch):

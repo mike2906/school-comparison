@@ -79,6 +79,12 @@ scraped row but do not wait for the old extraction stage's `extracted` status:
 and an accepted website (`SITE_ACCEPTED_STATUSES`). The old pipeline's rows still need
 `extracted`/`summarized`.
 
+The school's own `website_url` is shown on the detail and compare responses through
+`app/utils/website_data.py` `public_website_url`: never with a scheme other than http(s),
+and a pick that website discovery took from web search or an email domain stays hidden
+until URL validation accepts it (`SITE_ACCEPTED_STATUSES`). The publish gates still read
+the stored address.
+
 Social links (`attributes.social_links`, `social-links` stage) pass the same three checks
 through `app/utils/social_links.py` `shown_social_links` and reach the detail and compare
 responses as `social_links`.

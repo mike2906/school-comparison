@@ -18,6 +18,7 @@ import { schoolLevelLabel, schoolTypeLabel } from '../../utils/levelLabel'
 import { useCountry } from '../../context/CountryContext'
 import { orderAgeGroups } from '../../utils/ageGroupOrder'
 import { useCompare } from '../../context/CompareContext'
+import { safeWebsiteUrl } from '../../utils/priceSources'
 import {
   getNvoDetail,
   getAmenityFlags,
@@ -282,6 +283,8 @@ function SchoolDetailPage({ schoolId = null, embedded = false, onClose = null })
     )
   }
 
+  const websiteHref = safeWebsiteUrl(school.website_url)
+
   return (
     <Shell>
       <div className={`max-w-5xl mx-auto px-4 md:px-6 py-6 md:py-8 ${compareBarVisible ? 'pb-40' : 'pb-24 md:pb-8'}`}>
@@ -403,9 +406,9 @@ function SchoolDetailPage({ schoolId = null, embedded = false, onClose = null })
           )}
 
           <div className="flex flex-wrap items-center gap-3">
-            {school.website_url && (
+            {websiteHref && (
               <a
-                href={school.website_url}
+                href={websiteHref}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 px-4 py-2 bg-primary-50 text-primary-700 rounded-lg hover:bg-primary-100 transition-colors border border-primary-200"

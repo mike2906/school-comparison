@@ -60,6 +60,13 @@ _build_lock = asyncio.Lock()
 # of projection): their cold builds take their own lock, so a search or school page never
 # waits behind a list build.
 _city_build_lock = asyncio.Lock()
+# Requests with the advanced filters are built for that one request and not cached (the
+# site applies those filters client-side). They take their own lock, so a run of them is
+# built one at a time and never holds up a visitor's list, search or school page.
+_uncached_build_lock = asyncio.Lock()
+# Entries `warm_cache` keeps (the views the site asks for). A run of one-off requests with
+# made-up filter values must not push them out of the cache.
+_warm_keys: set[tuple] = set()
 _refreshing: set[tuple] = set()
 _background_tasks: set[asyncio.Task] = set()
 _session_factory = async_session_maker
@@ -71,12 +78,16 @@ def _store(cache: dict, key: tuple, value) -> None:
     # recently used: a run of one-off requests cannot push out what visitors keep asking for.
     limit = DETAIL_CACHE_MAX_ENTRIES if cache is _detail_cache else LIST_CACHE_MAX_ENTRIES
     if key not in cache and len(cache) >= limit:
-        del cache[next(iter(cache))]
+        victim = next((k for k in cache if (id(cache), k) not in _warm_keys), None)
+        if victim is not None:
+            del cache[victim]
     cache[key] = (time.monotonic(), value)
 
 
-async def _refresh(cache: dict, key: tuple, build) -> None:
+async def _refresh(cache: dict, key: tuple, build, *, warm: bool = False) -> None:
     """Rebuild one entry with its own session; the old entry stays if this fails."""
+    if warm:
+        _warm_keys.add((id(cache), key))
     try:
         async with _build_lock:
             async with _session_factory() as db:
@@ -220,9 +231,13 @@ async def warm_cache(country_code: str = "bg", city: str = "sofia") -> None:
             country = await db.get(Country, country_code)
         age_groups = get_valid_keys(country.education_config, "age_groups") if country else []
         place_key = _filters_key(country_code, city)
-        await _refresh(_filters_cache, place_key, partial(_build_filters, country_code=country_code, city=city))
-        await _refresh(_search_index_cache, place_key, partial(_build_search_index, country_code=country_code, city=city))
-        await _refresh(_same_place_cache, place_key, partial(_build_same_place, country_code=country_code, city=city))
+        await _refresh(_filters_cache, place_key, partial(_build_filters, country_code=country_code, city=city), warm=True)
+        await _refresh(
+            _search_index_cache, place_key, partial(_build_search_index, country_code=country_code, city=city), warm=True
+        )
+        await _refresh(
+            _same_place_cache, place_key, partial(_build_same_place, country_code=country_code, city=city), warm=True
+        )
         variants = [{"age_group": age_group} for age_group in [None, *age_groups]]
         if "preschool" in age_groups:
             # The preschool view also asks "where": kindergarten, school, or both.
@@ -241,7 +256,7 @@ async def warm_cache(country_code: str = "bg", city: str = "sofia") -> None:
                 "include_crossover": False,
                 **variant,
             }
-            await _refresh(_list_cache, _list_key(**filters), partial(_build_list_entry, **filters))
+            await _refresh(_list_cache, _list_key(**filters), partial(_build_list_entry, **filters), warm=True)
     except Exception:
         logger.exception("Warming the schools cache failed")
 
@@ -293,16 +308,17 @@ async def list_schools(
             include_crossover=include_crossover,
         )
         # The advanced filters are free-form lists (the site applies them client-side),
-        # so those requests are not cached.
+        # so those requests are not cached; they are built one at a time on their own lock.
         if any([language_focus, special_programs, facilities, teaching_approach]):
-            body = await _build_list_body(
-                db,
-                **filters,
-                language_focus=language_focus,
-                special_programs=special_programs,
-                facilities=facilities,
-                teaching_approach=teaching_approach,
-            )
+            async with _uncached_build_lock:
+                body = await _build_list_body(
+                    db,
+                    **filters,
+                    language_focus=language_focus,
+                    special_programs=special_programs,
+                    facilities=facilities,
+                    teaching_approach=teaching_approach,
+                )
         else:
             gzipped = await _cached_or_build(
                 _list_cache,
