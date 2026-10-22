@@ -11,6 +11,18 @@ export function safeSourceUrl(url) {
   }
 }
 
+/**
+ * The link for a school's website: an http(s) address, or a bare host as registers often
+ * store it ("www.school.bg" opens https://www.school.bg/). Anything else (javascript:, data:)
+ * gets no link.
+ */
+export function safeWebsiteUrl(url) {
+  const value = typeof url === 'string' ? url.trim() : ''
+  if (!value) return null
+  if (/^[a-z][a-z0-9+.-]*:/i.test(value)) return safeSourceUrl(value)
+  return /^[\p{L}\p{N}-]+(\.[\p{L}\p{N}-]+)+([/?#].*)?$/u.test(value) ? safeSourceUrl(`https://${value}`) : null
+}
+
 /** A short name for a source page: its site without "www." ("roerich-school.org"). */
 export function sourceSiteName(url) {
   const safe = safeSourceUrl(url)

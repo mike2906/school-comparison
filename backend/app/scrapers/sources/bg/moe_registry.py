@@ -27,6 +27,7 @@ from app.scrapers.sources.bg.school_kinds import child_bands
 from app.services.geocoding.base import GeocodingResult
 from app.services.geocoding.bg import GeoJSONProvider, city_storage_value
 from app.services.geocoding.nominatim import NominatimProvider
+from app.utils.website_data import safe_website_url
 
 if TYPE_CHECKING:
     from app.models.source_page import SourcePage
@@ -847,7 +848,7 @@ class MoeRegistryAdapter(BaseSourceAdapter):
 
             if detail_data:
                 # Extract website URL
-                website_url = (detail_data.get("website") or "").strip() or None
+                website_url = safe_website_url(detail_data.get("website"))
 
                 # Extract primary location
                 primary_address = self._address_with_locality_hint(

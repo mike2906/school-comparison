@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime
+import re
 from collections.abc import Mapping
 from typing import Any
 
@@ -129,6 +130,50 @@ def website_data_withheld_reasons(attributes: Any, scrape_status: Any) -> list[s
     if status not in WEBSITE_PUBLISHABLE_STATUSES:
         reasons.append("status_not_publishable")
     return reasons
+
+
+_URL_SCHEME_RE = re.compile(r"^[a-z][a-z0-9+.-]*:", re.IGNORECASE)
+
+
+def safe_website_url(url: Any) -> str | None:
+    """A stored website address, or None when it names a scheme other than http(s).
+
+    Register addresses often come without a scheme ("www.school.bg") and stay as they are;
+    a value such as "javascript:..." must never reach a link.
+    """
+    if not isinstance(url, str) or not url.strip():
+        return None
+    url = url.strip()
+    if _URL_SCHEME_RE.match(url) and not url.lower().startswith(("http://", "https://")):
+        return None
+    return url
+
+
+def public_website_url(url: Any, attributes: Any, scrape_status: Any) -> str | None:
+    """The website address a response may show as the school's own.
+
+    Website discovery stores its pick (``attributes.website_candidate_url``) in
+    ``website_url`` before URL validation has looked at it. A pick from web search or a
+    domain guessed from an email address is withheld until validation accepts it
+    (``SITE_ACCEPTED_STATUSES``), like every other website-derived field. Addresses the
+    school's own records give (the register import, ``existing``) are shown.
+    """
+    safe = safe_website_url(url)
+    if safe is None:
+        return None
+    attrs = attributes if isinstance(attributes, Mapping) else {}
+    candidate = attrs.get("website_candidate_url")
+    method = str(attrs.get("website_candidate_method") or "")
+    unchecked_pick = method == "search" or method.startswith("email_domain:")
+    status = str(scrape_status or "").strip().lower()
+    if (
+        unchecked_pick
+        and isinstance(candidate, str)
+        and candidate.strip() == safe
+        and status not in SITE_ACCEPTED_STATUSES
+    ):
+        return None
+    return safe
 
 
 def agent_fees_publishable(attributes: Any, scrape_status: Any) -> bool:
