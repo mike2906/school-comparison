@@ -16,6 +16,14 @@ import keeps both (``base_adapter._sync_source_location``). Each run recomputes 
 bands, so a band the site stops naming goes back. One location with school bands only
 (several are left as they are). No model calls; the default is a dry run.
 
+A school's preschool group also comes from the municipality's admission rounds for a
+preparatory group there (``municipal_preschool``: the ПГУ rows ``import_cutoffs.py`` matched
+to it, in the school's latest campaign; 25 Sofia schools showed grades 1-7 only on
+2026-10-22). That holds with no website, so a school with cut-off rounds is checked even when
+it has none, and so does a school carrying the stage's marks, so they go when the evidence
+does. That band is marked ``MUNICIPAL_ADDED_PREFIX``, which withholding the website keeps. Fact wording alone is not enough: "подготвителна група" is also the city's
+admissions system, a judo club's group and the certificate a first-grader brings.
+
 A kindergarten gets only its nursery group: the register lists private kindergartens' groups
 from age 3, while their sites take children from two (351, 185; parent trial 2026-10-21).
 The stage adds ``nursery`` when the published facts or fee names say so (``site_nursery``),
@@ -35,6 +43,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models import School, SchoolLocationAgeGroupShift
 from app.scrapers.campus_sync import (
     AGE_GROUP_TAG_PREFIX,
+    MUNICIPAL_ADDED_PREFIX,
     SITE_GRADES_ADDED_PREFIX,
     SITE_GRADES_HIDDEN_PREFIX,
     site_hidden_band,
@@ -88,6 +97,14 @@ def _fee_labels(row: Any) -> tuple[Any, ...]:
     context = row.pricing_context
     english = context.get("age_group_en") if isinstance(context, dict) else getattr(context, "age_group_en", None)
     return row.age_group, row.plan_name, english
+
+
+def municipal_preschool(admission_info: Any) -> bool:
+    """Whether the municipality's admission rounds have a preparatory group at the school in
+    its latest campaign (kg.sofia.bg ПГУ rows; ``docs/ADMISSION_CUTOFFS.md``)."""
+    rows = [row for row in (admission_info or {}).get("cutoff_summary") or [] if isinstance(row, dict)]
+    latest = max((str(row.get("campaign") or "") for row in rows), default="")
+    return any(row.get("stage") == "preparatory" and str(row.get("campaign") or "") == latest for row in rows)
 
 
 def site_grades(pricing: Iterable[Any], at_a_glance: Optional[dict[str, Any]]) -> tuple[set[int], Optional[int]]:
@@ -232,11 +249,8 @@ async def run_site_grades(
     from app.schemas.school import SchoolDetailResponse
     from app.services.school_service import SchoolService
 
-    query = select(School.id).where(
-        School.country_code == country,
-        School.website_url.isnot(None),
-        School.scrape_status.in_(SITE_ACCEPTED_STATUSES),
-    )
+    # Schools with no accepted website too: their cut-off rounds can name a preschool group.
+    query = select(School.id).where(School.country_code == country)
     if school_ids:
         query = query.where(School.id.in_(list(school_ids)))
     if city:
@@ -246,9 +260,20 @@ async def run_site_grades(
     service = SchoolService(db)
     sibling_bands = await _same_site_school_bands(db, country)
     changes: list[dict[str, Any]] = []
+    checked = 0
     for school_id in ids:
         school = await service.get_school_with_details(school_id)
         kindergarten = str(school.education_level or "").casefold() in KINDERGARTEN_LEVELS
+        site = bool(school.website_url) and school.scrape_status in SITE_ACCEPTED_STATUSES
+        municipal = not kindergarten and municipal_preschool(school.admission_info)
+        marked = any(
+            str(tag).startswith((SITE_GRADES_ADDED_PREFIX, SITE_GRADES_HIDDEN_PREFIX, MUNICIPAL_ADDED_PREFIX))
+            for location in school.locations
+            for tag in location.location_tags or []
+        )
+        if not site and not municipal and not marked:
+            continue
+        checked += 1
         # A kindergarten's site can only add its nursery group; a school's sets its grade bands.
         bands = {NURSERY} if kindergarten else set(BANDS)
         locations = [
@@ -262,10 +287,13 @@ async def run_site_grades(
         location = locations[0]
         tags = list(location.location_tags or [])
         added, hidden = _tagged(tags, SITE_GRADES_ADDED_PREFIX), set(site_hidden_bands(tags))
+        municipal_added = _tagged(tags, MUNICIPAL_ADDED_PREFIX)
         current = {link.age_group for link in location.age_group_shifts}
         # Bands the website's campus data added are the site's claim, not the register's.
         website = _tagged(tags, AGE_GROUP_TAG_PREFIX)
-        register_bands = ((current - added - website) | hidden) & bands
+        register_bands = ((current - added - municipal_added - website) | hidden) & bands
+        # The municipality names this school, not a site it shares: no sibling rule.
+        municipal_add = {"preschool"} - register_bands if municipal else set()
         published = SchoolDetailResponse.model_validate(school)
         facts = published.school_facts
         if kindergarten:
@@ -280,18 +308,23 @@ async def run_site_grades(
             # Zlatarski: the site's grade-8 admissions are the gymnasium's, its grade-5 ones
             # the primary's).
             add -= sibling_bands(school_id, school.website_url)
+        add -= municipal_add
         # An evening school's "1-12 клас" includes classes for adults.
         name_bg = (school.name_i18n or {}).get("bg")
         add = set(child_bands(add, name_bg, school.education_level))
-        desired = set(child_bands((register_bands | add | (website & bands)) - hide, name_bg, school.education_level))
+        municipal_add = set(child_bands(municipal_add, name_bg, school.education_level))
+        desired = set(
+            child_bands((register_bands | add | municipal_add | (website & bands)) - hide, name_bg, school.education_level)
+        )
         # Tags alone can match while a band came back another way (a campus sync, an import).
-        if add == added and hide == hidden and desired == current & bands:
+        if add == added and municipal_add == municipal_added and hide == hidden and desired == current & bands:
             continue
         change = {
             "school_id": school_id,
             "name_bg": (school.name_i18n or {}).get("bg"),
             "register": sorted(register_bands),
-            "add": sorted(add),
+            "add": sorted(add | municipal_add),
+            "municipal": sorted(municipal_add),
             "hide": sorted(hide),
             # What the apply deletes, including bands an evening school's child_bands drop.
             "remove": sorted((current & bands) - desired),
@@ -310,12 +343,17 @@ async def run_site_grades(
         was_hidden = site_hidden_bands(tags)
         for band in sorted(desired - current):
             db.add(SchoolLocationAgeGroupShift(location_id=location.id, age_group=band, **was_hidden.get(band, {})))
-        kept = [tag for tag in tags if not tag.startswith((SITE_GRADES_ADDED_PREFIX, SITE_GRADES_HIDDEN_PREFIX))]
+        kept = [
+            tag
+            for tag in tags
+            if not tag.startswith((SITE_GRADES_ADDED_PREFIX, SITE_GRADES_HIDDEN_PREFIX, MUNICIPAL_ADDED_PREFIX))
+        ]
         location.location_tags = (
             kept
             + [SITE_GRADES_ADDED_PREFIX + band for band in sorted(add)]
+            + [MUNICIPAL_ADDED_PREFIX + band for band in sorted(municipal_add)]
             + sorted(hidden_tags)
         )
         await db.commit()
         change["applied"] = True
-    return {"checked": len(ids), "changes": changes, "applied": apply}
+    return {"checked": checked, "changes": changes, "applied": apply}

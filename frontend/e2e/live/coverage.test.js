@@ -109,6 +109,14 @@ describe('coverage for realistic parents', () => {
     assertCoverage(t, results)
   })
 
+  test('preschool: a school the city admits preschool groups to is found for a preschool child', async t => {
+    // 25 municipal schools ran preparatory-group rounds but showed grades 1-7 only (#477).
+    const schools = (await allSchools()).filter(school => school.education_level !== 'kindergarten' &&
+      (school.admission_info?.cutoff_summary || []).some(row => row.stage === 'preparatory'))
+    const shown = schools.filter(school => (school.locations || []).some(l => (l.age_groups || []).includes('preschool')))
+    assertCoverage(t, [{ persona: 'preschool child, school with a preparatory round', withData: schools.length, shown: shown.length }])
+  })
+
   test('fees: a search for an age the school takes shows a tuition at most schools with tuition', async t => {
     const schools = (await allSchools()).filter(school => (school.pricing || []).some(row => row.category === 'tuition'))
     const groups = new Map()

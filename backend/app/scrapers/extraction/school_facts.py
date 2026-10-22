@@ -123,8 +123,8 @@ Rules:
     holiday programme's.
   - admission: how children are admitted, only as the quote states it: any of entrance_exam, interview,
     trial_day, open_entry (the quote says there is no test or interview); admission_grade: the grade it is
-    for (0 for kindergarten or preschool), only when the quote names the grade or the kindergarten or
-    preschool class; the grade pupils enter, so admission "after 7th grade" is for grade 8; for a range of grades (grades 2 to 4), admission_grade
+    for (0 for kindergarten or the preschool class before grade 1: подготвителна or предучилищна група,
+    ПГ, ПУК), only when the quote names the grade or the kindergarten or preschool class; the grade pupils enter, so admission "after 7th grade" is for grade 8; for a range of grades (grades 2 to 4), admission_grade
     is the first and admission_grade_to the last; exam_subjects: the subjects of an entrance exam, each as {"bg", "en"}.
   - places: full or waiting_list when the quote says a class or grade has no places or a waiting list for the
     current or coming school year (admission_grade for which grade).
