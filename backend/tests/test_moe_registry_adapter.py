@@ -7,7 +7,9 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.scrapers.sources import get_adapter, list_adapters
+from app.scrapers.sources.bg import moe_registry
 from app.scrapers.sources.bg.moe_registry import MoeRegistryAdapter
+from app.scrapers.sources.bg.registry_browser import browser_response
 from app.services.geocoding.base import GeocodingResult
 
 
@@ -560,24 +562,128 @@ class TestMoeRegistryAdapterIntegration:
         assert school.attributes["missing_location_data"] is True
         assert school.attributes["missing_location_reason"] == "no_address_and_geojson_miss"
 
-    async def test_discover_names_a_cloudflare_challenge(self, db_session: AsyncSession):
-        """A Cloudflare bot check in front of the register says so instead of a bare 403."""
-        adapter = MoeRegistryAdapter(db=db_session)
+    @staticmethod
+    def _challenged_client(adapter):
         challenge = httpx.Response(
             403,
             headers={"cf-mitigated": "challenge"},
             text="<title>Just a moment...</title>",
             request=httpx.Request("POST", adapter.PUBLIC_REGISTER_URL),
         )
-
         mock_client = AsyncMock()
         mock_client.__aenter__.return_value = mock_client
         mock_client.__aexit__.return_value = None
         mock_client.post = AsyncMock(return_value=challenge)
+        return mock_client, challenge
 
-        with patch("httpx.AsyncClient", return_value=mock_client):
-            with pytest.raises(RuntimeError, match="Cloudflare challenge"):
-                await adapter.discover(limit=1, fetch_details=False)
+    @staticmethod
+    def _browser(post):
+        class FakeBrowser:
+            opened = []
+
+            def __init__(self, origin):
+                FakeBrowser.opened.append(origin)
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *exc_info):
+                return None
+
+            async def post(self, url, json=None, headers=None):
+                return post(url)
+
+        return FakeBrowser
+
+    async def test_discover_names_a_cloudflare_challenge_a_browser_cannot_pass(self, db_session: AsyncSession):
+        """A Cloudflare bot check that stops the browser too says so instead of a bare 403."""
+        adapter = MoeRegistryAdapter(db=db_session)
+        mock_client, challenge = self._challenged_client(adapter)
+        browser = self._browser(lambda url: challenge)
+
+        with (
+            patch("httpx.AsyncClient", return_value=mock_client),
+            patch(f"{moe_registry.__name__}.BrowserClient", browser),
+            pytest.raises(RuntimeError, match="Cloudflare challenge .* even to a headless browser"),
+        ):
+            await adapter.discover(limit=1, fetch_details=False)
+        assert browser.opened == [adapter.API_BASE_URL]
+
+    async def test_discover_retries_a_challenged_register_through_a_browser(self, db_session: AsyncSession):
+        """Cloudflare screens out scripts: the same requests sent from a browser page get the register."""
+        adapter = MoeRegistryAdapter(db=db_session)
+        mock_client, _ = self._challenged_client(adapter)
+        institution = {
+            "id": 2200015,
+            "instid": 2200015,
+            "name": "Test School",
+            "region": 22,
+            "municipality": 220,
+            "town": 68134,
+            "instType": 1,
+            "detailedSchoolType": 122,
+            "financialSchoolType": 1,
+            "transformType": 5,
+            "instKind": 3,
+            "formName": "institution",
+            "procID": 9642,
+        }
+
+        def answer(url):
+            if "townMultiple" in url:
+                payload = {"status": 1, "data": [{"code": 68134, "label": "София"}]}
+            elif "public-register" in url:
+                payload = {"status": 1, "data": {"publicInstitutions": [institution]}}
+            else:
+                payload = {"status": 1, "data": []}
+            return httpx.Response(200, json=payload, request=httpx.Request("POST", url))
+
+        with (
+            patch("httpx.AsyncClient", return_value=mock_client),
+            patch(f"{moe_registry.__name__}.BrowserClient", self._browser(answer)),
+        ):
+            schools = await adapter.discover(limit=1, fetch_details=False)
+
+        assert [school.institutional_id for school in schools] == ["2200015"]
+        assert adapter._town_labels == {68134: "София"}  # the labels came through the browser too
+        assert mock_client.post.await_count == 1
+
+    async def test_a_challenge_on_a_detail_request_stops_the_import(self, db_session: AsyncSession):
+        """A clearance that runs out mid-run must not leave schools without their details."""
+        adapter = MoeRegistryAdapter(db=db_session)
+        mock_client, challenge = self._challenged_client(adapter)
+        institution = {"id": 1, "instid": 2200015, "name": "Test School", "region": 22, "procID": 9642}
+
+        def answer(url):
+            if "public-register" in url:
+                payload = {"status": 1, "data": {"publicInstitutions": [institution]}}
+                return httpx.Response(200, json=payload, request=httpx.Request("POST", url))
+            if "data/get/institution" in url:
+                return challenge
+            return httpx.Response(200, json={"status": 1, "data": []}, request=httpx.Request("POST", url))
+
+        with (
+            patch("httpx.AsyncClient", return_value=mock_client),
+            patch(f"{moe_registry.__name__}.BrowserClient", self._browser(answer)),
+            pytest.raises(moe_registry.RegisterBlocked, match="mid-run"),
+        ):
+            await adapter.discover(limit=1, fetch_details=True)
+
+
+def test_a_browser_response_reads_like_the_api_response():
+    """The page's fetch hands back decoded text: no second decompression, Cyrillic intact."""
+    url = MoeRegistryAdapter.PUBLIC_REGISTER_URL
+    response = browser_response(
+        url,
+        {
+            "status": 200,
+            "headers": {"content-type": "application/json; charset=windows-1251", "content-encoding": "br"},
+            "text": '{"status": 1, "data": [{"label": "София"}]}',
+        },
+    )
+    assert response.json() == {"status": 1, "data": [{"label": "София"}]}
+    challenge = browser_response(url, {"status": 403, "headers": {"cf-mitigated": "challenge"}, "text": "<title>"})
+    assert moe_registry.is_cloudflare_challenge(challenge)
 
 
 @pytest.mark.asyncio

@@ -37,6 +37,12 @@ backup
 stamp="$(date -u +%Y%m%dT%H%M%SZ)"
 cd "$repo_root/backend"
 cli() { timeout -k 5m "$run_timeout" uv run python -m app.scrapers.cli "$@" > /dev/null; }
+# The ministry register is behind a Cloudflare check that only a browser passes; the import
+# falls back to headless Chromium (registry_browser.py). Installing it again is a no-op, and a
+# failed install only matters if the register is challenged: then the import's error says so.
+browser_log="$state/register-browser-$stamp.log"
+timeout -k 5m 15m uv run playwright install chromium > "$browser_log" 2>&1 ||
+	log "installing the register's headless browser failed (output: $browser_log)"
 # Keep the import's output: its adapter errors (a blocked ministry API) go into the issue.
 discover_log="$state/register-discover-$stamp.log"
 COLUMNS=400 timeout -k 5m "$run_timeout" uv run python -m app.scrapers.cli run --stage discover --city sofia > "$discover_log" 2>&1 ||
@@ -49,7 +55,7 @@ for report in "$state"/register-*-"$stamp".json; do
 	[ -f "$report" ] || continue
 	log "$(basename "$report"): $(field "$report" 'r["outcomes"]')"
 done
-find "$state" \( -name 'register-*.json' -o -name 'register-discover-*.log' \) -mtime +90 -delete
+find "$state" \( -name 'register-*.json' -o -name 'register-discover-*.log' -o -name 'register-browser-*.log' \) -mtime +90 -delete
 
 started="$(date -u +%s)"
 # A small reserve per call, as in watch_open_days.sh: a pin-agent call costs well under a cent.

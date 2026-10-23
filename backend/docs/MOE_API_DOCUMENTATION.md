@@ -7,8 +7,13 @@ The Bulgarian Ministry of Education provides a public API at `https://ri-api.mon
 ruo.mon.bg, mon.bg) answers HTTP 403 with `cf-mitigated: challenge`: a Cloudflare bot check
 that only a real browser passes. Checked on 2026-10-21 from a cloud machine with and without a
 browser User-Agent and Origin/Referer (the PC's import got a 403 the same day), so it is not a
-header, rate limit or endpoint change. The adapter names the challenge in its error, and the
-scheduled register refresh puts that in its issue.
+header, rate limit or endpoint change. On a challenge the adapter sends every request again
+from a headless Chromium page opened on the API's origin (`registry_browser.py`, Playwright).
+The block is by network: cloud and GitHub runner addresses stay on the challenge even in a
+browser (tested 2026-10-21), so this runs on the PC's home connection. If the browser is
+challenged too, the adapter's error says so and the scheduled register refresh puts it in its issue.
+GitHub runners can download static files under `ruo.mon.bg/.../files/` (the pages listing them
+stay blocked).
 
 ## Base URL
 ```
