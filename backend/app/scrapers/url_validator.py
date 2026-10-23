@@ -487,10 +487,11 @@ class URLValidator:
         name_token_hits = self._count_school_name_token_hits(identity_context, name_tokens)
         min_name_token_hits = self._minimum_required_name_token_hits(name_tokens)
         explicit_name_match = self._has_explicit_expected_name_match(identity_context, expected_names)
-        if explicit_name_match:
+        whole_name = soup is not None and self._names_whole_name(site_identity_texts(soup), name_tokens)
+        if explicit_name_match or whole_name:
             min_name_token_hits = 1
         directory_signals = self._count_directory_signals(final_url, text_content, soup)
-        identity_mismatch = self._find_identity_mismatch(page_identity_labels, expected_names)
+        identity_mismatch = None if whole_name else self._find_identity_mismatch(page_identity_labels, expected_names)
         # The title, main headings and site name only: a site's other labels are its menu and
         # links. A page read by the browser has none of those apart, so it is not checked
         # (nor does the weekly site-city stage read it).
@@ -793,6 +794,26 @@ class URLValidator:
             add_label(anchor.get_text(" ", strip=True))
 
         return labels[:20]
+
+    def _names_whole_name(self, texts: list[str], expected_tokens) -> bool:
+        """True when the page's title, a main heading or its site name has every token of
+        the expected name in one script, each as a whole word.
+
+        A one-word name ("Евростандарт", "Детската") has one token a script, so it can
+        never reach two token hits, and 618's title ("Евростандарт - частна английска
+        бизнес гимназия, ...") is long enough to count as generic, so a menu item such as
+        "Училищен живот - Галерия" was taken for a rival identity. Menu labels do not
+        count here: "Лиценз на детската градина" is on every kindergarten's site."""
+        for script_tokens in (
+            {token for token in expected_tokens if re.search(r"[а-я]", token)},
+            {token for token in expected_tokens if not re.search(r"[а-я]", token)},
+        ):
+            if script_tokens and any(
+                all(re.search(rf"(?<![^\W\d_]){re.escape(token)}(?![^\W\d_])", text.casefold()) for token in script_tokens)
+                for text in texts
+            ):
+                return True
+        return False
 
     def _find_identity_mismatch(self, page_identity_labels: list[str], expected_names: list[str]) -> Optional[str]:
         expected_tokens = set(self._extract_expected_name_tokens(expected_names))
