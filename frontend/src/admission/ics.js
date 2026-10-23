@@ -84,8 +84,8 @@ export function buildIcs(calendar, { t, formatDate, birthYear, pageUrl, stamp, h
     const notes = [title]
     if (entry.estimated) {
       notes.push(
-        entry.publishedBy
-          ? t('calendar.estimatedUntil', { date: formatDate(`${entry.startYear}-${entry.publishedBy}`) })
+        entry.scheduleDue
+          ? t('calendar.estimatedUntil', { date: formatDate(entry.scheduleDue) })
           : t('calendar.estimated')
       )
     }
@@ -108,11 +108,12 @@ export function buildIcs(calendar, { t, formatDate, birthYear, pageUrl, stamp, h
         `DESCRIPTION:${escapeText(notes.join('\n'))}`,
         'TRANSP:TRANSPARENT',
       )
-      // A reminder a week and a day before each application deadline (apps that honour
-      // alarms in subscribed calendars, such as Apple Calendar, show them).
+      // Reminders at 09:00 a week and a day before the last day to apply, counted from the
+      // event's end so a deadline spanning days warns before its last one (apps that
+      // honour alarms in subscribed calendars, such as Apple Calendar, show them).
       if (milestone.key === 'applications_lock' || milestone.key === 'applications') {
-        for (const trigger of ['-P7D', '-P1D']) {
-          lines.push('BEGIN:VALARM', 'ACTION:DISPLAY', `DESCRIPTION:${escapeText(summary)}`, `TRIGGER:${trigger}`, 'END:VALARM')
+        for (const trigger of ['-P7DT15H', '-P1DT15H']) {
+          lines.push('BEGIN:VALARM', 'ACTION:DISPLAY', `DESCRIPTION:${escapeText(summary)}`, `TRIGGER;RELATED=END:${trigger}`, 'END:VALARM')
         }
       }
       lines.push('END:VEVENT')

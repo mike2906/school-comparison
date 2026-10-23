@@ -110,12 +110,14 @@ export function milestoneEnd(milestone) {
 }
 
 /**
- * Every step of a child born in `birthYear` whose campaign has not ended on `today`
- * (ISO date, Sofia): `{ step, startYear, estimated, rulesStatus, publishedBy, milestones }`,
- * in date order, without the ones already over (and an estimated campaign only up to its
- * first round). `rulesStatus` is the campaign file's `verified.status`, or null when the
- * campaign has no file yet (its rules are not written down either). An estimated campaign
- * whose official dates are due by a known day gets a `schedule_due` milestone that day.
+ * Every step of a child born in `birthYear` with something still ahead on `today` (ISO
+ * date, Sofia): `{ step, startYear, estimated, rulesStatus, scheduleDue, milestones }`, in
+ * date order. A running campaign keeps its past milestones, so a subscribed calendar keeps
+ * them too (the page hides them with `upcoming`); an estimated campaign lists only its
+ * first round. `rulesStatus` is the campaign file's `verified.status`, or null when the
+ * campaign has no file yet (its rules are not written down either). `scheduleDue` is the
+ * day an estimated campaign's official dates are due, while it is still ahead; that day
+ * gets a `schedule_due` milestone.
  */
 export function childCalendar(ruleSets, birthYear, today) {
   const steps = []
@@ -125,22 +127,27 @@ export function childCalendar(ruleSets, birthYear, today) {
     if (!dates) continue
     // Estimated later rounds would only fill a calendar with guesses: an estimated
     // campaign shows its first round, and the rest arrive with the official dates.
-    // A campaign still running shows what is left of it.
-    const milestones = dates.milestones.filter(m => (!dates.estimated || (m.round ?? 1) === 1) && milestoneEnd(m) >= today)
+    const milestones = dates.milestones.filter(m => !dates.estimated || (m.round ?? 1) === 1)
     const due = dates.estimated && dates.publishedBy ? `${startYear}-${dates.publishedBy}` : null
-    if (due && due >= today) milestones.unshift({ key: 'schedule_due', date: due })
-    if (milestones.length === 0) continue
+    const scheduleDue = due && due >= today ? due : null
+    if (scheduleDue) milestones.unshift({ key: 'schedule_due', date: scheduleDue })
+    if (!milestones.some(m => milestoneEnd(m) >= today)) continue
     steps.push({
       step,
       startYear,
       estimated: dates.estimated,
       rulesStatus: dates.ruleSet?.verified?.status ?? null,
-      publishedBy: dates.publishedBy,
+      scheduleDue,
       officialUrl: dates.ruleSet?.official_system_url ?? null,
       milestones: milestones.sort((a, b) => a.date.localeCompare(b.date)),
     })
   }
   return steps
+}
+
+/** The milestones of a calendar step not yet over on `today`. */
+export function upcoming(entry, today) {
+  return entry.milestones.filter(m => milestoneEnd(m) >= today)
 }
 
 /** Birth years with something still to come on `today`: from 8th-graders to next year's babies. */

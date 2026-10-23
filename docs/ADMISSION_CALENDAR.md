@@ -31,7 +31,7 @@ back to) and is saved only if the parent taps "Remember this year on this device
 
 | Step | September start | Dates from |
 |---|---|---|
-| Nursery (optional) | birth year + 1 | kindergarten rule file (one ordinance, one ИСОДЗ calendar) |
+| Nursery (optional, two years) | birth year + 1 and + 2 | kindergarten rule file (one ordinance, one ИСОДЗ calendar) |
 | Kindergarten, first group | + 3 | kindergarten rule file |
 | Preparatory group at a school (optional) | + 5 | kindergarten rule file |
 | First grade | + 7 | first-grade rule file |
@@ -74,4 +74,7 @@ whose rules are not verified for that campaign says the rules may still change.
 drop `schedule.estimated` (the rule watch's drafter is told to). Nothing else changes: the
 next deploy updates the page and every feed.
 
-Past dates are left out: a campaign still running shows only what is left of it.
+A campaign still running keeps its past dates in the feed (a subscribed calendar would
+otherwise delete them at the next deploy); the page shows only what is left of it. A
+campaign that has ended drops out of both. Reminders (Apple Calendar and others that
+honour them in subscriptions) fire at 09:00 a week and a day before the last day to apply.

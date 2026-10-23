@@ -5,19 +5,8 @@
  */
 import { calendarBirthYears, childCalendar, feedPath } from '../admission/calendar.js'
 import { buildIcs } from '../admission/ics.js'
+import { formatRankingDay } from '../admission/calculator.js'
 import { languagePath } from '../utils/languageUrl.js'
-
-const LOCALES = { bg: 'bg-BG', en: 'en-GB' }
-
-export function dateFormatter(language) {
-  const format = new Intl.DateTimeFormat(LOCALES[language] || 'en-GB', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-    timeZone: 'UTC',
-  })
-  return iso => format.format(new Date(`${iso}T00:00:00Z`))
-}
 
 /** The calendar page for a birth year, as an absolute URL. */
 export function calendarPageUrl(origin, language, birthYear) {
@@ -35,7 +24,7 @@ export function calendarFeeds(ruleSets, { t, language, origin, today, now }) {
     file: languagePath(feedPath(birthYear), language).replace(/^\//, ''),
     content: buildIcs(childCalendar(ruleSets, birthYear, today), {
       t,
-      formatDate: dateFormatter(language),
+      formatDate: iso => formatRankingDay(iso, language),
       birthYear,
       pageUrl: calendarPageUrl(origin, language, birthYear),
       stamp,

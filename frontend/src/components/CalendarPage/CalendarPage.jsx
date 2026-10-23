@@ -3,27 +3,20 @@ import { useTranslation } from 'react-i18next'
 import { Link, useSearchParams } from 'react-router-dom'
 import Layout from '../Layout/Layout'
 import { RULE_SETS } from '../../admission/ruleSets'
-import { sofiaToday } from '../../admission/calculator'
-import { calendarBirthYears, childCalendar, DEADLINES, feedPath } from '../../admission/calendar'
+import { formatRankingDay, sofiaToday } from '../../admission/calculator'
+import { calendarBirthYears, childCalendar, DEADLINES, feedPath, upcoming } from '../../admission/calendar'
 import { milestoneLabel, stepTitle } from '../../admission/ics'
 import { childBirthYear, getSaved, saveChild, subscribeSaved } from '../../admission/saved'
 import { intlLocale } from '../../utils/format'
 import { languagePath } from '../../utils/languageUrl'
 import { Field, INPUT_CLASS } from '../AdmissionPage/fields'
 
-/** The calculator tab that works out points for a calendar step. */
-const CALCULATOR_STAGE = { nursery: 'kindergarten', kindergarten: 'kindergarten', preparatory: 'kindergarten', grade_1: 'grade_1', grade_8: 'grade_8' }
-
-function useDates(language) {
+function useDaySpan(language) {
   return useMemo(() => {
     const locale = intlLocale(language)
     const day = new Intl.DateTimeFormat(locale, { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' })
-    const long = new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' })
     const asDate = iso => new Date(`${iso}T00:00:00Z`)
-    return {
-      span: m => (m.end ? day.formatRange(asDate(m.date), asDate(m.end)) : day.format(asDate(m.date))),
-      long: iso => long.format(asDate(iso)),
-    }
+    return m => (m.end ? day.formatRange(asDate(m.date), asDate(m.end)) : day.format(asDate(m.date)))
   }, [language])
 }
 
@@ -52,9 +45,9 @@ function Subscribe({ birthYear, language }) {
   )
 }
 
-function Step({ entry }) {
+function Step({ entry, today }) {
   const { t, i18n } = useTranslation()
-  const dates = useDates(i18n.language)
+  const span = useDaySpan(i18n.language)
   const id = entry.step.id
   return (
     <section className="rounded-2xl border border-neutral-200 bg-white p-5 md:p-6" data-step={id}>
@@ -70,18 +63,18 @@ function Step({ entry }) {
       <p className="mt-1 text-sm text-neutral-600">{t(`calendar.stepNotes.${id}`)}</p>
       {entry.estimated && (
         <p className="mt-1 text-sm text-amber-800">
-          {entry.publishedBy
-            ? t('calendar.estimatedUntil', { date: dates.long(`${entry.startYear}-${entry.publishedBy}`) })
+          {entry.scheduleDue
+            ? t('calendar.estimatedUntil', { date: formatRankingDay(entry.scheduleDue, i18n.language) })
             : t('calendar.estimated')}
         </p>
       )}
       {entry.rulesStatus !== 'verified' && <p className="mt-1 text-sm text-neutral-600">{t('calendar.rulesProvisional')}</p>}
       <ol className="mt-4 space-y-2">
-        {entry.milestones.map(milestone => {
+        {upcoming(entry, today).map(milestone => {
           const deadline = DEADLINES.has(milestone.key)
           return (
             <li key={`${milestone.key}-${milestone.round ?? ''}`} className="flex flex-col gap-0.5 sm:flex-row sm:gap-4">
-              <span className="text-sm text-neutral-500 sm:w-64 sm:flex-shrink-0">{dates.span(milestone)}</span>
+              <span className="text-sm text-neutral-500 sm:w-64 sm:flex-shrink-0">{span(milestone)}</span>
               <span className={`text-sm ${deadline ? 'font-semibold text-neutral-900' : 'text-neutral-800'}`}>
                 {milestoneLabel(t, entry.step, milestone)}
               </span>
@@ -90,7 +83,7 @@ function Step({ entry }) {
         })}
       </ol>
       <p className="mt-4 text-sm">
-        <Link to={`/admission?stage=${CALCULATOR_STAGE[id]}`} className="font-medium text-primary-700 underline">
+        <Link to={`/admission?stage=${entry.step.ruleStage}`} className="font-medium text-primary-700 underline">
           {t('calendar.calculatorLink')}
         </Link>
       </p>
@@ -105,7 +98,8 @@ function CalendarPage() {
   const today = sofiaToday()
   const years = useMemo(() => calendarBirthYears(RULE_SETS, today), [today])
   const savedYear = childBirthYear(saved)
-  const fromUrl = Number(params.get('born')) || null
+  const born = Number(params.get('born'))
+  const fromUrl = Number.isInteger(born) && born > 1900 ? born : null
   const birthYear = fromUrl ?? savedYear
   const calendar = useMemo(() => (birthYear ? childCalendar(RULE_SETS, birthYear, today) : []), [birthYear, today])
 
@@ -163,10 +157,11 @@ function CalendarPage() {
         )}
         {calendar.length > 0 && (
           <>
-            <Subscribe birthYear={birthYear} language={i18n.language} />
+            {/* The build writes a feed for each year the picker offers, and only those. */}
+            {years.includes(birthYear) && <Subscribe birthYear={birthYear} language={i18n.language} />}
             <div className="mt-6 space-y-4">
               {calendar.map(entry => (
-                <Step key={`${entry.step.id}-${entry.startYear}`} entry={entry} />
+                <Step key={`${entry.step.id}-${entry.startYear}`} entry={entry} today={today} />
               ))}
             </div>
           </>

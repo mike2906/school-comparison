@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 
-import { calendarBirthYears, CALENDAR_STEPS, campaignDates, childCalendar, milestoneEnd, shiftToYear } from './calendar.js'
+import { calendarBirthYears, CALENDAR_STEPS, campaignDates, childCalendar, milestoneEnd, shiftToYear, upcoming } from './calendar.js'
 import { buildIcs, foldLine } from './ics.js'
 import { createTranslator } from '../prerender/pages.js'
 import { calendarFeeds } from '../prerender/calendars.js'
@@ -75,6 +75,15 @@ test('estimated campaigns land on the dates their own rule files estimate', () =
   }
 })
 
+const kindergartenDue = calendar => calendar.find(e => e.step.id === 'kindergarten').scheduleDue
+
+test('a due date already past is not promised', () => {
+  // If the 2027 dates are still not on file in February, the calendar stops saying "by 5 January".
+  const calendar = childCalendar(RULE_SETS, 2024, '2027-02-01')
+  assert.equal(kindergartenDue(calendar), null)
+  assert.ok(!calendar.find(e => e.step.id === 'kindergarten').milestones.some(m => m.key === 'schedule_due'))
+})
+
 test('a child born in 2024 gets every step ahead, estimated where dates are not out', () => {
   const calendar = childCalendar(RULE_SETS, 2024, '2026-10-23')
   assert.deepEqual(calendar.map(e => [e.step.id, e.startYear]), [
@@ -85,7 +94,10 @@ test('a child born in 2024 gets every step ahead, estimated where dates are not 
     ['grade_1', 2031],
     ['grade_8', 2038],
   ])
-  assert.deepEqual(calendar[0].milestones.map(m => m.key), ['current_rankings'])
+  assert.deepEqual(upcoming(calendar[0], '2026-10-23').map(m => m.key), ['current_rankings'])
+  // The feed keeps the campaign's past dates, so subscribed calendars do not lose them.
+  assert.equal(calendar[0].milestones[0].key, 'free_places')
+  assert.equal(kindergartenDue(calendar), '2027-01-05')
   const kindergarten = calendar[1]
   assert.equal(kindergarten.estimated, true)
   assert.equal(kindergarten.rulesStatus, 'provisional')
@@ -105,8 +117,8 @@ test('a campaign still ranking stays; an ended one goes', () => {
   assert.equal(running[0].startYear, 2026)
   assert.equal(running[0].estimated, false)
   assert.equal(running[0].rulesStatus, 'verified')
-  // Only what is left of it: the autumn rankings for free places.
-  assert.deepEqual(running[0].milestones.map(m => m.key), ['current_rankings'])
+  // The page shows only what is left of it: the autumn rankings for free places.
+  assert.deepEqual(upcoming(running[0], '2026-10-23').map(m => m.key), ['current_rankings'])
   const after = childCalendar(RULE_SETS, 2023, '2026-11-28')
   assert.notEqual(after[0].startYear, 2026)
   // Born 2012: eighth grade in 2026 has ended, nothing is left.
@@ -147,16 +159,19 @@ for (const language of ['bg', 'en']) {
     assert.equal((unfolded.match(/BEGIN:VEVENT/g) || []).length, uids.length)
     assert.match(unfolded, /DTSTART;VALUE=DATE:20270520\r\nDTEND;VALUE=DATE:20270521/)
     assert.match(unfolded, /\?born=2024/)
-    // Two reminders per application deadline: kindergarten, preparatory group, 1st grade
-    // and 8th grade's first stage (later rounds of an estimated campaign are left out).
-    assert.equal((unfolded.match(/BEGIN:VALARM/g) || []).length, 2 * 4)
+    // Two reminders per application deadline: the running 2026 nursery campaign (past, kept),
+    // kindergarten, preparatory group, 1st grade and 8th grade's first stage (later rounds
+    // of an estimated campaign are left out).
+    assert.equal((unfolded.match(/BEGIN:VALARM/g) || []).length, 2 * 5)
     assert.doesNotMatch(unfolded, /UID:born2024-grade_8-2038-ranking-2@/)
+    assert.match(unfolded, /TRIGGER;RELATED=END:-P1DT15H/)
   })
 }
 
 test('a range event ends the day after its last day', () => {
   const unfolded = feedFor('en', 2023, '2026-05-01').content.replace(/\r\n /g, '')
-  // 2026 kindergarten enrolment after the first ranking: 26 May to 5 June.
+  // 2026 kindergarten enrolment after the first ranking: 26 May to 5 June, still in the feed in October.
+  assert.match(feedFor('en', 2023).content.replace(/\r\n /g, ''), /UID:born2023-kindergarten-2026-enrol-1@/)
   assert.match(unfolded, /UID:born2023-kindergarten-2026-enrol-1@schooldecider.com\r\nDTSTAMP:20261023T120000Z\r\nDTSTART;VALUE=DATE:20260526\r\nDTEND;VALUE=DATE:20260606/)
 })
 
