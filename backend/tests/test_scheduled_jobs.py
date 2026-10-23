@@ -304,10 +304,11 @@ def test_a_blocked_register_names_the_cause_in_its_issue(pc):
     assert "Cloudflare challenge" in pc.log("register")
 
 
-def test_a_register_browser_that_will_not_install_stops_before_the_import(pc):
+def test_a_register_browser_that_will_not_install_still_runs_the_import(pc):
     pc.run("refresh_register.sh", "2026-10-20T12:50")
     pc.run("refresh_register.sh", "2026-11-05T12:50", BROWSER_FAIL="1")
-    assert pc.code == 1 and len(pc.calls) == 1 and "installing the register's headless browser failed" in pc.issues
+    assert pc.code == 0 and "installing the register's headless browser failed" in pc.log("register")
+    assert pc.calls[-1] == {"pins": "1 0.05"}
 
 
 def test_an_untracked_file_under_backend_runs_nothing(pc):

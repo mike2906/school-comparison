@@ -21,6 +21,21 @@ _FETCH_JS = """async ([url, body, headers]) => {
 }"""
 
 
+def browser_response(url: str, result: dict) -> httpx.Response:
+    """An httpx.Response from what the page's fetch returned.
+
+    The browser has already decompressed and decoded the body, so the encoding headers go and
+    the text is stored as UTF-8.
+    """
+    content_type = result["headers"].get("content-type", "text/plain").split(";")[0]
+    headers = {"content-type": f"{content_type}; charset=utf-8"}
+    if "cf-mitigated" in result["headers"]:
+        headers["cf-mitigated"] = result["headers"]["cf-mitigated"]
+    return httpx.Response(
+        result["status"], headers=headers, content=result["text"].encode(), request=httpx.Request("POST", url)
+    )
+
+
 class BrowserClient:
     """The small part of httpx.AsyncClient the register adapter uses (`post`), sent from a browser page."""
 
@@ -32,14 +47,19 @@ class BrowserClient:
         self._page = None
 
     async def __aenter__(self) -> BrowserClient:
-        try:
-            from playwright.async_api import async_playwright
-        except ImportError as exc:  # pragma: no cover - the dependency is in pyproject
-            raise RuntimeError("the register needs a browser but Playwright is not installed") from exc
+        from playwright.async_api import async_playwright
+
         self._playwright = await async_playwright().start()
         try:
             self._browser = await self._playwright.chromium.launch(headless=True)
-            self._page = await self._browser.new_page(locale="bg-BG")
+            # Headless Chromium names itself "HeadlessChrome"; send the ordinary browser's name.
+            self._page = await self._browser.new_page(
+                locale="bg-BG",
+                user_agent=(
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko)"
+                    f" Chrome/{self._browser.version} Safari/537.36"
+                ),
+            )
             # The API's own origin: the page passes (or is let through) the challenge there,
             # and later requests are same-origin, so their status and headers stay readable.
             await self._page.goto(self.origin, wait_until="domcontentloaded", timeout=60_000)
@@ -57,9 +77,14 @@ class BrowserClient:
         self._browser = self._playwright = self._page = None
 
     async def _wait_for_clearance(self) -> None:
+        from playwright.async_api import Error as PlaywrightError
+
         deadline = time.monotonic() + self.wait_seconds
         while True:
-            title = await self._page.title()
+            try:
+                title = await self._page.title()
+            except PlaywrightError:
+                title = _CHALLENGE_TITLES[0]  # the challenge page reloading itself as it passes
             if not any(marker in title for marker in _CHALLENGE_TITLES):
                 return
             if time.monotonic() > deadline:
@@ -70,10 +95,4 @@ class BrowserClient:
             await asyncio.sleep(1)
 
     async def post(self, url: str, json: dict | None = None, headers: dict | None = None) -> httpx.Response:
-        result = await self._page.evaluate(_FETCH_JS, [url, json or {}, headers or {}])
-        return httpx.Response(
-            result["status"],
-            headers=result["headers"],
-            content=result["text"].encode(),
-            request=httpx.Request("POST", url),
-        )
+        return browser_response(url, await self._page.evaluate(_FETCH_JS, [url, json or {}, headers or {}]))

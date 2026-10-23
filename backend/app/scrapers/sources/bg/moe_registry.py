@@ -40,6 +40,10 @@ logger = logging.getLogger(__name__)
 def is_cloudflare_challenge(response: httpx.Response) -> bool:
     """Cloudflare's bot check ("Just a moment..."), which only a real browser passes."""
     return response.status_code == 403 and response.headers.get("cf-mitigated") == "challenge"
+
+
+class RegisterBlocked(RuntimeError):
+    """The register stopped answering mid-run: stop the import rather than keep schools without details."""
 _LOCALITY_MARKER_RE = re.compile(r"\b(?:гр\.?|с\.?|село|район|кв\.|ж\.к\.)\b", flags=re.IGNORECASE)
 
 
@@ -479,6 +483,8 @@ class MoeRegistryAdapter(BaseSourceAdapter):
                     if fetch_details and (changed or sampled):
                         await self._delay()
 
+                except RegisterBlocked:
+                    raise
                 except Exception as e:
                     logger.error(f"Error processing institution {inst_data.get('id')}: {e}")
                     continue
@@ -738,6 +744,8 @@ class MoeRegistryAdapter(BaseSourceAdapter):
                     "Content-Type": "application/json",
                 },
             )
+            if is_cloudflare_challenge(response):
+                raise RegisterBlocked(f"{self.API_BASE_URL} started answering with a Cloudflare challenge mid-run")
             response.raise_for_status()
 
             data = response.json()
@@ -754,6 +762,8 @@ class MoeRegistryAdapter(BaseSourceAdapter):
             # Return first item (should only be one)
             return detail_list[0]
 
+        except RegisterBlocked:
+            raise
         except Exception as e:
             logger.error(f"Error fetching detail for institution {inst_data.get('instid')}: {e}")
             return None
