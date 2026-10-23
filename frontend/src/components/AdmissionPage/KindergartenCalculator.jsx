@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { formatRange, measuredOnFor, rowFitsChild, sofiaToday } from '../../admission/calculator'
 import { districtLabel, sortedDistricts } from '../../admission/catchments'
 import { evaluateKindergarten, KINDERGARTEN_GROUPS, KINDERGARTEN_INITIAL, kindergartenAgeGroup, SOCIAL_FLAGS } from '../../admission/inputs'
-import { getSaved, saveStage, siblingsWith, withSiblings } from '../../admission/saved'
+import { childBirthYear, getSaved, saveStage, siblingsWith, withSiblings } from '../../admission/saved'
 import { useSavedAdmission } from '../../hooks/useSavedAdmission'
 import { birthYearsFor } from '../../utils/ageSelection'
 import { Choice, DateField, Field, INPUT_CLASS, MobileTotal, Section, YesNo } from './fields'
@@ -18,6 +18,8 @@ import { savedListFilters, savedListUrl } from '../../admission/schoolVerdict'
 const PER_PLACE = { siblingThere: null, wishRank: 1, sameDistrict: null }
 const withoutPlace = answers => ({ ...answers, ...PER_PLACE })
 
+const kindergartenBirthYears = startYear => birthYearsFor(startYear, 7).filter(year => year < startYear)
+
 /**
  * Sofia municipal nursery, kindergarten and preparatory-group points. Without a
  * kindergarten the district is a yes/no question; with one, the parent picks their own
@@ -27,7 +29,10 @@ function KindergartenCalculator({ selected, startYear, kindergarten, districts, 
   const { t, i18n } = useTranslation()
   const [a, setA] = useState(() => {
     const saved = getSaved().kindergarten
-    return saved ? { ...KINDERGARTEN_INITIAL, ...withoutPlace(saved.answers), ...saved.siblings?.[kindergarten?.id] } : KINDERGARTEN_INITIAL
+    // The child's birth year given on another page, so the parent does not give it twice.
+    return saved
+      ? { ...KINDERGARTEN_INITIAL, ...withoutPlace(saved.answers), ...saved.siblings?.[kindergarten?.id] }
+      : { ...KINDERGARTEN_INITIAL, birthYear: kindergartenBirthYears(startYear).includes(childBirthYear()) ? childBirthYear() : null }
   })
   const saved = useSavedAdmission().kindergarten
   const set = (key, value) => setA(prev => ({ ...prev, [key]: value }))
@@ -65,7 +70,7 @@ function KindergartenCalculator({ selected, startYear, kindergarten, districts, 
   const listFilters = savedListFilters('kindergarten', { startYear, answers: a })
   const listUrl = listFilters ? savedListUrl(listFilters) : '/search'
 
-  const yearOptions = birthYearsFor(startYear, 7).filter(year => year < startYear)
+  const yearOptions = kindergartenBirthYears(startYear)
   const activityOptions = [
     { value: 'working', label: t('admissionCalc.kg.activity.working') },
     { value: 'student', label: t('admissionCalc.kg.activity.student') },

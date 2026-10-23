@@ -4,7 +4,7 @@ import assert from 'node:assert/strict'
 import { parseSaved } from './saved.js'
 
 test('anything unreadable or from another version counts as nothing saved', () => {
-  const empty = { version: 1, home: null, kindergarten: null, grade_1: null }
+  const empty = { version: 1, child: null, home: null, kindergarten: null, grade_1: null }
   for (const text of [null, '', 'not json', '{"version":2,"kindergarten":{"startYear":2026,"answers":{}}}', '[]']) {
     assert.deepEqual(parseSaved(text), empty, String(text))
   }
@@ -33,4 +33,32 @@ test('forgetting first-grade answers forgets the home address they saved', async
   assert.equal(getSaved().grade_1, null)
   assert.equal(getSaved().home, null)
   assert.ok(getSaved().kindergarten)
+})
+
+test('the child is kept when well-formed, and every saved page shares its birth year', async () => {
+  assert.deepEqual(parseSaved(JSON.stringify({ version: 1, child: { birthYear: 2023 } })).child, { birthYear: 2023 })
+  assert.equal(parseSaved(JSON.stringify({ version: 1, child: { birthYear: '2023' } })).child, null)
+
+  const { childBirthYear, forgetSaved, getSaved, resetSavedForTests, saveChild, saveStage } = await import('./saved.js')
+  resetSavedForTests()
+  forgetSaved()
+  assert.equal(childBirthYear(), null)
+  saveStage('grade_1', { startYear: 2027, addresses: [], answers: {} })
+  assert.equal(childBirthYear(), 2020, 'first grade in the year the child turns seven')
+  saveStage('kindergarten', { startYear: 2027, answers: { birthYear: 2024 } })
+  assert.deepEqual(getSaved().child, { birthYear: 2024 }, 'kindergarten answers give the child')
+  saveChild({ birthYear: 2023 })
+  assert.equal(childBirthYear(), 2023)
+  assert.equal(getSaved().kindergarten.answers.birthYear, 2023, 'the kindergarten answers follow')
+  forgetSaved('kindergarten')
+  assert.equal(childBirthYear(), 2023, 'forgetting one tab keeps the child')
+  forgetSaved()
+  assert.equal(getSaved().child, null)
+})
+
+test('answers saved before the child existed still give its birth year', async () => {
+  const { childBirthYear } = await import('./saved.js')
+  const saved = parseSaved(JSON.stringify({ version: 1, kindergarten: { startYear: 2027, answers: { birthYear: 2024 } } }))
+  assert.equal(saved.child, null)
+  assert.equal(childBirthYear(saved), 2024)
 })
