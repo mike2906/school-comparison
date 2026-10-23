@@ -141,10 +141,17 @@ for one run to move one job, e.g. `MODEL_TIER_PRICING=anthropic/claude-haiku-5-5
 python -m app.scrapers.cli school-facts ...`. There is no automatic fallback between the
 two: a run stops with a clear error instead of quietly changing model mid-run.
 
-- **Models:** only priced models are accepted (`ANTHROPIC_PRICES`). Today that is
-  Claude Haiku 5.5, sent with thinking off and no temperature (it refuses a non-default
-  one). Sonnet 5.5 and Opus 5.5 refuse the forced tool call the structured answers use,
-  so they need NativeOutput before they can be added.
+- **Models:** only priced models are accepted (`ANTHROPIC_PRICES`): Claude Haiku 5.5,
+  Sonnet 5.5 and Opus 5.5, all sent with no temperature. Haiku is sent with thinking off
+  and answers through a forced tool call; Sonnet and Opus can't turn thinking off, so
+  they think (adaptive) and answer through structured outputs. Two per-run settings for
+  trials: `ANTHROPIC_THINKING=adaptive` makes Haiku think the same way, and
+  `ANTHROPIC_EFFORT` sets the effort of thinking calls whose stage sets none (the fee
+  check keeps its `medium`).
+- **Prompt caching:** every Anthropic call caches its system prompt (5-minute TTL), so a
+  run's later calls read the stage's instructions back at 0.1x the input price (0.05x on
+  Opus); a write costs 1.25x. A prompt under the model's minimum is simply not cached.
+  The cost each response carries prices cache writes and reads at those rates.
 - **Spend:** Anthropic reports tokens, not dollars, so `PricedAnthropicModel` puts the
   price × tokens into each response's `provider_details["cost"]`, where the run caps and
   the provider ledger already read OpenRouter's cost. The Claude Console usage page shows
