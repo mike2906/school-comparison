@@ -110,6 +110,15 @@ export function quarterQuery(address) {
   return `ж.к. ${trimmed}`
 }
 
+/**
+ * "ул. Шипка 5" finds nothing on OpenStreetMap while "Шипка 5" finds the house (it does
+ * not read every "ул." form): the address without the leading "ул."/"улица", or null.
+ */
+export function withoutStreetWord(address) {
+  const stripped = String(address || '').trim().replace(/^(?:ул\.\s*|ул\s+|улица\s+)(?=\p{L})/iu, '')
+  return stripped && stripped !== String(address || '').trim() ? stripped : null
+}
+
 const QUARTER_TYPES = new Set(['quarter', 'suburb', 'neighbourhood', 'residential'])
 
 export function isQuarterMatch(result, address) {
@@ -228,7 +237,12 @@ const fetchGeocode = async (address, geocodingConfig = {}) => {
   }
   if (!result) {
     try {
-      result = await plainSearch(address, citySuffix, countryCodes, bounds)
+      result = await plainSearch(address, citySuffix, countryCodes, bounds).catch(async error => {
+        const bare = error?.code === 'NO_RESULTS' && withoutStreetWord(address)
+        if (!bare) throw error
+        await waitForSlot(startedIn)
+        return plainSearch(bare, citySuffix, countryCodes, bounds)
+      })
     } catch (error) {
       // `fallback`: a looser query for when the exact one finds nothing in the city
       // (a saved address whose house number OpenStreetMap lacks).

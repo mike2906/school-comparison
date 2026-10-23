@@ -388,7 +388,7 @@ function HomeField({ homePoint, onChange }) {
   }
   const search = async event => {
     event.preventDefault()
-    if (!text.trim()) return
+    if (!text.trim() || !config) return
     setState('looking')
     try {
       const result = await geocodeAddress(text.trim(), geocodingConfig)
@@ -424,7 +424,8 @@ function HomeField({ homePoint, onChange }) {
           placeholder={t('location.addressPlaceholder')}
           className="h-11 min-w-0 flex-1 rounded-lg border border-neutral-300 px-2"
         />
-        <button type="submit" disabled={state === 'looking'} className="h-11 rounded-lg border border-neutral-300 px-3 font-medium">{t('common.search')}</button>
+        {/* Without the city's bounds a lookup could take a same-named street in another town. */}
+        <button type="submit" disabled={state === 'looking' || !config} className="h-11 rounded-lg border border-neutral-300 px-3 font-medium">{t('common.search')}</button>
       </form>
       <button type="button" onClick={locate} className="mt-2 text-primary-700 underline">{t('location.useMyLocation')}</button>
       {state === 'notFound' && <p className="mt-1 text-red-700">{t('location.errorNotFound')}</p>}
