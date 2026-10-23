@@ -117,7 +117,7 @@ async function main() {
   let sitemapPaths = []
   for (const language of URL_LANGUAGES) {
     const dictionary = JSON.parse(await readFile(path.resolve(`src/i18n/${language}.json`), 'utf8'))
-    const t = createTranslator(dictionary)
+    const t = createTranslator(dictionary, language)
     const pages = [
       ...fixedPages(t, language, schools.filter((school) => listedIds.has(school.id))),
       ...schools.map((school) => schoolPage(school, t, language, { listed: listedIds.has(school.id) })),
@@ -140,7 +140,8 @@ async function main() {
   const thin = reasons.filter((reason) => !Object.values(reason).some(Boolean)).length
   console.log(
     `prerender: ${reasons.length} listed schools, ${reasons.length - thin} indexable ` +
-      `(NVO ${count('nvo')}, pricing ${count('pricing')}, summary ${count('summary')}), ${thin} thin (noindex); ` +
+      `(NVO ${count('nvo')}, pricing ${count('pricing')}, facts ${count('facts')}, admission ${count('admission')}, ` +
+      `summary ${count('summary')}), ${thin} thin (noindex); ` +
       `${schools.length - reasons.length} unlisted (noindex)`
   )
 }
