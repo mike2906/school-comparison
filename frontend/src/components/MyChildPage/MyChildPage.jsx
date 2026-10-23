@@ -29,6 +29,7 @@ import { pinnedLocation } from '../../utils/coordinates'
 import { getAgeGroupLabel } from '../../utils/countryConfig'
 import { geocodeAddress } from '../../utils/geocoding'
 import { languageKey, languageLabel } from '../../utils/languages'
+import { matchesAdvancedFilters } from '../../utils/advancedFilters'
 import { schoolPath } from '../../utils/schoolPath'
 import { locationForAgeGroup, locationsForAgeGroup } from '../../utils/schoolLocation'
 
@@ -75,17 +76,18 @@ function MyChildPage() {
     [...new Set((availableFilters.language_focus_languages || []).map(languageKey).filter(Boolean))]
   ), [availableFilters])
   // A language counts at any level, as the list's language filter does, and so does a
-  // school that names the language without a level.
+  // school that names the language without a level. Canonical keys, matched on the client
+  // as the list does (the API compares its own spelling).
   const languagePairs = useMemo(() => [
     ...(availableFilters.language_focus_pairs || []),
     ...(availableFilters.language_focus_languages || []),
   ].filter(value => languages.includes(languageKey(value.split(':')[0]))), [availableFilters, languages])
 
-  const all = useSchools(ageGroup, null, selection.educationLevel, selection.includeCrossover, EMPTY_LIST, EMPTY_LIST, EMPTY_LIST, EMPTY_LIST, countryCode)
-  const withLanguage = useSchools(ageGroup, null, selection.educationLevel, selection.includeCrossover, languagePairs, EMPTY_LIST, EMPTY_LIST, EMPTY_LIST, countryCode)
-  const filtering = languagePairs.length > 0
-  const { schools, loading, error } = filtering ? withLanguage : all
-  const hiddenByLanguage = filtering && !all.loading && !withLanguage.loading ? all.schools.length - withLanguage.schools.length : 0
+  const { schools: ageSchools, loading, error } = useSchools(ageGroup, null, selection.educationLevel, selection.includeCrossover, EMPTY_LIST, EMPTY_LIST, EMPTY_LIST, EMPTY_LIST, countryCode)
+  const schools = useMemo(() => (languagePairs.length === 0
+    ? ageSchools
+    : ageSchools.filter(school => matchesAdvancedFilters(school, { languageFocus: languagePairs }))), [ageSchools, languagePairs])
+  const hiddenByLanguage = ageSchools.length - schools.length
 
   const placed = useMemo(() => schools.map(school => {
     const distanceLocation = pinnedLocation(locationsForAgeGroup(school, ageGroup))

@@ -29,6 +29,18 @@ describe("my child's options", () => {
       assert.ok(await page.getByRole('link', { name: t(lang, 'myChild.answersLink') }).isVisible(), 'the calculator is offered')
       const distances = await page.locator('[data-chance-group] article').evaluateAll(cards => cards.slice(0, 5).map(card => card.textContent))
       assert.ok(distances.length > 0, 'cards are shown')
+      // English narrows the list to the places that name it, and never empties it.
+      const total = () => page.locator('[data-chance-group] h2').evaluateAll(heads => heads
+        .reduce((sum, head) => sum + Number(head.textContent.match(/\((\d+)\)/)?.[1] || 0), 0))
+      const before = await total()
+      await page.getByRole('button', { name: t(lang, 'languages.english'), exact: true }).click()
+      await page.waitForFunction(count => {
+        const now = [...document.querySelectorAll('[data-chance-group] h2')]
+          .reduce((sum, head) => sum + Number(head.textContent.match(/\((\d+)\)/)?.[1] || 0), 0)
+        return now !== count
+      }, before, { timeout: 10_000 }).catch(() => {})
+      const after = await total()
+      assert.ok(after > 0 && after < before, `English keeps some places (${after} of ${before})`)
     })
   }
 
