@@ -20,7 +20,8 @@ import { kindergartenDistrict, savedVerdictsFor } from '../../src/admission/scho
 import { usesSofiaKindergartenSystem } from '../../src/utils/admission.js'
 import { isInstallmentPlan, statedTuition } from '../../src/utils/pricing.js'
 import { isClosedGroupFee, rowAgeGroupKeys } from '../../src/utils/priceRows.js'
-import { allSchools } from './live.js'
+import { childFreePlaces, schoolFreePlaces, usableFreePlaces } from '../../src/utils/freePlaces.js'
+import { API, allSchools } from './live.js'
 
 // A parent should get an answer at no fewer than this share of the schools that publish
 // the data for their child. Today's shares are 67–100%; an empty-result bug gives ~0%.
@@ -150,5 +151,26 @@ describe('coverage for realistic parents', () => {
     }
     assert.ok(checked >= MIN_WITH_DATA, `only ${checked} school ages with a tuition`)
     assert.deepEqual(missing, [], 'ages with a listed tuition but no headline fee')
+  })
+  test('free places: a search for a birth year this school year shows the places at most municipal kindergartens', async t => {
+    const response = await fetch(`${API}/schools/free-places?country_code=bg&city=sofia`, { signal: AbortSignal.timeout(30_000) })
+    // A PR that adds the endpoint runs this before its deploy (the path then reads as a school id).
+    if (response.status === 404 || response.status === 422) return t.skip('the free places endpoint is not deployed yet')
+    assert.ok(response.ok, `free places: HTTP ${response.status}`)
+    const data = usableFreePlaces(await response.json())
+    assert.ok(data, 'a free places snapshot from the last 48 hours')
+    const now = new Date()
+    const startYear = now.getMonth() >= 8 ? now.getFullYear() : now.getFullYear() - 1
+    const kindergartens = (await allSchools()).filter(usesSofiaKindergartenSystem)
+    const results = []
+    for (let age = 1; age <= 6; age += 1) {
+      const birthYear = startYear - age
+      const group = kindergartenAgeGroup({ birthYear }, startYear)
+      if (!KINDERGARTEN_GROUPS.includes(group)) continue
+      const offering = kindergartens.filter(school => (school.locations || []).some(l => (l.age_groups || []).includes(group)))
+      const shown = offering.filter(school => childFreePlaces(schoolFreePlaces(data, school.id), birthYear, startYear))
+      results.push({ persona: `born ${birthYear} (${group}), start ${startYear}`, withData: offering.length, shown: shown.length })
+    }
+    assertCoverage(t, results)
   })
 })

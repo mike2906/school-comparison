@@ -37,29 +37,12 @@ from app.services.admission_cutoffs import (  # noqa: E402
     match_key,
     school_cutoff_summary,
     school_cutoffs,
+    school_index,
 )
 
 # ИСОДЗ stages run by schools, whose ids are not on our schools: matched by school number.
 SCHOOL_STAGES = ("grade_1", "preparatory")
 DERIVED_KEYS = ("cutoffs", "cutoff_summary", "kg_sofia_ids", "admin_district")
-
-
-def school_index(schools: list[Any]) -> dict[tuple[str, str], int]:
-    """(match kind, id) -> school id. A school's own kg_sofia_id wins over a family listing."""
-    index: dict[tuple[str, str], int] = {}
-    for school in sorted(schools, key=lambda s: s.id):
-        attrs = school.attributes or {}
-        for kg_id in attrs.get("kg_sofia_ids") or []:
-            if kg_id is not None:
-                index.setdefault(("kg_sofia_id", str(kg_id)), school.id)
-    # Highest id first, so on a shared id the lowest school id wins, the same on every run.
-    for school in sorted(schools, key=lambda s: s.id, reverse=True):
-        attrs = school.attributes or {}
-        if attrs.get("kg_sofia_id") is not None:
-            index[("kg_sofia_id", str(attrs["kg_sofia_id"]))] = school.id
-        if school.institutional_id:
-            index[("institutional_id", str(school.institutional_id))] = school.id
-    return index
 
 
 def derived_admission_keys(rows: list[dict[str, Any]]) -> dict[str, Any]:
