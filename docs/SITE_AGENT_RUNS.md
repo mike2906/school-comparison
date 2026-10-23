@@ -178,5 +178,9 @@ two: a run stops with a clear error instead of quietly changing model mid-run.
   the pricing tier only after it scores at least as well on the fee replay eval and a
   facts dry run. First eval (2026-10-16, 6 trials, $0.51, thinking off): wrong 22%,
   found 30%, against Luna's 10% and 52%; leaving out the cut-off school, found 41% vs
-  45%, and wrong was still about double. Fee pictures stay on GPT-6.1 Sol until a Claude model passes the same
+  45%, and wrong was still about double. Second eval (2026-10-23, $4.01, #490's settings): Haiku with
+  adaptive thinking at medium effort, 5 trials, wrong 6% / found 32%; at high effort 7% / 29%,
+  and school 300 cut off at 32K output tokens in every trial; Sonnet 5.5 at medium, 2 trials,
+  9% / 43% at about $0.03 a school. Every Claude setting writes fewer wrong rows than Luna but
+  misses more fees (Haiku most of 583, 609, 505 and 300), so the reader stays on Luna. Fee pictures stay on GPT-6.1 Sol until a Claude model passes the same
   digits check.

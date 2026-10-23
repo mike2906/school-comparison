@@ -2,7 +2,7 @@
 # (backend/scripts/fees_eval.py). Runs on a PR that touches the reader, its checks, the
 # publish gate or the model choice when it is opened, reopened or marked ready, and again when the
 # `fees-eval` label is added; not on every push. About $0.15 a run (3 trials). At most
-# MAX_RUNS_PER_DAY PR runs a day (UTC), about $1: past that a PR run fails without calling the
+# MAX_RUNS_PER_DAY PR runs a day (UTC), about $0.50: past that a PR run fails without calling the
 # model, and the label runs it the next day. A run by hand is not capped. The cap counts runs, not
 # dollars; a daily limit on the CI key in OpenRouter is what caps the dollars.
 name: Fees eval
@@ -63,7 +63,7 @@ jobs:
     env:
       OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
       MODEL_TIER_PRICING: ${{ inputs.model }}
-      MAX_RUNS_PER_DAY: 6
+      MAX_RUNS_PER_DAY: 3
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
