@@ -273,6 +273,7 @@ export function arriveBy(tt, accessWalks, targets) {
   let next = new Uint8Array(S)
   const patFrom = new Int32Array(tt.P).fill(-1)
   const patList = []
+  const rode = [] // stop, ride arrival pairs
   // Per target and ride count: [leave, arrive] of the latest departure that is in time.
   const settled = open.map(() => new Array(K + 1).fill(null))
   let unsettled = nT * K
@@ -333,10 +334,12 @@ export function arriveBy(tt, accessWalks, targets) {
         }
         patFrom[p] = -1
       }
-      // Walk to nearby stops from every stop reached by this round's rides.
-      for (let s = 0; s < S; s++) {
-        if (!next[s]) continue
-        const a = arr[cur + s]
+      // Walk to nearby stops from every stop reached by this round's rides. Only from a ride's
+      // arrival: a walk on from a walk could undercut the feed's longer transfer time.
+      rode.length = 0
+      for (let s = 0; s < S; s++) if (next[s]) rode.push(s, arr[cur + s])
+      for (let r = 0; r < rode.length; r += 2) {
+        const s = rode[r], a = rode[r + 1]
         for (let x = tStart[s]; x < tStart[s + 1]; x++) {
           const u = tTo[x], t = a + tSec[x]
           if (t < arr[cur + u] && t < arr[prev + u]) {
@@ -366,7 +369,8 @@ export function arriveBy(tt, accessWalks, targets) {
           a = tArr[k * nT + ti]
           from = k
         }
-        if (!st[k] && a <= deadline) {
+        // A departure more than MAX_TRIP before this school's deadline is too early for it.
+        if (!st[k] && a <= deadline && tau >= deadline - MAX_TRIP) {
           st[k] = [tau, a, legsTo(from, tStop[from * nT + ti])]
           unsettled--
         }

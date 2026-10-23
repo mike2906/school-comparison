@@ -114,3 +114,39 @@ test('school buildings walked at build time match a walk in the browser', () => 
     assert.ok(Math.abs(f[1] - sec) <= 1)
   })
 })
+
+// The same timetable with other walks between stops: [from, to, seconds] by stop position.
+function withTransfers(list) {
+  const tStart = new Uint32Array(tt.S + 1)
+  list.forEach(([from]) => tStart[from + 1]++)
+  for (let s = 0; s < tt.S; s++) tStart[s + 1] += tStart[s]
+  const sorted = [...list].sort((a, b) => a[0] - b[0])
+  return { ...tt, tStart, tTo: Uint16Array.from(sorted, x => x[1]), tSec: Uint16Array.from(sorted, x => x[2]) }
+}
+const stopAt = (lat, lng) => {
+  for (let s = 0; s < tt.S; s++) if (Math.abs(tt.lat[s] - lat) < 2e-6 && Math.abs(tt.lon[s] - lng) < 2e-6) return s
+  throw new Error(`no stop at ${lat},${lng}`)
+}
+
+test('a walk on from a walk does not undercut the feed\'s transfer time', () => {
+  // S3 to N3 takes 10 min by the feed, but S3 to S5 and S5 to N3 are 30 s each. Catching the
+  // 07:22 tram at N3 then needs S3 by 07:22 - CHANGE_SLACK - 10 min: the 07:00 bus, not 07:10.
+  const [s1, s3, s5, n3] = [stopAt(42.70005, 23.3001), stopAt(42.70005, 23.3099), stopAt(42.70005, 23.3199), stopAt(42.7001, 23.3101)]
+  const t2 = withTransfers([[s3, n3, 600], [s3, s5, 30], [s5, n3, 30]])
+  const walks = schoolWalks(tt, fg, at(11, -0.0001))
+  const r = arriveBy(t2, [[s1, 30]], [{ id: 1, egress: walks.stops, deadline: hm(7, 35), walkSec: Infinity }]).get(1)
+  assert.deepEqual(r.legs.map(l => tt.routeName[l.route]), ['1', '2'])
+  assert.equal(r.legs[1].dep, hm(7, 22))
+  assert.equal(r.legs[0].dep, hm(7, 0))
+})
+
+test('a later school does not take a trip longer than MAX_TRIP because of an earlier one', () => {
+  // The last bus reaches S5 at 07:50: in time for 09:40, but longer than MAX_TRIP from leaving.
+  const { stops } = walkToStops(tt, fg, at(1, 0.0001))
+  const egress = schoolWalks(tt, fg, school.locations[0]).stops
+  const late = { id: 2, egress, deadline: hm(9, 40), walkSec: Infinity }
+  const r = arriveBy(tt, stops, [{ id: 1, egress, deadline: hm(7, 40), walkSec: Infinity }, late])
+  assert.ok(r.get(1))
+  assert.equal(r.get(2), undefined)
+  assert.equal(arriveBy(tt, stops, [late]).get(2), undefined)
+})
