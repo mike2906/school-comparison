@@ -28,6 +28,7 @@ export function useTransitTimes(home, schools, enabled) {
   useEffect(() => () => {
     workerRef.current?.terminate()
     workerRef.current = null
+    lastRequestRef.current = null // a new worker must be asked again
   }, [])
 
   useEffect(() => {
@@ -60,6 +61,10 @@ export function useTransitTimes(home, schools, enabled) {
         trips: data.status === 'ready' ? new Map(Object.entries(data.trips).map(([id, trip]) => [Number(id), trip])) : EMPTY,
         serviceDate: data.meta?.serviceDate ?? null,
       })
+    }
+    // A worker that cannot load (an old page after a deploy) would otherwise leave 'loading'.
+    worker.onerror = () => {
+      if (requestId === requestRef.current) setState({ status: 'unavailable', trips: EMPTY, serviceDate: null })
     }
     worker.postMessage({ requestId, origin: { lat: home.lat, lng: home.lng }, targets })
   }, [home, enabled, targets])

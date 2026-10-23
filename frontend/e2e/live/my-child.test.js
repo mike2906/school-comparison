@@ -67,7 +67,8 @@ describe("my child's options", () => {
       await chips.first().waitFor({ timeout: 45_000 })
       const shownAfter = Date.now() - started
       await page.getByRole('link', { name: t(lang, 'transitTime.timetableCredit') }).waitFor()
-      // Inside the first group, the place you can leave for latest comes first.
+      // Inside the first group, the place you can leave for latest comes first (by trip time,
+      // which is the same while every place starts at 8:00: no shifts are stored yet).
       const leaves = await page.locator('[data-chance-group]').first().locator('[data-transit-leave]')
         .evaluateAll(nodes => nodes.map(node => node.dataset.transitLeave))
       assert.ok(leaves.length >= 5, `only ${leaves.length} places have a trip`)

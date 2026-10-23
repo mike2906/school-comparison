@@ -1219,8 +1219,9 @@
   "transitTime": {
     "aria": "About {{minutes}} minutes by public transport ({{lines}}): leave home at {{leave}} to arrive by {{deadline}}",
     "ariaWalk": "About {{minutes}} minutes on foot: leave home at {{leave}} to arrive by {{deadline}}",
-    "note": "Public transport by the timetable for {{day}}, arriving by 8:00: walking at a child's pace, 2 min early at the stop, 2 min for each change. Places with no trip in time come last.",
+    "note": "Public transport by the timetable for {{day}}, arriving by 8:00 (or the start of the school's shift, where we know it): walking at a child's pace, 2 min early at the stop, 2 min for each change. Places with no trip in time come last.",
     "timetableCredit": "Timetable: Център за градска мобилност / Столична община (modified)",
+    "licence": "CC BY 4.0",
     "walkCredit": "footpaths © OpenStreetMap contributors",
     "loading": "Working out public transport times…",
     "outside": "Public transport times are only available in and around Sofia.",
