@@ -76,6 +76,11 @@ class TestHealthEndpoint:
 
     @pytest.mark.asyncio
     async def test_ready_with_schools(self, client, sample_schools):
+        # Until the whole-city list is built, the first visitor would wait for it.
+        response = await client.get("/ready")
+        assert response.status_code == 503
+        assert response.json() == {"status": "warming"}
+        await client.get("/schools?country_code=bg&city=sofia")
         response = await client.get("/ready")
         assert response.status_code == 200
         assert response.json() == {"status": "ready"}

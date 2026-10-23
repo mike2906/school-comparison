@@ -36,10 +36,11 @@ write_release() {
 	mv "$RELEASE_FILE.tmp" "$RELEASE_FILE"
 }
 
-# True once the API container runs image $1 and answers /ready (up to a minute).
+# True once the API container runs image $1 and answers /ready (up to two minutes: /ready
+# waits for the warm whole-city list).
 wait_ready() {
 	local container
-	for _ in $(seq 30); do
+	for _ in $(seq 60); do
 		container="$(dc ps -q api 2>/dev/null || true)"
 		if [ -n "$container" ] \
 			&& [ "$(docker inspect --format '{{.Config.Image}}' "$container" 2>/dev/null)" = "$1" ] \

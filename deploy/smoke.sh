@@ -29,7 +29,7 @@ smoke_api() {
 	# Cloudflare keeps GET answers a few minutes: ask past its copy, to check this deploy.
 	fresh="smoke=$(date +%s%N)"
 
-	for _ in $(seq 12); do
+	for _ in $(seq 24); do
 		ready="$(body "$api/ready" 2>/dev/null | jq -r '.status' 2>/dev/null || true)"
 		[ "$ready" = ready ] && break
 		sleep 5
