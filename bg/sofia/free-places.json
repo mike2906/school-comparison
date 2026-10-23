@@ -2,7 +2,7 @@
  "meta": {
   "source": "kg.sofia.bg",
   "source_url": "https://kg.sofia.bg/spots",
-  "retrieved_at": "2026-10-23T18:20:01+00:00",
+  "retrieved_at": "2026-10-23T18:43:33+00:00",
   "as_of": "2026-10-23",
   "school_years": [
    "2026/2027",
@@ -10,6 +10,3956 @@
   ]
  },
  "buildings": [
+  {
+   "source_id": "527",
+   "family": "grade_1",
+   "name": "78. СУ \"Христо Смирненски\"",
+   "district": "Банкя",
+   "groups": [
+    {
+     "group_id": 9537,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 5.0,
+     "queues": {
+      "general": {
+       "capacity": 120,
+       "enrolled": 111,
+       "free": 9,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "528",
+   "family": "grade_1",
+   "name": "2. СУ \"Акад. Емилиян Станев\"",
+   "district": "Витоша",
+   "groups": [
+    {
+     "group_id": 9464,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 3.0,
+     "queues": {
+      "general": {
+       "capacity": 81,
+       "enrolled": 80,
+       "free": 1,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "529",
+   "family": "grade_1",
+   "name": "5. ОУ \"Иван Вазов\"",
+   "district": "Витоша",
+   "groups": [
+    {
+     "group_id": 9467,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 3.0,
+     "queues": {
+      "general": {
+       "capacity": 91,
+       "enrolled": 91,
+       "free": 0,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "530",
+   "family": "grade_1",
+   "name": "26. СУ \"Йордан Йовков\"",
+   "district": "Витоша",
+   "groups": [
+    {
+     "group_id": 9486,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 3.0,
+     "queues": {
+      "general": {
+       "capacity": 72,
+       "enrolled": 64,
+       "free": 8,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "531",
+   "family": "grade_1",
+   "name": "50. ОУ \"Васил Левски\"",
+   "district": "Витоша",
+   "groups": [
+    {
+     "group_id": 9510,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 3.0,
+     "queues": {
+      "general": {
+       "capacity": 68,
+       "enrolled": 68,
+       "free": 0,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "532",
+   "family": "grade_1",
+   "name": "52. ОУ \"Цанко Церковски\"",
+   "district": "Витоша",
+   "groups": [
+    {
+     "group_id": 9512,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 3.0,
+     "queues": {
+      "general": {
+       "capacity": 72,
+       "enrolled": 70,
+       "free": 2,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "533",
+   "family": "grade_1",
+   "name": "64. ОУ \"Цар Симеон Велики\"",
+   "district": "Витоша",
+   "groups": [
+    {
+     "group_id": 9523,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 2.0,
+     "queues": {
+      "general": {
+       "capacity": 56,
+       "enrolled": 54,
+       "free": 2,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "534",
+   "family": "grade_1",
+   "name": "86. ОУ \"Климент Охридски\"",
+   "district": "Витоша",
+   "groups": [
+    {
+     "group_id": 9544,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 1.0,
+     "queues": {
+      "general": {
+       "capacity": 26,
+       "enrolled": 26,
+       "free": 0,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "535",
+   "family": "grade_1",
+   "name": "152. ОУ \"Св. Св. Кирил и Методий\"",
+   "district": "Витоша",
+   "groups": [
+    {
+     "group_id": 9602,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 1.0,
+     "queues": {
+      "general": {
+       "capacity": 22,
+       "enrolled": 7,
+       "free": 15,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "536",
+   "family": "grade_1",
+   "name": "61. ОУ \"Св. Св. Кирил и Методий\"",
+   "district": "Връбница",
+   "groups": [
+    {
+     "group_id": 9520,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 3.0,
+     "queues": {
+      "general": {
+       "capacity": 74,
+       "enrolled": 74,
+       "free": 0,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "537",
+   "family": "grade_1",
+   "name": "62. ОУ \"Христо Ботев\"",
+   "district": "Връбница",
+   "groups": [
+    {
+     "group_id": 9521,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 2.0,
+     "queues": {
+      "general": {
+       "capacity": 48,
+       "enrolled": 43,
+       "free": 5,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "538",
+   "family": "grade_1",
+   "name": "70. ОУ \"Климент Охридски\"",
+   "district": "Връбница",
+   "groups": [
+    {
+     "group_id": 9529,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 1.0,
+     "queues": {
+      "general": {
+       "capacity": 22,
+       "enrolled": 20,
+       "free": 2,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "539",
+   "family": "grade_1",
+   "name": "74. СУ \"Гоце Делчев\"",
+   "district": "Връбница",
+   "groups": [
+    {
+     "group_id": 9533,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 3.0,
+     "queues": {
+      "general": {
+       "capacity": 66,
+       "enrolled": 49,
+       "free": 17,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "540",
+   "family": "grade_1",
+   "name": "140. СУ \"Иван Богоров\"",
+   "district": "Връбница",
+   "groups": [
+    {
+     "group_id": 9591,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 0.0,
+     "queues": {
+      "general": {
+       "capacity": 96,
+       "enrolled": 79,
+       "free": 17,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "541",
+   "family": "grade_1",
+   "name": "146. ОУ \"Патриарх Евтимий\"",
+   "district": "Връбница",
+   "groups": [
+    {
+     "group_id": 9597,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 1.0,
+     "queues": {
+      "general": {
+       "capacity": 24,
+       "enrolled": 15,
+       "free": 9,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "542",
+   "family": "grade_1",
+   "name": "175. ОУ \"Васил Левски\"",
+   "district": "Връбница",
+   "groups": [
+    {
+     "group_id": 9611,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 2.0,
+     "queues": {
+      "general": {
+       "capacity": 44,
+       "enrolled": 23,
+       "free": 21,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "543",
+   "family": "grade_1",
+   "name": "18. СУ \"Уилям Гладстон\"",
+   "district": "Възраждане",
+   "groups": [
+    {
+     "group_id": 9478,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 6.0,
+     "queues": {
+      "general": {
+       "capacity": 144,
+       "enrolled": 142,
+       "free": 2,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "544",
+   "family": "grade_1",
+   "name": "30. СУ \"Братя Миладинови\"",
+   "district": "Възраждане",
+   "groups": [
+    {
+     "group_id": 9490,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 4.0,
+     "queues": {
+      "general": {
+       "capacity": 96,
+       "enrolled": 95,
+       "free": 1,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "545",
+   "family": "grade_1",
+   "name": "32. СУИЧЕ \"Св. Климент Охридски\"",
+   "district": "Възраждане",
+   "groups": [
+    {
+     "group_id": 9492,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 4.0,
+     "queues": {
+      "general": {
+       "capacity": 96,
+       "enrolled": 96,
+       "free": 0,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "546",
+   "family": "grade_1",
+   "name": "46. ОУ \"Константин Фотинов\"",
+   "district": "Възраждане",
+   "groups": [
+    {
+     "group_id": 9506,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 1.0,
+     "queues": {
+      "general": {
+       "capacity": 22,
+       "enrolled": 10,
+       "free": 12,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "547",
+   "family": "grade_1",
+   "name": "67. ОУ \"Васил Друмев\"",
+   "district": "Възраждане",
+   "groups": [
+    {
+     "group_id": 9526,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 2.0,
+     "queues": {
+      "general": {
+       "capacity": 44,
+       "enrolled": 30,
+       "free": 14,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "548",
+   "family": "grade_1",
+   "name": "76. ОУ \"Уилям Сароян\"",
+   "district": "Възраждане",
+   "groups": [
+    {
+     "group_id": 9535,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 2.0,
+     "queues": {
+      "general": {
+       "capacity": 44,
+       "enrolled": 7,
+       "free": 37,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "549",
+   "family": "grade_1",
+   "name": "136. ОУ \"Любен Каравелов\"",
+   "district": "Възраждане",
+   "groups": [
+    {
+     "group_id": 9587,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 2.0,
+     "queues": {
+      "general": {
+       "capacity": 48,
+       "enrolled": 29,
+       "free": 19,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "550",
+   "family": "grade_1",
+   "name": "11. ОУ \"Св. Пимен Зографски\"",
+   "district": "Изгрев",
+   "groups": [
+    {
+     "group_id": 9472,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 3.0,
+     "queues": {
+      "general": {
+       "capacity": 112,
+       "enrolled": 106,
+       "free": 6,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "551",
+   "family": "grade_1",
+   "name": "105. СУ \"Атанас Далчев\"",
+   "district": "Изгрев",
+   "groups": [
+    {
+     "group_id": 9560,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 5.0,
+     "queues": {
+      "general": {
+       "capacity": 128,
+       "enrolled": 128,
+       "free": 0,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "552",
+   "family": "grade_1",
+   "name": "119. СУ \"Акад. Михаил Арнаудов\"",
+   "district": "Изгрев",
+   "groups": [
+    {
+     "group_id": 9571,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 5.0,
+     "queues": {
+      "general": {
+       "capacity": 140,
+       "enrolled": 138,
+       "free": 2,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "553",
+   "family": "grade_1",
+   "name": "3. СУ \"Марин Дринов\"",
+   "district": "Илинден",
+   "groups": [
+    {
+     "group_id": 9465,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 1.0,
+     "queues": {
+      "general": {
+       "capacity": 24,
+       "enrolled": 24,
+       "free": 0,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "554",
+   "family": "grade_1",
+   "name": "43. ОУ \"Христо Смирненски\"",
+   "district": "Илинден",
+   "groups": [
+    {
+     "group_id": 9503,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 4.0,
+     "queues": {
+      "general": {
+       "capacity": 92,
+       "enrolled": 92,
+       "free": 0,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "555",
+   "family": "grade_1",
+   "name": "45. ОУ \"Константин Величков\"",
+   "district": "Илинден",
+   "groups": [
+    {
+     "group_id": 9505,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 5.0,
+     "queues": {
+      "general": {
+       "capacity": 100,
+       "enrolled": 100,
+       "free": 0,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "556",
+   "family": "grade_1",
+   "name": "113. СУ \"Сава Филаретов\"",
+   "district": "Илинден",
+   "groups": [
+    {
+     "group_id": 9566,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 1.0,
+     "queues": {
+      "general": {
+       "capacity": 24,
+       "enrolled": 14,
+       "free": 10,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "557",
+   "family": "grade_1",
+   "name": "4. ОУ \"Професор Джон Атанасов\"",
+   "district": "Искър",
+   "groups": [
+    {
+     "group_id": 9466,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 5.0,
+     "queues": {
+      "general": {
+       "capacity": 120,
+       "enrolled": 120,
+       "free": 0,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "558",
+   "family": "grade_1",
+   "name": "65. ОУ \"Св. Св. Кирил и Методий\"",
+   "district": "Искър",
+   "groups": [
+    {
+     "group_id": 9524,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 1.0,
+     "queues": {
+      "general": {
+       "capacity": 24,
+       "enrolled": 17,
+       "free": 7,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "559",
+   "family": "grade_1",
+   "name": "68. СУ \"Акад. Никола Обрешков\"",
+   "district": "Искър",
+   "groups": [
+    {
+     "group_id": 9527,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 3.0,
+     "queues": {
+      "general": {
+       "capacity": 72,
+       "enrolled": 60,
+       "free": 12,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "560",
+   "family": "grade_1",
+   "name": "69. СУ \"Димитър Маринов\"",
+   "district": "Искър",
+   "groups": [
+    {
+     "group_id": 9528,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 2.0,
+     "queues": {
+      "general": {
+       "capacity": 48,
+       "enrolled": 24,
+       "free": 24,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "561",
+   "family": "grade_1",
+   "name": "89. ОУ \"д-р Христо Стамболски\"",
+   "district": "Искър",
+   "groups": [
+    {
+     "group_id": 9546,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 2.0,
+     "queues": {
+      "general": {
+       "capacity": 41,
+       "enrolled": 15,
+       "free": 26,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "562",
+   "family": "grade_1",
+   "name": "108. СУ \"Никола Беловеждов\"",
+   "district": "Искър",
+   "groups": [
+    {
+     "group_id": 9563,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 4.0,
+     "queues": {
+      "general": {
+       "capacity": 96,
+       "enrolled": 96,
+       "free": 0,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "563",
+   "family": "grade_1",
+   "name": "150. ОУ \"Цар Симеон I\"",
+   "district": "Искър",
+   "groups": [
+    {
+     "group_id": 9601,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 3.0,
+     "queues": {
+      "general": {
+       "capacity": 66,
+       "enrolled": 50,
+       "free": 16,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "564",
+   "family": "grade_1",
+   "name": "163. ОУ \"Черноризец Храбър\"",
+   "district": "Искър",
+   "groups": [
+    {
+     "group_id": 9607,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 5.0,
+     "queues": {
+      "general": {
+       "capacity": 121,
+       "enrolled": 121,
+       "free": 0,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "565",
+   "family": "grade_1",
+   "name": "17. СУ \"Дамян Груев\"",
+   "district": "Красна поляна",
+   "groups": [
+    {
+     "group_id": 9477,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 4.0,
+     "queues": {
+      "general": {
+       "capacity": 120,
+       "enrolled": 120,
+       "free": 0,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "566",
+   "family": "grade_1",
+   "name": "28. СУ \"Алеко Константинов\"",
+   "district": "Красна поляна",
+   "groups": [
+    {
+     "group_id": 9488,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 2.0,
+     "queues": {
+      "general": {
+       "capacity": 44,
+       "enrolled": 44,
+       "free": 0,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "567",
+   "family": "grade_1",
+   "name": "75. ОУ \"Тодор Каблешков\"",
+   "district": "Красна поляна",
+   "groups": [
+    {
+     "group_id": 9534,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 4.0,
+     "queues": {
+      "general": {
+       "capacity": 96,
+       "enrolled": 75,
+       "free": 21,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "568",
+   "family": "grade_1",
+   "name": "92. ОУ \"Димитър Талев\"",
+   "district": "Красна поляна",
+   "groups": [
+    {
+     "group_id": 9548,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 3.0,
+     "queues": {
+      "general": {
+       "capacity": 66,
+       "enrolled": 66,
+       "free": 0,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "569",
+   "family": "grade_1",
+   "name": "123. СУ \"Стефан Стамболов\"",
+   "district": "Красна поляна",
+   "groups": [
+    {
+     "group_id": 9575,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 3.0,
+     "queues": {
+      "general": {
+       "capacity": 66,
+       "enrolled": 62,
+       "free": 4,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "570",
+   "family": "grade_1",
+   "name": "135. СУ \"Ян Амос Коменски\"",
+   "district": "Красна поляна",
+   "groups": [
+    {
+     "group_id": 9586,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 2.0,
+     "queues": {
+      "general": {
+       "capacity": 44,
+       "enrolled": 33,
+       "free": 11,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "571",
+   "family": "grade_1",
+   "name": "147. ОУ \"Йордан Радичков\"",
+   "district": "Красна поляна",
+   "groups": [
+    {
+     "group_id": 9598,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 1.0,
+     "queues": {
+      "general": {
+       "capacity": 22,
+       "enrolled": 7,
+       "free": 15,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "572",
+   "family": "grade_1",
+   "name": "19. СУ \"Елин Пелин\"",
+   "district": "Красно село",
+   "groups": [
+    {
+     "group_id": 9479,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 4.0,
+     "queues": {
+      "general": {
+       "capacity": 90,
+       "enrolled": 89,
+       "free": 1,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "573",
+   "family": "grade_1",
+   "name": "25. ОУ \"д-р Петър Берон\"",
+   "district": "Красно село",
+   "groups": [
+    {
+     "group_id": 9485,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 4.0,
+     "queues": {
+      "general": {
+       "capacity": 94,
+       "enrolled": 92,
+       "free": 2,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "574",
+   "family": "grade_1",
+   "name": "34. ОУ \"Стою Шишков\"",
+   "district": "Красно село",
+   "groups": [
+    {
+     "group_id": 9494,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 6.0,
+     "queues": {
+      "general": {
+       "capacity": 144,
+       "enrolled": 143,
+       "free": 1,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "575",
+   "family": "grade_1",
+   "name": "36. СУ \"Максим Горки\"",
+   "district": "Красно село",
+   "groups": [
+    {
+     "group_id": 9496,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 5.0,
+     "queues": {
+      "general": {
+       "capacity": 125,
+       "enrolled": 122,
+       "free": 3,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "576",
+   "family": "grade_1",
+   "name": "51. СУ \"Елисавета Багряна\"",
+   "district": "Красно село",
+   "groups": [
+    {
+     "group_id": 9511,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 4.0,
+     "queues": {
+      "general": {
+       "capacity": 114,
+       "enrolled": 115,
+       "free": 0,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "577",
+   "family": "grade_1",
+   "name": "132. СУ \"Ваня Войнова\"",
+   "district": "Красно село",
+   "groups": [
+    {
+     "group_id": 9584,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 1.0,
+     "queues": {
+      "general": {
+       "capacity": 24,
+       "enrolled": 21,
+       "free": 3,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "578",
+   "family": "grade_1",
+   "name": "142. ОУ \"Веселин Ханчев\"",
+   "district": "Красно село",
+   "groups": [
+    {
+     "group_id": 9593,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 3.0,
+     "queues": {
+      "general": {
+       "capacity": 72,
+       "enrolled": 50,
+       "free": 22,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "579",
+   "family": "grade_1",
+   "name": "85. СУ \"Отец Паисий\"",
+   "district": "Кремиковци",
+   "groups": [
+    {
+     "group_id": 9543,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 2.0,
+     "queues": {
+      "general": {
+       "capacity": 48,
+       "enrolled": 41,
+       "free": 7,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "580",
+   "family": "grade_1",
+   "name": "115. ОУ \"Св. Св. Кирил и Методий\"",
+   "district": "Кремиковци",
+   "groups": [
+    {
+     "group_id": 9567,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 1.0,
+     "queues": {
+      "general": {
+       "capacity": 24,
+       "enrolled": 12,
+       "free": 12,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "581",
+   "family": "grade_1",
+   "name": "116. ОУ \"Паисий Хилендарски\"",
+   "district": "Кремиковци",
+   "groups": [
+    {
+     "group_id": 9568,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 1.0,
+     "queues": {
+      "general": {
+       "capacity": 22,
+       "enrolled": 11,
+       "free": 11,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "582",
+   "family": "grade_1",
+   "name": "117. СУ \"Св. Св. Кирил и Методий\"",
+   "district": "Кремиковци",
+   "groups": [
+    {
+     "group_id": 9569,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 2.0,
+     "queues": {
+      "general": {
+       "capacity": 44,
+       "enrolled": 20,
+       "free": 24,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "583",
+   "family": "grade_1",
+   "name": "156. ОбУ \"Васил Левски\"",
+   "district": "Кремиковци",
+   "groups": [
+    {
+     "group_id": 9603,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 1.0,
+     "queues": {
+      "general": {
+       "capacity": 24,
+       "enrolled": 20,
+       "free": 4,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "584",
+   "family": "grade_1",
+   "name": "159. ОУ \"Васил Левски\"",
+   "district": "Кремиковци",
+   "groups": [
+    {
+     "group_id": 9604,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 1.0,
+     "queues": {
+      "general": {
+       "capacity": 24,
+       "enrolled": 24,
+       "free": 0,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "585",
+   "family": "grade_1",
+   "name": "162. ОбУ \"Отец Паисий\"",
+   "district": "Кремиковци",
+   "groups": [
+    {
+     "group_id": 9606,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 2.0,
+     "queues": {
+      "general": {
+       "capacity": 48,
+       "enrolled": 26,
+       "free": 22,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "586",
+   "family": "grade_1",
+   "name": "21. СУ \"Христо Ботев\"",
+   "district": "Лозенец",
+   "groups": [
+    {
+     "group_id": 9481,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 3.0,
+     "queues": {
+      "general": {
+       "capacity": 75,
+       "enrolled": 75,
+       "free": 0,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "587",
+   "family": "grade_1",
+   "name": "35. СЕУ \"Добри Войников\"",
+   "district": "Лозенец",
+   "groups": [
+    {
+     "group_id": 9495,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 2.0,
+     "queues": {
+      "general": {
+       "capacity": 54,
+       "enrolled": 53,
+       "free": 1,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "588",
+   "family": "grade_1",
+   "name": "107. ОУ \"Хан Крум\"",
+   "district": "Лозенец",
+   "groups": [
+    {
+     "group_id": 9562,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 4.0,
+     "queues": {
+      "general": {
+       "capacity": 88,
+       "enrolled": 88,
+       "free": 0,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "589",
+   "family": "grade_1",
+   "name": "120. ОУ \"Георги С. Раковски\"",
+   "district": "Лозенец",
+   "groups": [
+    {
+     "group_id": 9572,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 3.0,
+     "queues": {
+      "general": {
+       "capacity": 84,
+       "enrolled": 83,
+       "free": 1,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "590",
+   "family": "grade_1",
+   "name": "122. ОУ \"Николай Лилиев\"",
+   "district": "Лозенец",
+   "groups": [
+    {
+     "group_id": 9574,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 3.0,
+     "queues": {
+      "general": {
+       "capacity": 84,
+       "enrolled": 84,
+       "free": 0,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "591",
+   "family": "grade_1",
+   "name": "139. ОУ \"Захари Круша\"",
+   "district": "Лозенец",
+   "groups": [
+    {
+     "group_id": 9590,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 4.0,
+     "queues": {
+      "general": {
+       "capacity": 96,
+       "enrolled": 98,
+       "free": 0,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "592",
+   "family": "grade_1",
+   "name": "27. СУ \"Акад. Георги Караславов\"",
+   "district": "Люлин",
+   "groups": [
+    {
+     "group_id": 9487,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 2.0,
+     "queues": {
+      "general": {
+       "capacity": 48,
+       "enrolled": 36,
+       "free": 12,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "593",
+   "family": "grade_1",
+   "name": "33. ОУ \"Санкт Петербург\"",
+   "district": "Люлин",
+   "groups": [
+    {
+     "group_id": 9493,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 5.0,
+     "queues": {
+      "general": {
+       "capacity": 110,
+       "enrolled": 57,
+       "free": 53,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "594",
+   "family": "grade_1",
+   "name": "37. СУ \"Райна Княгиня\"",
+   "district": "Люлин",
+   "groups": [
+    {
+     "group_id": 9497,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 0.0,
+     "queues": {
+      "general": {
+       "capacity": 24,
+       "enrolled": 17,
+       "free": 7,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "595",
+   "family": "grade_1",
+   "name": "40. СУ \"Луи Пастьор\"",
+   "district": "Люлин",
+   "groups": [
+    {
+     "group_id": 9500,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 5.0,
+     "queues": {
+      "general": {
+       "capacity": 122,
+       "enrolled": 120,
+       "free": 2,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "596",
+   "family": "grade_1",
+   "name": "56. СУ \"Проф. Константин Иречек\"",
+   "district": "Люлин",
+   "groups": [
+    {
+     "group_id": 9516,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 4.0,
+     "queues": {
+      "general": {
+       "capacity": 88,
+       "enrolled": 78,
+       "free": 10,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "597",
+   "family": "grade_1",
+   "name": "77. ОУ \"Св. Св. Кирил и Методий\"",
+   "district": "Люлин",
+   "groups": [
+    {
+     "group_id": 9536,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 1.0,
+     "queues": {
+      "general": {
+       "capacity": 18,
+       "enrolled": 18,
+       "free": 0,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "598",
+   "family": "grade_1",
+   "name": "79. СУ \"Индира Ганди\"",
+   "district": "Люлин",
+   "groups": [
+    {
+     "group_id": 9538,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 3.0,
+     "queues": {
+      "general": {
+       "capacity": 72,
+       "enrolled": 72,
+       "free": 0,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "599",
+   "family": "grade_1",
+   "name": "90. СУ \"Ген. Хосе де Сан Мартин\"",
+   "district": "Люлин",
+   "groups": [
+    {
+     "group_id": 9547,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 5.0,
+     "queues": {
+      "general": {
+       "capacity": 120,
+       "enrolled": 120,
+       "free": 0,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "600",
+   "family": "grade_1",
+   "name": "96. СУ \"Лев Николаевич Толстой\"",
+   "district": "Люлин",
+   "groups": [
+    {
+     "group_id": 9552,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 4.0,
+     "queues": {
+      "general": {
+       "capacity": 96,
+       "enrolled": 98,
+       "free": 0,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "601",
+   "family": "grade_1",
+   "name": "97. СУ \"Братя Миладинови\"",
+   "district": "Люлин",
+   "groups": [
+    {
+     "group_id": 9553,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 5.0,
+     "queues": {
+      "general": {
+       "capacity": 110,
+       "enrolled": 104,
+       "free": 6,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "602",
+   "family": "grade_1",
+   "name": "103. ОУ \"Васил Левски\"",
+   "district": "Люлин",
+   "groups": [
+    {
+     "group_id": 9558,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 1.0,
+     "queues": {
+      "general": {
+       "capacity": 24,
+       "enrolled": 17,
+       "free": 7,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "603",
+   "family": "grade_1",
+   "name": "137. СУ \"Ангел Кънчев\"",
+   "district": "Люлин",
+   "groups": [
+    {
+     "group_id": 9588,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 4.0,
+     "queues": {
+      "general": {
+       "capacity": 96,
+       "enrolled": 96,
+       "free": 0,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "604",
+   "family": "grade_1",
+   "name": "10. СУ \"Теодор Траянов\"",
+   "district": "Младост",
+   "groups": [
+    {
+     "group_id": 9471,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 4.0,
+     "queues": {
+      "general": {
+       "capacity": 96,
+       "enrolled": 95,
+       "free": 1,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "605",
+   "family": "grade_1",
+   "name": "39. СУ \"Петър Динеков\"",
+   "district": "Младост",
+   "groups": [
+    {
+     "group_id": 9499,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 3.0,
+     "queues": {
+      "general": {
+       "capacity": 72,
+       "enrolled": 46,
+       "free": 26,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "606",
+   "family": "grade_1",
+   "name": "81. СУ \"Виктор Юго\"",
+   "district": "Младост",
+   "groups": [
+    {
+     "group_id": 9539,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 5.0,
+     "queues": {
+      "general": {
+       "capacity": 120,
+       "enrolled": 114,
+       "free": 6,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "607",
+   "family": "grade_1",
+   "name": "82. ОУ \"Васил Априлов\"",
+   "district": "Младост",
+   "groups": [
+    {
+     "group_id": 9540,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 2.0,
+     "queues": {
+      "general": {
+       "capacity": 48,
+       "enrolled": 45,
+       "free": 3,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "608",
+   "family": "grade_1",
+   "name": "118. СУ \"Акад. Людмил Стоянов\"",
+   "district": "Младост",
+   "groups": [
+    {
+     "group_id": 9570,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 4.0,
+     "queues": {
+      "general": {
+       "capacity": 92,
+       "enrolled": 91,
+       "free": 1,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "609",
+   "family": "grade_1",
+   "name": "125. СУ \"Боян Пенев\"",
+   "district": "Младост",
+   "groups": [
+    {
+     "group_id": 9577,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 6.0,
+     "queues": {
+      "general": {
+       "capacity": 144,
+       "enrolled": 141,
+       "free": 3,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "610",
+   "family": "grade_1",
+   "name": "128. СУ \"Алберт Айнщайн\"",
+   "district": "Младост",
+   "groups": [
+    {
+     "group_id": 9580,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 4.0,
+     "queues": {
+      "general": {
+       "capacity": 96,
+       "enrolled": 96,
+       "free": 0,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "611",
+   "family": "grade_1",
+   "name": "131. СУ \"Климент Аркадиевич Тимирязев\"",
+   "district": "Младост",
+   "groups": [
+    {
+     "group_id": 9583,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 6.0,
+     "queues": {
+      "general": {
+       "capacity": 156,
+       "enrolled": 156,
+       "free": 0,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "612",
+   "family": "grade_1",
+   "name": "144. СУ \"Народни будители\"",
+   "district": "Младост",
+   "groups": [
+    {
+     "group_id": 9595,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 5.0,
+     "queues": {
+      "general": {
+       "capacity": 110,
+       "enrolled": 106,
+       "free": 4,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "613",
+   "family": "grade_1",
+   "name": "145. ОУ \"Симеон Радев\"",
+   "district": "Младост",
+   "groups": [
+    {
+     "group_id": 9596,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 5.0,
+     "queues": {
+      "general": {
+       "capacity": 130,
+       "enrolled": 130,
+       "free": 0,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "614",
+   "family": "grade_1",
+   "name": "15. СУ \"Адам Мицкевич\"",
+   "district": "Надежда",
+   "groups": [
+    {
+     "group_id": 9475,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 3.0,
+     "queues": {
+      "general": {
+       "capacity": 72,
+       "enrolled": 45,
+       "free": 27,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "615",
+   "family": "grade_1",
+   "name": "16. ОУ \"Райко Жинзифов\"",
+   "district": "Надежда",
+   "groups": [
+    {
+     "group_id": 9476,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 3.0,
+     "queues": {
+      "general": {
+       "capacity": 72,
+       "enrolled": 63,
+       "free": 9,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "616",
+   "family": "grade_1",
+   "name": "54. СУ \"Св. Иван Рилски\"",
+   "district": "Надежда",
+   "groups": [
+    {
+     "group_id": 9514,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 5.0,
+     "queues": {
+      "general": {
+       "capacity": 120,
+       "enrolled": 114,
+       "free": 6,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "617",
+   "family": "grade_1",
+   "name": "63. ОУ \"Христо Ботев\"",
+   "district": "Надежда",
+   "groups": [
+    {
+     "group_id": 9522,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 2.0,
+     "queues": {
+      "general": {
+       "capacity": 48,
+       "enrolled": 45,
+       "free": 3,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "618",
+   "family": "grade_1",
+   "name": "98. НУ \"Св. Св. Кирил и Методий\"",
+   "district": "Надежда",
+   "groups": [
+    {
+     "group_id": 9554,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 2.0,
+     "queues": {
+      "general": {
+       "capacity": 46,
+       "enrolled": 46,
+       "free": 0,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "619",
+   "family": "grade_1",
+   "name": "101. СУ \"Бачо Киро\"",
+   "district": "Надежда",
+   "groups": [
+    {
+     "group_id": 9556,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 5.0,
+     "queues": {
+      "general": {
+       "capacity": 120,
+       "enrolled": 118,
+       "free": 2,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "620",
+   "family": "grade_1",
+   "name": "102. ОУ \"Панайот Волов\"",
+   "district": "Надежда",
+   "groups": [
+    {
+     "group_id": 9557,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 3.0,
+     "queues": {
+      "general": {
+       "capacity": 66,
+       "enrolled": 60,
+       "free": 6,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "621",
+   "family": "grade_1",
+   "name": "141. ОУ \"Народни будители\"",
+   "district": "Надежда",
+   "groups": [
+    {
+     "group_id": 9592,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 3.0,
+     "queues": {
+      "general": {
+       "capacity": 66,
+       "enrolled": 12,
+       "free": 54,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "622",
+   "family": "grade_1",
+   "name": "160. ОУ \"Св. Св. Кирил и Методий\"",
+   "district": "Нови Искър",
+   "groups": [
+    {
+     "group_id": 9605,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 1.0,
+     "queues": {
+      "general": {
+       "capacity": 22,
+       "enrolled": 16,
+       "free": 6,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "623",
+   "family": "grade_1",
+   "name": "170. СУ \"Васил Левски\"",
+   "district": "Нови Искър",
+   "groups": [
+    {
+     "group_id": 9608,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 4.0,
+     "queues": {
+      "general": {
+       "capacity": 96,
+       "enrolled": 93,
+       "free": 3,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "624",
+   "family": "grade_1",
+   "name": "171. ОУ \"Стоил Попов\"",
+   "district": "Нови Искър",
+   "groups": [
+    {
+     "group_id": 9609,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 2.0,
+     "queues": {
+      "general": {
+       "capacity": 48,
+       "enrolled": 48,
+       "free": 0,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "625",
+   "family": "grade_1",
+   "name": "172. ОУ \"Христо Ботев\"",
+   "district": "Нови Искър",
+   "groups": [
+    {
+     "group_id": 9610,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 1.0,
+     "queues": {
+      "general": {
+       "capacity": 24,
+       "enrolled": 9,
+       "free": 15,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "626",
+   "family": "grade_1",
+   "name": "176. ОУ \"Св. Св. Кирил и Методий\"",
+   "district": "Нови Искър",
+   "groups": [
+    {
+     "group_id": 9612,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 1.0,
+     "queues": {
+      "general": {
+       "capacity": 22,
+       "enrolled": 21,
+       "free": 1,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "627",
+   "family": "grade_1",
+   "name": "177. ОУ \"Св. Св. Кирил и Методий\"",
+   "district": "Нови Искър",
+   "groups": [
+    {
+     "group_id": 9613,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 1.0,
+     "queues": {
+      "general": {
+       "capacity": 22,
+       "enrolled": 17,
+       "free": 5,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "628",
+   "family": "grade_1",
+   "name": "179. ОУ \"Васил Левски\"",
+   "district": "Нови Искър",
+   "groups": [
+    {
+     "group_id": 9614,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 1.0,
+     "queues": {
+      "general": {
+       "capacity": 22,
+       "enrolled": 19,
+       "free": 3,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "629",
+   "family": "grade_1",
+   "name": "1. СУ \"Пенчо П. Славейков\"",
+   "district": "Оборище",
+   "groups": [
+    {
+     "group_id": 9463,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 2.0,
+     "queues": {
+      "general": {
+       "capacity": 44,
+       "enrolled": 41,
+       "free": 3,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "630",
+   "family": "grade_1",
+   "name": "112. ОУ \"Стоян Заимов\"",
+   "district": "Оборище",
+   "groups": [
+    {
+     "group_id": 9565,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 5.0,
+     "queues": {
+      "general": {
+       "capacity": 120,
+       "enrolled": 117,
+       "free": 3,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "631",
+   "family": "grade_1",
+   "name": "129. ОУ \"Антим I\"",
+   "district": "Оборище",
+   "groups": [
+    {
+     "group_id": 9581,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 3.0,
+     "queues": {
+      "general": {
+       "capacity": 79,
+       "enrolled": 77,
+       "free": 2,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "632",
+   "family": "grade_1",
+   "name": "53. ОУ \"Николай Хрелков\"",
+   "district": "Овча купел",
+   "groups": [
+    {
+     "group_id": 9513,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 2.0,
+     "queues": {
+      "general": {
+       "capacity": 56,
+       "enrolled": 56,
+       "free": 0,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "633",
+   "family": "grade_1",
+   "name": "66. СУ \"Филип Станиславов\"",
+   "district": "Овча купел",
+   "groups": [
+    {
+     "group_id": 9525,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 2.0,
+     "queues": {
+      "general": {
+       "capacity": 44,
+       "enrolled": 14,
+       "free": 30,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "634",
+   "family": "grade_1",
+   "name": "72. ОУ \"Христо Ботев\"",
+   "district": "Овча купел",
+   "groups": [
+    {
+     "group_id": 9531,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 1.0,
+     "queues": {
+      "general": {
+       "capacity": 27,
+       "enrolled": 27,
+       "free": 0,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "635",
+   "family": "grade_1",
+   "name": "88. СУ \"Димитър Попниколов\"",
+   "district": "Овча купел",
+   "groups": [
+    {
+     "group_id": 9545,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 6.0,
+     "queues": {
+      "general": {
+       "capacity": 120,
+       "enrolled": 111,
+       "free": 9,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "636",
+   "family": "grade_1",
+   "name": "149. СУ \"Иван Хаджийски\"",
+   "district": "Овча купел",
+   "groups": [
+    {
+     "group_id": 9600,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 5.0,
+     "queues": {
+      "general": {
+       "capacity": 120,
+       "enrolled": 117,
+       "free": 3,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "637",
+   "family": "grade_1",
+   "name": "71. СУ \"Пейо К. Яворов\"",
+   "district": "Панчарево",
+   "groups": [
+    {
+     "group_id": 9530,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 2.0,
+     "queues": {
+      "general": {
+       "capacity": 48,
+       "enrolled": 22,
+       "free": 26,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "638",
+   "family": "grade_1",
+   "name": "83. ОУ \"Елин Пелин\"",
+   "district": "Панчарево",
+   "groups": [
+    {
+     "group_id": 9541,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 2.0,
+     "queues": {
+      "general": {
+       "capacity": 48,
+       "enrolled": 30,
+       "free": 18,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "639",
+   "family": "grade_1",
+   "name": "84. ОУ \"Васил Левски\"",
+   "district": "Панчарево",
+   "groups": [
+    {
+     "group_id": 9542,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 2.0,
+     "queues": {
+      "general": {
+       "capacity": 48,
+       "enrolled": 48,
+       "free": 0,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "640",
+   "family": "grade_1",
+   "name": "191. ОУ \"Отец Паисий\"",
+   "district": "Панчарево",
+   "groups": [
+    {
+     "group_id": 9615,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 2.0,
+     "queues": {
+      "general": {
+       "capacity": 36,
+       "enrolled": 26,
+       "free": 10,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "641",
+   "family": "grade_1",
+   "name": "192. СУ \"Христо Ботев\"",
+   "district": "Панчарево",
+   "groups": [
+    {
+     "group_id": 9616,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 2.0,
+     "queues": {
+      "general": {
+       "capacity": 40,
+       "enrolled": 39,
+       "free": 1,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "642",
+   "family": "grade_1",
+   "name": "200. ОУ \"Отец Паисий\"",
+   "district": "Панчарево",
+   "groups": [
+    {
+     "group_id": 9618,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 1.0,
+     "queues": {
+      "general": {
+       "capacity": 25,
+       "enrolled": 14,
+       "free": 11,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "643",
+   "family": "grade_1",
+   "name": "201. ОУ \"Св. Св. Кирил и Методий\"",
+   "district": "Панчарево",
+   "groups": [
+    {
+     "group_id": 9619,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 2.0,
+     "queues": {
+      "general": {
+       "capacity": 48,
+       "enrolled": 32,
+       "free": 16,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "644",
+   "family": "grade_1",
+   "name": "202. ОУ \"Христо Ботев\"",
+   "district": "Панчарево",
+   "groups": [
+    {
+     "group_id": 9620,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 1.0,
+     "queues": {
+      "general": {
+       "capacity": 6,
+       "enrolled": 6,
+       "free": 0,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "645",
+   "family": "grade_1",
+   "name": "24. СУ \"Пейо К. Яворов\"",
+   "district": "Подуяне",
+   "groups": [
+    {
+     "group_id": 9484,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 1.0,
+     "queues": {
+      "general": {
+       "capacity": 22,
+       "enrolled": 0,
+       "free": 22,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "646",
+   "family": "grade_1",
+   "name": "42. ОУ \"Хаджи Димитър\"",
+   "district": "Подуяне",
+   "groups": [
+    {
+     "group_id": 9502,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 5.0,
+     "queues": {
+      "general": {
+       "capacity": 110,
+       "enrolled": 97,
+       "free": 13,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "647",
+   "family": "grade_1",
+   "name": "44. СУ \"Неофит Бозвели\"",
+   "district": "Подуяне",
+   "groups": [
+    {
+     "group_id": 9504,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 4.0,
+     "queues": {
+      "general": {
+       "capacity": 96,
+       "enrolled": 96,
+       "free": 0,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "648",
+   "family": "grade_1",
+   "name": "49. ОУ \"Бенито Хуарес\"",
+   "district": "Подуяне",
+   "groups": [
+    {
+     "group_id": 9509,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 6.0,
+     "queues": {
+      "general": {
+       "capacity": 144,
+       "enrolled": 144,
+       "free": 0,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "649",
+   "family": "grade_1",
+   "name": "95. СУ \"Проф. Иван Шишманов\"",
+   "district": "Подуяне",
+   "groups": [
+    {
+     "group_id": 9551,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 3.0,
+     "queues": {
+      "general": {
+       "capacity": 66,
+       "enrolled": 53,
+       "free": 13,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "650",
+   "family": "grade_1",
+   "name": "106. ОУ \"Григорий Цамблак\"",
+   "district": "Подуяне",
+   "groups": [
+    {
+     "group_id": 9561,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 1.0,
+     "queues": {
+      "general": {
+       "capacity": 22,
+       "enrolled": 13,
+       "free": 9,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "651",
+   "family": "grade_1",
+   "name": "124. ОУ \"Васил Левски\"",
+   "district": "Подуяне",
+   "groups": [
+    {
+     "group_id": 9576,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 1.0,
+     "queues": {
+      "general": {
+       "capacity": 22,
+       "enrolled": 13,
+       "free": 9,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "652",
+   "family": "grade_1",
+   "name": "130. СУ \"Стефан Караджа\"",
+   "district": "Подуяне",
+   "groups": [
+    {
+     "group_id": 9582,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 2.0,
+     "queues": {
+      "general": {
+       "capacity": 44,
+       "enrolled": 12,
+       "free": 32,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "653",
+   "family": "grade_1",
+   "name": "143. ОУ \"Георги Бенковски\"",
+   "district": "Подуяне",
+   "groups": [
+    {
+     "group_id": 9594,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 4.0,
+     "queues": {
+      "general": {
+       "capacity": 97,
+       "enrolled": 97,
+       "free": 0,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "654",
+   "family": "grade_1",
+   "name": "199. ОУ \"Св. Апостол Йоан Богослов\"",
+   "district": "Подуяне",
+   "groups": [
+    {
+     "group_id": 9617,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 3.0,
+     "queues": {
+      "general": {
+       "capacity": 72,
+       "enrolled": 72,
+       "free": 0,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "655",
+   "family": "grade_1",
+   "name": "14. СУ \"Проф. д-р Асен Златаров\"",
+   "district": "Сердика",
+   "groups": [
+    {
+     "group_id": 9474,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 2.0,
+     "queues": {
+      "general": {
+       "capacity": 44,
+       "enrolled": 23,
+       "free": 21,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "656",
+   "family": "grade_1",
+   "name": "29. СУ \"Кузман Шапкарев\"",
+   "district": "Сердика",
+   "groups": [
+    {
+     "group_id": 9489,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 2.0,
+     "queues": {
+      "general": {
+       "capacity": 48,
+       "enrolled": 17,
+       "free": 31,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "657",
+   "family": "grade_1",
+   "name": "48. ОУ \"Йосиф Ковачев\"",
+   "district": "Сердика",
+   "groups": [
+    {
+     "group_id": 9508,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 3.0,
+     "queues": {
+      "general": {
+       "capacity": 66,
+       "enrolled": 48,
+       "free": 18,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "658",
+   "family": "grade_1",
+   "name": "58. ОУ \"Сергей Румянцев\"",
+   "district": "Сердика",
+   "groups": [
+    {
+     "group_id": 9517,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 2.0,
+     "queues": {
+      "general": {
+       "capacity": 48,
+       "enrolled": 43,
+       "free": 5,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "659",
+   "family": "grade_1",
+   "name": "59. СУ \"Васил Левски\"",
+   "district": "Сердика",
+   "groups": [
+    {
+     "group_id": 9518,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 2.0,
+     "queues": {
+      "general": {
+       "capacity": 44,
+       "enrolled": 27,
+       "free": 17,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "660",
+   "family": "grade_1",
+   "name": "60. ОУ \"Св. Св. Кирил и Методий\"",
+   "district": "Сердика",
+   "groups": [
+    {
+     "group_id": 9519,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 2.0,
+     "queues": {
+      "general": {
+       "capacity": 52,
+       "enrolled": 51,
+       "free": 1,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "661",
+   "family": "grade_1",
+   "name": "100. ОУ \"Найден Геров\"",
+   "district": "Сердика",
+   "groups": [
+    {
+     "group_id": 9555,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 2.0,
+     "queues": {
+      "general": {
+       "capacity": 40,
+       "enrolled": 32,
+       "free": 8,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "662",
+   "family": "grade_1",
+   "name": "23. СУ \"Фредерик Жолио Кюри\"",
+   "district": "Слатина",
+   "groups": [
+    {
+     "group_id": 9483,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 3.0,
+     "queues": {
+      "general": {
+       "capacity": 66,
+       "enrolled": 66,
+       "free": 0,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "663",
+   "family": "grade_1",
+   "name": "31. СУЧЕМ \"Иван Вазов\"",
+   "district": "Слатина",
+   "groups": [
+    {
+     "group_id": 9491,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 4.0,
+     "queues": {
+      "general": {
+       "capacity": 96,
+       "enrolled": 95,
+       "free": 1,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "664",
+   "family": "grade_1",
+   "name": "93. СУ \"Александър Теодоров-Балан\"",
+   "district": "Слатина",
+   "groups": [
+    {
+     "group_id": 9549,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 2.0,
+     "queues": {
+      "general": {
+       "capacity": 55,
+       "enrolled": 55,
+       "free": 0,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "665",
+   "family": "grade_1",
+   "name": "94. СУ \"Димитър Страшимиров\"",
+   "district": "Слатина",
+   "groups": [
+    {
+     "group_id": 9550,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 4.0,
+     "queues": {
+      "general": {
+       "capacity": 88,
+       "enrolled": 84,
+       "free": 4,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "666",
+   "family": "grade_1",
+   "name": "109. ОУ \"Христо Смирненски\"",
+   "district": "Слатина",
+   "groups": [
+    {
+     "group_id": 9564,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 4.0,
+     "queues": {
+      "general": {
+       "capacity": 98,
+       "enrolled": 98,
+       "free": 0,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "667",
+   "family": "grade_1",
+   "name": "138. СУЗИЕ \"Проф. Васил Златарски\"",
+   "district": "Слатина",
+   "groups": [
+    {
+     "group_id": 9589,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 4.0,
+     "queues": {
+      "general": {
+       "capacity": 97,
+       "enrolled": 96,
+       "free": 1,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "668",
+   "family": "grade_1",
+   "name": "148. ОУ \"Проф. д-р Любомир Милетич\"",
+   "district": "Слатина",
+   "groups": [
+    {
+     "group_id": 9599,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 3.0,
+     "queues": {
+      "general": {
+       "capacity": 72,
+       "enrolled": 72,
+       "free": 0,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "669",
+   "family": "grade_1",
+   "name": "6. ОУ \"Граф Игнатиев\"",
+   "district": "Средец",
+   "groups": [
+    {
+     "group_id": 9468,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 3.0,
+     "queues": {
+      "general": {
+       "capacity": 78,
+       "enrolled": 78,
+       "free": 0,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "670",
+   "family": "grade_1",
+   "name": "7. СУ \"Свети Седмочисленици\"",
+   "district": "Средец",
+   "groups": [
+    {
+     "group_id": 9469,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 3.0,
+     "queues": {
+      "general": {
+       "capacity": 71,
+       "enrolled": 71,
+       "free": 0,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "671",
+   "family": "grade_1",
+   "name": "12. СУ \"Цар Иван Асен II\"",
+   "district": "Средец",
+   "groups": [
+    {
+     "group_id": 9473,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 3.0,
+     "queues": {
+      "general": {
+       "capacity": 72,
+       "enrolled": 70,
+       "free": 2,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "672",
+   "family": "grade_1",
+   "name": "38. ОУ \"Васил Априлов\"",
+   "district": "Средец",
+   "groups": [
+    {
+     "group_id": 9498,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 3.0,
+     "queues": {
+      "general": {
+       "capacity": 72,
+       "enrolled": 71,
+       "free": 1,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "674",
+   "family": "grade_1",
+   "name": "133. СУ \"Александър С. Пушкин\"",
+   "district": "Средец",
+   "groups": [
+    {
+     "group_id": 9585,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 3.0,
+     "queues": {
+      "general": {
+       "capacity": 78,
+       "enrolled": 78,
+       "free": 0,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "675",
+   "family": "grade_1",
+   "name": "8. СУ \"Васил Левски\"",
+   "district": "Студентски",
+   "groups": [
+    {
+     "group_id": 9470,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 6.0,
+     "queues": {
+      "general": {
+       "capacity": 144,
+       "enrolled": 144,
+       "free": 0,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "676",
+   "family": "grade_1",
+   "name": "55. СУ \"Петко Каравелов\"",
+   "district": "Студентски",
+   "groups": [
+    {
+     "group_id": 9515,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 8.0,
+     "queues": {
+      "general": {
+       "capacity": 200,
+       "enrolled": 200,
+       "free": 0,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "677",
+   "family": "grade_1",
+   "name": "20. ОУ \"Тодор Минков\"",
+   "district": "Триадица",
+   "groups": [
+    {
+     "group_id": 9480,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 4.0,
+     "queues": {
+      "general": {
+       "capacity": 96,
+       "enrolled": 94,
+       "free": 2,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "678",
+   "family": "grade_1",
+   "name": "22. СЕУ \"Георги Стойков Раковски\"",
+   "district": "Триадица",
+   "groups": [
+    {
+     "group_id": 9482,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 5.0,
+     "queues": {
+      "general": {
+       "capacity": 110,
+       "enrolled": 110,
+       "free": 0,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "679",
+   "family": "grade_1",
+   "name": "41. ОУ \"Св. Патриарх Евтимий\"",
+   "district": "Триадица",
+   "groups": [
+    {
+     "group_id": 9501,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 3.0,
+     "queues": {
+      "general": {
+       "capacity": 72,
+       "enrolled": 58,
+       "free": 14,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "680",
+   "family": "grade_1",
+   "name": "47. СУ \"Христо Г. Данов\"",
+   "district": "Триадица",
+   "groups": [
+    {
+     "group_id": 9507,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 2.0,
+     "queues": {
+      "general": {
+       "capacity": 48,
+       "enrolled": 17,
+       "free": 31,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "681",
+   "family": "grade_1",
+   "name": "73. СУ \"Владислав Граматик\"",
+   "district": "Триадица",
+   "groups": [
+    {
+     "group_id": 9532,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 3.0,
+     "queues": {
+      "general": {
+       "capacity": 84,
+       "enrolled": 84,
+       "free": 0,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "682",
+   "family": "grade_1",
+   "name": "104. ОУ \"Захари Стоянов\"",
+   "district": "Триадица",
+   "groups": [
+    {
+     "group_id": 9559,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 4.0,
+     "queues": {
+      "general": {
+       "capacity": 104,
+       "enrolled": 100,
+       "free": 4,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "683",
+   "family": "grade_1",
+   "name": "121. СУ \"Георги Измирлиев\"",
+   "district": "Триадица",
+   "groups": [
+    {
+     "group_id": 9573,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 5.0,
+     "queues": {
+      "general": {
+       "capacity": 139,
+       "enrolled": 139,
+       "free": 0,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "684",
+   "family": "grade_1",
+   "name": "126. ОУ \"Петко Ю. Тодоров\"",
+   "district": "Триадица",
+   "groups": [
+    {
+     "group_id": 9578,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 4.0,
+     "queues": {
+      "general": {
+       "capacity": 96,
+       "enrolled": 93,
+       "free": 3,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "source_id": "733",
+   "family": "grade_1",
+   "name": "204. ОУ \"\"",
+   "district": "Витоша",
+   "groups": [
+    {
+     "group_id": 9626,
+     "label": "1-ви клас, родени 2019 г.",
+     "birth_year": 2019,
+     "campaign": "2026/2027",
+     "stage": "grade_1",
+     "age_group": null,
+     "groups": 4.0,
+     "queues": {
+      "general": {
+       "capacity": 125,
+       "enrolled": 122,
+       "free": 3,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
   {
    "source_id": "1",
    "family": "kindergarten",
