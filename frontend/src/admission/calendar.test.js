@@ -55,6 +55,10 @@ test("milestones agree with the schedule keys the calculator reads", () => {
     if (first) assert.equal(rankings[0], first, ruleSet.id)
     if (general) assert.deepEqual(rankings, general, ruleSet.id)
     if (listed) assert.deepEqual(rankings, listed, ruleSet.id)
+    // The calculator counts first-grade address durations to applications_close: the
+    // same last day to apply that the calendar shows.
+    const lock = milestones.find(m => m.key === 'applications_lock')?.date
+    if (ruleSet.schedule.applications_close) assert.equal(ruleSet.schedule.applications_close, lock, ruleSet.id)
   }
 })
 
@@ -66,6 +70,8 @@ test('estimated campaigns land on the dates their own rule files estimate', () =
     const firstRanking = dates.milestones.find(m => m.key === 'ranking').date
     const expected = ruleSet.schedule.first_general_ranking || ruleSet.schedule.first_ranking
     if (expected) assert.equal(firstRanking, expected, ruleSet.id)
+    const lock = dates.milestones.find(m => m.key === 'applications_lock')?.date
+    if (ruleSet.schedule.applications_close) assert.equal(lock, ruleSet.schedule.applications_close, ruleSet.id)
   }
 })
 

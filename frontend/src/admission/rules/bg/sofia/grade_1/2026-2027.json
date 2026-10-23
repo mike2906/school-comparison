@@ -60,9 +60,9 @@
     }
   ],
   "schedule": {
-    "applications_close": "2026-05-31",
+    "applications_close": "2026-06-01",
     "first_ranking": "2026-06-02",
-    "source": "schedule-2026-press",
+    "source": "isodz-calendar-2026",
     "milestones": [
       {
         "key": "free_places",
