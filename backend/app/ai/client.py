@@ -47,6 +47,10 @@ MODEL_TIERS = {
     # Translating the fee names, class names and list items a page shows as the website
     # wrote them (stages/text_translations.py): short labels, on the Max plan's API credit.
     "translation": "anthropic/claude-haiku-5-5",
+    # School facts and open days (stages/school_facts.py, stages/open_days.py), on the Max
+    # plan's API credit: the Sofia facts re-read published 2026-10-20 ran on it. Before, they
+    # shared the fee reader's OpenRouter tier, so an empty OpenRouter balance stopped them (339).
+    "facts": "anthropic/claude-haiku-5-5",
 }
 
 # Cost per 1M tokens (input/output), verified against OpenRouter 2026-07-13.
@@ -57,6 +61,7 @@ MODEL_COSTS = {
     "vision": (2.00, 10.00),  # OpenRouter, 2026-10-09
     "fee_check": (2.00, 10.00),  # Sonnet 5.5, if the tier is pointed at OpenRouter
     "translation": (0.10, 0.50),  # Haiku 5.5, if the tier is pointed at OpenRouter
+    "facts": (0.10, 0.50),  # Haiku 5.5, if the tier is pointed at OpenRouter
 }
 
 # Anthropic's API reports tokens, not a cost, so a tier routed there needs its model's
@@ -97,7 +102,7 @@ ANTHROPIC_THINKING_PROFILES = {
     ),
 }
 
-ModelTier = Literal["cheap", "capable", "pricing", "vision", "fee_check", "translation"]
+ModelTier = Literal["cheap", "capable", "pricing", "vision", "fee_check", "translation", "facts"]
 
 
 def get_model(tier: ModelTier) -> str:

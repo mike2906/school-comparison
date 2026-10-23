@@ -37,7 +37,7 @@ from app.utils.school_facts import ATTRIBUTE_KEY, LANGUAGES_READ_KEY, SITE_ACCEP
 logger = logging.getLogger(__name__)
 
 STAGE = "school-facts"
-TIER = "pricing"  # the fee reader's model: cheap, and follows quoting rules well
+TIER = "facts"  # Haiku 5.5 on Anthropic's API (app/ai/client.py MODEL_TIERS)
 DEFAULT_MAX_USD = 0.50
 OUTPUT_TOKENS_RESERVE = 6000  # up to 20 facts, each with its quote, in two languages
 MAX_READ_CHARS = 100_000
@@ -355,6 +355,7 @@ async def run_school_facts(
                         stage=STAGE,
                         must_read=facts_rules.ADMISSION_LINK_RE,
                         first_urls=stored_fact_pages(school),
+                        pick_tier=TIER,  # the picker too: no OpenRouter call in a facts run
                     )
 
                 async def one(school_db: AsyncSession, current_id: int) -> dict[str, Any]:
