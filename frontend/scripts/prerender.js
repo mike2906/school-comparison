@@ -24,7 +24,8 @@ import {
 import { DEFAULT_SITE_ORIGIN, URL_LANGUAGES } from '../src/utils/languageUrl.js'
 
 const DIST = path.resolve('dist')
-const CONCURRENCY = 8
+// Kept well under the edge rate limit (infra/main.tf) even if the API gets faster.
+const CONCURRENCY = 4
 const strict = process.argv.includes('--strict')
 
 function siteOrigin(value) {
@@ -49,11 +50,18 @@ function freshUrl(url) {
 
 async function fetchJson(url) {
   let lastError
-  for (const delaySeconds of [0, 1, 2]) {
-    if (delaySeconds) await new Promise((resolve) => setTimeout(resolve, delaySeconds * 1000))
+  let waitSeconds = 0
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    if (waitSeconds) await new Promise((resolve) => setTimeout(resolve, waitSeconds * 1000))
+    waitSeconds = attempt
     try {
       const response = await fetch(freshUrl(url), { signal: AbortSignal.timeout(30_000) })
-      if (!response.ok) throw new Error(`HTTP ${response.status}`)
+      if (!response.ok) {
+        // The edge rate limit (infra/main.tf) blocks an address for a while; wait it out.
+        if (response.status === 429) waitSeconds = (Number(response.headers.get('retry-after')) || 10) + 1
+        await response.body?.cancel()
+        throw new Error(`HTTP ${response.status}`)
+      }
       return await response.json()
     } catch (error) {
       lastError = error
