@@ -21,10 +21,15 @@ import {
   renderPage,
   schoolPage,
 } from '../src/prerender/pages.js'
+import { catchmentUrl } from '../src/admission/catchments.js'
+import { CATCHMENT_CAMPAIGNS } from '../src/admission/loadCatchments.js'
 import { DEFAULT_SITE_ORIGIN, URL_LANGUAGES } from '../src/utils/languageUrl.js'
 
 const DIST = path.resolve('dist')
-const CONCURRENCY = 8
+// Sofia's district boundaries, the same file the admission pages load.
+const DISTRICTS_FILE = catchmentUrl(CATCHMENT_CAMPAIGNS[0], 'districts.json').slice(1)
+// Kept well under the edge rate limit (infra/main.tf) even if the API gets faster.
+const CONCURRENCY = 4
 const strict = process.argv.includes('--strict')
 
 function siteOrigin(value) {
@@ -49,11 +54,18 @@ function freshUrl(url) {
 
 async function fetchJson(url) {
   let lastError
-  for (const delaySeconds of [0, 1, 2]) {
-    if (delaySeconds) await new Promise((resolve) => setTimeout(resolve, delaySeconds * 1000))
+  let waitSeconds = 0
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    if (waitSeconds) await new Promise((resolve) => setTimeout(resolve, waitSeconds * 1000))
+    waitSeconds = attempt
     try {
       const response = await fetch(freshUrl(url), { signal: AbortSignal.timeout(30_000) })
-      if (!response.ok) throw new Error(`HTTP ${response.status}`)
+      if (!response.ok) {
+        // The edge rate limit (infra/main.tf) blocks an address for a while; wait it out.
+        if (response.status === 429) waitSeconds = (Number(response.headers.get('retry-after')) || 10) + 1
+        await response.body?.cancel()
+        throw new Error(`HTTP ${response.status}`)
+      }
       return await response.json()
     } catch (error) {
       lastError = error
@@ -105,14 +117,15 @@ async function main() {
 
   const { schools, listedIds } = apiUrl ? await fetchSchools(apiUrl) : { schools: [], listedIds: new Set() }
   const template = await readFile(path.join(DIST, 'index.html'), 'utf8')
+  const districts = JSON.parse(await readFile(path.join(DIST, DISTRICTS_FILE), 'utf8'))
 
   let sitemapPaths = []
   for (const language of URL_LANGUAGES) {
     const dictionary = JSON.parse(await readFile(path.resolve(`src/i18n/${language}.json`), 'utf8'))
-    const t = createTranslator(dictionary)
+    const t = createTranslator(dictionary, language)
     const pages = [
       ...fixedPages(t, language, schools.filter((school) => listedIds.has(school.id))),
-      ...schools.map((school) => schoolPage(school, t, language, { listed: listedIds.has(school.id) })),
+      ...schools.map((school) => schoolPage(school, t, language, { listed: listedIds.has(school.id), districts, origin })),
     ]
     for (const page of pages) {
       await write(outputFile(page.routePath, language), renderPage(template, page, { language, origin, siteName: t('nav.title') }))
@@ -132,7 +145,8 @@ async function main() {
   const thin = reasons.filter((reason) => !Object.values(reason).some(Boolean)).length
   console.log(
     `prerender: ${reasons.length} listed schools, ${reasons.length - thin} indexable ` +
-      `(NVO ${count('nvo')}, pricing ${count('pricing')}, summary ${count('summary')}), ${thin} thin (noindex); ` +
+      `(NVO ${count('nvo')}, pricing ${count('pricing')}, facts ${count('facts')}, admission ${count('admission')}, ` +
+      `summary ${count('summary')}), ${thin} thin (noindex); ` +
       `${schools.length - reasons.length} unlisted (noindex)`
   )
 }

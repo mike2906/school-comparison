@@ -41,6 +41,7 @@ import PhoneLinks from './PhoneLinks'
 import SocialLinks from './SocialLinks'
 import SchoolAdmissionArea from '../Admission/SchoolAdmissionArea'
 import SchoolCutoffs from '../Admission/SchoolCutoffs'
+import FreePlaces from '../Admission/FreePlaces'
 
 // The chart library is large and only schools with exam results need it. If the chunk
 // cannot be loaded (a tab that outlived a deploy), the page stays usable without the chart.
@@ -147,7 +148,10 @@ function SchoolDetailPage({ schoolId = null, embedded = false, onClose = null })
   useEffect(() => {
     if (!school) return undefined
     const previousTitle = document.title
-    document.title = `${getSchoolName(school, i18n.language)} · ${t('nav.title')}`
+    const name = getSchoolName(school, i18n.language)
+    // Landing straight on the page keeps the prerendered title, which adds the district
+    // (src/prerender/pages.js): it is the one search engines index.
+    if (!previousTitle.startsWith(`${name}, `)) document.title = `${name} · ${t('nav.title')}`
     return () => {
       document.title = previousTitle
     }
@@ -666,6 +670,7 @@ function SchoolDetailPage({ schoolId = null, embedded = false, onClose = null })
         )}
 
         <SchoolAdmissionArea school={school} />
+        <FreePlaces school={school} />
         <SchoolCutoffs school={school} />
 
         {/* Academic Performance (NVO Results) */}

@@ -22,7 +22,7 @@ from app.ai.client import calculate_cost, create_agent, extract_provider_cost_us
 from app.config import get_settings
 from app.scrapers.school_tokens import extract_school_name_tokens
 from app.scrapers.site_city import identity_texts as site_identity_texts
-from app.scrapers.site_city import other_town_named
+from app.scrapers.site_city import other_number_named, other_town_named
 from app.services.provider_costs import execute_billable_request
 from app.utils.transliteration import transliterate_bulgarian
 from app.utils.website_data import WEBSITE_DATA_WITHHELD_KEY
@@ -497,6 +497,9 @@ class URLValidator:
         other_town = other_town_named(site_identity_texts(soup), self.school_city) if soup is not None else None
         if other_town:
             return ValidationResult.INVALID, None, f"Website names another town: {other_town}"
+        other_school = other_number_named(site_identity_texts(soup), expected_names) if soup is not None else None
+        if other_school:
+            return ValidationResult.INVALID, None, f"Website names another school: {other_school}"
 
         if directory_signals >= 1 and name_tokens and name_token_hits < min_name_token_hits:
             if keyword_count >= 2 and name_token_hits > 0 and not identity_mismatch:
@@ -1096,6 +1099,7 @@ def _should_clear_website_derived_data(result: ValidationResult, reason: Optiona
         "expected-school mismatch",
         "directory-like listing signals",
         "website names another town",
+        "website names another school",
     )
     return any(marker in lowered for marker in strong_markers)
 

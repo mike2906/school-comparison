@@ -89,6 +89,24 @@ def promote_validation_report(
     return attrs
 
 
+def start_given_site_clean(attributes: Any, *, drop_site_blocks: bool) -> dict[str, Any]:
+    """Attributes for a school whose site a person gave or a search found and validation
+    accepted: no withholding marker and no old Stage 6 report.
+
+    The marker protected website-derived blocks read before it was set, and those do not
+    check which content they came from, only which site: a re-accepted URL, or a section
+    of the same site, would show them again unread. So with ``drop_site_blocks`` (set
+    when the marker was set, or the site was replaced) the facts, website name and
+    social links go too, and come back only from a fresh read."""
+    attrs = dict(attributes) if isinstance(attributes, Mapping) else {}
+    attrs.pop(WEBSITE_DATA_WITHHELD_KEY, None)
+    attrs.pop("data_validation", None)
+    if drop_site_blocks:
+        for key in (*_SCHOOL_FACTS_KEYS, "social_links"):
+            attrs.pop(key, None)
+    return attrs
+
+
 def record_validation_failure(
     attributes: Any, *, error: str, failed_at: str | None = None
 ) -> dict[str, Any]:

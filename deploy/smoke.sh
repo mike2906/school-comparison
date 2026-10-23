@@ -19,11 +19,12 @@ status() {
 }
 
 body() {
-	curl -fsS -m 30 "$@"
+	# Gzip, as every browser and the edge ask: the Sofia list is ~4 MB plain, ~0.4 MB gzipped.
+	curl -fsS --compressed -m 30 "$@"
 }
 
 smoke_api() {
-	local api="$1" site="$2" ready="" count id headers fresh
+	local api="$1" site="$2" ready="" list count id headers fresh
 	# Cloudflare keeps GET answers a few minutes: ask past its copy, to check this deploy.
 	fresh="smoke=$(date +%s%N)"
 
@@ -35,11 +36,12 @@ smoke_api() {
 	[ "$ready" = ready ] || fail "$api/ready did not report ready"
 	ok "/ready"
 
-	count="$(body "$api/schools?$fresh" | jq 'length')"
+	list="$(body "$api/schools?$fresh")" || fail "/schools did not answer"
+	count="$(jq 'length' <<< "$list")"
 	[ "$count" -gt 0 ] || fail "/schools returned no schools"
 	ok "/schools lists $count schools"
 
-	id="$(body "$api/schools?$fresh" | jq '.[0].id')"
+	id="$(jq '.[0].id' <<< "$list")"
 	[ "$(status "$api/schools/$id?$fresh")" = 200 ] || fail "/schools/$id is not 200"
 	ok "/schools/$id"
 
@@ -88,7 +90,8 @@ smoke_site() {
 
 	sitemap="$(body "$site/sitemap.xml")"
 	urls="$(grep -c '<loc>' <<< "$sitemap" || true)"
-	[ "$urls" -ge 200 ] || fail "sitemap.xml lists $urls URLs, expected at least 200"
+	# About 1,100 (pages in two languages) since kindergartens count by their admission rankings (2026-10).
+	[ "$urls" -ge 800 ] || fail "sitemap.xml lists $urls URLs, expected at least 800"
 	ok "sitemap.xml lists $urls URLs"
 
 	# -m 1, not `| head`: with pipefail, head closing the pipe early fails the script.

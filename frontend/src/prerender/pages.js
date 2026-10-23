@@ -3,8 +3,22 @@
  * block inside `#root` that React replaces on mount (hidden until then, see index.html).
  * Pure builders; the file and network work lives in `scripts/prerender.js`.
  */
+import {
+  LAST_ADMITTED_KINDS,
+  comparableRound,
+  cutoffText,
+  cutoffValue,
+  rankingLabel,
+  roundCounts,
+  rowLabel,
+  shortCampaign,
+} from '../admission/calculator.js'
+import { districtLabel } from '../admission/catchments.js'
+import { kindergartenDistrictFeature } from '../admission/schoolVerdict.js'
 import { getAddress, getSchoolName } from '../utils/i18n.js'
 import { formatPercent } from '../utils/nvoDisplay.js'
+import { parseCoordinate } from '../utils/coordinates.js'
+import { parsePhones } from '../utils/phone.js'
 import { URL_LANGUAGES, alternateLinks, canonicalUrl, languagePath } from '../utils/languageUrl.js'
 import { schoolLevelLabel, schoolTypeLabel } from '../utils/levelLabel.js'
 import {
@@ -15,6 +29,7 @@ import {
   isAverageMetric,
 } from '../utils/nvo.js'
 import { statedTuition } from '../utils/pricing.js'
+import { getSchoolFacts } from '../utils/schoolFacts.js'
 import { directorySections } from '../utils/schoolDirectory.js'
 
 // Our own thin-content heuristic, not an SEO rule: a published Bulgarian summary shorter
@@ -25,11 +40,17 @@ const DESCRIPTION_MAX_CHARS = 160
 const OG_LOCALES = { bg: 'bg_BG', en: 'en_GB' }
 const BODY_CLASS = 'mx-auto max-w-3xl space-y-3 px-4 py-8 text-neutral-900'
 
-/** A minimal `t()` over one locale file: dotted keys and `{{name}}` interpolation. */
-export function createTranslator(dictionary) {
+/**
+ * A minimal `t()` over one locale file: dotted keys, `{{name}}` interpolation, and
+ * i18next's `_one`/`_other` plural keys when `count` is given.
+ */
+export function createTranslator(dictionary, language = 'en') {
+  const plurals = new Intl.PluralRules(language)
+  const lookup = (key) => key.split('.').reduce((node, part) => node?.[part], dictionary)
   return (key, values = {}) => {
-    const template = key.split('.').reduce((node, part) => node?.[part], dictionary)
-    if (typeof template !== 'string') return key
+    const plural = typeof values.count === 'number' ? lookup(`${key}_${plurals.select(values.count)}`) : undefined
+    const template = typeof plural === 'string' ? plural : lookup(key)
+    if (typeof template !== 'string') return values.defaultValue ?? key
     return template.replace(/\{\{\s*(\w+)\s*\}\}/g, (_match, name) => String(values[name] ?? ''))
   }
 }
@@ -103,13 +124,45 @@ function tuitionLine(school, t) {
 }
 
 /**
- * What makes a school page worth indexing: official NVO results, a published price, or a
- * substantive published summary. A page with none of them is thin (`noindex`).
+ * The admission rankings in words, one line per group or class, read on the same ranking
+ * as the school page's "Who got in before" (`comparableRound`).
+ */
+function cutoffLines(school, t, language) {
+  const rows = school?.admission_info?.cutoff_summary
+  if (!Array.isArray(rows)) return []
+  return rows.flatMap((row) => {
+    const round = comparableRound(row)
+    if (!round) return []
+    const value = cutoffText(round, t, language)
+    const ranking = rankingLabel(row, round, t, language)
+    const result = value
+      ? `${ranking}${LAST_ADMITTED_KINDS.has(cutoffValue(round)?.kind) ? `, ${t('cutoffs.lastAdmitted')} ` : ': '}${value}`
+      : ranking
+    const tie = round.tie_at_cutoff ? ` ${t('cutoffs.tie')}` : ''
+    const counts = roundCounts(round, t)
+    const label = [shortCampaign(row.campaign), row.quota && t('cutoffs.quota')].filter(Boolean).join(', ')
+    return [`${rowLabel(row, t, language)} (${label}): ${result}${tie}${counts ? ` (${counts})` : ''}`]
+  })
+}
+
+/** A row whose ranking says who got in: a cut-off, or that everyone did. */
+function hasAdmissionResult(row) {
+  const kind = cutoffValue(comparableRound(row))?.kind
+  return Boolean(kind) && kind !== 'noPlaces'
+}
+
+/**
+ * What makes a school page worth indexing: official NVO results, a published price,
+ * facts from the school's own site, an admission ranking that says who got in, or a substantive
+ * published summary. A page with none of them is thin (`noindex`).
  */
 export function indexReasons(school) {
+  const rows = school?.admission_info?.cutoff_summary
   return {
     nvo: latestNvoResults(school).length > 0,
     pricing: Array.isArray(school?.pricing) && school.pricing.length > 0,
+    facts: getSchoolFacts(school, 'bg', { keyOnly: true }).length > 0,
+    admission: Array.isArray(rows) && rows.some(hasAdmissionResult),
     summary: summaryText(school, 'bg').length >= SUMMARY_MIN_CHARS,
   }
 }
@@ -137,6 +190,12 @@ function mainBlock(parts) {
 
 function heading(text) {
   return `<h1 class="text-2xl font-bold">${escapeHtml(text)}</h1>`
+}
+
+function listSection(title, lines) {
+  if (lines.length === 0) return ''
+  const items = lines.map((line) => `<li>${escapeHtml(line)}</li>`).join('')
+  return `<section><h2 class="font-semibold">${escapeHtml(title)}</h2><ul>${items}</ul></section>`
 }
 
 function paragraph(text) {
@@ -221,19 +280,60 @@ export function fixedPages(t, language, listedSchools = []) {
   ]
 }
 
+function primaryLocation(school) {
+  const locations = Array.isArray(school?.locations) ? school.locations : []
+  return locations.find((location) => location.is_primary) || locations[0]
+}
+
+/**
+ * schema.org data for a school page: a Preschool or School with its address, pin and
+ * phone, so search engines and assistants read the facts without parsing the text.
+ */
+function schoolJsonLd(school, { name, url, language, district, listed, t }) {
+  const primary = primaryLocation(school)
+  const other = URL_LANGUAGES.filter((code) => code !== language).map((code) => getSchoolName(school, code))
+  const address = getAddress(primary, language)
+  const lat = parseCoordinate(primary?.lat)
+  const lng = parseCoordinate(primary?.lng)
+  return {
+    '@context': 'https://schema.org',
+    '@type': school.education_level === 'kindergarten' ? 'Preschool' : 'School',
+    name,
+    alternateName: other.filter((value) => value && value !== name)[0],
+    url,
+    sameAs: /^https?:\/\//.test(school.website_url || '') ? school.website_url : undefined,
+    telephone: parsePhones(primary?.phone).find((phone) => phone.href)?.href.replace(/^tel:/, '') || undefined,
+    address: address
+      ? {
+        '@type': 'PostalAddress',
+        streetAddress: address,
+        // Listed schools are in the launch city; the rest only keep a working URL.
+        addressLocality: listed ? t('seo.city') : undefined,
+        addressRegion: district ? t('seo.district', { district: districtLabel(district, language) }) : undefined,
+        addressCountry: 'BG',
+      }
+      : undefined,
+    geo: lat != null && lng != null && (lat || lng)
+      ? { '@type': 'GeoCoordinates', latitude: lat, longitude: lng }
+      : undefined,
+  }
+}
+
 /**
  * A school's page. State schools lead with their official NVO results. A school the site
  * does not list (`listed: false`, outside the launch city) keeps a working URL but is not
  * offered to search engines.
  */
-export function schoolPage(school, t, language, { listed = true } = {}) {
+export function schoolPage(school, t, language, { listed = true, districts = null, origin = null } = {}) {
   const name = getSchoolName(school, language)
+  const district = listed ? kindergartenDistrictFeature(school, districts)?.properties.name ?? null : null
+  const districtText = district ? t('seo.district', { district: districtLabel(district, language) }) : ''
   const facts = t('seo.schoolFacts', {
     type: schoolTypeLabel(school, t),
     level: schoolLevelLabel(school, t),
   })
   const locations = Array.isArray(school.locations) ? school.locations : []
-  const primary = locations.find((location) => location.is_primary) || locations[0]
+  const primary = primaryLocation(school)
   const addresses = [primary, ...locations.filter((location) => location !== primary)]
     .map((location) => getAddress(location, language))
     .filter(Boolean)
@@ -247,23 +347,31 @@ export function schoolPage(school, t, language, { listed = true } = {}) {
   const headlineNvo = nvo.find((result) => result.examType === levelExam) || nvo[nvo.length - 1]
   const about = `${[facts, addresses[0]].filter(Boolean).join(', ')}.`
   const nvoSentence = headlineNvo ? `${nvoLine(headlineNvo, t, language)}.` : ''
-  const description = (leadWithNvo ? [nvoSentence, about] : [about, nvoSentence, summary || tuition])
+  // Only facts written in the page's language: the app labels a Bulgarian fallback, this can't.
+  const siteFacts = getSchoolFacts(school, language, { fallback: false })
+  const admission = cutoffLines(school, t, language)
+  const keyFact = siteFacts.find((fact) => fact.rank === 'key')?.text
+  const detail = summary || tuition || keyFact || (admission[0] && `${admission[0]}.`)
+  const description = (leadWithNvo ? [nvoSentence, about] : [about, nvoSentence, detail])
     .filter(Boolean)
     .join(' ')
 
-  const nvoSection = nvo.length > 0
-    ? `<section><h2 class="font-semibold">${escapeHtml(t('seo.nvoHeading'))}</h2><ul>${nvo
-      .map((result) => `<li>${escapeHtml(nvoLine(result, t, language))}</li>`)
-      .join('')}</ul></section>`
-    : ''
+  const nvoSection = listSection(t('seo.nvoHeading'), nvo.map((result) => nvoLine(result, t, language)))
+  const factsSection = listSection(
+    t('schoolFacts.title'),
+    siteFacts.map((fact) => `${t(`schoolFacts.topics.${fact.topic}`)}: ${fact.text}`),
+  )
+  const admissionSection = listSection(t('cutoffs.title'), admission)
   const aboutParts = [paragraph(facts), ...addresses.map(paragraph)]
-  const rest = [paragraph(summary), paragraph(tuition)]
+  const rest = [paragraph(summary), paragraph(tuition), factsSection, admissionSection]
 
   return {
     routePath: `/schools/${school.id}`,
-    title: `${name} · ${t('nav.title')}`,
+    // The district is what parents add to a school's name when they search.
+    title: `${[name, districtText].filter(Boolean).join(', ')} · ${t('nav.title')}`,
     description: truncate(description),
     canonicalPath: `/schools/${school.id}`,
+    jsonLd: origin ? schoolJsonLd(school, { name, url: canonicalUrl(`/schools/${school.id}`, language, origin), language, district, listed, t }) : null,
     noindex: !listed || isThinSchool(school),
     sitemap: listed && !isThinSchool(school),
     body: mainBlock([
@@ -283,6 +391,10 @@ export function renderPage(template, page, { language, origin, siteName }) {
   const meta = (attribute, key, content) => `<meta ${attribute}="${key}" content="${escapeHtml(content)}" />`
   const link = (rel, href, extra = '') => `<link rel="${rel}"${extra} href="${escapeHtml(href)}" />`
   const head = [meta('name', 'description', page.description)]
+  if (page.jsonLd) {
+    // `<` escaped so school text can never close the script element.
+    head.push(`<script type="application/ld+json">${JSON.stringify(page.jsonLd).replace(/</g, '\\u003c')}</script>`)
+  }
   if (page.noindex) head.push(meta('name', 'robots', 'noindex, follow'))
   if (page.canonicalPath) {
     const canonical = canonicalUrl(page.canonicalPath, language, origin)

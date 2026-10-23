@@ -19,7 +19,7 @@ import {
 const ORIGIN = 'https://example.test'
 const TEMPLATE = '<!doctype html>\n<html lang="bg">\n  <head>\n    <title>App</title>\n  </head>\n  <body>\n    <div id="root"></div>\n  </body>\n</html>'
 const translator = (language) =>
-  createTranslator(JSON.parse(readFileSync(new URL(`../i18n/${language}.json`, import.meta.url), 'utf8')))
+  createTranslator(JSON.parse(readFileSync(new URL(`../i18n/${language}.json`, import.meta.url), 'utf8')), language)
 const t = translator('en')
 
 const exam = (exam_type, year, subject, value) => ({ exam_type, year, subject, metric: 'average_score', value })
@@ -69,8 +69,62 @@ test('the app and the prerender agree on which fixed routes carry a canonical', 
 })
 
 test('NVO results or a published price alone make a page indexable', () => {
-  assert.deepEqual(indexReasons(withNvo), { nvo: true, pricing: false, summary: false })
+  assert.deepEqual(indexReasons(withNvo), { nvo: true, pricing: false, facts: false, admission: false, summary: false })
   assert.equal(isThinSchool(school({ pricing: [{ id: 1, category: 'tuition' }] })), false)
+})
+
+const kindergarten = school({
+  education_level: 'kindergarten',
+  school_facts: {
+    facts: [
+      { topic: 'facilities', rank: 'key', text_i18n: { bg: 'Има басейн.', en: 'It has a <pool>.' } },
+      { topic: 'meals', rank: 'more', text_i18n: { bg: 'Собствена кухня.' } },
+    ],
+  },
+  admission_info: {
+    cutoff_summary: [
+      {
+        stage: 'kindergarten',
+        age_group: 'nursery',
+        birth_year: 2024,
+        campaign: '2026/2027',
+        rounds: 1,
+        first: {
+          round_id: 1, round_kind: 'current', classified_on: '2026-09-04',
+          places: 2, applicants_count: 34, admitted_count: 2, last_admitted_points: 19,
+        },
+      },
+    ],
+  },
+})
+
+test('facts from the school site or official admission rankings make a page indexable', () => {
+  assert.equal(isThinSchool(school({ school_facts: kindergarten.school_facts })), false)
+  assert.equal(isThinSchool(school({ admission_info: kindergarten.admission_info })), false)
+  assert.equal(isThinSchool(school({ admission_info: { cutoff_summary: [{ stage: 'grade_1', rounds: 0 }] } })), true)
+  const noPlaces = { ...kindergarten.admission_info.cutoff_summary[0], first: { round_id: 2, round_kind: 'current', places: 0 } }
+  assert.equal(isThinSchool(school({ admission_info: { cutoff_summary: [noPlaces] } })), true)
+  assert.equal(isThinSchool(school({ admission_info: { cutoff_summary: {} } })), true)
+  const onlyMore = { facts: [kindergarten.school_facts.facts[1]] }
+  assert.equal(isThinSchool(school({ school_facts: onlyMore })), true)
+})
+
+test('a page lists its site facts and admission results, escaped', () => {
+  const page = schoolPage(kindergarten, t, 'en')
+  assert.match(page.body, /From the school's website.*Facilities: It has a &lt;pool&gt;\./)
+  assert.doesNotMatch(page.body, /Собствена кухня/)
+  assert.match(schoolPage(kindergarten, translator('bg'), 'bg').body, /Собствена кухня/)
+  assert.match(page.body, /Who got in before.*Nursery · born 2024 \(2026\/27\): Free-place ranking, 4 September 2026, last admitted: 19 points \(2 places · 34 applicants · 2 admitted\)/)
+  assert.match(page.description, /, 1 Main St\. It has a <pool>\.$/)
+  assert.equal(page.sitemap, true)
+})
+
+test('the translator picks plural keys by count', () => {
+  const tr = createTranslator({ n_one: '{{count}} place', n_other: '{{count}} places', plain: 'x' }, 'en')
+  assert.equal(tr('n', { count: 1 }), '1 place')
+  assert.equal(tr('n', { count: 3 }), '3 places')
+  assert.equal(tr('plain', { count: 3 }), 'x')
+  assert.equal(tr('missing', { defaultValue: 'fallback' }), 'fallback')
 })
 
 test('only a substantive Bulgarian summary counts, measured on trimmed plain text', () => {
@@ -189,4 +243,48 @@ test('/schools lists schools then kindergartens by name, linked in the page lang
   assert.match(page('bg').body, /href="\/schools\/5"/)
   const search = fixedPages(t, 'en', listed).find((p) => p.routePath === '/search')
   assert.match(search.body, /<a href="\/en\/schools">All schools and kindergartens<\/a>/)
+})
+
+const districts = {
+  type: 'FeatureCollection',
+  features: [
+    { properties: { name: 'Младост' }, geometry: { type: 'Polygon', coordinates: [[[23, 42], [24, 42], [24, 43], [23, 43], [23, 42]]] } },
+  ],
+}
+const pinned = school({
+  website_url: 'https://school.example',
+  locations: [{ is_primary: true, lat: 42.5, lng: 23.5, phone: '02/824 11 70', address_i18n: { en: '1 Main St</script>' } }],
+})
+
+test('a school page names its district in the title, from the source or the pin', () => {
+  assert.match(schoolPage(pinned, t, 'en', { districts }).title, /^School <One>, Mladost district · /)
+  const named = school({ admission_info: { admin_district: 'Младост' }, locations: [] })
+  assert.match(schoolPage(named, translator('bg'), 'bg', { districts }).title, /^Училище, район Младост · /)
+  assert.doesNotMatch(schoolPage(school(), t, 'en', { districts }).title, /district/)
+})
+
+test('a school page carries schema.org data that cannot break out of its script', () => {
+  const page = schoolPage(pinned, t, 'en', { districts, origin: ORIGIN })
+  assert.deepEqual(page.jsonLd, {
+    '@context': 'https://schema.org',
+    '@type': 'School',
+    name: 'School <One>',
+    alternateName: 'Училище',
+    url: 'https://example.test/en/schools/12',
+    sameAs: 'https://school.example',
+    telephone: '+35928241170',
+    address: {
+      '@type': 'PostalAddress',
+      streetAddress: '1 Main St</script>',
+      addressLocality: 'Sofia',
+      addressRegion: 'Mladost district',
+      addressCountry: 'BG',
+    },
+    geo: { '@type': 'GeoCoordinates', latitude: 42.5, longitude: 23.5 },
+  })
+  assert.equal(schoolPage(kindergarten, t, 'en', { origin: ORIGIN }).jsonLd['@type'], 'Preschool')
+  const html = renderPage(TEMPLATE, page, { language: 'en', origin: ORIGIN, siteName: 'Site' })
+  const script = html.match(/<script type="application\/ld\+json">(.*?)<\/script>/)[1]
+  assert.doesNotMatch(script, /</)
+  assert.equal(JSON.parse(script).address.streetAddress, '1 Main St</script>')
 })

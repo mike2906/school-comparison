@@ -107,6 +107,8 @@ class Settings(BaseSettings):
     # API settings
     max_schools_to_compare: int = 5
     max_search_query_length: int = 100
+    # Free kindergarten places snapshot (docs/FREE_PLACES.md), written by the capture workflow.
+    free_places_url: str = "https://raw.githubusercontent.com/mike2906/school-comparison/free-places-data/bg/sofia/free-places.json"
 
     # Launch-scope publication flags (sparse/fail-closed by default)
     publish_summaries: bool = False

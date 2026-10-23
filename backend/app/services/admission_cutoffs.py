@@ -200,3 +200,21 @@ def match_key(row: dict[str, Any]) -> tuple[str, str]:
     if row.get("source") == "kg.sofia.bg":
         return ("kg_sofia_id", str(row["source_id"]))
     return ("institutional_id", str(row["source_id"]))
+
+
+def school_index(schools: list[Any]) -> dict[tuple[str, str], int]:
+    """(match kind, id) -> school id. A school's own kg_sofia_id wins over a family listing."""
+    index: dict[tuple[str, str], int] = {}
+    for school in sorted(schools, key=lambda s: s.id):
+        attrs = school.attributes or {}
+        for kg_id in attrs.get("kg_sofia_ids") or []:
+            if kg_id is not None:
+                index.setdefault(("kg_sofia_id", str(kg_id)), school.id)
+    # Highest id first, so on a shared id the lowest school id wins, the same on every run.
+    for school in sorted(schools, key=lambda s: s.id, reverse=True):
+        attrs = school.attributes or {}
+        if attrs.get("kg_sofia_id") is not None:
+            index[("kg_sofia_id", str(attrs["kg_sofia_id"]))] = school.id
+        if school.institutional_id:
+            index[("institutional_id", str(school.institutional_id))] = school.id
+    return index

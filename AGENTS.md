@@ -58,7 +58,8 @@ of those changed, raise it with him rather than overriding it.
 
 Live: the admission points calculator (kindergarten, first grade, and the eighth-grade
 score from NVO results) with the catchment map (`docs/ADMISSION_POINTS.md`), and admission
-cut-offs (`docs/ADMISSION_CUTOFFS.md`).
+cut-offs (`docs/ADMISSION_CUTOFFS.md`), and today's free places in municipal kindergartens
+(`docs/FREE_PLACES.md`).
 
 ---
 
