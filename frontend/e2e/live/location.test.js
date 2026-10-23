@@ -68,6 +68,6 @@ describe('location', () => {
     await page.getByRole('button', { name: t('bg', 'location.forgetHome') }).click()
     const after = await page.evaluate(() => localStorage.getItem('admissionAnswers'))
     assert.equal(after, null, 'nothing else was saved, so nothing is left')
-    assert.equal((await storedLocation())?.lat, undefined, 'the list no longer measures from the forgotten home')
+    assert.equal(await storedLocation(), null, 'the list no longer measures from the forgotten home')
   })
 })

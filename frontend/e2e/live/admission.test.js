@@ -324,7 +324,7 @@ describe('admission from a school page', () => {
     // Turned off, the location stays off: a reload neither falls back to the saved home nor
     // looks the saved address up again.
     const stored = () => page.evaluate(() => JSON.parse(localStorage.getItem('userLocation') || 'null'))
-    await page.waitForFunction(() => JSON.parse(localStorage.getItem('userLocation') || 'null')?.off)
+    await page.waitForFunction(() => localStorage.getItem('userLocation') === '{"off":true}')
     await page.reload()
     await page.getByTestId('saved-admission-banner').waitFor()
     assert.deepEqual(await stored(), { off: true }, 'a reload brought the saved home back as the location')

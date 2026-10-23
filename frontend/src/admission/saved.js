@@ -176,6 +176,9 @@ export function saveHomePoint(point) {
     label: point.label || null,
     ...(point.fromHome ? { fromHome: point.fromHome } : {}),
   }
+  // A different home is a fresh start: the list starts from it again even if its location
+  // was turned off.
+  if (homePoint && !samePoint(homePoint, read().homePoint) && locationTurnedOff()) writeLocation(null)
   write({ ...read(), homePoint })
 }
 
@@ -256,16 +259,11 @@ export function writeLocation(location) {
 }
 
 /**
- * The parent turned the list's location off: no page falls back to the saved home until
- * they set a location again. Kept as a marker, since a missing key means "never set".
+ * The parent turned the list's location off (`writeLocation(LOCATION_OFF)`): the list does
+ * not start from the saved home until a location or a different home is set. A marker,
+ * since a missing key means "never set". Other pages still measure from the saved home.
  */
-export function turnOffLocation() {
-  try {
-    storage()?.setItem(LOCATION_KEY, JSON.stringify({ off: true }))
-  } catch {
-    // Full or blocked storage: the location lives for this page view only.
-  }
-}
+export const LOCATION_OFF = { off: true }
 
 export function locationTurnedOff() {
   try {
@@ -277,13 +275,12 @@ export function locationTurnedOff() {
 
 /**
  * Where trips start, as `{ lat, lng, label, isHome }`: the location the parent last set on
- * the search page (it may be somewhere other than home on purpose), else the saved home
- * unless the parent turned the location off, else null.
+ * the search page (it may be somewhere other than home on purpose), else the saved home,
+ * else null.
  */
 export function tripOrigin(saved = read()) {
   const location = readLocation()
   if (location) return { lat: location.lat, lng: location.lng, label: location.address || null, isHome: samePoint(location, saved.homePoint) }
-  if (locationTurnedOff()) return null
   return saved.homePoint ? { ...saved.homePoint, isHome: true } : null
 }
 
