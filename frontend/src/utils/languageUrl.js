@@ -39,7 +39,7 @@ export function languagePath(routePath, language) {
  * per-visitor compare page are `noindex` and carry neither.
  */
 export function hasCanonical(routePath) {
-  return /^\/(search|about|admission|schools|schools\/\d+)$/.test(routePath || '')
+  return /^\/(search|about|admission|my-child|schools|schools\/\d+)$/.test(routePath || '')
 }
 
 /** Absolute canonical URL of a route path in the given language. */

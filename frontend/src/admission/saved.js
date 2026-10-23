@@ -6,6 +6,7 @@
  *
  * Shape: { version, child: { birthYear, startYear? } | null, home: { streetId, number } | null,
  *          homePoint: { lat, lng, label, fromHome? } | null,
+ *          preferences: { languages: [key], monthlyBudget: number | null } | null,
  *          kindergarten: { startYear, answers, siblings?, savedOn } | null,
  *          grade_1: { startYear, addresses, answers, siblings?, savedOn } | null }
  * `siblings` maps a school id to that school's sibling answers (see siblingsWith).
@@ -22,7 +23,7 @@ export const LOCATION_KEY = 'userLocation'
 const VERSION = 1
 export const SAVED_STAGES = ['kindergarten', 'grade_1']
 
-const EMPTY = Object.freeze({ version: VERSION, child: null, home: null, homePoint: null, kindergarten: null, grade_1: null })
+const EMPTY = Object.freeze({ version: VERSION, child: null, home: null, homePoint: null, preferences: null, kindergarten: null, grade_1: null })
 
 function storage() {
   try {
@@ -42,6 +43,7 @@ export function parseSaved(text) {
       child: isChild(value.child) ? childFrom(value.child) : legacyChild(value.kindergarten),
       home: isHome(value.home) ? value.home : null,
       homePoint: isPoint(value.homePoint) ? value.homePoint : null,
+      preferences: preferencesFrom(value.preferences),
       kindergarten: isEntry(value.kindergarten) ? value.kindergarten : null,
       grade_1: isEntry(value.grade_1) && Array.isArray(value.grade_1.addresses) ? value.grade_1 : null,
     }
@@ -56,6 +58,15 @@ function isChild(child) {
 
 function childFrom({ birthYear, startYear }) {
   return Number.isInteger(startYear) ? { birthYear, startYear } : { birthYear }
+}
+
+// The options page's choices: languages (src/utils/languages.js keys) and a top tuition
+// per month in euro. Anything else is dropped.
+function preferencesFrom(value) {
+  if (!value || typeof value !== 'object') return null
+  const languages = Array.isArray(value.languages) ? value.languages.filter(key => typeof key === 'string') : []
+  const monthlyBudget = Number.isFinite(value.monthlyBudget) && value.monthlyBudget > 0 ? value.monthlyBudget : null
+  return languages.length > 0 || monthlyBudget ? { languages, monthlyBudget } : null
 }
 
 function isPoint(point) {
@@ -98,7 +109,7 @@ function read() {
 
 /** Whether the parent has saved anything on this device (their opt-in to keeping more). */
 export function hasSaved(saved) {
-  return Boolean(saved.child || saved.home || saved.homePoint || SAVED_STAGES.some(stage => saved[stage]))
+  return Boolean(saved.child || saved.home || saved.homePoint || saved.preferences || SAVED_STAGES.some(stage => saved[stage]))
 }
 
 function write(next) {
@@ -159,6 +170,11 @@ export function saveChild({ birthYear, startYear }) {
   const saved = read()
   const keep = startYear === undefined && saved.child?.birthYear === birthYear ? saved.child.startYear : startYear
   write({ ...saved, child: childFrom({ birthYear, startYear: keep }) })
+}
+
+/** Saves the options page's languages and budget (see preferencesFrom), or forgets them. */
+export function savePreferences(preferences) {
+  write({ ...read(), preferences: preferencesFrom(preferences) })
 }
 
 /** `home` as one string, to tie a point found from it to it. */

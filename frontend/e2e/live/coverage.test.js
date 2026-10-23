@@ -21,6 +21,7 @@ import { usesSofiaKindergartenSystem } from '../../src/utils/admission.js'
 import { isInstallmentPlan, statedTuition } from '../../src/utils/pricing.js'
 import { isClosedGroupFee, rowAgeGroupKeys } from '../../src/utils/priceRows.js'
 import { childFreePlaces, schoolFreePlaces, usableFreePlaces } from '../../src/utils/freePlaces.js'
+import { buildOptions } from '../../src/utils/childOptions.js'
 import { API, allSchools } from './live.js'
 
 // A parent should get an answer at no fewer than this share of the schools that publish
@@ -88,6 +89,34 @@ describe('coverage for realistic parents', () => {
         results.push({ persona: `start ${startYear}, born ${birthYear} (${group})`, withData, shown })
       }
     }
+    assert.ok(results.length > 0, 'the calculator offers a start year with kindergarten rules')
+    assertCoverage(t, results)
+  })
+
+  test("my child's options: a kindergarten family sees most kindergartens with a cut-off placed by chance", async t => {
+    const kindergartens = (await allSchools()).filter(usesSofiaKindergartenSystem)
+    const results = startYears('kindergarten').map(startYear => {
+      const birthYear = startYear - 4
+      const group = kindergartenAgeGroup({ birthYear }, startYear)
+      const answers = {
+        ...KINDERGARTEN_INITIAL,
+        birthYear,
+        inSofia: true,
+        addressSince: `${birthYear}-01-15`,
+        parentChildSameAddress: true,
+        parentActivities: ['working', 'working'],
+        nurseryAttended: false,
+      }
+      const withCutoff = kindergartens.filter(school =>
+        summaryRowsFor(school.admission_info?.cutoff_summary, stageById('kindergarten')).some(row => row.age_group === group))
+      // The page's own grouping, with the family living in each kindergarten's district.
+      const { groups } = buildOptions(withCutoff, {
+        ageGroup: group,
+        verdictsFor: school => savedVerdictsFor(school, { kindergarten: { startYear, answers: { ...answers, homeDistrict: kindergartenDistrict(school, data.districts) } } }, group, data),
+      })
+      const shown = withCutoff.length - groups.unknown.length
+      return { persona: `options page, start ${startYear}, born ${birthYear} (${group})`, withData: withCutoff.length, shown }
+    })
     assert.ok(results.length > 0, 'the calculator offers a start year with kindergarten rules')
     assertCoverage(t, results)
   })

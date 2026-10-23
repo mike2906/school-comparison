@@ -4,7 +4,7 @@ import assert from 'node:assert/strict'
 import { parseSaved } from './saved.js'
 
 test('anything unreadable or from another version counts as nothing saved', () => {
-  const empty = { version: 1, child: null, home: null, homePoint: null, kindergarten: null, grade_1: null }
+  const empty = { version: 1, child: null, home: null, homePoint: null, preferences: null, kindergarten: null, grade_1: null }
   for (const text of [null, '', 'not json', '{"version":2,"kindergarten":{"startYear":2026,"answers":{}}}', '[]']) {
     assert.deepEqual(parseSaved(text), empty, String(text))
   }
@@ -125,4 +125,9 @@ test('a calculator birth year that differs starts a new plan without the old sta
   assert.deepEqual(getSaved().child, { birthYear: 2022, startYear: 2027 }, 'same year: kept')
   saveStage('kindergarten', { startYear: 2027, answers: { birthYear: 2020 } })
   assert.deepEqual(getSaved().child, { birthYear: 2020 })
+})
+
+test('preferences keep only languages and a positive budget', () => {
+  assert.deepEqual(parseSaved(JSON.stringify({ version: 1, preferences: { languages: ['english', 3], monthlyBudget: 600 } })).preferences, { languages: ['english'], monthlyBudget: 600 })
+  assert.equal(parseSaved(JSON.stringify({ version: 1, preferences: { languages: [], monthlyBudget: -1 } })).preferences, null)
 })
