@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { fetchAvailableFilters, fetchExamAverages } from '../../api/schools.js'
+import { getSaved, hasSaved, saveChild } from '../../admission/saved.js'
 import {
   EMPTY_AVAILABLE_FILTERS,
   filterSearchParams,
@@ -23,6 +24,13 @@ export function useUrlFilters({ searchParams, locationSearch, navigate }) {
     setFilters(nextFilters)
     const params = filterSearchParams(searchParams, newFilters, nextFilters)
     navigate(`/search?${params.toString()}`, { replace: true })
+    // A parent who chose to save on this device gives the birth year once: a new one here
+    // is the child's for every page. Without a saved profile nothing is stored.
+    // The start year is kept only once the parent picked one (not the default year).
+    if (nextFilters.birthYear && hasSaved(getSaved()) && (newFilters.birthYear !== undefined || newFilters.targetYear !== undefined)) {
+      const yearChosen = newFilters.targetYear !== undefined && newFilters.targetYear !== filters.targetYear
+      saveChild({ birthYear: nextFilters.birthYear, ...(yearChosen ? { startYear: nextFilters.targetYear } : {}) })
+    }
   }
 
   return { filters, handleFilterChange }

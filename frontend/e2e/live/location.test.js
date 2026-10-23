@@ -48,4 +48,26 @@ describe('location', () => {
     await page.waitForURL(url => !url.searchParams.get('q'))
     assert.ok(await storedLocation(), 'a location was set')
   })
+
+  test('"This is my home" keeps the home after the location is cleared, and "Forget home" drops it', async () => {
+    await open('bg', '/search')
+    await page.getByRole('button', { name: t('bg', 'location.setShort') }).first().click()
+    await page.locator('#location-address').fill('Люлин 5')
+    await page.getByRole('button', { name: t('bg', 'common.search'), exact: true }).click()
+    await nearChip().first().waitFor({ timeout: 30_000 })
+    await nearChip().first().click()
+    await page.getByRole('button', { name: t('bg', 'location.saveAsHome') }).click()
+    const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('admissionAnswers') || 'null'))
+    assert.ok(saved?.homePoint, 'the home point is saved')
+
+    // A new visit with no location of its own starts from the home.
+    await page.evaluate(() => localStorage.removeItem('userLocation'))
+    await open('bg', '/search')
+    await nearChip().first().waitFor({ timeout: 10_000 })
+    await nearChip().first().click()
+    await page.getByRole('button', { name: t('bg', 'location.forgetHome') }).click()
+    const after = await page.evaluate(() => localStorage.getItem('admissionAnswers'))
+    assert.equal(after, null, 'nothing else was saved, so nothing is left')
+    assert.equal(await storedLocation(), null, 'the list no longer measures from the forgotten home')
+  })
 })

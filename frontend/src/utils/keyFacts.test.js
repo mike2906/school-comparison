@@ -5,7 +5,6 @@ import {
   getLatestNvoFact,
   getOfferedAgeGroups,
   getShifts,
-  parseSavedLocation,
 } from './keyFacts.js'
 
 const nvo = (year, subject, value, examType = 'nvo_7') => ({
@@ -43,11 +42,4 @@ test('offered age groups and shifts are distinct across locations', () => {
   assert.deepEqual(getOfferedAgeGroups(locations), ['grade_1_4', 'grade_5_7', 'grade_8_12'])
   assert.deepEqual(getShifts(locations), ['morning', 'afternoon'])
   assert.deepEqual(getOfferedAgeGroups(null), [])
-})
-
-test('saved location parsing tolerates missing and malformed values', () => {
-  assert.deepEqual(parseSavedLocation('{"lat":42.7,"lng":23.3,"address":"x"}'), { lat: 42.7, lng: 23.3 })
-  assert.equal(parseSavedLocation(null), null)
-  assert.equal(parseSavedLocation('not json'), null)
-  assert.equal(parseSavedLocation('{"lat":"42"}'), null)
 })
