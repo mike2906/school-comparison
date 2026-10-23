@@ -8,7 +8,8 @@ import {
   comparableRound,
   cutoffText,
   cutoffValue,
-  formatRankingDay,
+  rankingLabel,
+  roundCounts,
   rowLabel,
   shortCampaign,
 } from '../admission/calculator.js'
@@ -129,34 +130,35 @@ function cutoffLines(school, t, language) {
     const round = comparableRound(row)
     if (!round) return []
     const value = cutoffText(round, t, language)
-    const day = formatRankingDay(round.classified_on, language)
-    const ranking = round.round_kind === 'current'
-      ? t('cutoffs.ref.free', { date: day })
-      : t(round === row.first ? 'cutoffs.ref.main' : 'cutoffs.ref.other', { date: day })
-    const counts = [
-      round.places > 0 && t('cutoffs.places', { count: round.places }),
-      round.places > 0 && round.applicants_count != null && t('cutoffs.applicants', { count: round.applicants_count }),
-      round.places > 0 && round.admitted_count != null && t('cutoffs.admitted', { count: round.admitted_count }),
-    ].filter(Boolean).join(' · ')
+    const ranking = rankingLabel(row, round, t, language)
     const result = value
       ? `${ranking}${LAST_ADMITTED_KINDS.has(cutoffValue(round)?.kind) ? `, ${t('cutoffs.lastAdmitted')} ` : ': '}${value}`
       : ranking
-    const label = `${rowLabel(row, t, language)} (${shortCampaign(row.campaign)})`
-    return [`${label}: ${result}${counts ? ` (${counts})` : ''}`]
+    const tie = round.tie_at_cutoff ? ` ${t('cutoffs.tie')}` : ''
+    const counts = roundCounts(round, t)
+    const label = [shortCampaign(row.campaign), row.quota && t('cutoffs.quota')].filter(Boolean).join(', ')
+    return [`${rowLabel(row, t, language)} (${label}): ${result}${tie}${counts ? ` (${counts})` : ''}`]
   })
+}
+
+/** A row whose ranking says who got in: a cut-off, or that everyone did. */
+function hasAdmissionResult(row) {
+  const kind = cutoffValue(comparableRound(row))?.kind
+  return Boolean(kind) && kind !== 'noPlaces'
 }
 
 /**
  * What makes a school page worth indexing: official NVO results, a published price,
- * facts from the school's own site, official admission rankings, or a substantive
+ * facts from the school's own site, an admission ranking that says who got in, or a substantive
  * published summary. A page with none of them is thin (`noindex`).
  */
 export function indexReasons(school) {
+  const rows = school?.admission_info?.cutoff_summary
   return {
     nvo: latestNvoResults(school).length > 0,
     pricing: Array.isArray(school?.pricing) && school.pricing.length > 0,
-    facts: getSchoolFacts(school, 'bg').length > 0,
-    admission: (school?.admission_info?.cutoff_summary || []).some((row) => comparableRound(row)),
+    facts: getSchoolFacts(school, 'bg', { keyOnly: true }).length > 0,
+    admission: Array.isArray(rows) && rows.some(hasAdmissionResult),
     summary: summaryText(school, 'bg').length >= SUMMARY_MIN_CHARS,
   }
 }
@@ -300,7 +302,8 @@ export function schoolPage(school, t, language, { listed = true } = {}) {
   const headlineNvo = nvo.find((result) => result.examType === levelExam) || nvo[nvo.length - 1]
   const about = `${[facts, addresses[0]].filter(Boolean).join(', ')}.`
   const nvoSentence = headlineNvo ? `${nvoLine(headlineNvo, t, language)}.` : ''
-  const siteFacts = getSchoolFacts(school, language)
+  // Only facts written in the page's language: the app labels a Bulgarian fallback, this can't.
+  const siteFacts = getSchoolFacts(school, language, { fallback: false })
   const admission = cutoffLines(school, t, language)
   const keyFact = siteFacts.find((fact) => fact.rank === 'key')?.text
   const detail = summary || tuition || keyFact || (admission[0] && `${admission[0]}.`)

@@ -88,8 +88,8 @@ smoke_site() {
 
 	sitemap="$(body "$site/sitemap.xml")"
 	urls="$(grep -c '<loc>' <<< "$sitemap" || true)"
-	# ~580 pages in two languages since kindergartens count by their admission rankings (2026-10).
-	[ "$urls" -ge 1000 ] || fail "sitemap.xml lists $urls URLs, expected at least 1000"
+	# About 1,100 (pages in two languages) since kindergartens count by their admission rankings (2026-10).
+	[ "$urls" -ge 800 ] || fail "sitemap.xml lists $urls URLs, expected at least 800"
 	ok "sitemap.xml lists $urls URLs"
 
 	# -m 1, not `| head`: with pipefail, head closing the pipe early fails the script.

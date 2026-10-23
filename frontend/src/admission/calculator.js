@@ -201,6 +201,22 @@ export function cutoffText(round, t, language) {
   return t('cutoffs.points', { points: number(value.points) })
 }
 
+/** The size of a round in a few words: "66 places · 110 applicants · 66 admitted". */
+export function roundCounts(round, t) {
+  return [
+    round.places > 0 ? t('cutoffs.places', { count: round.places }) : null,
+    round.places > 0 && round.applicants_count != null ? t('cutoffs.applicants', { count: round.applicants_count }) : null,
+    round.places > 0 && round.admitted_count != null ? t('cutoffs.admitted', { count: round.admitted_count }) : null,
+  ].filter(Boolean).join(' · ')
+}
+
+/** Which ranking a row's headline reads: "First ranking, 2 October 2026", "Free-place ranking, …". */
+export function rankingLabel(row, round, t, language) {
+  const date = formatRankingDay(round.classified_on, language)
+  if (round.round_kind === 'current') return t('cutoffs.ref.free', { date })
+  return t(round === row.first ? 'cutoffs.ref.main' : 'cutoffs.ref.other', { date })
+}
+
 /** What a cut-off row is for: age group or class, birth year and building. */
 export function rowLabel(row, t, language = i18next.language) {
   // The ministry's class and building names are Bulgarian; the API adds English ones it has.

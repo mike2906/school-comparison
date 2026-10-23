@@ -102,11 +102,18 @@ test('facts from the school site or official admission rankings make a page inde
   assert.equal(isThinSchool(school({ school_facts: kindergarten.school_facts })), false)
   assert.equal(isThinSchool(school({ admission_info: kindergarten.admission_info })), false)
   assert.equal(isThinSchool(school({ admission_info: { cutoff_summary: [{ stage: 'grade_1', rounds: 0 }] } })), true)
+  const noPlaces = { ...kindergarten.admission_info.cutoff_summary[0], first: { round_id: 2, round_kind: 'current', places: 0 } }
+  assert.equal(isThinSchool(school({ admission_info: { cutoff_summary: [noPlaces] } })), true)
+  assert.equal(isThinSchool(school({ admission_info: { cutoff_summary: {} } })), true)
+  const onlyMore = { facts: [kindergarten.school_facts.facts[1]] }
+  assert.equal(isThinSchool(school({ school_facts: onlyMore })), true)
 })
 
 test('a page lists its site facts and admission results, escaped', () => {
   const page = schoolPage(kindergarten, t, 'en')
-  assert.match(page.body, /From the school's website.*Meals: Собствена кухня\..*Facilities: It has a &lt;pool&gt;\./)
+  assert.match(page.body, /From the school's website.*Facilities: It has a &lt;pool&gt;\./)
+  assert.doesNotMatch(page.body, /Собствена кухня/)
+  assert.match(schoolPage(kindergarten, translator('bg'), 'bg').body, /Собствена кухня/)
   assert.match(page.body, /Who got in before.*Nursery · born 2024 \(2026\/27\): Free-place ranking, 4 September 2026, last admitted: 19 points \(2 places · 34 applicants · 2 admitted\)/)
   assert.match(page.description, /, 1 Main St\. It has a <pool>\.$/)
   assert.equal(page.sitemap, true)

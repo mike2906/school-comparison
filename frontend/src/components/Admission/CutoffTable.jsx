@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { LAST_ADMITTED_KINDS, comparableRound, cutoffText, cutoffValue, formatRankingDay, laterEasierRound, laterHarder, rowLabel, roundsOf, shortCampaign } from '../../admission/calculator'
+import { LAST_ADMITTED_KINDS, comparableRound, cutoffText, cutoffValue, formatRankingDay, laterEasierRound, laterHarder, rankingLabel, roundCounts, rowLabel, roundsOf, shortCampaign } from '../../admission/calculator'
 
 // First grade: groups 1–3 live in the school's area (by how long), group 4 outside it.
 const GRADE_1_OUTSIDE_GROUP = 4
@@ -10,15 +10,6 @@ export function CutoffValue({ round }) {
   if (!text) return <span className="text-neutral-400">—</span>
   const kind = cutoffValue(round)?.kind
   return <span className={LAST_ADMITTED_KINDS.has(kind) ? 'tabular-nums' : undefined}>{text}</span>
-}
-
-/** The size of a round in a few words: "66 places · 110 applicants · 66 admitted". */
-function roundCounts(round, t) {
-  return [
-    round.places > 0 ? t('cutoffs.places', { count: round.places }) : null,
-    round.places > 0 && round.applicants_count != null ? t('cutoffs.applicants', { count: round.applicants_count }) : null,
-    round.places > 0 && round.admitted_count != null ? t('cutoffs.admitted', { count: round.admitted_count }) : null,
-  ].filter(Boolean).join(' · ')
 }
 
 /** "First ranking" for the campaign's main ranking, "Free-place ranking" for a later one. */
@@ -44,9 +35,7 @@ function Headline({ row, rounds }) {
     const from = formatRankingDay(rounds[0].classified_on, i18n.language)
     return <div className="font-medium text-neutral-900">{t('cutoffs.ref.noPlacesIn', { count: rounds.length, from, to: day })}</div>
   }
-  const label = round.round_kind === 'current'
-    ? t('cutoffs.ref.free', { date: day })
-    : t(round === row.first ? 'cutoffs.ref.main' : 'cutoffs.ref.other', { date: day })
+  const label = rankingLabel(row, round, t, i18n.language)
   const counts = roundCounts(round, t)
   return (
     <>

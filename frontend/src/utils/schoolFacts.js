@@ -18,15 +18,16 @@ export const FACT_TOPICS = [
 
 // [{ topic, text, sourceUrl, rank }] in topic order, text in `language` (Bulgarian if
 // missing). `rank` is "key" (shown first) or "more" (behind "show more"); `keyOnly` keeps
-// the key facts. A fact from before ranks counts as key.
-export function getSchoolFacts(school, language, { keyOnly = false } = {}) {
+// the key facts; `fallback: false` drops a fact with no text in `language`. A fact from
+// before ranks counts as key.
+export function getSchoolFacts(school, language, { keyOnly = false, fallback = true } = {}) {
   const facts = school?.school_facts?.facts
   if (!Array.isArray(facts)) return []
   return facts
     .filter(fact => FACT_TOPICS.includes(fact?.topic))
     .map(fact => ({
       topic: fact.topic,
-      text: fact.text_i18n?.[language] || fact.text_i18n?.bg || '',
+      text: fact.text_i18n?.[language] || (fallback && fact.text_i18n?.bg) || '',
       sourceUrl: fact.source_url,
       rank: fact.rank === 'more' ? 'more' : 'key',
     }))
