@@ -29,7 +29,7 @@ import { pinnedLocation } from '../../utils/coordinates'
 import { getAgeGroupLabel } from '../../utils/countryConfig'
 import { geocodeAddress } from '../../utils/geocoding'
 import { languageKey, languageLabel } from '../../utils/languages'
-import { matchesAdvancedFilters } from '../../utils/advancedFilters'
+import { getLanguageFocusPairs } from '../../utils/schoolAttributes'
 import { schoolPath } from '../../utils/schoolPath'
 import { locationForAgeGroup, locationsForAgeGroup } from '../../utils/schoolLocation'
 
@@ -58,13 +58,18 @@ function MyChildPage() {
   useEffect(() => {
     if (isSaved) setDraft(draftFrom(saved))
   }, [saved, isSaved])
-  // Merged into the latest draft and saved only if the profile is still saved when the
-  // change lands: a home lookup can finish after other edits, or after "forget".
-  const update = changes => setDraft(current => {
-    const next = { ...current, ...changes }
+  // Changes merge into the latest draft (a home lookup can finish after other edits) and
+  // are saved only if the profile is still saved then (it may have been forgotten). The ref
+  // holds the latest draft between renders. `changes` may be a function of that draft.
+  const draftRef = useRef(draft)
+  draftRef.current = draft
+  const update = changes => {
+    const current = draftRef.current
+    const next = { ...current, ...(typeof changes === 'function' ? changes(current) : changes) }
+    draftRef.current = next
+    setDraft(next)
     if (hasSaved(getSaved())) persist(next)
-    return next
-  })
+  }
   // Bumped on "forget", so a home lookup still running is dropped with the profile.
   const [forgets, setForgets] = useState(0)
 
@@ -75,18 +80,18 @@ function MyChildPage() {
   const languageOptions = useMemo(() => (
     [...new Set((availableFilters.language_focus_languages || []).map(languageKey).filter(Boolean))]
   ), [availableFilters])
-  // A language counts at any level, as the list's language filter does, and so does a
-  // school that names the language without a level. Canonical keys, matched on the client
-  // as the list does (the API compares its own spelling).
+  // A language counts at any level, and so does a school that names it without a level.
+  // Matched on each school's own languages; the pairs only carry the choice to the list.
+  const pairLanguage = pair => languageKey(pair.split(':')[0])
   const languagePairs = useMemo(() => [
     ...(availableFilters.language_focus_pairs || []),
     ...(availableFilters.language_focus_languages || []),
-  ].filter(value => languages.includes(languageKey(value.split(':')[0]))), [availableFilters, languages])
+  ].filter(value => languages.includes(pairLanguage(value))), [availableFilters, languages])
 
   const { schools: ageSchools, loading, error } = useSchools(ageGroup, null, selection.educationLevel, selection.includeCrossover, EMPTY_LIST, EMPTY_LIST, EMPTY_LIST, EMPTY_LIST, countryCode)
-  const schools = useMemo(() => (languagePairs.length === 0
+  const schools = useMemo(() => (languages.length === 0
     ? ageSchools
-    : ageSchools.filter(school => matchesAdvancedFilters(school, { languageFocus: languagePairs }))), [ageSchools, languagePairs])
+    : ageSchools.filter(school => [...getLanguageFocusPairs(school)].some(pair => languages.includes(pairLanguage(pair))))), [ageSchools, languages])
   const hiddenByLanguage = ageSchools.length - schools.length
 
   const placed = useMemo(() => schools.map(school => {
@@ -210,7 +215,7 @@ function MyChildPage() {
                     key={key}
                     type="button"
                     aria-pressed={on}
-                    onClick={() => update({ languages: on ? languages.filter(other => other !== key) : [...languages, key] })}
+                    onClick={() => update(current => ({ languages: on ? current.languages.filter(other => other !== key) : [...current.languages, key] }))}
                     className={`h-9 rounded-full border px-3 text-sm ${on ? 'border-primary-600 bg-primary-50 text-primary-800' : 'border-neutral-300 text-neutral-700'}`}
                   >
                     {languageLabel(key, t)}
@@ -376,9 +381,12 @@ function HomeField({ homePoint, onChange }) {
   const [text, setText] = useState('')
   const [state, setState] = useState('idle')
   // A lookup that ends after this field is gone (the profile was forgotten) is dropped.
-  const live = useRef(true)
-  useEffect(() => () => { live.current = false }, [])
-  const geocodingConfig = { ...config?.map_config?.geocoding, bounds: config?.map_config?.bounds }
+  const live = useRef(false)
+  useEffect(() => {
+    live.current = true
+    return () => { live.current = false }
+  }, [])
+  const geocodingConfig = { ...config?.map_config?.geocoding, bounds: config?.map_config?.bounds, retryWithoutStreetWord: true }
 
   if (homePoint) {
     return (

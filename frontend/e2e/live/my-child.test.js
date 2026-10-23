@@ -38,7 +38,7 @@ describe("my child's options", () => {
         const now = [...document.querySelectorAll('[data-chance-group] h2')]
           .reduce((sum, head) => sum + Number(head.textContent.match(/\((\d+)\)/)?.[1] || 0), 0)
         return now !== count
-      }, before, { timeout: 10_000 }).catch(() => {})
+      }, before, { timeout: 15_000 })
       const after = await total()
       assert.ok(after > 0 && after < before, `English keeps some places (${after} of ${before})`)
     })

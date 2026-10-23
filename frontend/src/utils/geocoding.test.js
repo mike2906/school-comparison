@@ -33,6 +33,7 @@ test('withoutStreetWord drops a leading "ул." for a second try', () => {
   assert.equal(withoutStreetWord('ул. Шипка 5'), 'Шипка 5')
   assert.equal(withoutStreetWord('улица Оборище 20'), 'Оборище 20')
   assert.equal(withoutStreetWord('ул.Шипка 5'), 'Шипка 5')
+  assert.equal(withoutStreetWord('ул. 6-ти септември 10'), '6-ти септември 10')
   assert.equal(withoutStreetWord('Шипка 5'), null)
   assert.equal(withoutStreetWord('бул. Витоша 10'), null)
   assert.equal(withoutStreetWord('Улан Батор 3'), null)
