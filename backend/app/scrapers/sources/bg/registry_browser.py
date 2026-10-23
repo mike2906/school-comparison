@@ -4,6 +4,11 @@ Since October 2026 every *.mon.bg host answers plain HTTP clients with a Cloudfl
 challenge. A real browser on a home connection usually gets through, so the register import
 retries through headless Chromium (Playwright) and sends the same POST requests from inside
 the page. Data-centre addresses stay blocked either way: this works on the PC, not in the cloud.
+
+Limit: this is a plain browser reading a public register at low volume. If Cloudflare still
+challenges it, do not add stealth plugins, fingerprint or user-agent disguises, or challenge
+solvers: that would be evading the ministry's security control. Use the legitimate routes
+instead (official open data, RUO files, asking МОН for access).
 """
 
 from __future__ import annotations
@@ -52,14 +57,7 @@ class BrowserClient:
         self._playwright = await async_playwright().start()
         try:
             self._browser = await self._playwright.chromium.launch(headless=True)
-            # Headless Chromium names itself "HeadlessChrome"; send the ordinary browser's name.
-            self._page = await self._browser.new_page(
-                locale="bg-BG",
-                user_agent=(
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko)"
-                    f" Chrome/{self._browser.version} Safari/537.36"
-                ),
-            )
+            self._page = await self._browser.new_page(locale="bg-BG")
             # The API's own origin: the page passes (or is let through) the challenge there,
             # and later requests are same-origin, so their status and headers stay readable.
             await self._page.goto(self.origin, wait_until="domcontentloaded", timeout=60_000)
