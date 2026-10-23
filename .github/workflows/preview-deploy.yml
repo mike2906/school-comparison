@@ -1,0 +1,176 @@
+name: Preview deploy
+
+# Uploads the site a PR's "Preview build" made as the Pages preview
+# https://pr-<number>.schooldecider.pages.dev (noindex), then walks the live flows on it
+# against the live API. The parent test for a PR happens on that link, before merge.
+#
+# workflow_run always runs this file as it is on main, so a PR cannot change it. The job
+# holding the Pages token runs nothing from the PR: it only uploads the built files, under
+# a branch name it makes itself. The flows run the PR's test code in a job with no secrets
+# and no caches (a cache saved here would be main's). PRs from forks get no preview.
+# Results: commit statuses "Preview" (the link) and "Preview flows" on the PR's head.
+on:
+  workflow_run:
+    workflows: [Preview build]
+    types: [completed]
+
+concurrency:
+  group: preview-deploy-${{ github.event.workflow_run.head_branch }}
+  cancel-in-progress: true
+
+permissions: {}
+
+env:
+  PAGES_PROJECT: schooldecider
+  API_ORIGIN: https://api.schooldecider.com
+
+jobs:
+  deploy:
+    name: Upload preview
+    if: >-
+      github.event.workflow_run.conclusion == 'success'
+      && github.event.workflow_run.event == 'pull_request'
+      && github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # The Pages token lives here. This job runs on main's ref, so the environment's branch
+    # rule lets it in; it never checks out or runs PR code.
+    environment: production
+    permissions:
+      actions: read
+      statuses: write
+      pull-requests: read
+    outputs:
+      url: ${{ steps.upload.outputs.url }}
+      sha: ${{ steps.pr.outputs.sha }}
+    steps:
+      - name: Find the PR
+        id: pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
+          BRANCH: ${{ github.event.workflow_run.head_branch }}
+        run: |
+          # workflow_run.pull_requests can be empty; ask by branch and check the head commit.
+          number="$(gh api "repos/$GITHUB_REPOSITORY/pulls?state=open&head=${GITHUB_REPOSITORY_OWNER}:${BRANCH}" \
+            --jq "[.[] | select(.head.sha == \"$SHA\") | .number][0] // empty")"
+          if ! [[ "$number" =~ ^[0-9]+$ ]]; then
+            echo "No open PR has $SHA at its head (pushed again since?); nothing to preview."
+            exit 0
+          fi
+          echo "number=$number" >> "$GITHUB_OUTPUT"
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Download the site
+        if: steps.pr.outputs.number != ''
+        uses: actions/download-artifact@v4
+        with:
+          name: preview-site
+          path: ${{ runner.temp }}/preview/site
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+
+      - name: Upload to Pages
+        id: upload
+        if: steps.pr.outputs.number != ''
+        working-directory: ${{ runner.temp }}/preview
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_PAGES_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          NUMBER: ${{ steps.pr.outputs.number }}
+          SHA: ${{ steps.pr.outputs.sha }}
+        run: |
+          # Static files only: a _worker.js would run code from the PR on the preview host.
+          if [ -e site/_worker.js ] || [ -e site/functions ]; then
+            echo "::error::The build has a _worker.js or functions/; previews take static files only"
+            exit 1
+          fi
+          branch="pr-$NUMBER"
+          npx --yes wrangler@4.147.0 pages deploy site --project-name "$PAGES_PROJECT" \
+            --branch "$branch" --commit-hash "$SHA" --commit-dirty=true
+          echo "url=https://$branch.$PAGES_PROJECT.pages.dev" >> "$GITHUB_OUTPUT"
+
+      - name: Link it on the PR
+        if: steps.upload.outputs.url != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ steps.pr.outputs.sha }}
+          URL: ${{ steps.upload.outputs.url }}
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/statuses/$SHA" -f state=success -f context=Preview \
+            -f target_url="$URL" -f description="This PR's site on the live API" >/dev/null
+          echo "Preview: $URL" >> "$GITHUB_STEP_SUMMARY"
+
+  flows:
+    name: Parent journeys on the preview
+    needs: deploy
+    if: needs.deploy.outputs.url != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    # PR code runs here: no secrets, a read-only token, no caches.
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Check out the PR
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.deploy.outputs.sha }}
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Wait for the preview
+        env:
+          URL: ${{ needs.deploy.outputs.url }}
+          SHA: ${{ needs.deploy.outputs.sha }}
+        run: |
+          for _ in $(seq 1 24); do
+            [ "$(curl -fsS -m 10 "$URL/version.txt?cb=$GITHUB_RUN_ID" 2>/dev/null | tr -d '[:space:]')" = "$SHA" ] && exit 0
+            sleep 5
+          done
+          echo "::error::$URL did not serve $SHA within 2 minutes"
+          exit 1
+
+      - name: Flows
+        env:
+          LIVE_SITE_URL: ${{ needs.deploy.outputs.url }}
+          LIVE_API_URL: ${{ env.API_ORIGIN }}
+        run: npm run test:live:ci || { echo "Retrying once in 60 seconds."; sleep 60; LIVE_LAST_TRY=1 npm run test:live:ci; }
+
+      - name: Upload screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: preview-flows-report
+          path: frontend/live-flows-report/
+          if-no-files-found: ignore
+
+  report:
+    name: Report the flows
+    needs: [deploy, flows]
+    if: always() && needs.deploy.outputs.url != ''
+    runs-on: ubuntu-latest
+    permissions:
+      statuses: write
+    steps:
+      - name: Set the status
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ needs.deploy.outputs.sha }}
+          RESULT: ${{ needs.flows.result }}
+          RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ "$RESULT" = success ]; then state=success; desc="Live flows pass on the preview"; else state=failure; desc="Live flows: $RESULT"; fi
+          gh api "repos/$GITHUB_REPOSITORY/statuses/$SHA" -f state="$state" -f context="Preview flows" \
+            -f target_url="$RUN" -f description="$desc" >/dev/null

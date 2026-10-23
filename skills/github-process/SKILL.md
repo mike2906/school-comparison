@@ -47,6 +47,11 @@ you picked, and go to Mike only for the short list in "Still goes to Mike".
   would. Flag an answer option that makes no sense for the question ("Not sure" on
   twins), a result that is empty or odd for an ordinary family, and wording only an
   insider understands.
+- **Parent test on the preview.** A PR that changes the site gets a Pages preview on the
+  live API (commit status "Preview", built by `preview-deploy.yml`) and the live flows run
+  on it ("Preview flows"). Do the parent test on that link before merge, not on the live
+  site after it. Data changes are still checked on the live site after a publish until
+  the staging slot exists (`docs/TECH_DEBT_PLAN.md`, E2).
 - **After a substantial round of fixes** (several fixes, or any that change logic rather
   than wording), run the built-in review once more on the whole PR.
 - **Then stop.** Don't request another round when the last one only found more page
