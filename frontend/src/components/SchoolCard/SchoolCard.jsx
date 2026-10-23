@@ -65,6 +65,7 @@ const SchoolCard = memo(function SchoolCard({
   examAverages = null,
   samePlace = [],
   freePlaces = null,
+  verdicts = null,
 }) {
   const { t, i18n } = useTranslation()
   const { config: countryConfig } = useCountry()
@@ -226,7 +227,9 @@ const SchoolCard = memo(function SchoolCard({
   }, [school, pricing, attributes, i18n.language, t, primaryLocation, activeAgeGroup])
 
   // Answers saved in the admission calculator, against this school's last admitted child.
-  const savedVerdicts = useSavedVerdicts(school, activeAgeGroup)
+  // A page that decides which saved answers apply (the options page) passes its own.
+  const ownVerdicts = useSavedVerdicts(school, activeAgeGroup)
+  const savedVerdicts = verdicts ?? ownVerdicts
 
   const nvoDetail = useMemo(() => {
     // Sorted by NVO: only the exam the list is ranked by, so no card shows a score from a

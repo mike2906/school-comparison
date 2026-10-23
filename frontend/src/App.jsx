@@ -42,6 +42,7 @@ function lazyPage(load) {
 const ComparePage = lazyPage(() => import('./components/ComparePage/ComparePage'))
 // The calculator carries every rule file, so it is its own chunk too.
 const AdmissionPage = lazyPage(() => import('./components/AdmissionPage/AdmissionPage'))
+const MyChildPage = lazyPage(() => import('./components/MyChildPage/MyChildPage'))
 const CalendarPage = lazyPage(() => import('./components/CalendarPage/CalendarPage'))
 
 // The language is fixed for the lifetime of the document: switching it is a full
@@ -152,6 +153,10 @@ const router = createBrowserRouter([
       {
         path: 'admission',
         element: <Suspense fallback={null}><AdmissionPage /></Suspense>,
+      },
+      {
+        path: 'my-child',
+        element: <Suspense fallback={null}><MyChildPage /></Suspense>,
       },
       {
         path: 'calendar',
