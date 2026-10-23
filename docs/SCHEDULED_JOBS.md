@@ -8,7 +8,7 @@ at the next hour. Each opens one GitHub issue when it stops.
 |---|---|---|---|---|
 | `watch_open_days.sh` | daily (weekly in July and August) | $0.30 a run, $0.60 a day | when dates changed | Open-days check stopped |
 | `publish_cutoffs.sh` | when the `cutoff-data` branch moves | none (no model) | new rounds | Automatic cut-off publish stopped |
-| `refresh_fees.sh` | monthly, from the 1st | $1.50 a month | what it wrote | Scheduled fees re-read stopped |
+| `refresh_fees.sh` | monthly, from the 1st (first: `find-websites`, free) | $1.50 a month | what it wrote | Scheduled fees re-read stopped |
 | `refresh_facts.sh` | twice a year, from 1 Feb and 25 Aug, 120 schools a night | $1.70 a night, $5 a cycle | each night | Scheduled facts re-read stopped |
 | `refresh_register.sh` | monthly, from the 5th | $0.30 a month: three tries of two $0.05 pin-agent passes | always (via `refresh_pins.sh`) | Scheduled register refresh stopped |
 
@@ -71,6 +71,17 @@ early; each school's write stands on its own, as with the open-days check.
 `refresh_register.sh` also writes outside the lock: its steps each skip what is already
 pinned, and `refresh_pins.sh` publishes at the end. A publish in between ships new schools
 before their pins, which then show "Not on the map yet" until the chain's publish.
+
+### Websites for schools without one
+
+The register import brings private schools in with the register's website, usually blank,
+and no website stage runs after it (33 of 174 private institutions had none on 2026-10-23).
+So the fees job's first run of a month, after its backup, runs `find-websites --apply`:
+SearXNG search and URL validation without the model (free) for each private school with no
+site that was not searched in the last 90 days; a site validation accepts is stored and its
+fees are read in the same run. It counts as written, so the month publishes even when no fee
+changed. A failed search is logged and the fee read goes ahead. Facts for a site found come
+with the next facts cycle, or a thread's run.
 
 ### The register chain
 
