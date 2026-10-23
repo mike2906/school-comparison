@@ -355,6 +355,7 @@ async def run_school_facts(
                         stage=STAGE,
                         must_read=facts_rules.ADMISSION_LINK_RE,
                         first_urls=stored_fact_pages(school),
+                        pick_tier=TIER,  # the picker too: no OpenRouter call in a facts run
                     )
 
                 async def one(school_db: AsyncSession, current_id: int) -> dict[str, Any]:

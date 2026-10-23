@@ -222,6 +222,26 @@ async def test_an_unattributed_pick_counts_at_the_request_reserve(monkeypatch):
     assert seen["max_tokens"] == fees_agent.PICK_MAX_OUTPUT_TOKENS
 
 
+async def test_the_picker_runs_on_the_callers_tier(monkeypatch):
+    # The facts stage picks links on its own tier, so a facts run makes no OpenRouter call.
+    tiers = []
+
+    def _agent(tier, prompt, output, **kwargs):
+        tiers.append(tier)
+        return SimpleNamespace(run=None)
+
+    async def _picked(*_args, **_kwargs):
+        return SimpleNamespace(output=SimpleNamespace(urls=["https://meridian22.org/priem/"]))
+
+    monkeypatch.setattr(fees_agent, "create_agent", _agent)
+    monkeypatch.setattr(fees_agent, "execute_billable_request", _picked)
+    monkeypatch.setattr(fees_agent, "extract_provider_cost_usd", lambda _result: 0.0)
+    links = [("https://meridian22.org/priem/", "Прием")]
+    assert await fees_agent._pick(_school(), [], links, Spend(1.0), tier="facts") == ["https://meridian22.org/priem/"]
+    await fees_agent._pick(_school(), [], links, Spend(1.0))
+    assert tiers == ["facts", "cheap"]
+
+
 def test_a_model_shared_with_an_overridden_tier_keeps_the_default_reserve(monkeypatch):
     from app.ai.client import MODEL_TIERS
 
