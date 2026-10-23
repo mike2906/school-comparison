@@ -21,9 +21,13 @@ import {
   renderPage,
   schoolPage,
 } from '../src/prerender/pages.js'
+import { catchmentUrl } from '../src/admission/catchments.js'
+import { CATCHMENT_CAMPAIGNS } from '../src/admission/loadCatchments.js'
 import { DEFAULT_SITE_ORIGIN, URL_LANGUAGES } from '../src/utils/languageUrl.js'
 
 const DIST = path.resolve('dist')
+// Sofia's district boundaries, the same file the admission pages load.
+const DISTRICTS_FILE = catchmentUrl(CATCHMENT_CAMPAIGNS[0], 'districts.json').slice(1)
 // Kept well under the edge rate limit (infra/main.tf) even if the API gets faster.
 const CONCURRENCY = 4
 const strict = process.argv.includes('--strict')
@@ -113,6 +117,7 @@ async function main() {
 
   const { schools, listedIds } = apiUrl ? await fetchSchools(apiUrl) : { schools: [], listedIds: new Set() }
   const template = await readFile(path.join(DIST, 'index.html'), 'utf8')
+  const districts = JSON.parse(await readFile(path.join(DIST, DISTRICTS_FILE), 'utf8'))
 
   let sitemapPaths = []
   for (const language of URL_LANGUAGES) {
@@ -120,7 +125,7 @@ async function main() {
     const t = createTranslator(dictionary, language)
     const pages = [
       ...fixedPages(t, language, schools.filter((school) => listedIds.has(school.id))),
-      ...schools.map((school) => schoolPage(school, t, language, { listed: listedIds.has(school.id) })),
+      ...schools.map((school) => schoolPage(school, t, language, { listed: listedIds.has(school.id), districts, origin })),
     ]
     for (const page of pages) {
       await write(outputFile(page.routePath, language), renderPage(template, page, { language, origin, siteName: t('nav.title') }))

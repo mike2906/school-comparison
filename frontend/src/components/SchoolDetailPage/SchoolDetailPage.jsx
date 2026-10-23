@@ -148,7 +148,10 @@ function SchoolDetailPage({ schoolId = null, embedded = false, onClose = null })
   useEffect(() => {
     if (!school) return undefined
     const previousTitle = document.title
-    document.title = `${getSchoolName(school, i18n.language)} · ${t('nav.title')}`
+    const name = getSchoolName(school, i18n.language)
+    // Landing straight on the page keeps the prerendered title, which adds the district
+    // (src/prerender/pages.js): it is the one search engines index.
+    if (!previousTitle.startsWith(`${name}, `)) document.title = `${name} · ${t('nav.title')}`
     return () => {
       document.title = previousTitle
     }
