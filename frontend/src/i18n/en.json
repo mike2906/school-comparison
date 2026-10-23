@@ -1302,7 +1302,7 @@
     "languagesNote": "Shows only places that list a language focus. Many state schools teach these languages without listing it, so they are hidden too.",
     "budget": "Tuition per month up to, € (optional)",
     "noLimit": "No limit",
-    "budgetNote": "Tuition only, as each private school states it. Schools whose fee is not given per month or year are never hidden.",
+    "budgetNote": "Tuition only, as each private school states it; a yearly fee counts as 12 equal months, so a school billing in 10 instalments may cost a little more a month. Schools whose fee is not given per month or year are never hidden.",
     "saved": "Saved on this device. The calculator and the school list use it too.",
     "forget": "Forget all of it",
     "save": "Save on this device",

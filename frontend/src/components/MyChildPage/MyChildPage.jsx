@@ -29,6 +29,7 @@ import { getAgeGroupLabel } from '../../utils/countryConfig'
 import { geocodeAddress } from '../../utils/geocoding'
 import { languageKey, languageLabel } from '../../utils/languages'
 import { schoolPath } from '../../utils/schoolPath'
+import { locationForAgeGroup, locationsForAgeGroup } from '../../utils/schoolLocation'
 
 const EMPTY_LIST = []
 // Shown first; the rest behind "more languages". The most common foreign languages in Sofia schools.
@@ -36,13 +37,6 @@ const MAIN_LANGUAGES = ['english', 'german', 'french', 'spanish', 'italian', 'ru
 // Cards per group before "show more": a whole age group is hundreds of cards.
 const PAGE = 20
 
-function locationsForAgeGroup(school, ageGroup) {
-  const all = school.locations || []
-  const matching = all.filter(location => (
-    Array.isArray(location.age_groups) ? location.age_groups.includes(ageGroup) : location.age_group === ageGroup
-  ))
-  return matching.length ? matching : all
-}
 
 /**
  * "My child's options" (docs/MY_CHILD_OPTIONS.md): the child's birth year, start year,
@@ -104,12 +98,21 @@ function MyChildPage() {
   const verdictSaved = useMemo(() => (fits ? { ...saved, [stage === 'kindergarten' ? 'grade_1' : 'kindergarten']: null } : null), [fits, saved, stage])
   const verdictData = useVerdictData(Boolean(fits && stage === 'kindergarten'), Boolean(fits && stage === 'grade_1'))
   const [showOverBudget, setShowOverBudget] = useState(false)
+  // The verdicts the groups use, also handed to the cards so a card never shows a result
+  // from saved answers the page decided do not apply.
+  const verdictsById = useMemo(() => {
+    const byId = new Map()
+    if (!verdictSaved || !verdictData) return byId
+    const data = { ...verdictData, today: sofiaToday() }
+    withTrips.forEach(school => byId.set(school.id, savedVerdictsFor(school, verdictSaved, ageGroup, data)))
+    return byId
+  }, [withTrips, verdictSaved, verdictData, ageGroup])
   const options = useMemo(() => buildOptions(withTrips, {
-    verdictsFor: school => (verdictSaved && verdictData ? savedVerdictsFor(school, verdictSaved, ageGroup, { ...verdictData, today: sofiaToday() }) : []),
+    verdictsFor: school => verdictsById.get(school.id) ?? [],
     monthlyBudget,
     ageGroup,
     showOverBudget,
-  }), [withTrips, verdictSaved, verdictData, ageGroup, monthlyBudget, showOverBudget])
+  }), [withTrips, verdictsById, ageGroup, monthlyBudget, showOverBudget])
   const [openBelow, setOpenBelow] = useState(false)
   const [shown, setShown] = useState({})
   // A saved profile opens as one summary line; the form is a tap away.
@@ -164,8 +167,9 @@ function MyChildPage() {
                 onChange={event => update({ birthYear: event.target.value ? Number(event.target.value) : null })}
                 className="h-11 w-full rounded-lg border border-neutral-300 bg-white px-2"
               >
-                <option value="">{t('myChild.choose')}</option>
-                {birthYearsFor(startYear, 19).filter(year => year < startYear).map(year => <option key={year} value={year}>{year}</option>)}
+                {/* A saved child keeps a birth year; "forget" is how to drop it. */}
+                {!(isSaved && birthYear) && <option value="">{t('myChild.choose')}</option>}
+                {birthYearsFor(startYear, 18).filter(year => year < startYear).map(year => <option key={year} value={year}>{year}</option>)}
               </select>
             </label>
             <label className="block text-sm">
@@ -304,7 +308,8 @@ function MyChildPage() {
                           <SchoolCard
                             key={school.id}
                             school={school}
-                            location={locationsForAgeGroup(school, ageGroup).find(l => l.is_primary) || locationsForAgeGroup(school, ageGroup)[0]}
+                            location={locationForAgeGroup(school, ageGroup)}
+                            verdicts={verdictsById.get(school.id) ?? EMPTY_LIST}
                             activeAgeGroup={ageGroup}
                             targetYear={startYear}
                             onClick={() => navigate(schoolPath(school.id, ageGroup, startYear))}
@@ -335,7 +340,8 @@ function MyChildPage() {
 function draftFrom(saved) {
   return {
     birthYear: saved.child?.birthYear ?? null,
-    startYear: saved.child?.startYear ?? planningYear(),
+    // A September already past is no longer offered: plan for the next one.
+    startYear: saved.child?.startYear >= planningYear() ? saved.child.startYear : planningYear(),
     homePoint: saved.homePoint ?? null,
     languages: saved.preferences?.languages ?? [],
     monthlyBudget: saved.preferences?.monthlyBudget ?? null,
@@ -373,7 +379,8 @@ function HomeField({ homePoint, onChange }) {
     setState('looking')
     try {
       const result = await geocodeAddress(text.trim(), geocodingConfig)
-      onChange({ lat: result.lat, lng: result.lng, label: result.address })
+      // A cached lookup keeps OpenStreetMap's coordinates as text.
+      onChange({ lat: Number(result.lat), lng: Number(result.lng), label: result.address })
       setState('idle')
     } catch {
       setState('notFound')

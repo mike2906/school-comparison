@@ -21,3 +21,24 @@ export function getShiftForAgeGroup(location, ageGroup) {
   }
   return shifts[0] || null
 }
+
+/**
+ * A school's locations for an age group: those that list it, else all of them (a school
+ * that does not say which building takes which age).
+ */
+export function locationsForAgeGroup(school, ageGroup) {
+  const all = school.locations || []
+  if (!ageGroup) return all
+  const matching = all.filter(location => {
+    if (Array.isArray(location.age_groups)) return location.age_groups.includes(ageGroup)
+    if (location.age_group) return location.age_group === ageGroup
+    return false
+  })
+  return matching.length ? matching : all
+}
+
+/** The building a card names for an age group: the primary one, else the first. */
+export function locationForAgeGroup(school, ageGroup) {
+  const locations = locationsForAgeGroup(school, ageGroup)
+  return locations.find(location => location.is_primary) || locations[0]
+}

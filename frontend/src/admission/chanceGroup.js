@@ -3,6 +3,7 @@
  * schoolVerdict.js can give a school is in exactly one group. Never a percentage: the
  * groups only say where the parent's points stand against the last admitted child.
  */
+import { isClearlyBelow } from './schoolVerdict.js'
 
 export const CHANCE_GROUPS = ['likely', 'close', 'unknown', 'below']
 
@@ -19,18 +20,22 @@ export const VERDICT_GROUP = {
   noPlaces: 'below',
 }
 
+const rank = group => CHANCE_GROUPS.indexOf(group)
+
 // "Below" only when nothing else could get the child in, as the list's "hide clearly
-// below" counts it (clearlyBelowIds): a cut-off under other rules, a social priority or
-// a special-needs place keeps the school close.
-function clearlyBelow(verdict) {
-  if (verdict.lines?.some(line => line.otherRules)) return false
-  if (verdict.stage === 'kindergarten' && verdict.socialPriority !== false) return false
-  return !verdict.specialPlaces
-}
+// below" counts it (isClearlyBelow); otherwise close.
+const belowOrClose = verdict => (isClearlyBelow({ ...verdict, verdict: 'below' }) ? 'below' : 'close')
 
 function groupOf(verdict) {
+  if (verdict.verdict === 'mixed') {
+    // Buildings or groups that disagree: their shared group when they all fall in one.
+    const groups = new Set((verdict.lines || []).map(line => VERDICT_GROUP[line.verdict] ?? 'unknown'))
+    if (groups.size !== 1) return 'close'
+    const [group] = groups
+    return group === 'below' ? belowOrClose(verdict) : group
+  }
   const group = VERDICT_GROUP[verdict.verdict] ?? 'unknown'
-  return group === 'below' && !clearlyBelow(verdict) ? 'close' : group
+  return group === 'below' ? belowOrClose(verdict) : group
 }
 
 /**
@@ -39,5 +44,5 @@ function groupOf(verdict) {
  */
 export function chanceGroup(verdicts = []) {
   if (verdicts.length === 0) return 'unknown'
-  return verdicts.map(groupOf).sort((a, b) => CHANCE_GROUPS.indexOf(a) - CHANCE_GROUPS.indexOf(b))[0]
+  return verdicts.map(groupOf).sort((a, b) => rank(a) - rank(b))[0]
 }
