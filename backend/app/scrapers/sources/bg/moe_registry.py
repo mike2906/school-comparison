@@ -12,6 +12,7 @@ import hashlib
 import json
 import logging
 import re
+from contextlib import AsyncExitStack
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Optional
 
@@ -23,6 +24,7 @@ from app.schemas.scraping import DiscoveredLocation, DiscoveredSchool
 from app.scrapers.base import BaseScraper
 from app.scrapers.sources import register_adapter
 from app.scrapers.sources.base_adapter import BaseSourceAdapter
+from app.scrapers.sources.bg.registry_browser import BrowserClient
 from app.scrapers.sources.bg.school_kinds import child_bands
 from app.services.geocoding.base import GeocodingResult
 from app.services.geocoding.bg import GeoJSONProvider, city_storage_value
@@ -212,7 +214,7 @@ class MoeRegistryAdapter(BaseSourceAdapter):
                 resolved[code] = label.strip()
         return resolved
 
-    async def _load_reference_labels(self, client: httpx.AsyncClient) -> None:
+    async def _load_reference_labels(self, client: httpx.AsyncClient | BrowserClient) -> None:
         if self._region_labels and self._municipality_labels and self._town_labels:
             return
 
@@ -361,9 +363,7 @@ class MoeRegistryAdapter(BaseSourceAdapter):
             if instid
         }
 
-        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
-            await self._load_reference_labels(client)
-
+        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client, AsyncExitStack() as stack:
             # Step 1: Fetch schools from Sofia city and Sofia region
             logger.info(f"Fetching schools from MoE API: {self.PUBLIC_REGISTER_URL}")
 
@@ -373,21 +373,23 @@ class MoeRegistryAdapter(BaseSourceAdapter):
                 "isRIActive": 1,  # Only active institutions
             }
 
-            response = await client.post(
-                self.PUBLIC_REGISTER_URL,
-                json=request_body,
-                headers={
-                    "Accept": "application/json, text/plain, */*",
-                    "Content-Type": "application/json",
-                },
-            )
+            register_headers = {
+                "Accept": "application/json, text/plain, */*",
+                "Content-Type": "application/json",
+            }
+            response = await client.post(self.PUBLIC_REGISTER_URL, json=request_body, headers=register_headers)
+            if is_cloudflare_challenge(response):
+                # Cloudflare screens out scripts, not browsers: send every request from a headless one.
+                logger.warning("%s answered with a Cloudflare challenge; retrying through a browser", self.API_BASE_URL)
+                client = await stack.enter_async_context(BrowserClient(self.API_BASE_URL))
+                response = await client.post(self.PUBLIC_REGISTER_URL, json=request_body, headers=register_headers)
             if is_cloudflare_challenge(response):
                 raise RuntimeError(
                     f"{self.API_BASE_URL} answered with a Cloudflare challenge (HTTP {response.status_code},"
-                    " cf-mitigated: challenge), so the ministry now screens out scripts; a header change"
-                    " cannot get past it"
+                    " cf-mitigated: challenge) even to a headless browser"
                 )
             response.raise_for_status()
+            await self._load_reference_labels(client)
 
             # Step 2: Parse response
             data = response.json()
@@ -705,7 +707,7 @@ class MoeRegistryAdapter(BaseSourceAdapter):
                 attrs.setdefault("moe_registry_inactive_since", now_iso)
             school.attributes = attrs
 
-    async def _fetch_institution_detail(self, client: httpx.AsyncClient, inst_data: dict) -> Optional[dict]:
+    async def _fetch_institution_detail(self, client: httpx.AsyncClient | BrowserClient, inst_data: dict) -> Optional[dict]:
         """
         Fetch detailed data for a specific institution.
 
