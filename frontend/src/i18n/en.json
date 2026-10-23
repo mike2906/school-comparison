@@ -1335,9 +1335,9 @@
     },
     "stepNotes": {
       "nursery": "Free nursery places are also ranked every two weeks in autumn, so you can apply later too.",
-      "kindergarten": "Children start the first group in the year they turn 3. Applications are made in the city's system (ИСОДЗ).",
+      "kindergarten": "Children start the first group in the year they turn 3. Applications are made in the city's online system, kg.sofia.bg.",
       "preparatory": "A preparatory group at a school gives 4 extra points for 1st grade at that school. The group for 6-year-olds is ranked a year later on the same dates.",
-      "grade_1": "Children start 1st grade in the year they turn 7. Applications are made in the city's system (ИСОДЗ).",
+      "grade_1": "Children start 1st grade in the year they turn 7. Applications are made in the city's online system, kg.sofia.bg.",
       "grade_8": "Classes with an aptitude exam (arts, sport) hold it in May or June: check the school."
     },
     "milestones": {
@@ -1359,8 +1359,8 @@
       },
       "grade_8": {
         "schedule_due": "Official dates due out: check them",
-        "nvo_bg": "National exam (НВО): Bulgarian language and literature",
-        "nvo_math": "National exam (НВО): maths",
+        "nvo_bg": "National exam (NVO): Bulgarian language and literature",
+        "nvo_math": "National exam (NVO): maths",
         "applications": "Apply for stage {{stage}}",
         "ranking": "Stage {{stage}} results",
         "enrol": "Enrol a pupil ranked in stage {{stage}}",
