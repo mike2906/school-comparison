@@ -235,14 +235,6 @@ async def warm_cache(country_code: str = "bg", city: str = "sofia") -> None:
         async with _session_factory() as db:
             country = await db.get(Country, country_code)
         age_groups = get_valid_keys(country.education_config, "age_groups") if country else []
-        place_key = _filters_key(country_code, city)
-        await _refresh(_filters_cache, place_key, partial(_build_filters, country_code=country_code, city=city), warm=True)
-        await _refresh(
-            _search_index_cache, place_key, partial(_build_search_index, country_code=country_code, city=city), warm=True
-        )
-        await _refresh(
-            _same_place_cache, place_key, partial(_build_same_place, country_code=country_code, city=city), warm=True
-        )
         variants = [{"age_group": age_group} for age_group in [None, *age_groups]]
         if "preschool" in age_groups:
             # The preschool view also asks "where": kindergarten, school, or both.
@@ -251,7 +243,8 @@ async def warm_cache(country_code: str = "bg", city: str = "sofia") -> None:
                 {"age_group": "preschool", "education_level": "primary"},
                 {"age_group": "preschool", "include_crossover": True},
             ]
-        for variant in variants:
+
+        async def warm_list(variant: dict) -> None:
             filters = {
                 "country_code": country_code,
                 "city": city,
@@ -262,6 +255,22 @@ async def warm_cache(country_code: str = "bg", city: str = "sofia") -> None:
                 **variant,
             }
             await _refresh(_list_cache, _list_key(**filters), partial(_build_list_entry, **filters), warm=True)
+
+        # The whole-city list first: every visitor (and the deploy check) asks for it
+        # first, and builds share one lock, so after a restart a request would otherwise
+        # wait behind the filters, search index and shared buildings, then build the list
+        # itself (over 30 s on #485's deploy).
+        await warm_list(variants[0])
+        place_key = _filters_key(country_code, city)
+        await _refresh(_filters_cache, place_key, partial(_build_filters, country_code=country_code, city=city), warm=True)
+        await _refresh(
+            _search_index_cache, place_key, partial(_build_search_index, country_code=country_code, city=city), warm=True
+        )
+        await _refresh(
+            _same_place_cache, place_key, partial(_build_same_place, country_code=country_code, city=city), warm=True
+        )
+        for variant in variants[1:]:
+            await warm_list(variant)
     except Exception:
         logger.exception("Warming the schools cache failed")
 
