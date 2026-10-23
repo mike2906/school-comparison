@@ -13,7 +13,9 @@
  * they read the kindergarten rule file's dates.
  */
 export const CALENDAR_STEPS = [
+  // Nursery groups take two birth years, so a child can apply in either September.
   { id: 'nursery', ruleStage: 'kindergarten', city: 'sofia', offset: 1, optional: true },
+  { id: 'nursery', ruleStage: 'kindergarten', city: 'sofia', offset: 2, optional: true },
   { id: 'kindergarten', ruleStage: 'kindergarten', city: 'sofia', offset: 3 },
   { id: 'preparatory', ruleStage: 'kindergarten', city: 'sofia', offset: 5, optional: true },
   { id: 'grade_1', ruleStage: 'grade_1', city: 'sofia', offset: 7 },

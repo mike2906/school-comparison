@@ -78,26 +78,30 @@ test('estimated campaigns land on the dates their own rule files estimate', () =
 test('a child born in 2024 gets every step ahead, estimated where dates are not out', () => {
   const calendar = childCalendar(RULE_SETS, 2024, '2026-10-23')
   assert.deepEqual(calendar.map(e => [e.step.id, e.startYear]), [
+    // The second nursery year: the 2026 campaign still ranks free places until 27 November.
+    ['nursery', 2026],
     ['kindergarten', 2027],
     ['preparatory', 2029],
     ['grade_1', 2031],
     ['grade_8', 2038],
   ])
-  const kindergarten = calendar[0]
+  assert.deepEqual(calendar[0].milestones.map(m => m.key), ['current_rankings'])
+  const kindergarten = calendar[1]
   assert.equal(kindergarten.estimated, true)
   assert.equal(kindergarten.rulesStatus, 'provisional')
   assert.deepEqual(kindergarten.milestones[0], { key: 'schedule_due', date: '2027-01-05' })
   assert.equal(kindergarten.milestones.find(m => m.key === 'applications_lock').date, '2027-05-20')
   // No rule file for 2029 yet: the rules are not written down either.
-  assert.equal(calendar[1].rulesStatus, null)
+  assert.equal(calendar[2].rulesStatus, null)
   // Eighth grade has no publication date to point at.
-  assert.ok(!calendar[3].milestones.some(m => m.key === 'schedule_due'))
+  assert.ok(!calendar[4].milestones.some(m => m.key === 'schedule_due'))
 })
 
 test('a campaign still ranking stays; an ended one goes', () => {
   // Born 2023: the 2026 kindergarten campaign ranks free places until 27 November.
   const running = childCalendar(RULE_SETS, 2023, '2026-10-23')
   assert.equal(running[0].step.id, 'kindergarten')
+  assert.ok(!running.some(e => e.step.id === 'nursery'), 'both nursery years are over')
   assert.equal(running[0].startYear, 2026)
   assert.equal(running[0].estimated, false)
   assert.equal(running[0].rulesStatus, 'verified')
@@ -182,6 +186,7 @@ test('every milestone the files use has a label in both languages', () => {
 
 test('the step list is in start-year order', () => {
   const offsets = CALENDAR_STEPS.map(s => s.offset)
+  assert.deepEqual(CALENDAR_STEPS.filter(s => s.id === 'nursery').map(s => s.offset), [1, 2])
   assert.deepEqual(offsets, [...offsets].sort((a, b) => a - b))
   assert.ok(step('grade_1'))
 })
