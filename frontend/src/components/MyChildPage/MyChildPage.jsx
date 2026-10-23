@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useNavigate } from 'react-router-dom'
 import Layout from '../Layout/Layout'
@@ -12,6 +12,7 @@ import { useSavedAdmission, useVerdictData } from '../../hooks/useSavedAdmission
 import { useFilterData } from '../SearchPage/useSearchFilters'
 import {
   forgetSaved,
+  getSaved,
   hasSaved,
   saveChild,
   saveHomePoint,
@@ -56,11 +57,15 @@ function MyChildPage() {
   useEffect(() => {
     if (isSaved) setDraft(draftFrom(saved))
   }, [saved, isSaved])
-  const update = changes => {
-    const next = { ...draft, ...changes }
-    setDraft(next)
-    if (isSaved) persist(next)
-  }
+  // Merged into the latest draft and saved only if the profile is still saved when the
+  // change lands: a home lookup can finish after other edits, or after "forget".
+  const update = changes => setDraft(current => {
+    const next = { ...current, ...changes }
+    if (hasSaved(getSaved())) persist(next)
+    return next
+  })
+  // Bumped on "forget", so a home lookup still running is dropped with the profile.
+  const [forgets, setForgets] = useState(0)
 
   const { birthYear, startYear, homePoint, languages, monthlyBudget } = draft
   const ageGroup = birthYear ? calculateAgeGroup(startYear, birthYear, config) : null
@@ -69,9 +74,12 @@ function MyChildPage() {
   const languageOptions = useMemo(() => (
     [...new Set((availableFilters.language_focus_languages || []).map(languageKey).filter(Boolean))]
   ), [availableFilters])
-  // A language counts at any level, as the list's language filter does.
-  const languagePairs = useMemo(() => (availableFilters.language_focus_pairs || [])
-    .filter(pair => languages.includes(languageKey(pair.split(':')[0]))), [availableFilters, languages])
+  // A language counts at any level, as the list's language filter does, and so does a
+  // school that names the language without a level.
+  const languagePairs = useMemo(() => [
+    ...(availableFilters.language_focus_pairs || []),
+    ...(availableFilters.language_focus_languages || []),
+  ].filter(value => languages.includes(languageKey(value.split(':')[0]))), [availableFilters, languages])
 
   const all = useSchools(ageGroup, null, selection.educationLevel, selection.includeCrossover, EMPTY_LIST, EMPTY_LIST, EMPTY_LIST, EMPTY_LIST, countryCode)
   const withLanguage = useSchools(ageGroup, null, selection.educationLevel, selection.includeCrossover, languagePairs, EMPTY_LIST, EMPTY_LIST, EMPTY_LIST, countryCode)
@@ -131,11 +139,13 @@ function MyChildPage() {
   }, [t])
 
   const groupLabel = group => (config ? getAgeGroupLabel(config, group, i18n.language) : t(`ageGroups.${group}`))
-  const searchUrl = `/search?${new URLSearchParams({
+  const searchParams = new URLSearchParams({
     target_year: String(startYear),
     ...(birthYear ? { birth_year: String(birthYear) } : {}),
     ...(ageGroup ? { age_group: ageGroup, include_crossover: String(selection.includeCrossover) } : {}),
-  })}`
+  })
+  languagePairs.forEach(value => searchParams.append('language_focus', value))
+  const searchUrl = `/search?${searchParams}`
 
   return (
     <Layout>
@@ -186,7 +196,7 @@ function MyChildPage() {
           </div>
           {ageGroup && <p className="text-sm text-neutral-700">{t('myChild.group', { group: groupLabel(ageGroup) })}</p>}
 
-          <HomeField homePoint={homePoint} onChange={point => update({ homePoint: point })} />
+          <HomeField key={forgets} homePoint={homePoint} onChange={point => update({ homePoint: point })} />
 
           <fieldset>
             <legend className="mb-1 text-sm font-medium text-neutral-800">{t('myChild.languages')}</legend>
@@ -235,7 +245,7 @@ function MyChildPage() {
               <p className="text-neutral-700">
                 {t('myChild.saved')}{' '}
                 {birthYear && <button type="button" onClick={() => setEditing(false)} className="mr-3 font-medium text-primary-700 underline">{t('myChild.done')}</button>}
-                <button type="button" onClick={() => { forgetSaved(); setDraft(draftFrom({})) }} className="text-neutral-600 underline">{t('myChild.forget')}</button>
+                <button type="button" onClick={() => { forgetSaved(); setDraft(draftFrom({})); setForgets(forgets + 1) }} className="text-neutral-600 underline">{t('myChild.forget')}</button>
               </p>
             ) : (
               <>
@@ -363,6 +373,9 @@ function HomeField({ homePoint, onChange }) {
   const { config } = useCountry()
   const [text, setText] = useState('')
   const [state, setState] = useState('idle')
+  // A lookup that ends after this field is gone (the profile was forgotten) is dropped.
+  const live = useRef(true)
+  useEffect(() => () => { live.current = false }, [])
   const geocodingConfig = { ...config?.map_config?.geocoding, bounds: config?.map_config?.bounds }
 
   if (homePoint) {
@@ -379,6 +392,7 @@ function HomeField({ homePoint, onChange }) {
     setState('looking')
     try {
       const result = await geocodeAddress(text.trim(), geocodingConfig)
+      if (!live.current) return
       // A cached lookup keeps OpenStreetMap's coordinates as text.
       onChange({ lat: Number(result.lat), lng: Number(result.lng), label: result.address })
       setState('idle')
@@ -391,6 +405,7 @@ function HomeField({ homePoint, onChange }) {
     setState('looking')
     navigator.geolocation.getCurrentPosition(
       position => {
+        if (!live.current) return
         onChange({ lat: position.coords.latitude, lng: position.coords.longitude, label: null })
         setState('idle')
       },

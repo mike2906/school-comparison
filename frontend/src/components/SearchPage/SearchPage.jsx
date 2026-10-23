@@ -607,7 +607,6 @@ function SearchPage() {
     handleFilterChange({ schoolType: 'private' })
   }, [rawSchoolType])
 
-
   const schoolsWithDistance = useMemo(() => {
     if (!userLocation) return schools
 
