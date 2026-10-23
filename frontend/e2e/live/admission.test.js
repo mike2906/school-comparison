@@ -321,10 +321,13 @@ describe('admission from a school page', () => {
     // Used once: a reload or Back must not send the address again without a tap.
     assert.ok(!(await page.evaluate(() => history.state?.usr?.nearSavedHome)), 'the arrival flag stays in history')
     await page.getByRole('button', { name: t('bg', 'location.clear'), exact: true }).first().click()
-    await page.waitForFunction(() => !localStorage.getItem('userLocation'))
+    // Turned off, the location stays off: a reload neither falls back to the saved home nor
+    // looks the saved address up again.
+    const stored = () => page.evaluate(() => JSON.parse(localStorage.getItem('userLocation') || 'null'))
+    await page.waitForFunction(() => JSON.parse(localStorage.getItem('userLocation') || 'null')?.off)
     await page.reload()
     await page.getByTestId('saved-admission-banner').waitFor()
-    assert.equal(await page.evaluate(() => localStorage.getItem('userLocation')), null, 'a reload looked the saved address up again')
+    assert.deepEqual(await stored(), { off: true }, 'a reload brought the saved home back as the location')
     // The list itself offers the saved home as its location too. The tap runs the same lookup
     // as the arrival above, so it is not sent to OpenStreetMap a second time.
     const locationToggle = page.getByRole('button', { name: t('bg', 'location.setShortSaved') }).first()

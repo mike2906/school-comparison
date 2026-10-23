@@ -78,6 +78,24 @@ test('the home point is kept apart from the address-table home, and trips start 
   assert.equal(parseSaved(JSON.stringify({ version: 1, homePoint: { lat: 1 } })).homePoint, null)
 })
 
+test('a location the parent turned off stays off, even with a saved home', async t => {
+  const items = new Map()
+  globalThis.window = { localStorage: { getItem: key => items.get(key) ?? null, setItem: (key, value) => items.set(key, String(value)), removeItem: key => items.delete(key) } }
+  t.after(() => { delete globalThis.window })
+  const { forgetSaved, locationTurnedOff, resetSavedForTests, saveHomePoint, tripOrigin, turnOffLocation, writeLocation } = await import('./saved.js')
+  resetSavedForTests()
+  forgetSaved()
+  saveHomePoint({ lat: 42.69, lng: 23.32, label: 'ул. Шипка 5' })
+  turnOffLocation()
+  assert.equal(locationTurnedOff(), true)
+  assert.equal(tripOrigin(), null, 'turned off: trips do not fall back to the home')
+  writeLocation({ lat: 42.7, lng: 23.3, address: 'Лозенец' })
+  assert.equal(locationTurnedOff(), false, 'a new location turns it back on')
+  assert.equal(tripOrigin().label, 'Лозенец')
+  forgetSaved()
+  assert.equal(locationTurnedOff(), false, 'forgetting everything leaves no marker')
+})
+
 test('the start year is kept with the birth year', async () => {
   const { childStartYear, resetSavedForTests, forgetSaved, saveChild } = await import('./saved.js')
   resetSavedForTests()

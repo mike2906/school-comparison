@@ -256,13 +256,34 @@ export function writeLocation(location) {
 }
 
 /**
+ * The parent turned the list's location off: no page falls back to the saved home until
+ * they set a location again. Kept as a marker, since a missing key means "never set".
+ */
+export function turnOffLocation() {
+  try {
+    storage()?.setItem(LOCATION_KEY, JSON.stringify({ off: true }))
+  } catch {
+    // Full or blocked storage: the location lives for this page view only.
+  }
+}
+
+export function locationTurnedOff() {
+  try {
+    return JSON.parse(storage()?.getItem(LOCATION_KEY) || 'null')?.off === true
+  } catch {
+    return false
+  }
+}
+
+/**
  * Where trips start, as `{ lat, lng, label, isHome }`: the location the parent last set on
- * the search page (it may be somewhere other than home on purpose), else the saved home,
- * else null.
+ * the search page (it may be somewhere other than home on purpose), else the saved home
+ * unless the parent turned the location off, else null.
  */
 export function tripOrigin(saved = read()) {
   const location = readLocation()
   if (location) return { lat: location.lat, lng: location.lng, label: location.address || null, isHome: samePoint(location, saved.homePoint) }
+  if (locationTurnedOff()) return null
   return saved.homePoint ? { ...saved.homePoint, isHome: true } : null
 }
 
