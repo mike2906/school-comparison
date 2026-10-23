@@ -1,0 +1,20 @@
+name: Probe mon.bg (temporary)
+on:
+  push:
+    branches: [probe-mon-bg]
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: cdx
+        run: |
+          mkdir -p f
+          curl -s --max-time 120 "https://web.archive.org/cdx/search/cdx?url=ruo.mon.bg/sofia-grad/files/sites/2/&matchType=prefix&filter=statuscode:200&collapse=urlkey&fl=timestamp,original,mimetype&limit=20000" -o f/cdx.txt; wc -l f/cdx.txt
+          curl -s --max-time 120 "https://web.archive.org/cdx/search/cdx?url=ruo.mon.bg/files/sites/2/&matchType=prefix&collapse=urlkey&fl=timestamp,original,mimetype&limit=20000" -o f/cdx2.txt; wc -l f/cdx2.txt
+          curl -s --max-time 120 "https://web.archive.org/cdx/search/cdx?url=ruo.mon.bg/sofia-grad/registri/*&fl=timestamp,original,statuscode&limit=200" -o f/cdx3.txt; wc -l f/cdx3.txt
+          curl -s --max-time 60 "https://index.commoncrawl.org/collinfo.json" -o f/cc.json; head -c 300 f/cc.json
+          echo "::notice::cdx $(wc -l < f/cdx.txt) cdx2 $(wc -l < f/cdx2.txt) cdx3 $(wc -l < f/cdx3.txt); $(grep -ci 'spisak\|gradin\|uchilish' f/cdx.txt) list-like"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: probe-cdx
+          path: f
