@@ -19,6 +19,9 @@ function Footer({ clearCompareBar }) {
           <Link to="/schools" className="text-primary-700 underline">
             {t('seo.allSchools')}
           </Link>
+          <Link to="/districts" className="text-primary-700 underline">
+            {t('districtPages.footer')}
+          </Link>
           <Link to="/admission" className="text-primary-700 underline">
             {t('nav.admission')}
           </Link>

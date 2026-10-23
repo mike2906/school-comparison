@@ -8,6 +8,7 @@ import SearchPage from './components/SearchPage/SearchPage'
 import SchoolDetailPage from './components/SchoolDetailPage/SchoolDetailPage'
 import AboutPage from './components/AboutPage/AboutPage'
 import DirectoryPage from './components/DirectoryPage/DirectoryPage'
+import DistrictPage from './components/DistrictPage/DistrictPage'
 import NotFoundPage from './components/NotFoundPage/NotFoundPage'
 import CompareBar from './components/CompareBar/CompareBar'
 import {
@@ -143,6 +144,14 @@ const router = createBrowserRouter([
       {
         path: 'schools/:id',
         element: <SchoolDetailPage />,
+      },
+      {
+        path: 'districts',
+        element: <DistrictPage />,
+      },
+      {
+        path: 'districts/:slug',
+        element: <DistrictPage />,
       },
       {
         path: 'compare',

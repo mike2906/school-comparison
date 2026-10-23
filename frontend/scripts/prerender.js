@@ -15,6 +15,7 @@ import {
   buildRobots,
   buildSitemap,
   createTranslator,
+  districtPages,
   fixedPages,
   indexReasons,
   outputFile,
@@ -123,8 +124,10 @@ async function main() {
   for (const language of URL_LANGUAGES) {
     const dictionary = JSON.parse(await readFile(path.resolve(`src/i18n/${language}.json`), 'utf8'))
     const t = createTranslator(dictionary, language)
+    const listed = schools.filter((school) => listedIds.has(school.id))
     const pages = [
-      ...fixedPages(t, language, schools.filter((school) => listedIds.has(school.id))),
+      ...fixedPages(t, language, listed),
+      ...districtPages(t, language, listed, districts),
       ...schools.map((school) => schoolPage(school, t, language, { listed: listedIds.has(school.id), districts, origin })),
     ]
     for (const page of pages) {
