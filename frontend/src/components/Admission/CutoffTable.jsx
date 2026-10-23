@@ -1,61 +1,15 @@
-import i18next from 'i18next'
 import { useTranslation } from 'react-i18next'
-import { comparableRound, cutoffValue, formatRankingDay, laterEasierRound, laterHarder, roundsOf, shortCampaign } from '../../admission/calculator'
-import { formatAmount } from '../../utils/format'
+import { LAST_ADMITTED_KINDS, comparableRound, cutoffText, cutoffValue, formatRankingDay, laterEasierRound, laterHarder, rowLabel, roundsOf, shortCampaign } from '../../admission/calculator'
 
 // First grade: groups 1–3 live in the school's area (by how long), group 4 outside it.
 const GRADE_1_OUTSIDE_GROUP = 4
-const LAST_ADMITTED_KINDS = new Set(['score', 'points', 'group', 'quota'])
-
-export function rowLabel(row, t, language = i18next.language) {
-  // The ministry's class and building names are Bulgarian; the API adds English ones it has.
-  const english = String(language || '').startsWith('en')
-  const className = (english && row.class_name_en) || row.class_name
-  const building = (english && row.building_en) || row.building
-  // An 8th-grade class by its name; the ministry's code only when it has none.
-  const what = row.stage === 'grade_8'
-    ? `${t('cutoffs.stage.grade_8')}: ${[className, row.class_code && (className ? `(${row.class_code})` : row.class_code)].filter(Boolean).join(' ')}`
-    : row.stage === 'grade_1'
-      ? t('cutoffs.stage.grade_1')
-      : row.stage === 'preparatory'
-        ? t('cutoffs.stage.preparatory')
-        : t(`ageGroups.${row.age_group}`, { defaultValue: row.age_group || '' })
-  // A nursery ranks two birth years separately, so each year is its own row.
-  const born = row.birth_year && row.stage !== 'grade_8' ? t('cutoffs.bornIn', { year: row.birth_year }) : null
-  return [what, born, building].filter(Boolean).join(' · ')
-}
 
 export function CutoffValue({ round }) {
   const { t, i18n } = useTranslation()
-  const value = cutoffValue(round)
-  const number = n => (n == null ? '—' : formatAmount(n, i18n.language, 2))
-  if (!value) {
-    // Places to fill, and nobody on the list was admitted to them.
-    if (round?.places > 0 && round.admitted_count === 0) return <span>{t('cutoffs.noneAdmitted')}</span>
-    return <span className="text-neutral-400">—</span>
-  }
-  if (value.kind === 'everyone') return <span>{round.applicants_count === 0 ? t('cutoffs.noApplicants') : t('cutoffs.everyone')}</span>
-  if (value.kind === 'noPlaces') return <span>{t('cutoffs.noPlaces')}</span>
-  if (value.kind === 'score') return <span className="tabular-nums">{t('cutoffs.score', { score: number(value.score) })}</span>
-  if (value.kind === 'quota') {
-    return (
-      <span className="tabular-nums">
-        {t('cutoffs.quotaScores', { boys: number(value.boys), girls: number(value.girls) })}
-      </span>
-    )
-  }
-  if (value.kind === 'group') {
-    return (
-      <span className="tabular-nums">
-        {value.points == null
-          ? t('cutoffs.groupOnly', { group: value.group })
-          : value.points === 0
-            ? t('cutoffs.groupNoPoints', { group: value.group })
-            : t('cutoffs.groupAndPoints', { group: value.group, points: number(value.points) })}
-      </span>
-    )
-  }
-  return <span className="tabular-nums">{t('cutoffs.points', { points: number(value.points) })}</span>
+  const text = cutoffText(round, t, i18n.language)
+  if (!text) return <span className="text-neutral-400">—</span>
+  const kind = cutoffValue(round)?.kind
+  return <span className={LAST_ADMITTED_KINDS.has(kind) ? 'tabular-nums' : undefined}>{text}</span>
 }
 
 /** The size of a round in a few words: "66 places · 110 applicants · 66 admitted". */

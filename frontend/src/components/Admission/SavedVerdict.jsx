@@ -1,10 +1,10 @@
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
-import { formatRange, rankingWhen } from '../../admission/calculator'
+import { formatRange, rankingWhen, rowLabel } from '../../admission/calculator'
 import { forgetSaved, SAVED_STAGES } from '../../admission/saved'
 import { savedListFilters, savedStageApplies } from '../../admission/schoolVerdict'
 import { setHideBelow, useHideBelow, useSavedAdmission } from '../../hooks/useSavedAdmission'
-import { CutoffValue, rowLabel } from './CutoffTable'
+import { CutoffValue } from './CutoffTable'
 
 const TONE = {
   above: 'text-green-800',

@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next'
-import { comparableRound, compareWithCutoff, rankingWhen } from '../../admission/calculator'
-import { CutoffValue, rowLabel } from './CutoffTable'
+import { comparableRound, compareWithCutoff, rankingWhen, rowLabel } from '../../admission/calculator'
+import { CutoffValue } from './CutoffTable'
 
 const TONE = {
   above: 'text-green-800',

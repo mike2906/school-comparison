@@ -19,7 +19,7 @@ import {
 const ORIGIN = 'https://example.test'
 const TEMPLATE = '<!doctype html>\n<html lang="bg">\n  <head>\n    <title>App</title>\n  </head>\n  <body>\n    <div id="root"></div>\n  </body>\n</html>'
 const translator = (language) =>
-  createTranslator(JSON.parse(readFileSync(new URL(`../i18n/${language}.json`, import.meta.url), 'utf8')))
+  createTranslator(JSON.parse(readFileSync(new URL(`../i18n/${language}.json`, import.meta.url), 'utf8')), language)
 const t = translator('en')
 
 const exam = (exam_type, year, subject, value) => ({ exam_type, year, subject, metric: 'average_score', value })
@@ -69,8 +69,55 @@ test('the app and the prerender agree on which fixed routes carry a canonical', 
 })
 
 test('NVO results or a published price alone make a page indexable', () => {
-  assert.deepEqual(indexReasons(withNvo), { nvo: true, pricing: false, summary: false })
+  assert.deepEqual(indexReasons(withNvo), { nvo: true, pricing: false, facts: false, admission: false, summary: false })
   assert.equal(isThinSchool(school({ pricing: [{ id: 1, category: 'tuition' }] })), false)
+})
+
+const kindergarten = school({
+  education_level: 'kindergarten',
+  school_facts: {
+    facts: [
+      { topic: 'facilities', rank: 'key', text_i18n: { bg: 'Има басейн.', en: 'It has a <pool>.' } },
+      { topic: 'meals', rank: 'more', text_i18n: { bg: 'Собствена кухня.' } },
+    ],
+  },
+  admission_info: {
+    cutoff_summary: [
+      {
+        stage: 'kindergarten',
+        age_group: 'nursery',
+        birth_year: 2024,
+        campaign: '2026/2027',
+        rounds: 1,
+        first: {
+          round_id: 1, round_kind: 'current', classified_on: '2026-09-04',
+          places: 2, applicants_count: 34, admitted_count: 2, last_admitted_points: 19,
+        },
+      },
+    ],
+  },
+})
+
+test('facts from the school site or official admission rankings make a page indexable', () => {
+  assert.equal(isThinSchool(school({ school_facts: kindergarten.school_facts })), false)
+  assert.equal(isThinSchool(school({ admission_info: kindergarten.admission_info })), false)
+  assert.equal(isThinSchool(school({ admission_info: { cutoff_summary: [{ stage: 'grade_1', rounds: 0 }] } })), true)
+})
+
+test('a page lists its site facts and admission results, escaped', () => {
+  const page = schoolPage(kindergarten, t, 'en')
+  assert.match(page.body, /From the school's website.*Meals: Собствена кухня\..*Facilities: It has a &lt;pool&gt;\./)
+  assert.match(page.body, /Who got in before.*Nursery · born 2024 \(2026\/27\): Free-place ranking, 4 September 2026, last admitted: 19 points \(2 places · 34 applicants · 2 admitted\)/)
+  assert.match(page.description, /, 1 Main St\. It has a <pool>\.$/)
+  assert.equal(page.sitemap, true)
+})
+
+test('the translator picks plural keys by count', () => {
+  const tr = createTranslator({ n_one: '{{count}} place', n_other: '{{count}} places', plain: 'x' }, 'en')
+  assert.equal(tr('n', { count: 1 }), '1 place')
+  assert.equal(tr('n', { count: 3 }), '3 places')
+  assert.equal(tr('plain', { count: 3 }), 'x')
+  assert.equal(tr('missing', { defaultValue: 'fallback' }), 'fallback')
 })
 
 test('only a substantive Bulgarian summary counts, measured on trimmed plain text', () => {

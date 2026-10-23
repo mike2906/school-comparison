@@ -177,6 +177,49 @@ export function cutoffValue(round) {
   return null
 }
 
+/** Cut-off kinds that name the last child admitted, not a fact about the whole ranking. */
+export const LAST_ADMITTED_KINDS = new Set(['score', 'points', 'group', 'quota'])
+
+/** A ranking's cut-off in words ("16 points", "Nobody turned down"), or '' when unknown. */
+export function cutoffText(round, t, language) {
+  const value = cutoffValue(round)
+  const number = n => (n == null ? '—' : formatAmount(n, language, 2))
+  if (!value) {
+    // Places to fill, and nobody on the list was admitted to them.
+    return round?.places > 0 && round.admitted_count === 0 ? t('cutoffs.noneAdmitted') : ''
+  }
+  if (value.kind === 'everyone') return round.applicants_count === 0 ? t('cutoffs.noApplicants') : t('cutoffs.everyone')
+  if (value.kind === 'noPlaces') return t('cutoffs.noPlaces')
+  if (value.kind === 'score') return t('cutoffs.score', { score: number(value.score) })
+  if (value.kind === 'quota') return t('cutoffs.quotaScores', { boys: number(value.boys), girls: number(value.girls) })
+  if (value.kind === 'group') {
+    if (value.points == null) return t('cutoffs.groupOnly', { group: value.group })
+    return value.points === 0
+      ? t('cutoffs.groupNoPoints', { group: value.group })
+      : t('cutoffs.groupAndPoints', { group: value.group, points: number(value.points) })
+  }
+  return t('cutoffs.points', { points: number(value.points) })
+}
+
+/** What a cut-off row is for: age group or class, birth year and building. */
+export function rowLabel(row, t, language = i18next.language) {
+  // The ministry's class and building names are Bulgarian; the API adds English ones it has.
+  const english = String(language || '').startsWith('en')
+  const className = (english && row.class_name_en) || row.class_name
+  const building = (english && row.building_en) || row.building
+  // An 8th-grade class by its name; the ministry's code only when it has none.
+  const what = row.stage === 'grade_8'
+    ? `${t('cutoffs.stage.grade_8')}: ${[className, row.class_code && (className ? `(${row.class_code})` : row.class_code)].filter(Boolean).join(' ')}`
+    : row.stage === 'grade_1'
+      ? t('cutoffs.stage.grade_1')
+      : row.stage === 'preparatory'
+        ? t('cutoffs.stage.preparatory')
+        : t(`ageGroups.${row.age_group}`, { defaultValue: row.age_group || '' })
+  // A nursery ranks two birth years separately, so each year is its own row.
+  const born = row.birth_year && row.stage !== 'grade_8' ? t('cutoffs.bornIn', { year: row.birth_year }) : null
+  return [what, born, building].filter(Boolean).join(' · ')
+}
+
 /** `2026/2027` → `2026/27`, as parents write a school year. */
 export function shortCampaign(campaign) {
   const match = /^(\d{4})\/\d{2}(\d{2})$/.exec(String(campaign || ''))
