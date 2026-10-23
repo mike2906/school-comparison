@@ -29,10 +29,10 @@ function KindergartenCalculator({ selected, startYear, kindergarten, districts, 
   const { t, i18n } = useTranslation()
   const [a, setA] = useState(() => {
     const saved = getSaved().kindergarten
+    if (saved) return { ...KINDERGARTEN_INITIAL, ...withoutPlace(saved.answers), ...saved.siblings?.[kindergarten?.id] }
     // The child's birth year given on another page, so the parent does not give it twice.
-    return saved
-      ? { ...KINDERGARTEN_INITIAL, ...withoutPlace(saved.answers), ...saved.siblings?.[kindergarten?.id] }
-      : { ...KINDERGARTEN_INITIAL, birthYear: kindergartenBirthYears(startYear).includes(childBirthYear()) ? childBirthYear() : null }
+    const birthYear = childBirthYear()
+    return { ...KINDERGARTEN_INITIAL, birthYear: kindergartenBirthYears(startYear).includes(birthYear) ? birthYear : null }
   })
   const saved = useSavedAdmission().kindergarten
   const set = (key, value) => setA(prev => ({ ...prev, [key]: value }))

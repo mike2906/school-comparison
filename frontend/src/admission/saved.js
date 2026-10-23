@@ -33,7 +33,7 @@ export function parseSaved(text) {
     if (!value || value.version !== VERSION) return EMPTY
     return {
       version: VERSION,
-      child: isChild(value.child) ? { birthYear: value.child.birthYear } : null,
+      child: isChild(value.child) ? { birthYear: value.child.birthYear } : legacyChild(value.kindergarten),
       home: isHome(value.home) ? value.home : null,
       kindergarten: isEntry(value.kindergarten) ? value.kindergarten : null,
       grade_1: isEntry(value.grade_1) && Array.isArray(value.grade_1.addresses) ? value.grade_1 : null,
@@ -49,6 +49,12 @@ function isChild(child) {
 
 function isBirthYear(year) {
   return Number.isInteger(year) && year > 1900
+}
+
+// Answers saved before `child` existed: the kindergarten answers held the birth year.
+function legacyChild(kindergarten) {
+  const birthYear = kindergarten?.answers?.birthYear
+  return isBirthYear(birthYear) ? { birthYear } : null
 }
 
 function isHome(home) {
@@ -110,26 +116,25 @@ export function saveStage(stage, entry, { home } = {}) {
 }
 
 /**
- * The child's birth year, or null: the one given anywhere, else the kindergarten answers'
- * (saved before `child` existed), else the year first-grade answers imply (a child starts
- * first grade in the calendar year it turns seven).
+ * The child's birth year as the parent gave it, or null. Never guessed from first-grade
+ * answers: a child may start first grade at six or eight.
  */
 export function childBirthYear(saved = read()) {
-  if (saved.child) return saved.child.birthYear
-  if (isBirthYear(saved.kindergarten?.answers.birthYear)) return saved.kindergarten.answers.birthYear
-  return saved.grade_1 ? saved.grade_1.startYear - 7 : null
+  return saved.child?.birthYear ?? null
 }
 
 /**
  * Saves the child's birth year. Saved kindergarten answers are for the same child, so they
- * take the new year too.
+ * take the new year too while it is still a kindergarten age for their start year.
  */
 export function saveChild({ birthYear }) {
   if (!isBirthYear(birthYear)) return
   const saved = read()
-  const kindergarten = saved.kindergarten && saved.kindergarten.answers.birthYear !== birthYear
-    ? { ...saved.kindergarten, answers: { ...saved.kindergarten.answers, birthYear } }
-    : saved.kindergarten
+  const entry = saved.kindergarten
+  const fits = entry && birthYear < entry.startYear && birthYear >= entry.startYear - 7
+  const kindergarten = fits && entry.answers.birthYear !== birthYear
+    ? { ...entry, answers: { ...entry.answers, birthYear } }
+    : entry
   write({ ...saved, child: { birthYear }, kindergarten })
 }
 
@@ -158,11 +163,14 @@ export function saveHome(home) {
 
 /**
  * Forgets one tab's answers, or everything (the child too) without a stage. First-grade
- * answers hold the home address too, so forgetting them forgets it.
+ * answers hold the home address too, so forgetting them forgets it. Forgetting the last
+ * saved tab forgets the child as well, so no "forget" leaves a birth year behind.
  */
 export function forgetSaved(stage = null) {
-  if (!stage) write(EMPTY)
-  else write({ ...read(), [stage]: null, ...(stage === 'grade_1' ? { home: null } : {}) })
+  if (!stage) return write(EMPTY)
+  const next = { ...read(), [stage]: null, ...(stage === 'grade_1' ? { home: null } : {}) }
+  if (SAVED_STAGES.every(other => !next[other])) next.child = null
+  write(next)
 }
 
 /** Tests only: drop the in-memory copy. */
