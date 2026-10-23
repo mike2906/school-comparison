@@ -43,7 +43,7 @@
   },
   "location": {
     "useMyLocation": "Use my location",
-    "useSavedHome": "Use the home address saved in the calculator",
+    "useSavedHome": "Use my saved home",
     "selectOnMap": "Choose on map",
     "cancelMapPick": "Cancel map selection",
     "mapPickHint": "Click anywhere on the map to set your location.",
@@ -72,7 +72,12 @@
     "setShort": "Set your location",
     "setShortSaved": "Near my saved address?",
     "whyShort": "See distances, sort by the nearest and limit by distance.",
-    "changeShort": "Change location"
+    "changeShort": "Change location",
+    "home": "Home",
+    "isHome": "This is your saved home.",
+    "forgetHome": "Forget home",
+    "saveAsHome": "This is my home",
+    "saveAsHomeNote": "Kept only in this browser, for distances and travel times on every page."
   },
   "sorting": {
     "sortBy": "Sort by",

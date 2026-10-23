@@ -4,6 +4,8 @@
  * Each helper returns null when the fact is not available, so the strip shows only the
  * facts a school actually has.
  */
+
+import { tripOrigin } from '../admission/saved.js'
 import { getBenchmarkToneClasses, getNvoSubjectKey, isAverageMetric } from './nvo.js'
 
 /**
@@ -72,14 +74,13 @@ export function getShifts(locations = []) {
   return [...seen]
 }
 
-/** A `{ lat, lng }` saved by the search page, or null when absent or malformed. */
-/** The search page's saved location (localStorage `userLocation`), or null. */
+/**
+ * Where distances start, as `{ lat, lng }`: the saved home on the map, else the search
+ * page's last location (src/admission/saved.js, tripOrigin), or null.
+ */
 export function readSavedLocation() {
-  try {
-    return parseSavedLocation(window.localStorage.getItem('userLocation'))
-  } catch {
-    return null
-  }
+  const origin = tripOrigin()
+  return origin ? { lat: origin.lat, lng: origin.lng } : null
 }
 
 export function parseSavedLocation(raw) {

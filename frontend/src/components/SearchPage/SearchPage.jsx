@@ -128,6 +128,9 @@ function SearchPage() {
     searchAddress,
     canUseSavedHome,
     locateSavedHome,
+    isHome,
+    saveAsHome,
+    forgetHome,
     clearLocation,
     setLocationFromMap,
   } = useUserLocation({
@@ -1270,6 +1273,9 @@ function SearchPage() {
                     setIsPickingLocation(false)
                     locateSavedHome()
                   } : null}
+                  isHome={isHome}
+                  onSaveAsHome={saveAsHome}
+                  onForgetHome={forgetHome}
                   onAddressSearch={handleAddressSearch}
                   onStartMapPick={handleStartMapPick}
                   onClear={handleClearLocation}

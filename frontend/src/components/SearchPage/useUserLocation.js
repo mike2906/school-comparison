@@ -3,6 +3,7 @@ import { geocodeAddress, reverseGeocode, cancelGeocode } from '../../utils/geoco
 import { mapSearchQuery } from '../../admission/catchments.js'
 import { loadAddresses } from '../../admission/loadCatchments.js'
 import { useSavedAdmission } from '../../hooks/useSavedAdmission.js'
+import { getSaved, saveHomePoint } from '../../admission/saved.js'
 
 function readStoredUserLocation(fallbackAddress) {
   try {
@@ -13,8 +14,12 @@ function readStoredUserLocation(fallbackAddress) {
   } catch {
     // Corrupt or blocked storage: start without a location.
   }
-  return null
+  // No location of its own yet: start from the home the parent saved.
+  const home = getSaved().homePoint
+  return home ? { lat: home.lat, lng: home.lng, address: home.label || fallbackAddress } : null
 }
+
+const samePoint = (a, b) => Boolean(a && b && a.lat === b.lat && a.lng === b.lng)
 
 const persistLocation = (location) => {
   localStorage.setItem('userLocation', JSON.stringify(location))
@@ -154,12 +159,27 @@ export function useUserLocation({ t, geocodingConfig, arriveNearSavedHome = fals
     return runLookup(() => geocodeAddress(trimmedAddress, geocodingConfig))
   }
 
-  // The home address saved in the admission calculator (street id and number from the
-  // official address table). Finding it on the map sends it to OpenStreetMap's search, so
-  // it runs only when the parent taps, like the calculator's own "show on the map".
-  const savedHome = useSavedAdmission().home
+  // The home: its map point when saved, used as is; else the address saved in the
+  // admission calculator (street id and number from the official address table). Finding
+  // that on the map sends it to OpenStreetMap's search, so it runs only when the parent
+  // taps, like the calculator's own "show on the map"; the point found is then kept as the
+  // home's point, so it is looked up once.
+  const saved = useSavedAdmission()
+  const savedHome = saved.home
+  const homePoint = saved.homePoint
   const savedHomeKey = savedHome ? `${savedHome.streetId}|${savedHome.number}` : null
   const locateSavedHome = () => {
+    if (homePoint) {
+      startLocationRequest()
+      setIsLocating(false)
+      setIsGeocoding(false)
+      setLocationError(null)
+      setAddressInput('')
+      const location = { lat: homePoint.lat, lng: homePoint.lng, address: homePoint.label || t('location.home') }
+      setUserLocation(location)
+      persistLocation(location)
+      return Promise.resolve(true)
+    }
     if (!savedHome) return Promise.resolve(false)
     setAddressInput('')
     return runLookup(async isCurrent => {
@@ -176,15 +196,24 @@ export function useUserLocation({ t, geocodingConfig, arriveNearSavedHome = fals
         error.code = 'NO_RESULTS'
         throw error
       }
-      return geocodeAddress(mapSearchQuery(street, savedHome.number), {
+      const result = await geocodeAddress(mapSearchQuery(street, savedHome.number), {
         ...geocodingConfig,
         city_suffix: '',
         remember: false,
         // OpenStreetMap lacks many house numbers; the street is close enough for distances.
         fallback: mapSearchQuery(street, '').replace(/\s+,/, ','),
       })
+      if (isCurrent()) saveHomePoint({ lat: result.lat, lng: result.lng, label: result.address })
+      return result
     }, { savedHome: savedHomeKey }, 'saved')
   }
+
+  // "This is my home": the parent's own choice to keep the current location as the home.
+  const isHome = samePoint(userLocation, homePoint)
+  const saveAsHome = () => {
+    if (userLocation) saveHomePoint({ lat: userLocation.lat, lng: userLocation.lng, label: userLocation.address })
+  }
+  const forgetHome = () => saveHomePoint(null)
 
   const clearLocation = () => {
     startLocationRequest()
@@ -234,7 +263,9 @@ export function useUserLocation({ t, geocodingConfig, arriveNearSavedHome = fals
   // Arriving from the calculator's "schools near your saved address" link: that tap is the
   // parent's go to look the address up, once the map config (the city's bounds) is here.
   // The flag is then dropped from the history entry, so a reload or Back does not repeat it.
-  const canUseSaved = Boolean(savedHomeKey) && userLocation?.savedHome !== savedHomeKey
+  const canUseSaved = homePoint
+    ? !isHome
+    : Boolean(savedHomeKey) && userLocation?.savedHome !== savedHomeKey
   const arrivalDoneRef = useRef(false)
   const hasBounds = Boolean(geocodingConfig?.bounds)
   useEffect(() => {
@@ -258,6 +289,10 @@ export function useUserLocation({ t, geocodingConfig, arriveNearSavedHome = fals
     // Offered only while the location is not already the saved home.
     canUseSavedHome: canUseSaved,
     locateSavedHome,
+    isHome,
+    hasHome: Boolean(homePoint),
+    saveAsHome,
+    forgetHome,
     clearLocation,
     setLocationFromMap,
   }

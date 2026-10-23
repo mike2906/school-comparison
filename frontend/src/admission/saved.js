@@ -4,19 +4,24 @@
  * anywhere. One entry per calculator tab, plus the home address checked against the
  * official address table, which the catchment maps reuse.
  *
- * Shape: { version, child: { birthYear } | null, home: { streetId, number } | null,
+ * Shape: { version, child: { birthYear, startYear? } | null, home: { streetId, number } | null,
+ *          homePoint: { lat, lng, label } | null,
  *          kindergarten: { startYear, answers, siblings?, savedOn } | null,
  *          grade_1: { startYear, addresses, answers, siblings?, savedOn } | null }
  * `siblings` maps a school id to that school's sibling answers (see siblingsWith).
- * `child` is the one child the answers are for, shared by every page that needs the birth
- * year (read it with childBirthYear), so a parent gives it once.
+ * `child` is the one child the pages plan for, shared by every page that needs the birth
+ * year (read it with childBirthYear), so a parent gives it once. `homePoint` is the home on
+ * the map, for distances and travel times; `home` is the same home in the official address
+ * table, for catchments. Either can exist without the other.
  */
 
 const STORAGE_KEY = 'admissionAnswers'
+// The search page's current location (useUserLocation): not part of the saved answers.
+export const LOCATION_KEY = 'userLocation'
 const VERSION = 1
 export const SAVED_STAGES = ['kindergarten', 'grade_1']
 
-const EMPTY = Object.freeze({ version: VERSION, child: null, home: null, kindergarten: null, grade_1: null })
+const EMPTY = Object.freeze({ version: VERSION, child: null, home: null, homePoint: null, kindergarten: null, grade_1: null })
 
 function storage() {
   try {
@@ -33,8 +38,9 @@ export function parseSaved(text) {
     if (!value || value.version !== VERSION) return EMPTY
     return {
       version: VERSION,
-      child: isChild(value.child) ? { birthYear: value.child.birthYear } : legacyChild(value.kindergarten),
+      child: isChild(value.child) ? childFrom(value.child) : legacyChild(value.kindergarten),
       home: isHome(value.home) ? value.home : null,
+      homePoint: isPoint(value.homePoint) ? value.homePoint : null,
       kindergarten: isEntry(value.kindergarten) ? value.kindergarten : null,
       grade_1: isEntry(value.grade_1) && Array.isArray(value.grade_1.addresses) ? value.grade_1 : null,
     }
@@ -45,6 +51,14 @@ export function parseSaved(text) {
 
 function isChild(child) {
   return Boolean(child && isBirthYear(child.birthYear))
+}
+
+function childFrom({ birthYear, startYear }) {
+  return Number.isInteger(startYear) ? { birthYear, startYear } : { birthYear }
+}
+
+function isPoint(point) {
+  return Boolean(point && Number.isFinite(point.lat) && Number.isFinite(point.lng))
 }
 
 function isBirthYear(year) {
@@ -81,9 +95,14 @@ function read() {
   return current
 }
 
+/** Whether the parent has saved anything on this device (their opt-in to keeping more). */
+export function hasSaved(saved) {
+  return Boolean(saved.child || saved.home || saved.homePoint || SAVED_STAGES.some(stage => saved[stage]))
+}
+
 function write(next) {
   current = next
-  const empty = !next.child && !next.home && SAVED_STAGES.every(stage => !next[stage])
+  const empty = !hasSaved(next)
   try {
     if (empty) storage()?.removeItem(STORAGE_KEY)
     else storage()?.setItem(STORAGE_KEY, JSON.stringify(next))
@@ -123,13 +142,25 @@ export function childBirthYear(saved = read()) {
   return saved.child?.birthYear ?? null
 }
 
+/** The September the parent plans for, when they chose one, or null. */
+export function childStartYear(saved = read()) {
+  return saved.child?.startYear ?? null
+}
+
 /**
- * Saves the child's birth year. Saved calculator answers keep their own: a family may have
- * saved kindergarten answers for a younger child and first-grade ones for an older one.
+ * Saves the child's birth year, and the start year when given (a new birth year without
+ * one drops the old start year). Saved calculator answers keep their own: a family may
+ * have saved kindergarten answers for a younger child and first-grade ones for an older one.
  */
-export function saveChild({ birthYear }) {
+export function saveChild({ birthYear, startYear }) {
   if (!isBirthYear(birthYear)) return
-  write({ ...read(), child: { birthYear } })
+  write({ ...read(), child: childFrom({ birthYear, startYear }) })
+}
+
+/** Saves the home's map point ({ lat, lng, label }), or forgets it with null. */
+export function saveHomePoint(point) {
+  if (point !== null && !isPoint(point)) return
+  write({ ...read(), homePoint: point && { lat: point.lat, lng: point.lng, label: point.label || null } })
 }
 
 /**
@@ -161,10 +192,33 @@ export function saveHome(home) {
  * saved tab forgets the child as well, so no "forget" leaves a birth year behind.
  */
 export function forgetSaved(stage = null) {
-  if (!stage) return write(EMPTY)
+  if (!stage) {
+    // The search page's last location too: "forget" leaves no place behind.
+    try {
+      storage()?.removeItem(LOCATION_KEY)
+    } catch {
+      // Blocked storage holds nothing to forget.
+    }
+    return write(EMPTY)
+  }
   const next = { ...read(), [stage]: null, ...(stage === 'grade_1' ? { home: null } : {}) }
   if (SAVED_STAGES.every(other => !next[other])) next.child = null
   write(next)
+}
+
+/**
+ * Where trips start: the saved home on the map, else the search page's last location, else
+ * null. `{ lat, lng, label, isHome }`.
+ */
+export function tripOrigin(saved = read()) {
+  if (saved.homePoint) return { ...saved.homePoint, isHome: true }
+  try {
+    const parsed = JSON.parse(storage()?.getItem(LOCATION_KEY) || 'null')
+    if (isPoint(parsed)) return { lat: parsed.lat, lng: parsed.lng, label: parsed.address || null, isHome: false }
+  } catch {
+    // Unreadable or blocked: no location.
+  }
+  return null
 }
 
 /** Tests only: drop the in-memory copy. */

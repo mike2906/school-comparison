@@ -4,7 +4,7 @@ import assert from 'node:assert/strict'
 import { parseSaved } from './saved.js'
 
 test('anything unreadable or from another version counts as nothing saved', () => {
-  const empty = { version: 1, child: null, home: null, kindergarten: null, grade_1: null }
+  const empty = { version: 1, child: null, home: null, homePoint: null, kindergarten: null, grade_1: null }
   for (const text of [null, '', 'not json', '{"version":2,"kindergarten":{"startYear":2026,"answers":{}}}', '[]']) {
     assert.deepEqual(parseSaved(text), empty, String(text))
   }
@@ -61,4 +61,29 @@ test('the child is kept when well-formed, and every saved page shares its birth 
 test('answers saved before the child existed give it from the kindergarten answers', () => {
   const saved = parseSaved(JSON.stringify({ version: 1, kindergarten: { startYear: 2027, answers: { birthYear: 2024 } } }))
   assert.deepEqual(saved.child, { birthYear: 2024 })
+})
+
+test('the home point is kept apart from the address-table home, and trips start from it', async () => {
+  const { forgetSaved, getSaved, resetSavedForTests, saveHomePoint, tripOrigin } = await import('./saved.js')
+  resetSavedForTests()
+  forgetSaved()
+  assert.equal(tripOrigin(), null)
+  saveHomePoint({ lat: 42.69, lng: 23.32, label: 'ул. Шипка 5' })
+  assert.deepEqual(tripOrigin(), { lat: 42.69, lng: 23.32, label: 'ул. Шипка 5', isHome: true })
+  assert.equal(getSaved().home, null)
+  saveHomePoint({ lat: 'x', lng: 1 })
+  assert.equal(getSaved().homePoint.lat, 42.69, 'a malformed point is ignored')
+  forgetSaved()
+  assert.equal(getSaved().homePoint, null)
+  assert.equal(parseSaved(JSON.stringify({ version: 1, homePoint: { lat: 1 } })).homePoint, null)
+})
+
+test('the start year is kept with the birth year', async () => {
+  const { childStartYear, resetSavedForTests, forgetSaved, saveChild } = await import('./saved.js')
+  resetSavedForTests()
+  forgetSaved()
+  saveChild({ birthYear: 2022, startYear: 2027 })
+  assert.equal(childStartYear(), 2027)
+  saveChild({ birthYear: 2023 })
+  assert.equal(childStartYear(), null)
 })
