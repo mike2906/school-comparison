@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useParams } from 'react-router-dom'
 import { fetchSchools, peekSchools } from '../../api/schools'
@@ -36,7 +36,10 @@ function DistrictPage() {
     }
   }, [])
 
-  const groups = schools && districts ? districtGroups(schools, districts, i18n.language) : null
+  const groups = useMemo(
+    () => (schools && districts ? districtGroups(schools, districts, i18n.language) : null),
+    [schools, districts, i18n.language],
+  )
   const group = slug && groups ? groups.find((item) => item.slug === slug) : null
   const title = slug
     ? group && t('districtPages.pageTitle', { district: group.label })

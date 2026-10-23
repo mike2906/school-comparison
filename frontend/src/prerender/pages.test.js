@@ -304,5 +304,6 @@ test('district pages list each district with its schools, kindergartens and head
   assert.ok(page.sitemap && page.canonicalPath === '/districts/mladost')
   assert.match(page.body, /Schools \(1\).*School &lt;One&gt;.*Kindergartens \(1\).*same district \(Mladost district\) get 3 extra points.*Bee Garden.*<br \/>1 Main St&lt;\/script&gt;/)
   assert.doesNotMatch(page.body, /schools\/14/)
-  assert.deepEqual(districtPages(t, 'en', [], districts), [])
+  const [empty] = districtPages(t, 'en', [], districts)
+  assert.deepEqual([empty.routePath, empty.sitemap, empty.noindex], ['/districts', false, true])
 })

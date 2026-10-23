@@ -142,9 +142,10 @@ function districtEntry({ school, name }, t, language, where) {
 
 /** `/districts` and one page per district (src/components/DistrictPage), as the app renders them. */
 export function districtPages(t, language, listedSchools, districts) {
-  if (!districts?.features || listedSchools.length === 0) return []
   const siteName = t('nav.title')
-  const groups = districtGroups(listedSchools, districts, language)
+  // The index is always written (a route without a file is a 404 in production), but
+  // offered to search engines only with districts to list.
+  const groups = districts?.features ? districtGroups(listedSchools, districts, language) : []
   const index = groups
     .map((group) => {
       const href = languagePath(`/districts/${group.slug}`, language)
@@ -158,7 +159,8 @@ export function districtPages(t, language, listedSchools, districts) {
       title: `${t('districtPages.title')} · ${siteName}`,
       description: truncate(t('districtPages.intro')),
       canonicalPath: '/districts',
-      sitemap: true,
+      sitemap: groups.length > 0,
+      noindex: groups.length === 0,
       body: mainBlock([heading(t('districtPages.title')), paragraph(t('districtPages.intro')), `<ul>${index}</ul>`]),
     },
     ...groups.map((group) => {

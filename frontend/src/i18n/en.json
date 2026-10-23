@@ -774,8 +774,7 @@
     "count_one": "{{count}} kindergarten or school",
     "count_other": "{{count}} kindergartens and schools",
     "footer": "By district",
-    "allDistricts": "All districts",
-    "unknown": "There is no such district."
+    "allDistricts": "All districts"
   },
   "directory": {
     "title": "All schools and kindergartens in Sofia",

@@ -14,7 +14,11 @@ function schoolDistrictNames(school, districts) {
   const names = new Set()
   const own = kindergartenDistrictFeature(school, districts)?.properties.name
   if (own) names.add(own)
-  for (const location of Array.isArray(school?.locations) ? school.locations : []) {
+  const locations = Array.isArray(school?.locations) ? school.locations : []
+  const primary = locations.find((location) => location.is_primary) || locations[0]
+  // The main building's district is the school's own one, decided above (the source's
+  // name wins over a pin near a border); only other buildings add districts.
+  for (const location of own ? locations.filter((location) => location !== primary) : locations) {
     const lat = parseCoordinate(location.lat)
     const lng = parseCoordinate(location.lng)
     const feature = lat != null && lng != null ? districtAt(districts, lat, lng) : null
