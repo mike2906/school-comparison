@@ -102,6 +102,7 @@ use `pip install` or `requirements.txt`.
 ├── skills/               # Task procedures (index below)
 ├── docs/                 # Plans and design notes (GO_LIVE_PLAN.md)
 ├── tools/road-graph/     # OSM → car road graph for in-browser drive times (docs/DRIVE_TIMES.md)
+├── tools/transit/        # OSM walking graph + GTFS timetable for public transport times (docs/TRANSIT_TIMES.md)
 └── docker-compose.yml    # PostgreSQL + SearXNG
 ```
 

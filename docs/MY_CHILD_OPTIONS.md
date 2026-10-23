@@ -5,7 +5,7 @@ list: where the child can get in, how long the trip is, what it costs, and wheth
 teaches the languages they want. Mike, 2026-10-23: parents never enter anything twice, and
 whatever they enter is shared with the calculator, the list and the school pages.
 
-Status: profile shared (#484, #487); page `/my-child` with car times and stated fees (this PR); public transport and the yearly cost estimate next.
+Status: profile shared (#484, #487); page `/my-child` with car times and stated fees (#493); public transport data and search built (`docs/TRANSIT_TIMES.md`), the page's transit option next; then the yearly cost estimate.
 
 ## What exists today, and where parents already enter things twice
 

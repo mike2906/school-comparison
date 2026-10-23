@@ -47,6 +47,16 @@ jobs:
             "https://github.com/$GITHUB_REPOSITORY/releases/download/road-graph/sofia-roads.bin.gz" \
             || { rm -f public/routing/sofia-roads.bin.gz; echo "::warning::No road graph release yet: drive times are unavailable"; }
 
+      # Built monthly by transit.yml. Without them public transport times say they could not be
+      # loaded.
+      - name: Fetch the public transport data
+        run: |
+          for f in sofia-foot.bin.gz sofia-timetable.bin.gz; do
+            curl -fsSL --retry 3 -o "public/routing/$f" \
+              "https://github.com/$GITHUB_REPOSITORY/releases/download/transit/$f" \
+              || { rm -f "public/routing/$f"; echo "::warning::No transit release yet: public transport times are unavailable"; }
+          done
+
       - name: Build
         env:
           # Links and canonical tags keep pointing at the live site; the preview is noindex.
