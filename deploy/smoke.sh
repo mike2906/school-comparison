@@ -19,8 +19,7 @@ status() {
 }
 
 body() {
-	# Gzip, as every browser and the edge ask: the Sofia list is ~4 MB plain and ~0.4 MB
-	# gzipped, and plain it did not arrive within 30 s from a just-restarted host (#485's deploy).
+	# Gzip, as every browser and the edge ask: the Sofia list is ~4 MB plain, ~0.4 MB gzipped.
 	curl -fsS --compressed -m 30 "$@"
 }
 
@@ -29,7 +28,7 @@ smoke_api() {
 	# Cloudflare keeps GET answers a few minutes: ask past its copy, to check this deploy.
 	fresh="smoke=$(date +%s%N)"
 
-	for _ in $(seq 24); do
+	for _ in $(seq 12); do
 		ready="$(body "$api/ready" 2>/dev/null | jq -r '.status' 2>/dev/null || true)"
 		[ "$ready" = ready ] && break
 		sleep 5

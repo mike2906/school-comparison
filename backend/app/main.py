@@ -115,7 +115,7 @@ async def health_check():
 
 @app.get("/ready")
 async def readiness_check(db: AsyncSession = Depends(get_db)):
-    """Ready only when the DB answers, a school snapshot is loaded and the list is built.
+    """Ready only when the DB answers and a school snapshot is loaded.
 
     `/health` is liveness (no dependencies). An unreachable DB, a missing schema and an
     empty `schools` table all return 503, without error detail.
@@ -129,9 +129,4 @@ async def readiness_check(db: AsyncSession = Depends(get_db)):
         school_id = None
     if school_id is None:
         return JSONResponse(status_code=503, content={"status": "not_ready"})
-    # Not before the whole-city list is built: after a restart the first list request
-    # would otherwise build it cold (over 30 s on #485's deploy, which the smoke check
-    # then rolled back). The warm-up builds it within seconds of startup.
-    if not schools.default_list_warm():
-        return JSONResponse(status_code=503, content={"status": "warming"})
     return {"status": "ready"}

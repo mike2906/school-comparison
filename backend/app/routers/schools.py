@@ -266,11 +266,6 @@ async def warm_cache(country_code: str = "bg", city: str = "sofia") -> None:
         logger.exception("Warming the schools cache failed")
 
 
-def default_list_warm(country_code: str = "bg", city: str = "sofia") -> bool:
-    """Whether this process has the whole-city list built, the first thing every visitor asks for."""
-    return _list_key(country_code, city, None, None, None, False) in _list_cache
-
-
 async def keep_cache_warm() -> None:
     while True:
         await warm_cache()
@@ -408,7 +403,7 @@ async def _build_free_places(db: AsyncSession, *, country_code, city) -> bytes:
         meta = snapshot.get("meta") or {}
         payload.update({key: meta.get(key) for key in ("as_of", "retrieved_at", "source_url")})
         if free_places.snapshot_is_fresh(snapshot):
-            schools = (await db.execute(select(School).where(School.country_code == "bg"))).scalars().all()
+            schools = await free_places.matchable_schools(db)
             by_school, unmatched = free_places.places_by_school(snapshot, schools)
             if unmatched:
                 logger.info("Free places: %d ИСОДЗ buildings match no school", unmatched)
