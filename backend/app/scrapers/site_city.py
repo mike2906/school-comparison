@@ -11,6 +11,12 @@ Only towns in :data:`TOWNS` count. "гр." also abbreviates "група" and "Д
 kindergarten's name ("ДГ 5 Яслена гр. Калинка", "Детски град Пинокио"), so a capitalised
 word after "гр." is not enough. A wrong site from a village or a town missing here is
 not caught.
+
+The same texts give a numbered school away. Private kindergarten 184 "Елхица" in
+Симеоново was linked to dg-59.com, titled "ДГ 59 Елхица": the municipal kindergarten of
+the same name in Младост, whose facts it then showed. A title, heading or site name that
+numbers a school ("ДГ 59", "59 ДГ", "Детска градина №59") with a number the school's own
+names do not have rejects the site (:func:`other_number_named`).
 """
 
 from __future__ import annotations
@@ -109,6 +115,59 @@ def known_towns_in(text: str) -> list[str]:
         for key in _towns_in(" ".join(line.split()))
         if key in _KNOWN_TOWNS or key in _PATRON_TOWNS
     ]
+
+
+# How a municipal or state school's number is written: "ДГ №59", "ДГ 59", "119 СУ",
+# "Детска градина №59". A spelled-out type takes the number only after "№": a private
+# chain numbers its schools in words ("Основно прогресивно училище 1", 633's
+# school1.transform.bg), which is no other school's number.
+_NUMBERED_ABBREVIATION = r"(?:ЦДГ|ДГ|ОДЗ|ДЯ|ОУ|СОУ|СУ|НУ|ПГ|ПМГ|ЕГ|ГПЧЕ|СПИ|dg|cdg|ou|sou|su)"
+_NUMBERED_WORDS = r"(?:детска\s+градина|основно\s+училище|средно\s+училище|начално\s+училище|гимназия|училище)"
+_NUMBER_AFTER_TYPE_RE = re.compile(
+    rf"(?<![^\W\d_])(?:{_NUMBERED_ABBREVIATION}\s*(?:№\s*)?|{_NUMBERED_WORDS}\s*№\s*)(\d{{1,3}})(?!\d)",
+    re.IGNORECASE,
+)
+_NUMBER_BEFORE_TYPE_RE = re.compile(
+    rf"(?<![\d№])(\d{{1,3}})\s*(?:\.|-?(?:о|во|ро|то|ми|ри|ти))?\s*{_NUMBERED_ABBREVIATION}(?![^\W\d_])",
+    re.IGNORECASE,
+)
+_NUMBER_RE = re.compile(r"(?<!\d)(\d{1,4})(?!\d)")
+# "Трето средно училище" is 3 СУ (221's 3coy.eu).
+_ORDINAL_STEMS = {
+    "първ": 1, "втор": 2, "трет": 3, "четвърт": 4, "пет": 5, "шест": 6, "седм": 7, "осм": 8, "девет": 9,
+    "десет": 10,
+}
+_ORDINAL_RE = re.compile(
+    r"(?<![^\W\d_])(" + "|".join(_ORDINAL_STEMS) + r")(?:о|а|и|ото|ата|ия|ият)(?![^\W\d_])", re.IGNORECASE
+)
+
+
+def _own_numbers(name: str) -> set[str]:
+    numbers = {str(int(number)) for number in _NUMBER_RE.findall(name)}
+    return numbers | {str(_ORDINAL_STEMS[match.group(1).casefold()]) for match in _ORDINAL_RE.finditer(name)}
+
+
+def numbered_schools_in(text: str) -> list[tuple[str, str]]:
+    """The (label, number) pairs a text names a numbered school with, in order."""
+    text = " ".join(str(text or "").split())
+    found = []
+    for pattern in (_NUMBER_AFTER_TYPE_RE, _NUMBER_BEFORE_TYPE_RE):
+        found += [(match.start(), match.group(0).strip(), str(int(match.group(1)))) for match in pattern.finditer(text)]
+    return [(label, number) for _, label, number in sorted(found)]
+
+
+def other_number_named(texts: Iterable[Optional[str]], names: Iterable[Optional[str]]) -> Optional[str]:
+    """The numbered school a site's identity texts name that ``names`` (the school's own
+    names and aliases) do not number, or None.
+
+    Nothing is reported when the texts also name one of the school's own numbers: a site
+    for two kindergartens, or one that names its branch. Numbers in the names count
+    whatever they go with, so "Меридиан 22" keeps a site titled "СУ 22 Меридиан"."""
+    own = {number for name in names for number in _own_numbers(str(name or ""))}
+    named = [pair for text in texts for pair in numbered_schools_in(text or "")]
+    if any(number in own for _, number in named):
+        return None
+    return named[0][0] if named else None
 
 
 def other_town_named(texts: Iterable[Optional[str]], city: Optional[str]) -> Optional[str]:

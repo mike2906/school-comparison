@@ -76,7 +76,7 @@ async def test_replace_swaps_an_accepted_site_and_drops_what_it_gave(db_session)
     school = School(
         country_code="bg", city="sofia", name_i18n={"bg": "ЧДГ Дружба-София"}, school_type="private",
         education_level="kindergarten", website_url="https://drujba.org/", scrape_status="extracted",
-        attributes={"validated_website_url": "https://drujba.org/"},
+        attributes={"validated_website_url": "https://drujba.org/", "data_validation": {"_schema_version": 1}},
     )
     db_session.add(school)
     await db_session.commit()
@@ -102,7 +102,11 @@ async def test_replace_swaps_an_accepted_site_and_drops_what_it_gave(db_session)
     assert school.scrape_status == "pending"  # validation then moves it to "validated"
     assert school.attributes["website_replaced_url"] == "https://drujba.org/"
     assert "shared_site_check" not in school.attributes  # no shared-site decision was made
-    assert school.attributes[WEBSITE_DATA_WITHHELD_KEY] is True  # the old extraction stays hidden
+    # The old extraction stays hidden by its status, its fee rows by their pages and the
+    # dropped Stage 6 report: no marker, which only an old-pipeline extraction would clear.
+    assert WEBSITE_DATA_WITHHELD_KEY not in school.attributes
+    assert "data_validation" not in school.attributes
+    assert school.attributes["website_candidate_method"] == "check_website_replace"
     assert "validated_website_url" not in school.attributes
     assert old_page.is_valid is False  # its fees no longer publish
     assert update.await_count == 1
@@ -176,3 +180,78 @@ async def test_section_with_the_same_path_changes_nothing(db_session):
             db_session, school.id, "bg", url="novigradini.com/pbk", apply=True, replace=True, section=True
         ) is None
     validate.assert_not_awaited()
+
+
+async def test_a_given_site_starts_clean(db_session):
+    """A school whose old site failed validation keeps the withholding marker, which hid
+    574's facts: storing a valid site drops it, with the old report and other sites' pages."""
+    from app.models import SourcePage
+    from app.models.scrape_log import ScrapeType
+    from app.utils.website_data import WEBSITE_DATA_WITHHELD_KEY
+
+    school = School(
+        country_code="bg", city="sofia", name_i18n={"bg": "ЧДГ Веда"}, school_type="private",
+        education_level="kindergarten", scrape_status="failed_validate",
+        attributes={WEBSITE_DATA_WITHHELD_KEY: True, "data_validation": {"_schema_version": 1}},
+    )
+    db_session.add(school)
+    await db_session.commit()
+    old_page = SourcePage(
+        school_id=school.id, scrape_type=ScrapeType.WEBSITE, source_url="https://vedabg.com/taksi/",
+        content_hash="x", is_valid=True,
+    )
+    own_page = SourcePage(
+        school_id=school.id, scrape_type=ScrapeType.WEBSITE, source_url="https://wedaschule.com/kontakti/",
+        content_hash="y", is_valid=True,
+    )
+    db_session.add_all([old_page, own_page])
+    await db_session.commit()
+
+    update = AsyncMock()
+    with patch.object(
+        url_validator, "validate_school_url",
+        AsyncMock(return_value=(ValidationResult.VALID, "https://wedaschule.com/", "match")),
+    ), patch.object(url_validator, "_update_validation_result", update):
+        await website_stage.run_validate_url(db_session, school.id, "bg", url="wedaschule.com", apply=True)
+
+    await db_session.refresh(school)
+    await db_session.refresh(old_page)
+    await db_session.refresh(own_page)
+    assert WEBSITE_DATA_WITHHELD_KEY not in school.attributes
+    assert "data_validation" not in school.attributes
+    assert school.attributes["website_candidate_method"] == "check_website"
+    assert (old_page.is_valid, own_page.is_valid) == (False, True)
+    assert update.await_args.args[2:4] == (ValidationResult.VALID, "https://wedaschule.com/")
+
+
+async def test_a_section_replace_keeps_the_pages_under_the_section(db_session):
+    """574's fee pages under /anika/ are its own: only the group's other pages go."""
+    from app.models import SourcePage
+    from app.models.scrape_log import ScrapeType
+
+    school = School(
+        country_code="bg", city="sofia", name_i18n={"bg": "ЧДГ Аника"}, school_type="private",
+        education_level="kindergarten", website_url="https://novigradini.com/", scrape_status="extracted",
+    )
+    db_session.add(school)
+    await db_session.commit()
+    group = SourcePage(
+        school_id=school.id, scrape_type=ScrapeType.WEBSITE, source_url="https://novigradini.com/pbk/ceni/",
+        content_hash="x", is_valid=True,
+    )
+    own = SourcePage(
+        school_id=school.id, scrape_type=ScrapeType.WEBSITE, source_url="https://novigradini.com/anika/ceni/",
+        content_hash="y", is_valid=True,
+    )
+    db_session.add_all([group, own])
+    await db_session.commit()
+    with patch.object(
+        url_validator, "validate_school_url",
+        AsyncMock(return_value=(ValidationResult.VALID, "https://novigradini.com/anika/", "match")),
+    ), patch.object(url_validator, "_update_validation_result", AsyncMock()):
+        await website_stage.run_validate_url(
+            db_session, school.id, "bg", url="https://novigradini.com/anika/", apply=True, replace=True, section=True
+        )
+    await db_session.refresh(group)
+    await db_session.refresh(own)
+    assert (group.is_valid, own.is_valid) == (False, True)

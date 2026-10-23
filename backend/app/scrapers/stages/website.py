@@ -488,7 +488,6 @@ async def run_validate_url(
     from app.scrapers.url_validator import (
         URLValidator,
         ValidationResult,
-        _update_validation_result,
         extract_validation_aliases,
         validate_school_url,
     )
@@ -540,10 +539,10 @@ async def run_validate_url(
 
     stored = apply and given and validation_result is ValidationResult.VALID
     if stored:
-        source_url = URLValidator(country_code=country).normalize_url(url) or url
         if replacing:
-            await _replace_accepted_site(db, school, source_url)
-        await _update_validation_result(school_id, source_url, validation_result, final_url or source_url, reason)
+            await _replace_accepted_site(db, school, given_url)
+        method = "check_website_replace" if replacing else "check_website"
+        await store_given_site(db, school, url, final_url, reason, method=method)
     console.print(f"  Result: {validation_result.value} - {reason}")
     if given:
         console.print("  Stored." if stored else "  Not stored" + ("." if apply else " (dry run; --apply stores a valid site)."))
@@ -552,22 +551,83 @@ async def run_validate_url(
     return validation_result, final_url, reason
 
 
+async def store_given_site(db, school, url: str, final_url: Optional[str], reason: Optional[str], *, method: str) -> None:
+    """Store a site URL validation accepted for a school (``check-website``, ``find-websites``).
+
+    The new site starts clean, so what it gives shows once it is read. A school whose old
+    site failed validation keeps the website-data withholding marker, and only the old
+    extraction stage clears it: 574's facts stayed hidden after its own section replaced
+    its group's home page, and a kindergarten that lists no fees would never show the
+    facts read from a site found for it. The marker goes, with what it protected: the
+    old Stage 6 report (so no fee row shows before a read and a fresh report) and the
+    pages on other sites (their fees). The old extraction does not publish before the
+    new site is extracted (its status is only "validated"), and facts, social links and
+    the website name show only from the site they were read from."""
+    from sqlalchemy import select
+
+    from app.models import SourcePage
+    from app.models.scrape_log import ScrapeType
+    from app.scrapers.shared_site_check import site_id
+    from app.scrapers.url_validator import URLValidator, ValidationResult, _update_validation_result
+    from app.utils.website_data import WEBSITE_DATA_WITHHELD_KEY
+
+    source_url = URLValidator(country_code=school.country_code or "bg").normalize_url(url) or url
+    new_sites = {site_id(source_url), site_id(final_url or source_url)}
+    pages = (
+        await db.execute(
+            select(SourcePage).where(SourcePage.school_id == school.id, SourcePage.scrape_type == ScrapeType.WEBSITE)
+        )
+    ).scalars()
+    for page in pages:
+        if site_id(page.source_url) not in new_sites and page.is_valid is not False:
+            page.is_valid = False
+    attrs = dict(school.attributes or {})
+    attrs.pop(WEBSITE_DATA_WITHHELD_KEY, None)
+    attrs.pop("data_validation", None)
+    attrs["website_candidate_method"] = method
+    school.attributes = attrs
+    db.add(school)
+    await db.commit()
+    await _update_validation_result(school.id, source_url, ValidationResult.VALID, final_url or source_url, reason)
+    await db.refresh(school)
+
+
 def _site_path(url: str) -> str:
     return urlparse(url).path.strip("/").casefold()
 
 
+def _under(url: str, section_url: str) -> bool:
+    path = _site_path(url)
+    section = _site_path(section_url)
+    return bool(section) and (path == section or path.startswith(section + "/"))
+
+
 async def _replace_accepted_site(db, school, new_url: str) -> None:
     """Drop what the old site gave, as the shared-site check's replace does: its pages (and
-    so their fees) and site-copied addresses; the old extraction stays withheld until the
-    new site is extracted. The new site then starts from "validated"."""
-    from app.scrapers.shared_site_check import _invalidate_host_pages, _site_derived_locations
-    from app.utils.website_data import WEBSITE_DATA_WITHHELD_KEY
+    so their fees) and site-copied addresses. A school moved to its own section of the
+    same site keeps the pages under that section. The new site then starts from
+    "validated" (:func:`store_given_site`)."""
+    from sqlalchemy import select
+
+    from app.models import SourcePage
+    from app.models.scrape_log import ScrapeType
+    from app.scrapers.shared_site_check import _site_derived_locations, site_id
 
     old_url = school.website_url
     locations = await _site_derived_locations(db, school.id, preview=False)
-    pages = await _invalidate_host_pages(db, school.id, old_url) if old_url else 0
+    pages = 0
+    if old_url:
+        stored = (
+            await db.execute(
+                select(SourcePage).where(SourcePage.school_id == school.id, SourcePage.scrape_type == ScrapeType.WEBSITE)
+            )
+        ).scalars()
+        for page in stored:
+            same_section = site_id(page.source_url) == site_id(new_url) and _under(page.source_url, new_url)
+            if site_id(page.source_url) == site_id(old_url) and page.is_valid is not False and not same_section:
+                page.is_valid = False
+                pages += 1
     attrs = dict(school.attributes or {})
-    attrs[WEBSITE_DATA_WITHHELD_KEY] = True
     attrs.pop("validated_website_url", None)
     attrs["website_candidate_method"] = "check_website_replace"
     attrs["website_replaced_url"] = old_url
