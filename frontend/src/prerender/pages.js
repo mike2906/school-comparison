@@ -13,8 +13,10 @@ import {
   rowLabel,
   shortCampaign,
 } from '../admission/calculator.js'
+import { districtAt, districtByName, districtLabel } from '../admission/catchments.js'
 import { getAddress, getSchoolName } from '../utils/i18n.js'
 import { formatPercent } from '../utils/nvoDisplay.js'
+import { parsePhones } from '../utils/phone.js'
 import { URL_LANGUAGES, alternateLinks, canonicalUrl, languagePath } from '../utils/languageUrl.js'
 import { schoolLevelLabel, schoolTypeLabel } from '../utils/levelLabel.js'
 import {
@@ -277,18 +279,69 @@ export function fixedPages(t, language, listedSchools = []) {
 }
 
 /**
+ * The Sofia district a school is in: the one its source names, else the one its main
+ * building's pin falls in. `districts` is the catchment GeoJSON (`districts.json`).
+ */
+export function schoolDistrict(school, districts) {
+  if (!districts?.features) return null
+  const named = districtByName(districts, school?.admission_info?.admin_district)
+  if (named) return named.properties.name
+  const primary = primaryLocation(school)
+  return districtAt(districts, Number(primary?.lat), Number(primary?.lng))?.properties.name ?? null
+}
+
+function primaryLocation(school) {
+  const locations = Array.isArray(school?.locations) ? school.locations : []
+  return locations.find((location) => location.is_primary) || locations[0]
+}
+
+/**
+ * schema.org data for a school page: a Preschool or School with its address, pin and
+ * phone, so search engines and assistants read the facts without parsing the text.
+ */
+function schoolJsonLd(school, { name, url, language, district, t }) {
+  const primary = primaryLocation(school)
+  const other = URL_LANGUAGES.filter((code) => code !== language).map((code) => getSchoolName(school, code))
+  const lat = Number(primary?.lat)
+  const lng = Number(primary?.lng)
+  return {
+    '@context': 'https://schema.org',
+    '@type': school.education_level === 'kindergarten' ? 'Preschool' : 'School',
+    name,
+    alternateName: other.filter((value) => value && value !== name)[0],
+    url,
+    sameAs: /^https?:\/\//.test(school.website_url || '') ? school.website_url : undefined,
+    telephone: parsePhones(primary?.phone)[0]?.href?.replace(/^tel:/, '') || undefined,
+    address: getAddress(primary, language)
+      ? {
+        '@type': 'PostalAddress',
+        streetAddress: getAddress(primary, language),
+        addressLocality: t('seo.city'),
+        addressRegion: district ? t('seo.district', { district: districtLabel(district, language) }) : undefined,
+        addressCountry: 'BG',
+      }
+      : undefined,
+    geo: Number.isFinite(lat) && Number.isFinite(lng) && (lat || lng)
+      ? { '@type': 'GeoCoordinates', latitude: lat, longitude: lng }
+      : undefined,
+  }
+}
+
+/**
  * A school's page. State schools lead with their official NVO results. A school the site
  * does not list (`listed: false`, outside the launch city) keeps a working URL but is not
  * offered to search engines.
  */
-export function schoolPage(school, t, language, { listed = true } = {}) {
+export function schoolPage(school, t, language, { listed = true, districts = null, origin = null } = {}) {
   const name = getSchoolName(school, language)
+  const district = schoolDistrict(school, districts)
+  const districtText = district ? t('seo.district', { district: districtLabel(district, language) }) : ''
   const facts = t('seo.schoolFacts', {
     type: schoolTypeLabel(school, t),
     level: schoolLevelLabel(school, t),
   })
   const locations = Array.isArray(school.locations) ? school.locations : []
-  const primary = locations.find((location) => location.is_primary) || locations[0]
+  const primary = primaryLocation(school)
   const addresses = [primary, ...locations.filter((location) => location !== primary)]
     .map((location) => getAddress(location, language))
     .filter(Boolean)
@@ -322,9 +375,11 @@ export function schoolPage(school, t, language, { listed = true } = {}) {
 
   return {
     routePath: `/schools/${school.id}`,
-    title: `${name} · ${t('nav.title')}`,
+    // The district is what parents add to a school's name when they search.
+    title: `${[name, districtText].filter(Boolean).join(', ')} · ${t('nav.title')}`,
     description: truncate(description),
     canonicalPath: `/schools/${school.id}`,
+    jsonLd: origin ? schoolJsonLd(school, { name, url: canonicalUrl(`/schools/${school.id}`, language, origin), language, district, t }) : null,
     noindex: !listed || isThinSchool(school),
     sitemap: listed && !isThinSchool(school),
     body: mainBlock([
@@ -344,6 +399,10 @@ export function renderPage(template, page, { language, origin, siteName }) {
   const meta = (attribute, key, content) => `<meta ${attribute}="${key}" content="${escapeHtml(content)}" />`
   const link = (rel, href, extra = '') => `<link rel="${rel}"${extra} href="${escapeHtml(href)}" />`
   const head = [meta('name', 'description', page.description)]
+  if (page.jsonLd) {
+    // `<` escaped so school text can never close the script element.
+    head.push(`<script type="application/ld+json">${JSON.stringify(page.jsonLd).replace(/</g, '\\u003c')}</script>`)
+  }
   if (page.noindex) head.push(meta('name', 'robots', 'noindex, follow'))
   if (page.canonicalPath) {
     const canonical = canonicalUrl(page.canonicalPath, language, origin)
