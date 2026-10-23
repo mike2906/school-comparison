@@ -23,8 +23,8 @@ from app.schemas.school import (
     SchoolListResponse,
 )
 from app.scrapers.shared_site_check import level_family
-from app.services.country_service import get_valid_keys
 from app.services import free_places
+from app.services.country_service import get_valid_keys
 from app.services.school_relations import continued_from, continues_to, same_place_by_school
 from app.services.school_service import SchoolService
 from app.utils import school_search

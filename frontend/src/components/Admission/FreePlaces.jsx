@@ -1,8 +1,7 @@
 import { useTranslation } from 'react-i18next'
-import { formatRankingDay, shortCampaign } from '../../admission/calculator'
+import { formatRankingDay, rowLabel, shortCampaign } from '../../admission/calculator'
 import { useFreePlaces } from '../../hooks/useFreePlaces'
 import { schoolFreePlaces } from '../../utils/freePlaces'
-import { rowLabel } from './CutoffTable'
 
 /** The English building names the cut-off rows carry (translate-texts), by Bulgarian name. */
 function englishBuildings(school) {

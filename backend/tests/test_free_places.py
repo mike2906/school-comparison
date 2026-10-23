@@ -162,3 +162,21 @@ async def test_fetch_reuses_the_snapshot_on_304(monkeypatch):
     second = await free_places.fetch_snapshot("https://example.test/free-places.json")
     assert first == second == {"meta": {"as_of": "2026-10-23"}}
     assert seen == [None, '"v1"']
+
+
+def test_first_grade_records_match_by_school_number_never_by_kindergarten_id():
+    grade_1 = _group(9500, 2019, "1-ви клас, родени 2019 г.", [_spot("general", 78, 75, 3, 0)])
+    # A 1st-grade record whose id equals a kindergarten's ИСОДЗ id.
+    school_record = building_free_places(_dz([grade_1], dz_id=171, name="5. ОУ \"Иван Вазов\""), "grade_1")
+    assert school_record["groups"][0]["stage"] == "grade_1"
+    assert "age_group" not in school_record["groups"][0] or school_record["groups"][0]["age_group"] is None
+    schools = [
+        SimpleNamespace(id=10, attributes={"kg_sofia_id": 171}, institutional_id=None,
+                        school_type="state", education_level="kindergarten", name_i18n={"bg": "ДГ 1"}),
+        SimpleNamespace(id=20, attributes={}, institutional_id="2205005", school_type="state",
+                        education_level="primary", name_i18n={"bg": "5 ОУ Иван Вазов"}),
+    ]
+    out, unmatched = free_places.places_by_school(_snapshot([school_record]), schools)
+    assert unmatched == 0
+    assert list(out) == [20]
+    assert out[20][0]["free"] == 3 and out[20][0]["stage"] == "grade_1"

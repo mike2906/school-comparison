@@ -1,10 +1,10 @@
-"""Today's free kindergarten and ПГУ places per school (docs/FREE_PLACES.md).
+"""Today's free kindergarten, ПГУ and 1st-grade places per school (docs/FREE_PLACES.md).
 
 The capture workflow writes one ИСОДЗ snapshot to the public ``free-places-data`` branch
 twice a day. The API reads it from there (``free_places_url``) rather than from the
 launch DB, so new numbers reach the site without a data publish. Buildings are matched to
 schools the way the cut-off import matches them: kindergartens by their kg.sofia.bg id in
-``attributes.kg_sofia_id(s)``, school ПГУ buildings by the Sofia school number
+``attributes.kg_sofia_id(s)``, school ПГУ and 1st-grade records by the Sofia school number
 (``isodz_school_match``).
 
 A snapshot older than ``MAX_AGE`` shows nothing: a stale count of free places misleads
@@ -26,6 +26,7 @@ logger = logging.getLogger(__name__)
 
 MAX_AGE = timedelta(hours=48)
 SIDE_QUEUES = ("sop", "chronic")
+SCHOOL_FAMILIES = ("preparatory", "grade_1")
 
 
 def snapshot_is_fresh(snapshot: dict[str, Any], now: Optional[datetime] = None) -> bool:
@@ -68,8 +69,11 @@ def places_by_school(snapshot: dict[str, Any], schools: Iterable[Any]) -> tuple[
     matched: dict[int, list[dict[str, Any]]] = {}
     unmatched = 0
     for building in (snapshot or {}).get("buildings") or []:
-        school_id = index.get(("kg_sofia_id", str(building.get("source_id"))))
-        if school_id is None and building.get("family") == "preparatory":
+        family = building.get("family")
+        # 1st-grade records have ids of their own (a separate ИСОДЗ list), which can equal a
+        # kindergarten's: those match by school number only.
+        school_id = None if family == "grade_1" else index.get(("kg_sofia_id", str(building.get("source_id"))))
+        if school_id is None and family in SCHOOL_FAMILIES:
             school = match_school(building.get("name"), numbers)
             school_id = school.id if school else None
         if school_id is None:

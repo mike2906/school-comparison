@@ -1,7 +1,7 @@
-"""Capture today's free places in Sofia's municipal kindergartens and ПГУ from ИСОДЗ.
+"""Capture today's free places in Sofia's municipal kindergartens, ПГУ and 1st grade from ИСОДЗ.
 
 Run by .github/workflows/capture-free-places.yml; needs no database. Reads every
-kindergarten and ПГУ building's record (one request each) and writes one snapshot,
+kindergarten, ПГУ and 1st-grade school record (one request each) and writes one snapshot,
 ``<out>/bg/sofia/free-places.json``, which replaces the last one (git keeps the history).
 Counts only (app.scrapers.sources.bg.kg_sofia_free_places). Docs: docs/FREE_PLACES.md
 
@@ -29,7 +29,7 @@ from app.scrapers.sources.bg.kg_sofia_ratings import INSTITUTION_TYPES, PUBLIC_S
 logger = logging.getLogger("capture_isodz_free_places")
 
 SNAPSHOT_PATH = Path("bg") / "sofia" / "free-places.json"
-FAMILIES = ("kindergarten", "preparatory")
+FAMILIES = ("kindergarten", "preparatory", "grade_1")
 # Below this share of the last snapshot's buildings, the scan is treated as broken.
 MIN_SHARE_OF_LAST = 0.8
 MAX_FAILED_SHARE = 0.2

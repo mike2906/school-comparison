@@ -1,6 +1,6 @@
-"""Today's free places in Sofia's municipal kindergartens and ПГУ, from ИСОДЗ (kg.sofia.bg).
+"""Today's free places in Sofia's municipal kindergartens, ПГУ and 1st grade, from ИСОДЗ (kg.sofia.bg).
 
-Every building's ``GET /api/public/{0|1}/dz/{id}`` record lists its groups (birth year,
+Every building's ``GET /api/public/{0|1}/dz/{id}`` record (1 = a school's 1st grade) lists its groups (birth year,
 label) with ``spots`` per queue: ``capacity``, ``zapisani`` (enrolled), ``svobodni`` (free)
 and ``nezapisani`` (ranked in a round but not yet enrolled, so the place is held for them).
 These are the numbers kg.sofia.bg shows on a kindergarten's page and in its "Свободни
@@ -53,7 +53,8 @@ def _queues(spots: list[dict[str, Any]]) -> dict[str, dict[str, int]]:
 def building_free_places(dz_payload: dict[str, Any], family: str) -> Optional[dict[str, Any]]:
     """One building's groups with their counts per queue; None when the record is empty.
 
-    ``family`` is the institution list it came from: ``kindergarten`` or ``preparatory``.
+    ``family`` is the institution list it came from: ``kindergarten``, ``preparatory`` or
+    ``grade_1``.
     """
     items = (dz_payload or {}).get("items") or {}
     dz = items.get("dz") or {}

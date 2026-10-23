@@ -1,9 +1,9 @@
 name: Capture free kindergarten places
 
-# Reads today's free places in every Sofia municipal kindergarten and ПГУ from ИСОДЗ
+# Reads today's free places in every Sofia municipal kindergarten, ПГУ and 1st grade from ИСОДЗ
 # (kg.sofia.bg) and commits the snapshot to the free-places-data branch, which the API
 # reads (backend/app/services/free_places.py). Twice a day, Sofia morning and afternoon:
-# kindergartens enrol children during the day. About 400 requests, 2 a second.
+# kindergartens enrol children during the day. About 570 requests, 2 a second.
 # Docs: docs/FREE_PLACES.md
 on:
   schedule:

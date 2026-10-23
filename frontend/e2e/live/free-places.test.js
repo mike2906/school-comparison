@@ -2,7 +2,8 @@
  * Live flows for today's free places in municipal kindergartens (docs/FREE_PLACES.md): the
  * API has a fresh ИСОДЗ snapshot matched to most municipal kindergartens, a kindergarten
  * page lists its groups' free places, and a search for a child's birth year this school
- * year puts that child's free places on each card.
+ * year puts that child's free places on each card. Municipal schools' ПГУ and 1st grade are
+ * in the same answer.
  */
 import assert from 'node:assert/strict'
 import { describe, test } from 'node:test'
@@ -28,6 +29,8 @@ describe('free kindergarten places', () => {
     const kindergartens = (await allSchools()).filter(usesSofiaKindergartenSystem)
     const withPlaces = kindergartens.filter(school => schoolFreePlaces(data, school.id).length > 0)
     assert.ok(withPlaces.length >= 0.8 * kindergartens.length, `${withPlaces.length} of ${kindergartens.length} municipal kindergartens have groups`)
+    const firstGrade = Object.values(data.schools).filter(entries => entries.some(entry => entry.stage === 'grade_1'))
+    assert.ok(firstGrade.length >= 100, `${firstGrade.length} schools with 1st-grade places`)
     for (const entries of Object.values(data.schools)) {
       for (const entry of entries) {
         assert.ok(entry.free >= 0 && entry.free <= entry.capacity, JSON.stringify(entry))
