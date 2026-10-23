@@ -22,7 +22,8 @@
     "allSchools": "All schools",
     "about": "About the data",
     "language": "Language",
-    "admission": "Admission points"
+    "admission": "Admission points",
+    "calendar": "Admission calendar"
   },
   "landing": {
     "categoryKindergarten": "Kindergarten",
@@ -1122,7 +1123,8 @@
       "invalid": "Check the numbers: NVO results are 0 to 100 and the exam is 0 to 50.",
       "tieBreak": "Equal scores are ordered by the NVO total, then the two grades, then the average 7th-grade grade."
     },
-    "runsUntil": "Rankings for {{campaign}} continue until {{date}}; after that, applications are for {{next}}: choose that year above."
+    "runsUntil": "Rankings for {{campaign}} continue until {{date}}; after that, applications are for {{next}}: choose that year above.",
+    "calendarLink": "Every admission date for your child's birth year, in your calendar"
   },
   "cutoffs": {
     "title": "Who got in before",
@@ -1254,6 +1256,87 @@
       "kindergarten": "kindergarten",
       "grade_1": "1st grade",
       "preparatory": "preparatory group"
+    }
+  },
+  "calendar": {
+    "title": "Admission calendar",
+    "intro": "Every date to act on in Sofia, from nursery to 8th grade, for your child's birth year. Add it to your phone's calendar and it updates itself when the official dates come out.",
+    "birthYear": "Year your child was born",
+    "pickYear": "Choose a year",
+    "fromSaved": "From the answers you saved on this device.",
+    "saveYear": "Remember this year on this device",
+    "subscribeTitle": "Add to your calendar",
+    "google": "Google Calendar",
+    "apple": "Apple Calendar or Outlook",
+    "download": "Download the .ics file",
+    "subscribeNote": "The calendar link says only the birth year, so it holds nothing about you. Your calendar app checks it about once a day, so when the official dates come out the estimated ones move by themselves (Google Calendar can take up to a day).",
+    "officialBadge": "Official dates",
+    "estimatedBadge": "Estimated dates",
+    "estimatedUntil": "Estimated from the last official schedule. The official dates are published by {{date}}.",
+    "estimated": "Estimated from the last official schedule. The official dates are not out yet.",
+    "estimatedShort": "estimated",
+    "rulesProvisional": "The admission rules for this year may still change.",
+    "official": "Official system: {{url}}",
+    "optional": "Optional",
+    "empty": "Every admission for children born in {{year}} has ended.",
+    "calculatorLink": "Work out your points",
+    "feedName": "Admissions · born {{year}}",
+    "feedDescription": "Sofia admission dates for children born in {{year}}: {{url}}",
+    "stepTitle": "{{step}} · September {{year}}",
+    "rounds": {
+      "1": "1st",
+      "2": "2nd",
+      "3": "3rd",
+      "4": "4th",
+      "5": "5th"
+    },
+    "steps": {
+      "nursery": "Nursery",
+      "kindergarten": "Kindergarten (first group)",
+      "preparatory": "Preparatory group at a school",
+      "grade_1": "1st grade",
+      "grade_8": "8th grade"
+    },
+    "stepsShort": {
+      "nursery": "Nursery",
+      "kindergarten": "Kindergarten",
+      "preparatory": "Preparatory group",
+      "grade_1": "1st grade",
+      "grade_8": "8th grade"
+    },
+    "stepNotes": {
+      "nursery": "Free nursery places are also ranked every two weeks in autumn, so you can apply later too.",
+      "kindergarten": "Children start the first group in the year they turn 3. Applications are made in the city's system (ИСОДЗ).",
+      "preparatory": "A preparatory group at a school gives 4 extra points for 1st grade at that school. The group for 6-year-olds is ranked a year later on the same dates.",
+      "grade_1": "Children start 1st grade in the year they turn 7. Applications are made in the city's system (ИСОДЗ).",
+      "grade_8": "Classes with an aptitude exam (arts, sport) hold it in May or June: check the school."
+    },
+    "milestones": {
+      "kindergarten": {
+        "schedule_due": "Official dates due out: check them",
+        "free_places": "Free places for September announced",
+        "applications_lock": "Last day to apply or change your application (until {{time}})",
+        "ranking": "{{round}} ranking published",
+        "enrol": "Enrol a child who got a place (until {{time}} on the last day)",
+        "current_rankings": "Rankings for the places left, every two weeks"
+      },
+      "grade_1": {
+        "schedule_due": "Official dates due out: check them",
+        "free_places": "Free places for 1st grade announced",
+        "applications_lock": "Last day to apply or change your application (until {{time}})",
+        "ranking": "{{round}} ranking published",
+        "enrol": "Enrol a child who got a place (until {{time}} on the last day)",
+        "current_rankings": "September rankings for the places left"
+      },
+      "grade_8": {
+        "schedule_due": "Official dates due out: check them",
+        "nvo_bg": "National exam (НВО): Bulgarian language and literature",
+        "nvo_math": "National exam (НВО): maths",
+        "applications": "Apply for stage {{stage}}",
+        "ranking": "Stage {{stage}} results",
+        "enrol": "Enrol a pupil ranked in stage {{stage}}",
+        "enrol_1": "Enrol a pupil ranked in stage I, or apply for stage II"
+      }
     }
   }
 }

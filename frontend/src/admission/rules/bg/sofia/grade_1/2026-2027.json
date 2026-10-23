@@ -62,7 +62,74 @@
   "schedule": {
     "applications_close": "2026-05-31",
     "first_ranking": "2026-06-02",
-    "source": "schedule-2026-press"
+    "source": "schedule-2026-press",
+    "milestones": [
+      {
+        "key": "free_places",
+        "date": "2026-04-20"
+      },
+      {
+        "key": "applications_lock",
+        "date": "2026-06-01",
+        "time": "18:00"
+      },
+      {
+        "key": "ranking",
+        "round": 1,
+        "date": "2026-06-02"
+      },
+      {
+        "key": "enrol",
+        "round": 1,
+        "date": "2026-06-03",
+        "end": "2026-06-09",
+        "time": "16:00"
+      },
+      {
+        "key": "ranking",
+        "round": 2,
+        "date": "2026-06-09"
+      },
+      {
+        "key": "enrol",
+        "round": 2,
+        "date": "2026-06-10",
+        "end": "2026-06-16",
+        "time": "16:00"
+      },
+      {
+        "key": "ranking",
+        "round": 3,
+        "date": "2026-06-16"
+      },
+      {
+        "key": "enrol",
+        "round": 3,
+        "date": "2026-06-18",
+        "end": "2026-06-23",
+        "time": "16:00"
+      },
+      {
+        "key": "ranking",
+        "round": 4,
+        "date": "2026-06-23"
+      },
+      {
+        "key": "enrol",
+        "round": 4,
+        "date": "2026-06-24",
+        "end": "2026-06-25",
+        "time": "16:00"
+      },
+      {
+        "key": "current_rankings",
+        "date": "2026-09-02",
+        "end": "2026-09-11"
+      }
+    ],
+    "milestones_source": "isodz-calendar-2026",
+    "published_by": "01-05",
+    "estimate_by": "date"
   },
   "verified": {
     "status": "verified",
@@ -102,6 +169,12 @@
       "title": "ВАС, Определение № 5326 от 18.05.2026 г. по адм. дело № 4277/2026",
       "url": "https://info-adc.justice.bg/courts/portal/edis.nsf/e_act.xsp?code=vas&guid=1274720299&id=2636546",
       "retrieved": "2026-10-14"
+    },
+    {
+      "id": "isodz-calendar-2026",
+      "title": "ИСОДЗ (kg.sofia.bg): календар на класиранията 2026",
+      "url": "https://kg.sofia.bg/",
+      "retrieved": "2026-10-23"
     }
   ],
   "params": {

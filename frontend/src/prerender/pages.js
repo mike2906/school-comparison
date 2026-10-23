@@ -250,6 +250,14 @@ export function fixedPages(t, language, listedSchools = []) {
       body: mainBlock([heading(t('admissionCalc.title')), paragraph(t('admissionCalc.intro'))]),
     },
     {
+      routePath: '/calendar',
+      title: `${t('calendar.title')} · ${siteName}`,
+      description: truncate(t('calendar.intro')),
+      canonicalPath: '/calendar',
+      sitemap: true,
+      body: mainBlock([heading(t('calendar.title')), paragraph(t('calendar.intro'))]),
+    },
+    {
       routePath: '/schools',
       title: `${t('directory.title')} · ${siteName}`,
       description: truncate(t('directory.intro')),
