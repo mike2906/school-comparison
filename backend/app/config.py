@@ -31,6 +31,11 @@ class Settings(BaseSettings):
     model_tier_facts: str = ""  # Default: anthropic/claude-haiku-5-5 (school-facts, open-days)
     # Each takes "openrouter/<vendor>/<model>" or "anthropic/<model>" (direct API, e.g.
     # MODEL_TIER_PRICING=anthropic/claude-haiku-5-5); set it per run to switch one job.
+    # Per-run trial settings for Anthropic tiers: "adaptive" turns Haiku 5.5's thinking on
+    # (Sonnet and Opus always think); an effort (low/medium/high/xhigh/max) for thinking calls
+    # whose stage sets none. Empty keeps the defaults.
+    anthropic_thinking: str = ""
+    anthropic_effort: str = ""
 
     # Spot-check validation settings
     spot_check_sample_size: int = 10  # Number of schools to spot-check per run (-1 = all, for calibration)

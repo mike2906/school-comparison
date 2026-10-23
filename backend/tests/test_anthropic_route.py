@@ -28,6 +28,8 @@ def _settings(**tiers):
         model_tier_fee_check=tiers.get("fee_check", ""),
         model_tier_translation=tiers.get("translation", ""),
         model_tier_facts=tiers.get("facts", ""),
+        anthropic_thinking=tiers.get("thinking", ""),
+        anthropic_effort=tiers.get("effort", ""),
     )
 
 
@@ -84,7 +86,7 @@ def test_a_bare_vendor_model_id_stays_on_openrouter(monkeypatch):
 
 
 def test_an_unpriced_anthropic_model_is_refused(monkeypatch):
-    monkeypatch.setattr(ai_client, "get_settings", lambda: _settings(pricing="anthropic/claude-opus-5-5"))
+    monkeypatch.setattr(ai_client, "get_settings", lambda: _settings(pricing="anthropic/claude-opus-4-8"))
     with pytest.raises(ValueError, match="no price"):
         ai_client.create_agent("pricing", "system", Pick)
     with pytest.raises(ValueError, match="no price"):
@@ -107,6 +109,59 @@ def test_prices_follow_the_anthropic_model(haiku_pricing):
     assert ai_client.anthropic_cost_usd("claude-haiku-5-5", 100_001, 1_000) == pytest.approx(
         100_001 / 1e6 * 0.50 + 1_000 / 1e6 * 2.50
     )
+
+
+def test_cached_prompt_tokens_are_priced_as_cache_writes_and_reads():
+    # 10K prompt tokens: 1K uncached, 2K written to the cache, 7K read from it.
+    assert ai_client.anthropic_cost_usd("claude-sonnet-5-5", 10_000, 500, 2_000, 7_000) == pytest.approx(
+        (1_000 + 2_000 * 1.25 + 7_000 * 0.10) / 1e6 * 2.00 + 500 / 1e6 * 10.00
+    )
+    # Opus 5.5 reads its cache at 0.05x.
+    assert ai_client.anthropic_cost_usd("claude-opus-5-5", 10_000, 0, 0, 10_000) == pytest.approx(10_000 / 1e6 * 0.20)
+
+
+async def test_an_anthropic_call_caches_its_system_prompt(monkeypatch, haiku_pricing):
+    sent = _mock_anthropic(monkeypatch, _tool_answer)
+    await ai_client.create_agent("pricing", "Pick the fee page.", Pick).run("links: /fees")
+    assert sent[0]["system"][-1]["cache_control"]["type"] == "ephemeral"
+
+
+@pytest.mark.parametrize(
+    ("tiers", "thinks"),
+    [
+        ({"pricing": "anthropic/claude-haiku-5-5"}, False),
+        ({"pricing": "anthropic/claude-haiku-5-5", "thinking": "adaptive"}, True),
+        ({"pricing": "anthropic/claude-sonnet-5-5"}, True),
+        ({"pricing": "anthropic/claude-opus-5-5"}, True),
+    ],
+)
+def test_which_anthropic_calls_think(monkeypatch, tiers, thinks):
+    captured = {}
+
+    class DummyAgent:
+        def __init__(self, **kwargs):
+            captured.update(kwargs)
+
+    monkeypatch.setattr(ai_client, "get_settings", lambda: _settings(effort="low", **tiers))
+    monkeypatch.setattr(ai_client, "Agent", DummyAgent)
+    ai_client.create_agent("pricing", "system", Pick)
+    settings = captured["model_settings"]
+    assert settings["anthropic_thinking"] == ({"type": "adaptive"} if thinks else {"type": "disabled"})
+    assert settings.get("anthropic_effort") == ("low" if thinks else None)
+    assert captured["model"].profile.anthropic_supports_forced_tool_choice is not thinks
+
+
+def test_a_stage_effort_wins_over_the_run_setting(monkeypatch):
+    captured = {}
+
+    class DummyAgent:
+        def __init__(self, **kwargs):
+            captured.update(kwargs)
+
+    monkeypatch.setattr(ai_client, "get_settings", lambda: _settings(pricing="anthropic/claude-sonnet-5-5", effort="low"))
+    monkeypatch.setattr(ai_client, "Agent", DummyAgent)
+    ai_client.create_agent("pricing", "system", Pick, model_settings={"anthropic_effort": "medium"})
+    assert captured["model_settings"]["anthropic_effort"] == "medium"
 
 
 def test_openrouter_tiers_keep_their_settings_next_to_an_anthropic_tier(monkeypatch):
