@@ -1,0 +1,81 @@
+name: Capture free kindergarten places
+
+# Reads today's free places in every Sofia municipal kindergarten and ПГУ from ИСОДЗ
+# (kg.sofia.bg) and commits the snapshot to the free-places-data branch, which the API
+# reads (backend/app/services/free_places.py). Twice a day, Sofia morning and afternoon:
+# kindergartens enrol children during the day. About 400 requests, 2 a second.
+# Docs: docs/FREE_PLACES.md
+on:
+  schedule:
+    - cron: "20 4,13 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: capture-free-places
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  capture:
+    name: ИСОДЗ free places
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v7
+
+      - name: Check out the data branch
+        uses: actions/checkout@v7
+        with:
+          ref: free-places-data
+          path: free-places-data
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v8.3.2
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install
+        working-directory: backend
+        run: uv sync --locked
+
+      - name: Capture
+        working-directory: backend
+        timeout-minutes: 20
+        run: uv run python -m scripts.capture_isodz_free_places --out ../free-places-data
+
+      - name: Commit the snapshot
+        working-directory: free-places-data
+        run: |
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No change."
+            exit 0
+          fi
+          git -c user.name="free places capture" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -q -m "Free places $(date -u +%Y-%m-%dT%H:%MZ)"
+          git push origin HEAD:free-places-data
+
+      # The site hides free places two days after the last good capture, so a failure
+      # needs a look within a day. One open issue; later failures add a comment.
+      - name: Report a failure
+        if: failure() && github.event_name == 'schedule'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          title="Free places capture failing"
+          number="$(gh issue list -R "$GITHUB_REPOSITORY" --state open --search "in:title \"$title\"" --json number -q '.[0].number')"
+          if [ -n "$number" ]; then
+            gh issue comment "$number" -R "$GITHUB_REPOSITORY" --body "Failed again: $RUN_URL"
+          else
+            gh issue create -R "$GITHUB_REPOSITORY" --title "$title" --body "The free kindergarten places capture failed: $RUN_URL
+
+          The site stops showing free places 48 hours after the last good snapshot (docs/FREE_PLACES.md). Close this issue once a run succeeds."
+          fi

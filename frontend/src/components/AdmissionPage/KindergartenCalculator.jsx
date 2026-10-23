@@ -12,6 +12,8 @@ import SaveAnswers, { saveBoxId } from './SaveAnswers'
 import NextTierHint from './NextTierHint'
 import CutoffComparison from '../Admission/CutoffComparison'
 import { savedListFilters, savedListUrl } from '../../admission/schoolVerdict'
+import { useFreePlaces } from '../../hooks/useFreePlaces'
+import { childFreePlaces, schoolFreePlaces } from '../../utils/freePlaces'
 
 // Answers about one kindergarten: never saved, since the list compares every kindergarten
 // (whether one is in the parent's district comes from its own district there).
@@ -30,6 +32,7 @@ function KindergartenCalculator({ selected, startYear, kindergarten, districts, 
     return saved ? { ...KINDERGARTEN_INITIAL, ...withoutPlace(saved.answers), ...saved.siblings?.[kindergarten?.id] } : KINDERGARTEN_INITIAL
   })
   const saved = useSavedAdmission().kindergarten
+  const freePlacesData = useFreePlaces(Boolean(kindergarten?.id))
   const set = (key, value) => setA(prev => ({ ...prev, [key]: value }))
   // The kindergarten loads after the form: put back the sibling saved for it, and clear
   // an answer given for another one.
@@ -253,6 +256,23 @@ function KindergartenCalculator({ selected, startYear, kindergarten, districts, 
                 isCurrentRules={isCurrentRules}
               />
             )}
+            {(() => {
+              // Today's places in this child's group, for the year being calculated.
+              const places = kindergarten && childFreePlaces(schoolFreePlaces(freePlacesData, kindergarten.id), a.birthYear, startYear)
+              if (!places) return null
+              return (
+                <p className="mt-4 rounded-lg bg-neutral-50 p-3 text-xs text-neutral-700" data-testid="calculator-free-places">
+                  <strong className={places.free > 0 ? 'text-teal-800' : 'text-neutral-800'}>
+                    {places.free > 0
+                      ? t('freePlaces.child', { count: places.free, year: places.birthYear }) +
+                    (places.buildings > 1 ? ` ${t('freePlaces.inBuildings', { count: places.buildingsWithFree, total: places.buildings })}` : '')
+                      : t('freePlaces.childFull', { year: places.birthYear })}
+                  </strong>
+                  {places.rankedNotEnrolled > 0 && ` · ${t('freePlaces.childRanked', { count: places.rankedNotEnrolled })}`}
+                  <span className="mt-1 block">{t('freePlaces.calculatorNote')}</span>
+                </p>
+              )
+            })()}
             {result.socialPriority !== false && (
               <p className="mt-4 rounded-lg bg-neutral-50 p-3 text-xs text-neutral-700">{t('admissionCalc.kg.socialPriority')}</p>
             )}

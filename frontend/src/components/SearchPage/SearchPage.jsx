@@ -63,6 +63,8 @@ import { LANGUAGE_SWITCH_EVENT, languageSwitchArrival } from '../../utils/langua
 import { pinnedLocation } from '../../utils/coordinates'
 import { useDriveTimes } from '../../routing/useDriveTimes'
 import DriveTimeNote from '../../routing/DriveTimeNote'
+import { useFreePlaces } from '../../hooks/useFreePlaces'
+import { childFreePlacesBySchool } from '../../utils/freePlaces'
 
 const TYPE_SORT_ORDER = {
   state: 0,
@@ -192,6 +194,12 @@ function SearchPage() {
   // can say when its fees are for an earlier year. A group picked without a birth year has none.
   const childYear = filters.birthYear ? filters.targetYear : null
   const { availableFilters, examAverages } = useFilterData(countryCode)
+  // Today's free places for the child's birth year, when the year asked about is one ИСОДЗ has.
+  const freePlacesData = useFreePlaces(Boolean(filters.birthYear && childYear))
+  const freePlacesById = useMemo(
+    () => childFreePlacesBySchool(freePlacesData, filters.birthYear, childYear),
+    [freePlacesData, filters.birthYear, childYear]
+  )
 
   const effectiveEducationLevel =
     filters.ageGroup === 'preschool' && !filters.includeCrossover
@@ -1434,6 +1442,7 @@ function SearchPage() {
                     onFocusLocation={handleFocusLocation}
                     onClearLocations={clearLocationOverlay}
                     examAverages={examAverages}
+                    freePlaces={freePlacesById.get(school.id) || null}
                   />
                 ))}
                 {visibleCount < listCards.length && (

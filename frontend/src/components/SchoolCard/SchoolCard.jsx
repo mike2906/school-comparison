@@ -64,6 +64,7 @@ const SchoolCard = memo(function SchoolCard({
   onOpenDetails,
   examAverages = null,
   samePlace = [],
+  freePlaces = null,
 }) {
   const { t, i18n } = useTranslation()
   const { config: countryConfig } = useCountry()
@@ -500,6 +501,17 @@ const SchoolCard = memo(function SchoolCard({
               <SavedVerdictLine verdict={verdict} />
             </div>
           ))}
+          {freePlaces && (
+            <div className="flex items-start gap-2 text-sm" data-testid="free-places-line">
+              <span className={`mt-1.5 h-2 w-2 flex-shrink-0 rounded-full ${freePlaces.free > 0 ? 'bg-teal-600' : 'bg-neutral-400'}`} aria-hidden="true" />
+              <span className={freePlaces.free > 0 ? 'font-medium text-teal-800' : 'text-neutral-600'}>
+                {freePlaces.free > 0
+                  ? t('freePlaces.child', { count: freePlaces.free, year: freePlaces.birthYear }) +
+                    (freePlaces.buildings > 1 ? ` ${t('freePlaces.inBuildings', { count: freePlaces.buildingsWithFree, total: freePlaces.buildings })}` : '')
+                  : t('freePlaces.childFull', { year: freePlaces.birthYear })}
+              </span>
+            </div>
+          )}
           {admissionsInfo && !savedVerdicts.some(verdict => verdict.lines.length > 0) && (
             <div className="space-y-1">
               <div className="flex items-start gap-2">
