@@ -150,7 +150,8 @@ test('a calculator birth year that differs starts a new plan without the old sta
   assert.deepEqual(getSaved().child, { birthYear: 2020 })
 })
 
-test('preferences keep only languages and a positive budget', () => {
-  assert.deepEqual(parseSaved(JSON.stringify({ version: 1, preferences: { languages: ['english', 3], monthlyBudget: 600 } })).preferences, { languages: ['english'], monthlyBudget: 600 })
-  assert.equal(parseSaved(JSON.stringify({ version: 1, preferences: { languages: [], monthlyBudget: -1 } })).preferences, null)
+test('preferences keep only languages, a positive budget and a known way to travel', () => {
+  assert.deepEqual(parseSaved(JSON.stringify({ version: 1, preferences: { languages: ['english', 3], monthlyBudget: 600 } })).preferences, { languages: ['english'], monthlyBudget: 600, travel: 'car' })
+  assert.equal(parseSaved(JSON.stringify({ version: 1, preferences: { languages: [], monthlyBudget: -1, travel: 'boat' } })).preferences, null)
+  assert.deepEqual(parseSaved(JSON.stringify({ version: 1, preferences: { travel: 'transit' } })).preferences, { languages: [], monthlyBudget: null, travel: 'transit' })
 })

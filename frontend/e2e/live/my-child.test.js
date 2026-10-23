@@ -44,6 +44,41 @@ describe("my child's options", () => {
     })
   }
 
+  for (const lang of ['bg', 'en']) {
+    test(`${lang}: by public transport, each place says when to leave, latest first`, async testContext => {
+      await page.addInitScript(() => {
+        window.__longestTask = 0
+        try {
+          new PerformanceObserver(list => {
+            for (const entry of list.getEntries()) window.__longestTask = Math.max(window.__longestTask, entry.duration)
+          }).observe({ type: 'longtask', buffered: true })
+        } catch {
+          // No long-task timing in this browser: the check below then sees 0.
+        }
+      })
+      await open(lang, '/my-child')
+      await page.locator('#my-child-birth-year').selectOption(String(planningYear() - 4))
+      await page.locator('#my-child-address').fill('Люлин 5')
+      await page.getByRole('button', { name: t(lang, 'common.search'), exact: true }).click()
+      await page.getByText(t(lang, 'myChild.changeHome'), { exact: true }).waitFor({ timeout: 30_000 })
+      const started = Date.now()
+      await page.getByRole('button', { name: t(lang, 'myChild.travel_transit'), exact: true }).click()
+      const chips = page.locator('[data-chance-group] [data-transit-leave]')
+      await chips.first().waitFor({ timeout: 45_000 })
+      const shownAfter = Date.now() - started
+      await page.getByRole('link', { name: t(lang, 'transitTime.timetableCredit') }).waitFor()
+      // Inside the first group, the place you can leave for latest comes first.
+      const leaves = await page.locator('[data-chance-group]').first().locator('[data-transit-leave]')
+        .evaluateAll(nodes => nodes.map(node => node.dataset.transitLeave))
+      assert.ok(leaves.length >= 5, `only ${leaves.length} places have a trip`)
+      assert.ok(leaves.every(leave => leave >= '05:30' && leave <= '08:00'), `odd times to leave: ${leaves.join(', ')}`)
+      assert.deepEqual(leaves, [...leaves].sort().reverse(), `not latest first: ${leaves.join(', ')}`)
+      const longestTask = await page.evaluate(() => Math.round(window.__longestTask))
+      testContext.diagnostic(`Public transport times shown ${shownAfter} ms after choosing it; longest main-thread task ${longestTask} ms.`)
+      assert.ok(longestTask < 1000, `the page was blocked for ${longestTask} ms`)
+    })
+  }
+
   test('saved once, the calculator starts from the same child', async () => {
     await open('bg', '/my-child')
     const birthYear = planningYear() - 3

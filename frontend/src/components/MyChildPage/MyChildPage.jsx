@@ -5,7 +5,10 @@ import Layout from '../Layout/Layout'
 import SchoolCard from '../SchoolCard/SchoolCard'
 import SchoolCardSkeleton from '../SchoolCard/SchoolCardSkeleton'
 import DriveTimeNote from '../../routing/DriveTimeNote'
+import TransitTimeNote from '../../routing/TransitTimeNote'
 import { useDriveTimes } from '../../routing/useDriveTimes'
+import { useTransitTimes } from '../../routing/useTransitTimes'
+import { arriveBySeconds } from '../../routing/transitTimes'
 import { useCountry } from '../../context/CountryContext'
 import { useSchools } from '../../hooks/useSchools'
 import { useSavedAdmission, useVerdictData } from '../../hooks/useSavedAdmission'
@@ -73,7 +76,8 @@ function MyChildPage() {
   // Bumped on "forget", so a home lookup still running is dropped with the profile.
   const [forgets, setForgets] = useState(0)
 
-  const { birthYear, startYear, homePoint, languages, monthlyBudget } = draft
+  const { birthYear, startYear, homePoint, languages, monthlyBudget, travel } = draft
+  const byTransit = travel === 'transit'
   const ageGroup = birthYear ? calculateAgeGroup(startYear, birthYear, config) : null
   const selection = toSearchSelection({ ageGroup, where: 'both' })
   const { availableFilters } = useFilterData(countryCode)
@@ -99,12 +103,22 @@ function MyChildPage() {
     const distance = homePoint && distanceLocation
       ? calculateDistance(homePoint.lat, homePoint.lng, distanceLocation.lat, distanceLocation.lng)
       : null
-    return { ...school, distance, distanceLocation }
+    return { ...school, distance, distanceLocation, arriveBy: arriveBySeconds(distanceLocation, ageGroup) }
   }), [schools, homePoint, ageGroup])
-  const driveTimes = useDriveTimes(homePoint, placed)
-  const withTrips = useMemo(() => (driveTimes.seconds.size === 0
-    ? placed
-    : placed.map(school => ({ ...school, driveSeconds: driveTimes.seconds.get(school.id) ?? null }))), [placed, driveTimes.seconds])
+  const driveTimes = useDriveTimes(byTransit ? null : homePoint, placed)
+  const transitTimes = useTransitTimes(homePoint, placed, byTransit)
+  const withTrips = useMemo(() => {
+    if (byTransit) {
+      if (transitTimes.status !== 'ready' && transitTimes.trips.size === 0) return placed
+      return placed.map(school => {
+        const trip = transitTimes.trips.get(school.id) ?? null
+        return { ...school, transit: trip, tripSeconds: trip ? trip.deadline - trip.leave : null }
+      })
+    }
+    return driveTimes.seconds.size === 0
+      ? placed
+      : placed.map(school => ({ ...school, driveSeconds: driveTimes.seconds.get(school.id) ?? null }))
+  }, [placed, byTransit, driveTimes.seconds, transitTimes])
 
   // Saved calculator answers count only when they are about this child and September.
   const stage = birthYear ? calculatorStage(ageGroup, birthYear, startYear) : null
@@ -286,7 +300,26 @@ function MyChildPage() {
             )}
             {!stage && <p className="mb-4 text-sm text-neutral-600">{t('myChild.noCalculator')}</p>}
             {!homePoint && <p className="mb-4 text-sm text-neutral-600">{t('myChild.noHome')}</p>}
-            {homePoint && <DriveTimeNote status={driveTimes.status} />}
+            {homePoint && (
+              <div className="mb-3">
+                <div className="mb-1 inline-flex rounded-lg border border-neutral-300 p-0.5 text-sm" role="group" aria-label={t('myChild.travel')}>
+                  {['car', 'transit'].map(mode => (
+                    <button
+                      key={mode}
+                      type="button"
+                      aria-pressed={travel === mode}
+                      onClick={() => update({ travel: mode })}
+                      className={`h-9 rounded-md px-3 ${travel === mode ? 'bg-primary-700 font-medium text-white' : 'text-neutral-700'}`}
+                    >
+                      {t(`myChild.travel_${mode}`)}
+                    </button>
+                  ))}
+                </div>
+                {byTransit
+                  ? <TransitTimeNote status={transitTimes.status} serviceDate={transitTimes.serviceDate} />
+                  : <DriveTimeNote status={driveTimes.status} />}
+              </div>
+            )}
 
             <p className="mb-3 text-sm text-neutral-600">
               {hiddenByLanguage > 0 && <>{t('myChild.hiddenLanguage', { count: hiddenByLanguage })}{' '}</>}
@@ -362,13 +395,14 @@ function draftFrom(saved) {
     homePoint: saved.homePoint ?? null,
     languages: saved.preferences?.languages ?? [],
     monthlyBudget: saved.preferences?.monthlyBudget ?? null,
+    travel: saved.preferences?.travel ?? 'car',
   }
 }
 
 function persist(draft) {
   if (draft.birthYear) saveChild({ birthYear: draft.birthYear, startYear: draft.startYear })
   saveHomePoint(draft.homePoint)
-  savePreferences({ languages: draft.languages, monthlyBudget: draft.monthlyBudget })
+  savePreferences({ languages: draft.languages, monthlyBudget: draft.monthlyBudget, travel: draft.travel })
 }
 
 /**

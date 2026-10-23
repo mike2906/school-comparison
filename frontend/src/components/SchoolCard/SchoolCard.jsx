@@ -8,6 +8,7 @@ import { useCompare } from '../../context/CompareContext'
 import { getSchoolName, getAddress } from '../../utils/i18n'
 import { formatAmount, formatDistance, intlLocale } from '../../utils/format'
 import { rushHourMinutes } from '../../routing/driveTimes'
+import { clock, linesText, tripMinutes } from '../../routing/transitTimes'
 import { getStatusInfo } from '../../utils/schoolAttributes'
 import {
   curatedRequirement,
@@ -322,6 +323,11 @@ const SchoolCard = memo(function SchoolCard({
     ? { backgroundColor: 'rgba(245,158,11,0.1)', color: '#d97706' }
     : { backgroundColor: 'rgba(239,68,68,0.1)', color: '#dc2626' }
   const driveMinutes = rushHourMinutes(school.driveSeconds)
+  // By public transport (the options page): the trip, and when to leave to be there in time.
+  const transit = school.transit
+  const transitLabel = transit && t(transit.lines.length ? 'transitTime.aria' : 'transitTime.ariaWalk', {
+    minutes: tripMinutes(transit), leave: clock(transit.leave), deadline: clock(transit.deadline), lines: linesText(transit.lines, t),
+  })
   const statusStyle = statusInfo ? {
     backgroundColor: statusInfo.color,
     boxShadow: `0 0 8px ${hexToRgba(statusInfo.color, 0.4)}`,
@@ -410,7 +416,7 @@ const SchoolCard = memo(function SchoolCard({
             {schoolName}
           </h3>
         </div>
-        {(distanceLabel || driveMinutes != null) && (
+        {(distanceLabel || driveMinutes != null || transit) && (
           <div className="flex flex-shrink-0 flex-col items-end gap-1">
             {distanceLabel && (
               <span
@@ -428,6 +434,19 @@ const SchoolCard = memo(function SchoolCard({
                 title={t('driveTime.aria', { minutes: driveMinutes })}
               >
                 🚗 {t('driveTime.minutes', { minutes: driveMinutes })}
+              </span>
+            )}
+            {transit && (
+              <span
+                className="flex flex-col items-end"
+                aria-label={transitLabel}
+                title={transitLabel}
+                data-transit-leave={clock(transit.leave)}
+              >
+                <span className="inline-flex flex-shrink-0 items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-neutral-100 text-neutral-700">
+                  {transit.lines.length ? '🚌' : '🚶'} {t('driveTime.minutes', { minutes: tripMinutes(transit) })}
+                </span>
+                <span className="mt-0.5 px-2 text-[11px] text-neutral-500">{t('transitTime.leave', { leave: clock(transit.leave) })}</span>
               </span>
             )}
           </div>

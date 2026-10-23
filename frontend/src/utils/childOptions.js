@@ -31,13 +31,16 @@ export function monthlyTuition(school, ageGroup) {
   return school.school_type === 'state' ? null : tuitionSortValue(school.pricing, { ageGroup })
 }
 
+// The chosen way to travel: by public transport (`tripSeconds` set, null when no trip arrives
+// in time), how long before the start of the day the child leaves home; else the drive.
+const tripTime = school => (school.tripSeconds !== undefined ? school.tripSeconds : school.driveSeconds) ?? Infinity
 const tripOrder = (a, b) => (
-  (a.driveSeconds ?? Infinity) - (b.driveSeconds ?? Infinity) ||
+  tripTime(a) - tripTime(b) ||
   (a.distance ?? Infinity) - (b.distance ?? Infinity)
 )
 
 /**
- * `schools` carry `distance` and `driveSeconds` when a home is set. `verdictsFor(school)`
+ * `schools` carry `distance` and `driveSeconds` (or `tripSeconds` by public transport) when a home is set. `verdictsFor(school)`
  * gives its saved verdicts. Returns `{ groups: { likely, close, unknown, below }, overBudget }`,
  * where overBudget counts the private schools whose monthly tuition is above the budget
  * (a fee with no monthly figure is never hidden).

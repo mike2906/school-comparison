@@ -163,7 +163,7 @@ export function walkToStops(tt, fg, point, limitSec = ACCESS_LIMIT) {
     const ds = to ? walk.costTo(to) : Infinity
     if (ds < Infinity) stops.push([s, Math.round(ds / 10)])
   }
-  return { snap, stops, walk }
+  return { snap, stops }
 }
 
 /**
