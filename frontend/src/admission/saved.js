@@ -124,37 +124,12 @@ export function childBirthYear(saved = read()) {
 }
 
 /**
- * Saves the child's birth year. Saved kindergarten answers are for the same child, so they
- * take the new year too while it is still a kindergarten age for their start year.
+ * Saves the child's birth year. Saved calculator answers keep their own: a family may have
+ * saved kindergarten answers for a younger child and first-grade ones for an older one.
  */
 export function saveChild({ birthYear }) {
   if (!isBirthYear(birthYear)) return
-  const saved = read()
-  const entry = saved.kindergarten
-  const fits = entry && birthYear < entry.startYear && birthYear >= entry.startYear - 7
-  const kindergarten = fits && entry.answers.birthYear !== birthYear
-    ? { ...entry, answers: { ...entry.answers, birthYear } }
-    : entry
-  write({ ...saved, child: { birthYear }, kindergarten })
-}
-
-/**
- * The schools where a sibling attends, from answers given on that school's own calculator
- * page: the list counts a sibling only there. `entry` is the saved entry; its siblings
- * stand for its own start year only (a sibling's age is checked against it). With a school
- * on the page, `place` is its sibling answers for a yes and null otherwise (forgets it).
- */
-export function siblingsWith(entry, startYear, schoolId, place) {
-  const next = { ...(entry?.startYear === startYear ? entry.siblings : null) }
-  if (schoolId == null) return next
-  if (place) next[schoolId] = place
-  else delete next[schoolId]
-  return next
-}
-
-/** `entry` with its siblings, left out when there are none. */
-export function withSiblings(entry, siblings) {
-  return Object.keys(siblings).length > 0 ? { ...entry, siblings } : entry
+  write({ ...read(), child: { birthYear } })
 }
 
 export function saveHome(home) {
