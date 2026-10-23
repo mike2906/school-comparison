@@ -447,6 +447,10 @@ const SchoolCard = memo(function SchoolCard({
                   {transit.lines.length ? '🚌' : '🚶'} {t('driveTime.minutes', { minutes: tripMinutes(transit) })}
                 </span>
                 <span className="mt-0.5 px-2 text-[11px] text-neutral-500">{t('transitTime.leave', { leave: clock(transit.leave) })}</span>
+                {/* Which lines, in view: a phone shows no title. */}
+                {transit.lines.length > 0 && (
+                  <span className="max-w-[11rem] px-2 text-right text-[11px] leading-tight text-neutral-500" aria-hidden="true">{linesText(transit.lines, t)}</span>
+                )}
               </span>
             )}
           </div>
