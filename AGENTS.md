@@ -37,9 +37,8 @@ Bulgarian cities, then other countries.
 
 **Current status:** The site is live for Sofia with no real users yet. The scraper CLI
 runs the pipeline stages (discovery, website discovery, URL validation, navigation,
-extraction, validation/spot checks, summarization). Private-school fees now come from the
-fees agent (`docs/AGENT_FEE_EXTRACTION.md`); the old price extraction stays behind
-`EXTRACTION_PIPELINE_PRICES` until Mike is confident in the agent. School facts, an agent
+extraction, validation/spot checks, summarization). Private-school fees come from the
+fees agent (`docs/AGENT_FEE_EXTRACTION.md`); the old price extraction was deleted. School facts, an agent
 stage replacing the summaries, are in `docs/SCHOOL_FACTS.md`. Official NVO and ДЗИ imports
 are independent stages.
 
@@ -199,7 +198,7 @@ you hit a real problem.
 - Treat existing implementation work as sunk cost when a simpler design is available.
 - Prefer what libraries already do (Leaflet distance, not a custom haversine) and simple
   retries (1-2-3, not backoff with jitter). No caching/queues before a real performance problem.
-- Large files (`app/scrapers/extractor.py` is ~1,900 lines): locate
+- Large files (`app/scrapers/extractor.py` is ~1,700 lines): locate
   code with `grep -n` and read only the needed line ranges.
 - **Don't grow the giant files.** New functions do not go into `app/scrapers/cli.py`,
   `app/scrapers/extractor.py`, `app/scrapers/validator.py` or

@@ -112,31 +112,7 @@
           ]
         }
       }
-    },
-    "pricing": [
-      {
-        "academic_year": null,
-        "age_group": null,
-        "amount": 1300.0,
-        "amount_max": null,
-        "amount_min": null,
-        "category": "tuition",
-        "currency": "BGN",
-        "period": null,
-        "plan_name": null
-      },
-      {
-        "academic_year": null,
-        "age_group": null,
-        "amount": 1000.0,
-        "amount_max": null,
-        "amount_min": null,
-        "category": "tuition",
-        "currency": "BGN",
-        "period": null,
-        "plan_name": null
-      }
-    ]
+    }
   },
   "known_issues": [],
   "name_aliases": [],

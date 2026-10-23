@@ -24,7 +24,6 @@ from app.models.source_page import SourcePage
 from app.schemas.validation import ValidationReport
 from app.scrapers.validator import _check_price_evidence
 from app.utils.display_gating import KEPT_PRICE_ISSUES_KEY
-from app.utils.website_data import website_data_is_publishable
 
 logger = logging.getLogger(__name__)
 
@@ -104,10 +103,3 @@ async def withhold_unsupported_kept_prices(db: AsyncSession, school: School) -> 
     school.attributes = attrs
     flag_modified(school, "attributes")
 
-
-async def recheck_after_failed_price_refresh(db: AsyncSession, school_id: int) -> None:
-    """A prices-only run that changed nothing: re-check the kept rows and commit."""
-    school = await db.get(School, school_id, populate_existing=True)
-    if school is not None and website_data_is_publishable(school.attributes, school.scrape_status):
-        await withhold_unsupported_kept_prices(db, school)
-        await db.commit()

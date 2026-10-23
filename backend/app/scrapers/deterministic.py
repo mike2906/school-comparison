@@ -3,12 +3,11 @@
 This is the canonical composition of the deterministic sub-steps that the Stage 5
 extractor already relies on as its LLM-free fallback:
 
-* pricing  -> page selection + ``_extract_prices_deterministic`` + support filter/dedupe + row coercion
 * general  -> ``_build_deterministic_general_info_output`` + normalization + attribute projection
 * display  -> ``_build_display_name_evidence``
 
 Every leaf function used here is the *same* one production runs in
-``extractor._extract_prices`` / ``_extract_general_info``, so the golden-fixture
+``extractor._extract_general_info``, so the golden-fixture
 corpus (P1.5) exercises real production logic rather than a hand-mirrored copy —
 if a coercion or filter step changes in the extractor, this path changes with it.
 """
@@ -20,36 +19,7 @@ from typing import Any
 from app.models.school import School
 from app.models.source_page import SourcePage
 from app.scrapers import extractor
-from app.scrapers.extraction import contact_details, general_fields, page_selection, price_lines, price_step
-
-
-def deterministic_pricing_rows(school: School, pages: list[SourcePage]) -> list[dict[str, Any]]:
-    """Deterministic pricing rows as normalized field dicts (enums -> ``.value``)."""
-    selected_text, _source_urls = page_selection._select_pages(
-        school=school,
-        pages=pages,
-        preferred_categories=extractor.PRICING_PAGE_CATEGORIES,
-        use_case="pricing",
-    )
-    if not selected_text:
-        return []
-
-    deterministic = price_lines._extract_prices_deterministic(selected_text)
-    supported = price_step._supported_price_rows(deterministic.prices, selected_text)
-
-    rows: list[dict[str, Any]] = []
-    for extracted in supported:
-        fields = price_step._normalized_price_fields(extracted)
-        if fields is None:
-            continue
-        rows.append(
-            {
-                **fields,
-                "category": fields["category"].value,
-                "period": fields["period"].value if fields["period"] else None,
-            }
-        )
-    return rows
+from app.scrapers.extraction import contact_details, general_fields, page_selection
 
 
 def deterministic_general_info(
@@ -96,7 +66,6 @@ def run_deterministic_extraction(school: School, pages: list[SourcePage]) -> dic
         pages=pages,
     )
     return {
-        "pricing": deterministic_pricing_rows(school, pages),
         "general_info": {
             "extracted": extracted,
             "extracted_i18n": extracted_i18n,

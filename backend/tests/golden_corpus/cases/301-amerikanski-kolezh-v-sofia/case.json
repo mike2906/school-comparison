@@ -98,31 +98,7 @@
           ]
         }
       }
-    },
-    "pricing": [
-      {
-        "academic_year": "2025-2026",
-        "age_group": null,
-        "amount": 10040.0,
-        "amount_max": null,
-        "amount_min": null,
-        "category": "tuition",
-        "currency": "EUR",
-        "period": null,
-        "plan_name": null
-      },
-      {
-        "academic_year": "2025-2026",
-        "age_group": null,
-        "amount": 21700.0,
-        "amount_max": null,
-        "amount_min": null,
-        "category": "tuition",
-        "currency": "EUR",
-        "period": null,
-        "plan_name": null
-      }
-    ]
+    }
   },
   "known_issues": [],
   "name_aliases": [

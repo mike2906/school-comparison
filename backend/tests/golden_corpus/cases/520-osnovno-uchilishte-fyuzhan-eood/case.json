@@ -117,42 +117,7 @@
           ]
         }
       }
-    },
-    "pricing": [
-      {
-        "academic_year": "2025-2026",
-        "age_group": "preschool",
-        "amount": 6650.0,
-        "amount_max": null,
-        "amount_min": null,
-        "category": "tuition",
-        "currency": "EUR",
-        "period": null,
-        "plan_name": null
-      },
-      {
-        "academic_year": "2025-2026",
-        "age_group": "1-7 клас",
-        "amount": 7150.0,
-        "amount_max": null,
-        "amount_min": null,
-        "category": "tuition",
-        "currency": "EUR",
-        "period": null,
-        "plan_name": null
-      },
-      {
-        "academic_year": "2025-2026",
-        "age_group": "1-7 клас",
-        "amount": 545.0,
-        "amount_max": null,
-        "amount_min": null,
-        "category": "materials",
-        "currency": "EUR",
-        "period": null,
-        "plan_name": null
-      }
-    ]
+    }
   },
   "known_issues": [],
   "name_aliases": [],

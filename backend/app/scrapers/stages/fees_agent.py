@@ -1,9 +1,8 @@
 """Fees-agent stage (R6 step 2): find a school's fee pages, read them once, check, store.
 
-Plan: ``docs/AGENT_FEE_EXTRACTION.md``. Experimental until step 3 passes, so it is not part
-of ``all``. The default is a dry run: nothing is written, the report says what would be.
-Page-line checks live in ``extraction/agent_fees.py``; row replacement reuses the rules of
-``extraction/price_step.py``.
+Plan: ``docs/AGENT_FEE_EXTRACTION.md``. Not part of ``all``. The default is a dry run:
+nothing is written, the report says what would be. Page-line checks live in
+``extraction/agent_fees.py``; row replacement and the write in ``extraction/price_store.py``.
 """
 
 from __future__ import annotations
@@ -46,7 +45,7 @@ from app.models.pricing import PriceCategory, PricePeriod, PriceSource
 from app.models.scrape_log import ScrapeType
 from app.models.source_page import SourcePage
 from app.schemas.extraction import ExtractedPrice
-from app.scrapers.extraction import llm_results, price_step, text_values
+from app.scrapers.extraction import llm_results, price_store, text_values
 from app.scrapers.extraction.agent_fees import (
     READER_PROMPT,
     AgentDiscount,
@@ -64,6 +63,7 @@ from app.scrapers.extraction.agent_fees import (
     read_amounts,
 )
 from app.scrapers.fee_pages import fee_http_client, page_key, pdf_text
+from app.scrapers.page_content import is_template_filler
 from app.scrapers.price_evidence import _PRICE_RE, PriceRow, _amount_key
 from app.scrapers.shared_site_check import registrable_domain
 from app.scrapers.stages import common as stage_common
@@ -364,7 +364,10 @@ async def find_pages(
                 api_text = await _wordpress_text(client, final)
                 wordpress = api_text is not None
                 text = api_text or text
-            read.append(PageRead(final, text, bool(_PRICE_RE.search(text))))
+            if is_template_filler(text):  # a theme's sample prices (590's "$1,800/mo")
+                read.append(PageRead(final, text, False, "template sample text"))
+            else:
+                read.append(PageRead(final, text, bool(_PRICE_RE.search(text))))
             if read_pictures:
                 for picture in page_pictures:
                     if len(pictures) >= fee_images_module.MAX_IMAGES or page_key(picture[0]) in seen:
@@ -702,7 +705,7 @@ def _build_rows(
         fee = result.fee
         # The name of a way of paying says nothing once the fee carries its payment options.
         plan_name_dropped = bool(fee.payment_options and _PAYMENT_PLAN_NAME_RE.match(fee.plan_name or ""))
-        fields = price_step._normalized_price_fields(
+        fields = price_store.normalized_price_fields(
             ExtractedPrice(
                 category=fee.category.value,
                 amount=fee.amount,
@@ -878,7 +881,7 @@ async def _superseded_rows(db: AsyncSession, school: School, rows: list[Pricing]
     group: 305's earlier read stored "Плащане на две вноски" totals and halves as dated fees
     of their own, and the re-read gives them as payment options of undated fees, so the
     dated rows stayed and led the headline."""
-    replaced = await price_step._find_superseded_rows(db, school, rows)
+    replaced = await price_store.find_superseded_rows(db, school, rows)
     undated = [row for row in rows if not str(row.academic_year or "").strip()]
     undated_fees = {
         (row.category, float(row.amount), (row.currency or "").upper()) for row in undated if row.amount is not None
@@ -961,7 +964,7 @@ def _rows_to_keep(
     for key, olds in groups.items():
         if _refiled(olds, proposed):
             continue
-        lost = price_step._pricing_replacement_regressions(school, pages, olds, proposed, listed)
+        lost = price_store.pricing_replacement_regressions(school, pages, olds, proposed, listed)
         if lost:  # only what rule 6 protects: a withheld or blocked row at that amount still goes
             rows = [old._row if isinstance(old, _InEuro) else old for old in olds]
             protected = [row for row in rows if row.id not in blocked and pricing_row_is_publishable(row)]
@@ -1402,7 +1405,7 @@ async def run_school(
         report["reason"] = "every fee read is already stored"
         if apply:  # an earlier run's hold no longer applies
             await _lock_attributes(db, school)
-            price_step._update_pricing_hold(school, [], 0)
+            price_store.update_pricing_hold(school, [], 0)
             if discounts is not None:
                 _store_discounts(school, report)
             await db.commit()
@@ -1411,7 +1414,7 @@ async def run_school(
         report["outcome"] = "would_write"
         return report
     await _lock_attributes(db, school)
-    price_step._update_pricing_hold(school, [], len(rows))  # clears a hold an earlier run left
+    price_store.update_pricing_hold(school, [], len(rows))  # clears a hold an earlier run left
 
     await _upsert_pages(db, source_pages, stored)
     for row in rows:  # rows were built against the placeholder pages
@@ -1419,7 +1422,7 @@ async def run_school(
         row.source_page_id = row.source_page.id
     for source in sources:
         source.scraped_at = text_values._utcnow_naive()
-    await price_step._write_price_rows(db, school, [row.id for row in superseded], rows, sources)
+    await price_store.write_price_rows(db, school, [row.id for row in superseded], rows, sources)
     if discounts is not None:
         _store_discounts(school, report)
     # The new rows stay withheld until Stage 6 has checked them, as after an extraction.

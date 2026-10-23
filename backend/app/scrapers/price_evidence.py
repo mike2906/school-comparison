@@ -132,28 +132,6 @@ def currency_price_starts(text: str) -> list[int]:
     return [m.start() for m in _PRICE_RE.finditer(text)]
 
 
-_TABLE_NUMBER_RE = re.compile(r"(?<![\d.,/])\d{1,3}(?:[ \u00a0]?\d{3})+(?![\d.,/])|(?<![\d.,/])\d{3,5}(?![\d.,/])")
-
-
-def fee_number_starts(text: str) -> list[int]:
-    """Start offsets of what reads as prices: currency amounts, and table cells of 3+ digits.
-
-    A fee table often names its currency once, in a heading ("all fees are in euro"),
-    and leaves the cells bare.
-    """
-    starts = currency_price_starts(text)
-    offset = 0
-    for line in text.splitlines(keepends=True):
-        if "|" in line:
-            starts.extend(
-                offset + m.start()
-                for m in _TABLE_NUMBER_RE.finditer(line)
-                if not re.fullmatch(r"(?:19|20)\d{2}", m.group(0))  # a year, not a price
-            )
-        offset += len(line)
-    return sorted(set(starts))
-
-
 def _has_words(text: str) -> bool:
     return bool(re.search(r"[^\W\d_]{2,}", re.sub(_CURRENCY, " ", text, flags=re.IGNORECASE)))
 
@@ -1383,18 +1361,3 @@ def replacement_regressions(
                 reasons.append(f"loses the {old.period} period of {old.category} {', '.join(key)}")
                 break
     return reasons
-
-
-def period_in_label_parts(block: str, label: str | None) -> str | None:
-    """The one period the parts of a copied label name, counting only parts on the page.
-
-    The model joins a row's words with " / "; a part the page states may carry the period
-    the layout lost: "Плащане на 1 вноска" heads a column of a table flattened one cell
-    a line (610), so nothing above the amount says which column it is in.
-    """
-    found: set[str] = set()
-    for part in str(label or "").split(" / "):
-        named = period_families(part.casefold())
-        if named and label_spans(block, part):
-            found |= named
-    return next(iter(found)).lower() if len(found) == 1 else None

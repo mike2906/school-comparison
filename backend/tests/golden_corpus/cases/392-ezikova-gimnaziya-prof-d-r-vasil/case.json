@@ -137,75 +137,7 @@
           ]
         }
       }
-    },
-    "pricing": [
-      {
-        "academic_year": "2025/2026",
-        "age_group": null,
-        "amount": 8890.0,
-        "amount_max": null,
-        "amount_min": null,
-        "category": "tuition",
-        "currency": "EUR",
-        "period": null,
-        "plan_name": null
-      },
-      {
-        "academic_year": "2025/2026",
-        "age_group": null,
-        "amount": 8980.0,
-        "amount_max": null,
-        "amount_min": null,
-        "category": "tuition",
-        "currency": "EUR",
-        "period": null,
-        "plan_name": null
-      },
-      {
-        "academic_year": "2025/2026",
-        "age_group": null,
-        "amount": 9200.0,
-        "amount_max": null,
-        "amount_min": null,
-        "category": "tuition",
-        "currency": "EUR",
-        "period": null,
-        "plan_name": null
-      },
-      {
-        "academic_year": "2025/2026",
-        "age_group": null,
-        "amount": 9680.0,
-        "amount_max": null,
-        "amount_min": null,
-        "category": "tuition",
-        "currency": "EUR",
-        "period": null,
-        "plan_name": null
-      },
-      {
-        "academic_year": "2025/2026",
-        "age_group": null,
-        "amount": 2100.0,
-        "amount_max": null,
-        "amount_min": null,
-        "category": "transport",
-        "currency": "EUR",
-        "period": null,
-        "plan_name": null
-      },
-      {
-        "academic_year": "2025/2026",
-        "age_group": null,
-        "amount": 345.0,
-        "amount_max": null,
-        "amount_min": null,
-        "category": "food",
-        "currency": "EUR",
-        "period": "quarter",
-        "plan_name": null
-      }
-    ]
+    }
   },
   "known_issues": [],
   "name_aliases": [],

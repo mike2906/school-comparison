@@ -279,7 +279,7 @@ Mike asked for the work to go ahead without waiting for him, so these defaults w
 
 1. **Phases 0 and 1 and the test-only steps start now.** The price, extractor and CLI phases wait until after Monday's data steps.
 2. **Spot checks: nothing to port.** The CLI's validate-data stage already runs sampled spot checks (`_run_validate_data_batch`). The Celery task was a duplicate.
-3. **`audit_price_rows_uf45.py` and `refresh_prices.py` stay.** They are still price tooling, and `price_evidence.py` cites the audit.
+3. **`audit_price_rows_uf45.py` stays** (`price_evidence.py` cites the audit). `refresh_prices.py` was deleted with the old fee extraction (2026-10-23).
 4. **`app/utils/education.py` is deleted with its tests.** The admission calculator gets written test-first when that work starts.
 5. **Kept on purpose:** `merge_kindergarten_buildings.py` (needed again if kg.sofia.bg is re-imported), `import_sofia_municipal_points.py` (the geocoding write gate references it), `pilot_identity_adjudication.py` with its service, which needs its own review before deletion, and `backfill_nvo_pupil_counts.py`, because `cli run --stage nvo` can't replace it while io.mon.bg blocks automated requests.
 6. **Settled (2026-10-12):** the scoreboard's website-validation coverage is replaced by `withheld_website_data` (lane C).

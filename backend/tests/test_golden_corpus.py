@@ -7,7 +7,7 @@ deterministic regression coverage that runs in CI.
 To (re)generate fixtures from the live database:
     uv run python -m scripts.build_golden_corpus
 
-When a deterministic pricing/display-name/general-info fix intentionally changes
+When a deterministic display-name/general-info fix intentionally changes
 output, regenerate (or hand-edit) the affected ``case.json`` and review the diff.
 
 Snapshots are characterization baselines of *current* behavior, so they can

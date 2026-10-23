@@ -1,8 +1,0 @@
-== school 533: Re-extracted pricing held for review (kept published rows): loses the MONTHLY period of CAMP 950.00; Validation completed before commit (ok)
-    camp 950.00 EUR monthly 2026/2027 [Зелени училища (приблизително) / Зелени училища (приблизително)] https://school3.transform.bg/application-and-admission/finansovi-uslovia/
-    extracurricular 10.00 EUR no period 2026/2027 [Допълнителни извънкласни дейности (опционално)] https://school3.transform.bg/application-and-admission/finansovi-uslovia/
-    extracurricular 20.00 EUR no period 2026/2027 [Допълнителни извънкласни дейности (опционално)] https://school3.transform.bg/application-and-admission/finansovi-uslovia/
-    materials 100.00 EUR no period 2026/2027 [Материали] https://school3.transform.bg/application-and-admission/finansovi-uslovia/
-    registration 125.00 EUR one_time 2026/2027 [Административна такса за приемна процедура] https://school3.transform.bg/application-and-admission/finansovi-uslovia/
-    transport 200.00 EUR monthly 2026/2027 [Транспорт в две посоки (опционално)] https://school3.transform.bg/application-and-admission/finansovi-uslovia/
-

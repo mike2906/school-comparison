@@ -28,8 +28,7 @@ async def run_extract_school(db, school_id: int, country: str):
         console.print("[yellow]  Skipped: content unchanged[/yellow]")
     elif result.get("status") == "extracted":
         console.print(
-            f"[green]  Success: pricing={result.get('pricing_count')} items, "
-            f"general_info={result.get('general_info_success')}[/green]"
+            f"[green]  Success: general_info={result.get('general_info_success')}[/green]"
         )
         if result.get("details"):
             for detail in result.get("details"):

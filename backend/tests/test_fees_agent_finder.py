@@ -428,3 +428,19 @@ async def test_first_urls_are_read_after_home_on_top_of_the_cap(monkeypatch):
     )
     assert [p.url for p in read][:2] == [HOME, arts]
     assert len(read) == fees_agent.MAX_FETCHES + 1
+
+
+async def test_a_themes_sample_page_is_not_read_for_fees(monkeypatch):
+    """590's theme cards: "$1,800/mo" beside lorem ipsum is not a fee of the school."""
+    sample = (
+        "Welcome\nLorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor "
+        "incididunt ut labore et dolore magna aliqua.\nHalf Days $1,800/mo\nFull Days $2,300/mo"
+    )
+    fees = "https://meridian22.org/taksi/"
+    crawler = _Crawler({HOME: [(sample, [(fees, "Такси")])], fees: [("Месечна такса: 700 евро " + "x" * 300, [])]})
+    monkeypatch.setattr(fees_agent, "_pick", _picks([fees]))
+    read = await fees_agent.find_pages(crawler, None, _Client(), _school(), Spend(0.05))
+    assert [(p.url, p.prices, p.note) for p in read] == [
+        (HOME, False, "template sample text"),
+        (fees, True, None),
+    ]

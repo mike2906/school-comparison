@@ -41,15 +41,15 @@ class _FrozenDateTime(datetime.datetime):
 
 @pytest.fixture
 def frozen_today(monkeypatch):
-    """Pin the clock that the price extraction and evidence code reads to FROZEN_TODAY."""
+    """Pin the clock that the extraction and price evidence code reads to FROZEN_TODAY."""
     from app.scrapers import price_evidence
-    from app.scrapers.extraction import fee_lines, general_fields, price_lines, text_values
+    from app.scrapers.extraction import general_fields, text_values
     from app.utils import academic_year
 
     clock = types.SimpleNamespace(**vars(datetime))
     clock.date = _FrozenDate
     clock.datetime = _FrozenDateTime
-    for module in (fee_lines, general_fields, price_lines, text_values):
+    for module in (general_fields, text_values):
         monkeypatch.setattr(module, "datetime", clock)
     monkeypatch.setattr(price_evidence, "datetime", clock)
     monkeypatch.setattr(academic_year, "date", _FrozenDate)

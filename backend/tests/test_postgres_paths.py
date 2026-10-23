@@ -16,7 +16,6 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.config import get_settings
 from app.models import Pricing, School
 from app.models.country import Country
 from app.models.field_source import FieldSource, SourceConfidence, SourceType
@@ -224,35 +223,21 @@ async def _failed_llm_call(**kwargs):
     return None, 0, 0, 0.0
 
 
-async def test_failed_extraction_rolls_back_and_keeps_published_data(db_session, async_engine, monkeypatch):
-    # The rows to roll back come from the old fee extraction, off by default since fees-agent owns fees.
-    monkeypatch.setattr(get_settings(), "extraction_pipeline_prices", True)
+async def test_failed_extraction_rolls_back_and_keeps_published_data(db_session, async_engine):
     school, row = await _published_school_with_pages(db_session)
     school_id, row_id = school.id, row.id  # the rollback expires the session's objects
     before = (await _fresh_read(async_engine, School, school_id)).attributes
 
-    real_extract_prices = extractor_module._extract_prices
-    written = []
-
-    async def _spy_extract_prices(*args, **kwargs):
-        price_result = await real_extract_prices(*args, **kwargs)
-        written.append(price_result.get("count", 0))
-        return price_result
-
-    with (
-        patch("app.scrapers.extractor._run_typed_agent", new=_failed_llm_call),
-        patch("app.scrapers.extractor._extract_prices", new=_spy_extract_prices),
-    ):
+    with patch("app.scrapers.extractor._run_typed_agent", new=_failed_llm_call):
         result = await extractor_module.extract_school(db_session, school_id, "bg")
     assert result["status"] == "extraction_failed"
-    assert written and written[0] > 0, "the fallback must write rows for the rollback to undo"
 
     stored = await _fresh_read(async_engine, School, school_id)
     assert stored.scrape_status == "extracted"
+    # The deterministic fallback's general information was rolled back.
     assert stored.attributes == before
     async with async_sessionmaker(async_engine, class_=AsyncSession)() as session:
         rows = (await session.execute(select(Pricing).where(Pricing.school_id == school_id))).scalars().all()
-    # The deterministic fallback's rows were rolled back; the published row is untouched.
     assert [(r.id, r.amount, r.period) for r in rows] == [(row_id, 7500, None)]
 
 

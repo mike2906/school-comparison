@@ -10,7 +10,7 @@ from decimal import Decimal
 
 import pytest
 
-from app.scrapers.extraction import price_lines, text_values
+from app.scrapers.extraction import text_values
 from app.scrapers.price_evidence import (
     RULE_EXPIRED,
     RULE_LEVEL,
@@ -20,7 +20,6 @@ from app.scrapers.price_evidence import (
     PriceRow,
     amount_spans,
     check_price_row,
-    fee_number_starts,
     heading_period,
     label_is_another_institutions,
     normalize_text,
@@ -276,20 +275,6 @@ def test_expired_offers(page, amount, category, expired):
     assert any(rule == RULE_EXPIRED for rule, _ in findings(stored, page, "school")) is expired
 
 
-def test_517_extraction_reads_the_heading_when_the_word_beside_the_amount_cannot_fit():
-    from app.schemas.extraction import ExtractedPrice
-    from app.scrapers.extraction.fee_lines import _filter_model_prices
-
-    page = (
-        "--- SOURCE: https://school.test/fees ---\n"
-        "ГОДИШНА ТАКСА | НА ДВЕ ВНОСКИ | НА ОСЕМ ВНОСКИ\n"
-        "7810 евро | 2 х 4022 евро | 8 х 1045 евро\n"
-        "Еднократно плащане: До 09.07.2026 г.\n"
-    )
-    price = ExtractedPrice(category="tuition", amount=7810, currency="EUR", plan_name="ГОДИШНА ТАКСА", confidence=0.9)
-    assert [row.period for row in _filter_model_prices([price], page)] == ["yearly"]
-
-
 @pytest.mark.parametrize(
     ("raw", "expected"),
     [
@@ -310,29 +295,6 @@ def test_text_list_keeps_decimal_commas(raw, expected):
 # ---------------------------------------------------------------------------
 
 @pytest.mark.parametrize(
-    "text,expected",
-    [
-        ("1.234,56 лв.", (1234.56, "BGN")),  # dot thousands, decimal comma
-        ("1,234.56 EUR", (1234.56, "EUR")),  # comma thousands, decimal point
-        ("6.200 лв.", (6200.0, "BGN")),  # a dot before three digits groups thousands
-        ("12.50 евро", (12.5, "EUR")),  # before two digits it is a decimal point
-        ("6,200 EUR", (6200.0, "EUR")),
-        ("181,44 лв.", (181.44, "BGN")),
-        ("1.234.567 лв", (1234567.0, "BGN")),
-        ("1,234,567 €", (1234567.0, "EUR")),
-        ("6 200 лв.", (6200.0, "BGN")),
-        ("лв 450", (450.0, "BGN")),
-        ("BGN 1 200", (1200.0, "BGN")),
-        ("500 лева", (500.0, "BGN")),
-        ("€ 7 500", (7500.0, "EUR")),
-        ("300 USD", (None, None)),
-    ],
-)
-def test_price_line_amount_and_currency(text, expected):
-    assert price_lines._extract_price_amount_currency(text) == expected
-
-
-@pytest.mark.parametrize(
     "name,month",
     [
         ("януари", 1), ("февруари", 2), ("март", 3), ("април", 4), ("май", 5), ("юни", 6),
@@ -347,11 +309,6 @@ def test_offer_deadline_reads_every_month_name(name, month):
     else:
         context = f"Цени за договори, сключени до 15 {name} 2026\n5500 €"
     assert offer_end(context) == datetime.date(2026, month, 15)
-
-
-def test_years_in_a_fee_table_are_not_read_as_bare_prices():
-    text = "| Клас | Такса |\n|---|---|\n| 2025 | 2026 |\n| 1-4 | 7500 |\n"
-    assert [text[start:start + 4] for start in fee_number_starts(text)] == ["7500"]
 
 
 # --- 2026-10-12 refresh (171, 533, 564, 610) ---------------------------------------------
