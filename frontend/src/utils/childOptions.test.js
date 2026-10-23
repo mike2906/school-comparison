@@ -38,3 +38,13 @@ test('schools are grouped by chance, nearest trip first, and the budget hides on
   const all = buildOptions(schools, { verdictsFor: () => [], monthlyBudget: 500, showOverBudget: true })
   assert.equal(all.groups.unknown.length, 6)
 })
+
+test('by public transport the earliest leaving goes last, whatever the drive', () => {
+  const schools = [
+    { id: 1, school_type: 'state', driveSeconds: 300, tripSeconds: 2400 },
+    { id: 2, school_type: 'state', driveSeconds: 900, tripSeconds: 1200 },
+    { id: 3, school_type: 'state', driveSeconds: 100, tripSeconds: null, distance: 9 },
+  ]
+  const { groups } = buildOptions(schools, { verdictsFor: () => [] })
+  assert.deepEqual(groups.unknown.map(s => s.id), [2, 1, 3], 'no trip in time sorts after every trip')
+})

@@ -1216,6 +1216,25 @@
     "outside": "Drive times are only available in and around Sofia.",
     "unavailable": "Drive times could not be loaded."
   },
+  "transitTime": {
+    "aria": "About {{minutes}} minutes by public transport ({{lines}}): leave home at {{leave}} to arrive by {{deadline}}",
+    "ariaWalk": "About {{minutes}} minutes on foot: leave home at {{leave}} to arrive by {{deadline}}",
+    "note": "Public transport by the timetable for {{day}}, arriving by 8:00 (or the start of the school's shift, where we know it): walking at a child's pace, 2 min early at the stop, 2 min for each change. Places with no trip in time come last.",
+    "timetableCredit": "Timetable: Център за градска мобилност / Столична община (modified)",
+    "licence": "CC BY 4.0",
+    "walkCredit": "footpaths © OpenStreetMap contributors",
+    "loading": "Working out public transport times…",
+    "outside": "Public transport times are only available in and around Sofia.",
+    "unavailable": "Public transport times could not be loaded.",
+    "then": ", then ",
+    "mode": {
+      "bus": "bus",
+      "tram": "tram",
+      "trolleybus": "trolleybus",
+      "metro": "metro"
+    },
+    "leave": "leave {{leave}}"
+  },
   "savedAdmission": {
     "yoursPoints": "Your points: {{points}}",
     "yoursGroup": "You: group {{group}}, {{points}} points",
@@ -1341,7 +1360,10 @@
     "changeProfile": "Change",
     "done": "Done",
     "moreLanguages": "More languages",
-    "showMore": "Show {{count}} more"
+    "showMore": "Show {{count}} more",
+    "travel": "How do you get there?",
+    "travel_car": "By car",
+    "travel_transit": "Public transport"
   },
   "calendar": {
     "title": "Admission calendar",

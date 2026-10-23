@@ -6,7 +6,7 @@
  *
  * Shape: { version, child: { birthYear, startYear? } | null, home: { streetId, number } | null,
  *          homePoint: { lat, lng, label, fromHome? } | null,
- *          preferences: { languages: [key], monthlyBudget: number | null } | null,
+ *          preferences: { languages: [key], monthlyBudget: number | null, travel: 'car' | 'transit' } | null,
  *          kindergarten: { startYear, answers, siblings?, savedOn } | null,
  *          grade_1: { startYear, addresses, answers, siblings?, savedOn } | null }
  * `siblings` maps a school id to that school's sibling answers (see siblingsWith).
@@ -66,7 +66,8 @@ function preferencesFrom(value) {
   if (!value || typeof value !== 'object') return null
   const languages = Array.isArray(value.languages) ? value.languages.filter(key => typeof key === 'string') : []
   const monthlyBudget = Number.isFinite(value.monthlyBudget) && value.monthlyBudget > 0 ? value.monthlyBudget : null
-  return languages.length > 0 || monthlyBudget ? { languages, monthlyBudget } : null
+  const travel = value.travel === 'transit' ? 'transit' : 'car'
+  return languages.length > 0 || monthlyBudget || travel !== 'car' ? { languages, monthlyBudget, travel } : null
 }
 
 function isPoint(point) {
@@ -172,7 +173,7 @@ export function saveChild({ birthYear, startYear }) {
   write({ ...saved, child: childFrom({ birthYear, startYear: keep }) })
 }
 
-/** Saves the options page's languages and budget (see preferencesFrom), or forgets them. */
+/** Saves the options page's languages, budget and travel (see preferencesFrom), or forgets them. */
 export function savePreferences(preferences) {
   write({ ...read(), preferences: preferencesFrom(preferences) })
 }
