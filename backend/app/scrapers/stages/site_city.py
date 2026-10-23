@@ -1,8 +1,10 @@
-"""Site-city stage: withhold an accepted website whose home page names another town.
+"""Site-city stage: withhold an accepted website whose home page names another town or
+another numbered school.
 
-URL validation now rejects a site whose title or main heading names another town
-(``app.scrapers.site_city``), but validation runs only for new or failed sites. This stage
-re-reads the home page of every accepted site and applies the same rule, so a site
+URL validation now rejects a site whose title or main heading names another town or
+numbers another school (``app.scrapers.site_city``), but validation runs only for new or
+failed sites. This stage re-reads the home page of every accepted site and applies the
+same rules, so a site
 accepted before the rule, or one that changed hands since, is caught too: a hit takes
 the validation failure path (website-derived data withheld, ``failed_validate``), and
 the next ``recover-failed-urls`` searches for the school's real site. No model calls.
@@ -23,7 +25,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import School
 from app.scrapers.fee_pages import fee_http_client
-from app.scrapers.site_city import identity_texts, other_town_named
+from app.scrapers.site_city import identity_texts, other_number_named, other_town_named
 from app.scrapers.stages.social_links import Fetch, _http_fetch
 from app.utils.school_facts import SITE_ACCEPTED_STATUSES
 
@@ -44,7 +46,9 @@ async def run_site_city(
     fetch: Optional[Fetch] = None,
 ) -> dict[str, Any]:
     """Check the accepted sites (the given ids, or all in ``city``); returns the report."""
-    query = select(School.id, School.website_url, School.city, School.name_i18n).where(
+    from app.scrapers.url_validator import extract_validation_aliases
+
+    query = select(School.id, School.website_url, School.city, School.name_i18n, School.attributes).where(
         School.country_code == country,
         School.website_url.isnot(None),
         School.scrape_status.in_(SITE_ACCEPTED_STATUSES),
@@ -59,13 +63,16 @@ async def run_site_city(
         semaphore = asyncio.Semaphore(CONCURRENCY)
 
         async def check(row) -> Optional[dict[str, Any]]:
-            school_id, website_url, school_city, name_i18n = row
+            school_id, website_url, school_city, name_i18n, attributes = row
+            names = [*(name_i18n or {}).values(), *extract_validation_aliases(attributes)]
             try:
                 async with semaphore:
                     page = await fetch(website_url)
                 if page is None:
                     return None
-                town = other_town_named(identity_texts(BeautifulSoup(page[1], "html.parser")), school_city)
+                texts = identity_texts(BeautifulSoup(page[1], "html.parser"))
+                town = other_town_named(texts, school_city)
+                school = None if town else other_number_named(texts, names)
             except Exception:  # one odd page must not stop the run: it counts as not read
                 logger.exception("site-city could not check school %s", school_id)
                 return None
@@ -74,10 +81,13 @@ async def run_site_city(
                 "name_bg": (name_i18n or {}).get("bg"),
                 "website": website_url,
                 "town": town,
+                "school": school,
+                "reason": f"Website names another town: {town}" if town else f"Website names another school: {school}",
             }
 
         checked = await asyncio.gather(*(check(row) for row in rows))
-        return [item for item in checked if item and item["town"]], sum(item is None for item in checked)
+        hits = [item for item in checked if item and (item["town"] or item["school"])]
+        return hits, sum(item is None for item in checked)
 
     if fetch is not None:
         hits, unread = await check_all(fetch)
@@ -98,7 +108,7 @@ async def run_site_city(
                 normalize(hit["website"]) or hit["website"],
                 ValidationResult.INVALID,
                 None,
-                f"Website names another town: {hit['town']}",
+                hit["reason"],
             )
             hit["withheld"] = True
     return {"checked": len(rows), "unread": unread, "hits": hits, "applied": apply}

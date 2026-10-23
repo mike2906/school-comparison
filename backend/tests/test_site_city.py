@@ -6,7 +6,7 @@ import pytest
 from bs4 import BeautifulSoup
 
 from app.models import School
-from app.scrapers.site_city import identity_texts, other_town_named
+from app.scrapers.site_city import identity_texts, other_number_named, other_town_named
 from app.scrapers.stages.site_city import run_site_city
 from app.scrapers.url_validator import URLValidator, ValidationResult
 
@@ -125,3 +125,70 @@ def test_a_patron_named_like_a_town_is_not_another_town():
     # 74 СУ "Гоце Делчев": a patron, unless written as a town.
     assert other_town_named(["74 СУ - Гоце Делчев"], "sofia") is None
     assert other_town_named(["СУ гр. Гоце Делчев"], "sofia") == "Гоце Делчев"
+
+
+@pytest.mark.parametrize(
+    "texts, names, label",
+    [
+        # 184's link: the municipal kindergarten of the same name.
+        (["Детска градина - ДГ 59 Елхица - София", "ДГ №59 Елхица"], ['"ЧАСТНА ДЕТСКА ГРАДИНА ЕЛХИЦА" ООД'], "ДГ 59"),
+        (["119 СУ Акад. Михаил Арнаудов"], ["19 СУ Елин Пелин"], "119 СУ"),
+        (["Детска градина №160"], ["ДГ №60"], "Детска градина №160"),
+        # Its own number, written any way, or an ordinal ("Трето" is 3 СУ, 221's 3coy.eu).
+        (["ДГ №59 Елхица"], ["ДГ №59 Елхица (с яслени групи)"], None),
+        (["48. ОУ Йосиф Ковачев"], ["48 основно училище"], None),
+        (["3 СУ „Марин Дринов”"], ['Трето средно училище "Марин Дринов"'], None),
+        # A site naming the school beside another (a branch, a merged kindergarten).
+        (["ДГ 25 и ДГ 26"], ["ДГ 26"], None),
+        # A private chain's own numbering in words, and names with numbers in them.
+        (["ОПУ1 - Основно прогресивно училище 1 - Стрелбище, София"], ["ЧОУ Прогресивно образование"], None),
+        (["Гимназия 1, София - Прогресивна гимназия 1"], ["ЧПГ Прогресивно образование - София"], None),
+        (["СУ 22 Меридиан"], ["ЧСУ Меридиан 22"], None),
+        (["Частна детска градина 101 Защо"], ['ЧДГ "101 ЗАЩО"'], None),
+        (["Начало - Weda Schule"], ["ЧДГ Веда"], None),
+        # A preparatory group, not a vocational school.
+        (["ПГ 1 - Звездички"], ["ЧДГ Слънчо"], None),
+        ([], ["ДГ 5"], None),
+    ],
+)
+def test_other_number_named(texts, names, label):
+    assert other_number_named(texts, names) == label
+
+
+async def test_validator_rejects_another_numbered_schools_site():
+    html = """<html><head><title>Детска градина - ДГ 59 Елхица - София</title></head>
+        <body><h1>ДГ №59 Елхица</h1><p>детска градина деца група прием родители</p></body></html>"""
+    response = MagicMock(status_code=200, url="https://dg-59.com/", text=html)
+    with patch("httpx.AsyncClient") as client_class:
+        client = AsyncMock()
+        client.__aenter__.return_value = client
+        client.get.return_value = response
+        client_class.return_value = client
+        result, final_url, reason = await URLValidator("bg", school_city="sofia").validate_url(
+            "https://dg-59.com", use_llm_fallback=False, school_name='"ЧАСТНА ДЕТСКА ГРАДИНА ЕЛХИЦА" ООД'
+        )
+    assert (result, final_url, reason) == (ValidationResult.INVALID, None, "Website names another school: ДГ 59")
+
+
+async def test_site_city_stage_withholds_another_numbered_schools_site(db_session):
+    private = School(
+        country_code="bg", city="sofia", name_i18n={"bg": "ЧДГ Елхица"}, school_type="private",
+        education_level="kindergarten", website_url="https://dg-59.com/", scrape_status="validated",
+    )
+    own = School(
+        country_code="bg", city="sofia", name_i18n={"bg": "ДГ №59 Елхица"}, school_type="state",
+        education_level="kindergarten", website_url="https://dg59.bg/", scrape_status="validated",
+    )
+    db_session.add_all([private, own])
+    await db_session.commit()
+    pages = {"https://dg-59.com/": "<title>ДГ 59 Елхица - София</title>", "https://dg59.bg/": "<title>ДГ 59 Елхица</title>"}
+
+    async def fetch(url):
+        return url, pages[url]
+
+    with patch("app.scrapers.url_validator._update_validation_result", new=AsyncMock()) as update:
+        report = await run_site_city(db_session, fetch=fetch, apply=True)
+    assert [(hit["school_id"], hit["school"]) for hit in report["hits"]] == [(private.id, "ДГ 59")]
+    update.assert_awaited_once_with(
+        private.id, "https://dg-59.com/", ValidationResult.INVALID, None, "Website names another school: ДГ 59"
+    )

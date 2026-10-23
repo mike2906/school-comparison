@@ -244,3 +244,47 @@ test('/schools lists schools then kindergartens by name, linked in the page lang
   const search = fixedPages(t, 'en', listed).find((p) => p.routePath === '/search')
   assert.match(search.body, /<a href="\/en\/schools">All schools and kindergartens<\/a>/)
 })
+
+const districts = {
+  type: 'FeatureCollection',
+  features: [
+    { properties: { name: 'Младост' }, geometry: { type: 'Polygon', coordinates: [[[23, 42], [24, 42], [24, 43], [23, 43], [23, 42]]] } },
+  ],
+}
+const pinned = school({
+  website_url: 'https://school.example',
+  locations: [{ is_primary: true, lat: 42.5, lng: 23.5, phone: '02/824 11 70', address_i18n: { en: '1 Main St</script>' } }],
+})
+
+test('a school page names its district in the title, from the source or the pin', () => {
+  assert.match(schoolPage(pinned, t, 'en', { districts }).title, /^School <One>, Mladost district · /)
+  const named = school({ admission_info: { admin_district: 'Младост' }, locations: [] })
+  assert.match(schoolPage(named, translator('bg'), 'bg', { districts }).title, /^Училище, район Младост · /)
+  assert.doesNotMatch(schoolPage(school(), t, 'en', { districts }).title, /district/)
+})
+
+test('a school page carries schema.org data that cannot break out of its script', () => {
+  const page = schoolPage(pinned, t, 'en', { districts, origin: ORIGIN })
+  assert.deepEqual(page.jsonLd, {
+    '@context': 'https://schema.org',
+    '@type': 'School',
+    name: 'School <One>',
+    alternateName: 'Училище',
+    url: 'https://example.test/en/schools/12',
+    sameAs: 'https://school.example',
+    telephone: '+35928241170',
+    address: {
+      '@type': 'PostalAddress',
+      streetAddress: '1 Main St</script>',
+      addressLocality: 'Sofia',
+      addressRegion: 'Mladost district',
+      addressCountry: 'BG',
+    },
+    geo: { '@type': 'GeoCoordinates', latitude: 42.5, longitude: 23.5 },
+  })
+  assert.equal(schoolPage(kindergarten, t, 'en', { origin: ORIGIN }).jsonLd['@type'], 'Preschool')
+  const html = renderPage(TEMPLATE, page, { language: 'en', origin: ORIGIN, siteName: 'Site' })
+  const script = html.match(/<script type="application\/ld\+json">(.*?)<\/script>/)[1]
+  assert.doesNotMatch(script, /</)
+  assert.equal(JSON.parse(script).address.streetAddress, '1 Main St</script>')
+})

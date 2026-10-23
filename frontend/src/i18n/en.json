@@ -778,6 +778,8 @@
     "searchTitle": "Schools and kindergartens in Sofia: map and comparison",
     "searchDescription": "Find and compare kindergartens and schools in Sofia: map, official NVO exam results, private school fees and admissions.",
     "schoolFacts": "{{type}} · {{level}}",
+    "district": "{{district}} district",
+    "city": "Sofia",
     "nvoHeading": "Official NVO results",
     "nvoLine": "{{exam}} {{year}}: {{scores}}",
     "nvoBulgarian": "Bulgarian {{value}}",

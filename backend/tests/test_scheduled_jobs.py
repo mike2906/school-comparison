@@ -20,6 +20,11 @@ import json, os, sys
 args = sys.argv[1:]
 with open(os.environ["CALLS"], "a") as f:
     f.write(json.dumps({"uv": args, "force": os.environ.get("PINS_FORCE")}) + "\n")
+if "find-websites" in args:
+    if os.environ.get("FIND_FAIL"):
+        sys.exit(1)
+    json.dump({"found": int(os.environ.get("FIND_FOUND", "0")), "searched": 3}, open(args[args.index("--out") + 1], "w"))
+    sys.exit(0)
 if "--out" not in args or "--max-usd" not in args:
     print(os.environ.get("UV_STDOUT", ""))
     sys.exit(int(os.environ.get("UV_FAIL", "0")))
@@ -155,6 +160,41 @@ def test_installing_starts_nothing_and_the_next_month_runs_once(pc):
     assert pc.option("--workers") == "4" and pc.published
     assert (pc.state / "fees_cycle").read_text().strip() == "2026-11"
     assert pc.run("refresh_fees.sh", "2026-11-02T02:20").calls == []
+
+
+def _find_websites_calls(pc):
+    return [c["uv"] for c in pc.calls if "uv" in c and "find-websites" in c["uv"]]
+
+
+def test_the_months_first_fee_run_first_searches_for_missing_websites(pc):
+    pc.run("refresh_fees.sh", "2026-10-20T12:20")
+    pc.run("refresh_fees.sh", "2026-11-01T02:20", [{"schools": [5, 8], "spent": 0.8, "stopped": "stopped before school 9: cap"}], FIND_FOUND="2")
+    uv = [c["uv"] for c in pc.calls if "uv" in c]
+    assert "find-websites" in uv[0] and "--apply" in uv[0] and "--max-usd" in uv[1]  # searched before the read
+    assert "find-websites: 2 of 3 schools without a site found one" in pc.log("fees")
+    # A carried-on run does not search again: the schools before it were read already.
+    pc.run("refresh_fees.sh", "2026-11-02T02:20", [{"schools": [9], "spent": 0.3}])
+    assert _find_websites_calls(pc) == [] and pc.option("--after-id") == "8"
+
+
+def test_nothing_found_publishes_only_what_the_read_wrote(pc):
+    pc.run("refresh_fees.sh", "2026-10-20T12:20")
+    (pc.state / "fees-2026-11.schools.jsonl").unlink(missing_ok=True)
+    pc.run("refresh_fees.sh", "2026-11-01T02:20", [{"schools": [], "spent": 0.0}], FIND_FOUND="0")
+    assert pc.code == 0 and len(_find_websites_calls(pc)) == 1 and not pc.published
+
+
+def test_sites_found_are_published_even_when_no_fee_was_written(pc):
+    pc.run("refresh_fees.sh", "2026-10-20T12:20")
+    pc.run("refresh_fees.sh", "2026-11-01T02:20", [{"schools": [], "spent": 0.0}], FIND_FOUND="1")
+    assert pc.code == 0 and pc.published
+
+
+def test_a_failed_search_does_not_hold_up_the_fee_read(pc):
+    pc.run("refresh_fees.sh", "2026-10-20T12:20")
+    pc.run("refresh_fees.sh", "2026-11-01T02:20", [{"schools": [3], "spent": 0.2}], FIND_FAIL="1")
+    assert pc.code == 0 and pc.option("--max-usd") == "1.50"
+    assert "find-websites failed; the fee read goes on without it" in pc.log("fees")
 
 
 def test_a_run_the_cap_stopped_carries_on_tomorrow_with_what_is_left(pc):
