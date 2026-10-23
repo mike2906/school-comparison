@@ -3,7 +3,7 @@ import { geocodeAddress, reverseGeocode, cancelGeocode } from '../../utils/geoco
 import { mapSearchQuery } from '../../admission/catchments.js'
 import { loadAddresses } from '../../admission/loadCatchments.js'
 import { useSavedAdmission } from '../../hooks/useSavedAdmission.js'
-import { getSaved, homeKey, readLocation, samePoint, saveHomePoint, writeLocation } from '../../admission/saved.js'
+import { getSaved, homeKey, LOCATION_OFF, locationTurnedOff, readLocation, samePoint, saveHomePoint, writeLocation } from '../../admission/saved.js'
 
 // A location's `placeholder` marks a name that is not a place ("current location", "home"),
 // so it is never kept as the home's name.
@@ -18,7 +18,9 @@ function readStoredUserLocation(fallbackAddress, homeLabel) {
       placeholder: Boolean(stored.placeholder || !stored.address),
     }
   }
-  // No location of its own yet: start from the home the parent saved.
+  // No location of its own yet: start from the home the parent saved, unless they turned
+  // the location off.
+  if (locationTurnedOff()) return null
   const home = getSaved().homePoint
   return home ? { lat: home.lat, lng: home.lng, address: home.label || homeLabel, placeholder: !home.label } : null
 }
@@ -219,18 +221,20 @@ export function useUserLocation({ t, geocodingConfig, arriveNearSavedHome = fals
   // Forgetting the home also drops the list's location while it is the home, so no page
   // keeps measuring from it.
   const forgetHome = () => {
-    if (isHome) clearLocation()
+    if (isHome) clearLocation({ turnOff: false })
     saveHomePoint(null)
   }
 
-  const clearLocation = () => {
+  // Cleared by the parent, the location stays off on the next visit too (no fallback to the
+  // saved home); with the home itself forgotten there is nothing to fall back to.
+  const clearLocation = ({ turnOff = true } = {}) => {
     startLocationRequest()
     setIsLocating(false)
     setIsGeocoding(false)
     setUserLocation(null)
     setAddressInput('')
     setLocationError(null)
-    writeLocation(null)
+    writeLocation(turnOff ? LOCATION_OFF : null)
   }
 
   const setLocationFromMap = (lat, lng) => {
