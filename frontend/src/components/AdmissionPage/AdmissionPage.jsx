@@ -144,6 +144,9 @@ function AdmissionPage() {
         <h1 className="text-3xl font-bold text-neutral-900">{t('admissionCalc.title')}</h1>
         <p className="mt-2 max-w-3xl text-neutral-700">{t('admissionCalc.intro')}</p>
         <p className="mt-2 max-w-3xl text-sm text-neutral-600">{t('admissionCalc.privacy')}</p>
+        <p className="mt-2 max-w-3xl text-sm">
+          <Link to="/calendar" className="font-medium text-primary-700 underline">{t('admissionCalc.calendarLink')}</Link>
+        </p>
 
         <div className="mt-6 flex flex-wrap gap-2" role="tablist">
           {STAGES.map(option => (

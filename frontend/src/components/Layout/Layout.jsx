@@ -22,6 +22,9 @@ function Footer({ clearCompareBar }) {
           <Link to="/admission" className="text-primary-700 underline">
             {t('nav.admission')}
           </Link>
+          <Link to="/calendar" className="text-primary-700 underline">
+            {t('nav.calendar')}
+          </Link>
           <Link to="/about" className="text-primary-700 underline">
             {t('nav.about')}
           </Link>

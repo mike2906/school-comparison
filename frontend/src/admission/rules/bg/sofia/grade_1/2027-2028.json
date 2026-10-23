@@ -60,10 +60,10 @@
     }
   ],
   "schedule": {
-    "applications_close": "2027-05-31",
+    "applications_close": "2027-06-01",
     "first_ranking": "2027-06-02",
     "estimated": true,
-    "note": "The 2027 schedule is published by 5 January 2027. Until then the dates are estimated from the 2026 schedule."
+    "note": "The 2027 schedule is published by 5 January 2027. Until then the dates are estimated from the 2026 schedule (the ИСОДЗ system took applications until 1 June 2026, 18:00)."
   },
   "verified": {
     "status": "provisional",

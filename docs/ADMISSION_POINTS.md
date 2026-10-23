@@ -111,7 +111,10 @@ The page is `/admission?stage=kindergarten|grade_1|grade_8&school=<id>`. Only th
 stage and the school id go in the URL; with a school, its district, catchment and
 cut-offs fill in the school-specific questions. Address durations are counted to the
 date the rules name: the ranking date for kindergartens (чл. 18 т. 1 "към датата на
-класиране"), the application deadline for first grade. Eighth grade shows the score
+класиране"), the application deadline for first grade (`applications_close`: чл. 10
+counts to the day the parent applies, so the calculator assumes the last day the ИСОДЗ
+system takes applications, the same day the admission calendar shows; 1 June 2026, when
+the system locked at 18:00). Eighth grade shows the score
 under every formula the law allows, because each class's formula is in the school's
 admission plan, which we do not have.
 
