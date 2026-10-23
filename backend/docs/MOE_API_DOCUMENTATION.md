@@ -14,6 +14,9 @@ browser (tested 2026-10-21), so this runs on the PC's home connection. If the br
 challenged too, the adapter's error says so and the scheduled register refresh puts it in its issue.
 GitHub runners can download static files under `ruo.mon.bg/.../files/` (the pages listing them
 stay blocked).
+The browser is plain on purpose: if it is challenged too, we do not escalate to stealth
+plugins, disguises or challenge solvers (that evades the ministry's security control); the
+fallbacks are official open data, RUO files and asking МОН for access.
 
 ## Base URL
 ```
