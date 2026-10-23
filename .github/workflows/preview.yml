@@ -55,8 +55,10 @@ jobs:
           PRERENDER_API_URL: https://api.schooldecider.com
           VITE_CARTO_API_KEY: ${{ vars.VITE_CARTO_API_KEY }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        # A release restarts the API for about a minute (HTTP 502 while it comes back); the
+        # build reads every school from it, so wait that out once.
         run: |
-          npm run build:production
+          npm run build:production || { echo "Retrying once in 90 seconds."; sleep 90; npm run build:production; }
           echo "$HEAD_SHA" > dist/version.txt
 
       - name: Keep the site
