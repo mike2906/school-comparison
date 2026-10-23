@@ -149,7 +149,7 @@ async def test_section_replaces_a_group_home_with_the_schools_own_section(db_ses
     school = School(
         country_code="bg", city="sofia", name_i18n={"bg": "ЧДГ Аника"}, school_type="private",
         education_level="kindergarten", website_url="https://novigradini.com/#dipipopup-27586290#popup_on_load",
-        scrape_status="extracted",
+        scrape_status="extracted", attributes={"school_facts": {"facts": []}},
     )
     db_session.add(school)
     await db_session.commit()
@@ -164,6 +164,8 @@ async def test_section_replaces_a_group_home_with_the_schools_own_section(db_ses
     await db_session.refresh(school)
     assert school.website_url == "https://novigradini.com/anika/"
     assert update.await_count == 1
+    # Facts read from the group's home page are on the same site: they go, not show.
+    assert "school_facts" not in school.attributes
 
 
 async def test_section_with_the_same_path_changes_nothing(db_session):
@@ -192,7 +194,12 @@ async def test_a_given_site_starts_clean(db_session):
     school = School(
         country_code="bg", city="sofia", name_i18n={"bg": "ЧДГ Веда"}, school_type="private",
         education_level="kindergarten", scrape_status="failed_validate",
-        attributes={WEBSITE_DATA_WITHHELD_KEY: True, "data_validation": {"_schema_version": 1}},
+        attributes={
+            WEBSITE_DATA_WITHHELD_KEY: True, "data_validation": {"_schema_version": 1},
+            "school_facts": {"facts": []}, "school_facts_published": {"facts": []},
+            "website_name": {"name": "x"}, "social_links": {"facebook": "https://facebook.com/x"},
+            "moe_town_code": "68134",
+        },
     )
     db_session.add(school)
     await db_session.commit()
@@ -220,6 +227,10 @@ async def test_a_given_site_starts_clean(db_session):
     assert WEBSITE_DATA_WITHHELD_KEY not in school.attributes
     assert "data_validation" not in school.attributes
     assert school.attributes["website_candidate_method"] == "check_website"
+    # What the marker hid goes too: a re-accepted URL must not show it unread.
+    for key in ("school_facts", "school_facts_published", "website_name", "social_links"):
+        assert key not in school.attributes
+    assert school.attributes["moe_town_code"] == "68134"
     assert (old_page.is_valid, own_page.is_valid) == (False, True)
     assert update.await_args.args[2:4] == (ValidationResult.VALID, "https://wedaschule.com/")
 
@@ -255,3 +266,23 @@ async def test_a_section_replace_keeps_the_pages_under_the_section(db_session):
     await db_session.refresh(group)
     await db_session.refresh(own)
     assert (group.is_valid, own.is_valid) == (False, True)
+
+
+async def test_a_given_site_keeps_its_facts_when_nothing_was_withheld(db_session):
+    """Re-checking a school's accepted site keeps the facts read from it."""
+    school = School(
+        country_code="bg", city="sofia", name_i18n={"bg": "ЧДГ Веда"}, school_type="private",
+        education_level="kindergarten", scrape_status="validated", website_url="https://wedaschule.com/",
+        attributes={"school_facts": {"facts": []}, "social_links": {"facebook": "https://facebook.com/x"}},
+    )
+    db_session.add(school)
+    await db_session.commit()
+
+    with patch.object(
+        url_validator, "validate_school_url",
+        AsyncMock(return_value=(ValidationResult.VALID, "https://wedaschule.com/", "match")),
+    ), patch.object(url_validator, "_update_validation_result", AsyncMock()):
+        await website_stage.run_validate_url(db_session, school.id, "bg", url="wedaschule.com", apply=True)
+
+    await db_session.refresh(school)
+    assert "school_facts" in school.attributes and "social_links" in school.attributes

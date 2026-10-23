@@ -561,15 +561,16 @@ async def store_given_site(db, school, url: str, final_url: Optional[str], reaso
     facts read from a site found for it. The marker goes, with what it protected: the
     old Stage 6 report (so no fee row shows before a read and a fresh report) and the
     pages on other sites (their fees). The old extraction does not publish before the
-    new site is extracted (its status is only "validated"), and facts, social links and
-    the website name show only from the site they were read from."""
+    new site is extracted (its status is only "validated"). The facts, website name and
+    social links the marker hid, or that a replaced site gave, go as well
+    (:func:`app.utils.website_data.start_given_site_clean`): they come back from a read."""
     from sqlalchemy import select
 
     from app.models import SourcePage
     from app.models.scrape_log import ScrapeType
     from app.scrapers.shared_site_check import site_id
     from app.scrapers.url_validator import URLValidator, ValidationResult, _update_validation_result
-    from app.utils.website_data import WEBSITE_DATA_WITHHELD_KEY
+    from app.utils.website_data import WEBSITE_DATA_WITHHELD_KEY, start_given_site_clean
 
     source_url = URLValidator(country_code=school.country_code or "bg").normalize_url(url) or url
     new_sites = {site_id(source_url), site_id(final_url or source_url)}
@@ -581,9 +582,8 @@ async def store_given_site(db, school, url: str, final_url: Optional[str], reaso
     for page in pages:
         if site_id(page.source_url) not in new_sites and page.is_valid is not False:
             page.is_valid = False
-    attrs = dict(school.attributes or {})
-    attrs.pop(WEBSITE_DATA_WITHHELD_KEY, None)
-    attrs.pop("data_validation", None)
+    withheld = bool((school.attributes or {}).get(WEBSITE_DATA_WITHHELD_KEY))
+    attrs = start_given_site_clean(school.attributes, drop_site_blocks=withheld or method == "check_website_replace")
     attrs["website_candidate_method"] = method
     school.attributes = attrs
     db.add(school)

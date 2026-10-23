@@ -121,7 +121,8 @@ def known_towns_in(text: str) -> list[str]:
 # "Детска градина №59". A spelled-out type takes the number only after "№": a private
 # chain numbers its schools in words ("Основно прогресивно училище 1", 633's
 # school1.transform.bg), which is no other school's number.
-_NUMBERED_ABBREVIATION = r"(?:ЦДГ|ДГ|ОДЗ|ДЯ|ОУ|СОУ|СУ|НУ|ПГ|ПМГ|ЕГ|ГПЧЕ|СПИ|dg|cdg|ou|sou|su)"
+# "ПГ" is left out: a kindergarten's or school's own preparatory group is "ПГ 1" too.
+_NUMBERED_ABBREVIATION = r"(?:ЦДГ|ДГ|ОДЗ|ДЯ|ОУ|СОУ|СУ|НУ|ПМГ|ЕГ|ГПЧЕ|СПИ|dg|cdg|ou|sou|su)"
 _NUMBERED_WORDS = r"(?:детска\s+градина|основно\s+училище|средно\s+училище|начално\s+училище|гимназия|училище)"
 _NUMBER_AFTER_TYPE_RE = re.compile(
     rf"(?<![^\W\d_])(?:{_NUMBERED_ABBREVIATION}\s*(?:№\s*)?|{_NUMBERED_WORDS}\s*№\s*)(\d{{1,3}})(?!\d)",

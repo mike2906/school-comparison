@@ -146,6 +146,8 @@ def test_a_patron_named_like_a_town_is_not_another_town():
         (["СУ 22 Меридиан"], ["ЧСУ Меридиан 22"], None),
         (["Частна детска градина 101 Защо"], ['ЧДГ "101 ЗАЩО"'], None),
         (["Начало - Weda Schule"], ["ЧДГ Веда"], None),
+        # A preparatory group, not a vocational school.
+        (["ПГ 1 - Звездички"], ["ЧДГ Слънчо"], None),
         ([], ["ДГ 5"], None),
     ],
 )

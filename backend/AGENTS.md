@@ -127,7 +127,9 @@ against the school's median tuition, is withheld; a tuition row with no period i
 the floors as a yearly fee.
 
 URL validation failures set a persistent website-data withholding marker; only extraction plus
-deterministic validation may clear it. Gate coverage is coupled to the validator's spot-check
+deterministic validation may clear it, or a site that validation accepts through
+`check-website` / `find-websites` (`start_given_site_clean`), which drops the website-derived
+blocks the marker hid along with it. Gate coverage is coupled to the validator's spot-check
 scope (`SPOT_CHECK_CORE_FIELD_PREFIXES`) by a guard test.
 
 Routes live in `app/routers/` (`schools.py`, `compare.py`, `countries.py`); every response
