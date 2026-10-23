@@ -19,11 +19,13 @@ status() {
 }
 
 body() {
-	curl -fsS -m 30 "$@"
+	# Gzip, as every browser and the edge ask: the Sofia list is ~4 MB plain and ~0.4 MB
+	# gzipped, and plain it did not arrive within 30 s from a just-restarted host (#485's deploy).
+	curl -fsS --compressed -m 30 "$@"
 }
 
 smoke_api() {
-	local api="$1" site="$2" ready="" count id headers fresh
+	local api="$1" site="$2" ready="" list count id headers fresh
 	# Cloudflare keeps GET answers a few minutes: ask past its copy, to check this deploy.
 	fresh="smoke=$(date +%s%N)"
 
@@ -35,11 +37,12 @@ smoke_api() {
 	[ "$ready" = ready ] || fail "$api/ready did not report ready"
 	ok "/ready"
 
-	count="$(body "$api/schools?$fresh" | jq 'length')"
+	list="$(body "$api/schools?$fresh")" || fail "/schools did not answer"
+	count="$(jq 'length' <<< "$list")"
 	[ "$count" -gt 0 ] || fail "/schools returned no schools"
 	ok "/schools lists $count schools"
 
-	id="$(body "$api/schools?$fresh" | jq '.[0].id')"
+	id="$(jq '.[0].id' <<< "$list")"
 	[ "$(status "$api/schools/$id?$fresh")" = 200 ] || fail "/schools/$id is not 200"
 	ok "/schools/$id"
 
