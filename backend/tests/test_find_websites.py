@@ -20,10 +20,10 @@ def _school(**extra):
     return School(**{**values, **extra})
 
 
-async def _run(db_session, verdicts, candidates=("https://janbibijan.com/",), **options):
+async def _run(db_session, verdicts, candidates=("https://janbibijan.com/",), page="<title>ДГ Ян Бибиян</title>", **options):
     validate = AsyncMock(side_effect=verdicts)
     store = AsyncMock()
-    with patch.object(WebsiteDiscoverer, "_search_candidates", AsyncMock(return_value=list(candidates))), patch.object(
+    with patch.object(find_websites, "_page_text", AsyncMock(return_value=page)), patch.object(WebsiteDiscoverer, "_search_candidates", AsyncMock(return_value=list(candidates))), patch.object(
         URLValidator, "validate_url", validate
     ), patch.object(url_validator, "_update_validation_result", store), patch(
         "app.scrapers.stages.website.check_shared_sites", AsyncMock()
@@ -101,3 +101,27 @@ async def test_one_schools_failure_does_not_stop_the_run(db_session):
     assert [("error" in school, bool(school.get("found"))) for school in report["schools"]] == [(True, False), (False, True)]
     await db_session.refresh(first)
     assert find_websites.SEARCHED_AT_KEY not in (first.attributes or {})  # searched again next time
+
+
+async def test_a_valid_site_that_does_not_name_the_school_is_not_stored(db_session):
+    """150 "Стив Джобс": validation took SoftUni Будител's site for it on its profile words."""
+    school = _school(name_i18n={"bg": '"ЧАСТНА ПРОФЕСИОНАЛНА ГИМНАЗИЯ ПО ПРОГРАМИРАНЕ И РОБОТИКА "СТИВ ДЖОБС" ЕООД'})
+    db_session.add(school)
+    await db_session.commit()
+    report, _, store = await _run(
+        db_session,
+        [(ValidationResult.VALID, "https://buditel.softuni.bg/", "match")],
+        candidates=("https://buditel.softuni.bg/",),
+        page="<title>СофтУни БУДИТЕЛ</title><p>Програмиране и роботика</p>",
+        apply=True,
+    )
+    assert report["found"] == 0 and "СТИВ ДЖОБС" in report["schools"][0]["tried"][0]["reason"]
+    store.assert_not_awaited()
+
+
+def test_brands_are_the_quoted_parts_that_name_the_school():
+    assert find_websites.brands('"ЧАСТНА ПГ ПО ПРОГРАМИРАНЕ И РОБОТИКА "СТИВ ДЖОБС" ЕООД') == ["СТИВ ДЖОБС"]
+    assert find_websites.brands('"ЧДГ "ЯН БИБИЯН" - МЕГА-Х" ООД') == ["ЯН БИБИЯН", "МЕГА-Х"]
+    assert find_websites.brands('"ЧАСТНА ДЕТСКА ГРАДИНА ДЕТСКИ ОАЗИС" ЕООД') == []
+    assert find_websites.brand_named('"ЧДГ "ЯН БИБИЯН" - МЕГА-Х" ООД', "Детска градина Yan Bibiyan")
+    assert find_websites.brand_named("ЧДГ Веда", "anything")
