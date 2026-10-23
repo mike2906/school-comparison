@@ -17,43 +17,20 @@ from app.models.scrape_log import ScrapeType
 from app.models.source_page import SourcePage
 from app.schemas.extraction import (
     ExtractedLanguageFocus,
-    ExtractedPrice,
-    FeeLine,
     GeneralInfoExtractionOutput,
-    PageFees,
-    PriceExtractionOutput,
     SummarySourceExtractionOutput,
 )
 from app.scrapers import extractor as extractor_module
 from app.scrapers.extraction import (
     contact_details,
     display_naming,
-    fee_lines,
     page_selection,
-    price_lines,
-    price_rows,
-    price_step,
     summary_sources,
 )
-from app.scrapers.page_content import is_template_filler
 from app.services.geocoding.write_gate import OFFICIAL_COORDS_TAG
 
 # Fee pages in these tests name academic years such as 2025/2026; pin the date they are read on.
-pytestmark = pytest.mark.usefixtures("frozen_today", "pipeline_prices")
-
-
-@pytest.fixture
-def pipeline_prices(monkeypatch):
-    """These tests cover the old fee extraction, off by default since fees-agent owns fees."""
-    monkeypatch.setattr(get_settings(), "extraction_pipeline_prices", True)
-
-
-def _fee_line(label, amount, *, currency="BGN", per="month", kind="tuition", role="full", academic_year=None, quote=None):
-    """A price the model copied off a page, as the price call answers with it."""
-    return FeeLine(
-        label=label, amount=amount, currency=currency, per=per, kind=kind, role=role,
-        academic_year=academic_year, quote=quote or label,
-    )  # fmt: skip
+pytestmark = pytest.mark.usefixtures("frozen_today")
 
 
 @pytest.fixture
@@ -97,8 +74,7 @@ async def sample_school_for_extraction(db_session):
 
 
 @pytest.mark.asyncio
-async def test_extract_school_leaves_fees_to_the_fees_agent(db_session, sample_school_for_extraction, monkeypatch):
-    monkeypatch.setattr(get_settings(), "extraction_pipeline_prices", False)
+async def test_extract_school_leaves_fees_to_the_fees_agent(db_session, sample_school_for_extraction):
     school = sample_school_for_extraction
     db_session.add(
         Pricing(school_id=school.id, category=PriceCategory.TUITION, amount=700, currency="EUR",
@@ -107,80 +83,12 @@ async def test_extract_school_leaves_fees_to_the_fees_agent(db_session, sample_s
     await db_session.commit()
     general = GeneralInfoExtractionOutput(display_name_i18n={"en": "Fusion School"}, has_useful_info=True)
 
-    with patch("app.scrapers.extractor._run_typed_agent", new=AsyncMock(return_value=(general, 150, 20, 0.002))) as run:
+    with patch("app.scrapers.extractor._run_typed_agent", new=AsyncMock(return_value=(general, 150, 20, 0.002))):
         result = await extractor_module.extract_school(db_session, school.id, "bg")
 
-    assert all(call.kwargs.get("result_type") is not PageFees for call in run.await_args_list)
-    assert result["general_info_success"] is True and result["pricing_count"] == 0
+    assert result["general_info_success"] is True
     rows = (await db_session.execute(select(Pricing).where(Pricing.school_id == school.id))).scalars().all()
     assert [(float(r.amount), r.currency) for r in rows] == [(700.0, "EUR")]
-
-
-async def test_extract_school_persists_pricing_and_general_info(db_session, sample_school_for_extraction):
-    school = sample_school_for_extraction
-    school.attributes = {"website_data_withheld": True}
-    await db_session.commit()
-
-    mock_price = PageFees(
-        lines=[_fee_line("Tuition", 1000.0, quote="Tuition for 2024 is 1000 BGN monthly.")]
-    )
-    mock_general = GeneralInfoExtractionOutput(
-        display_name_i18n={"en": "Fusion School"},
-        languages=[ExtractedLanguageFocus(language="English")],
-        facilities=["pool"],
-        programs=["STEM"],
-        extracurricular=[],
-        class_size="18 students",
-        founded_year="1998",
-        accreditations=[],
-        summary_source=SummarySourceExtractionOutput(
-            teaching_approach=["project-based learning"],
-            differentiators=["licensed by the Ministry of Education"],
-            has_useful_info=True,
-        ),
-        has_useful_info=True,
-    )
-
-    with patch(
-        "app.scrapers.extractor._run_typed_agent",
-        new=AsyncMock(side_effect=[(mock_price, 100, 10, 0.001), (mock_general, 150, 20, 0.002)]),
-    ):
-        result = await extractor_module.extract_school(db_session, school.id, "bg")
-
-    assert result["status"] == "extracted"
-    assert result["pricing_count"] == 1
-    assert result["general_info_success"] is True
-    assert result["validation_status"] == "ok"
-    assert result["validation_auto_fixes"] > 0
-
-    pricing_rows = (await db_session.execute(select(Pricing).where(Pricing.school_id == school.id))).scalars().all()
-    assert len(pricing_rows) == 1
-
-    await db_session.refresh(school)
-    extracted = (school.attributes or {}).get("extracted", {})
-    assert extracted.get("facilities") == ["pool"]
-    assert extracted.get("programs") == []
-    assert extracted.get("class_size") is None
-    assert extracted.get("founded_year") is None
-    assert extracted.get("summary_source", {}).get("teaching_approach") == []
-    data_validation = (school.attributes or {}).get("data_validation", {})
-    assert data_validation.get("status") == "ok"
-    assert any(
-        fix.get("code") == "programs_missing_evidence"
-        for fix in data_validation.get("auto_fixes", [])
-    )
-    assert (school.attributes or {}).get("display_name_i18n") == {
-        "bg": "Fusion School",
-        "en": "Fusion School",
-    }
-    assert "website_data_withheld" not in (school.attributes or {})
-
-    field_sources = (
-        await db_session.execute(select(FieldSource).where(FieldSource.school_id == school.id))
-    ).scalars().all()
-    assert any(row.field_key == "attributes.facilities" for row in field_sources)
-    assert any(row.field_key == "attributes.summary_source" for row in field_sources)
-    assert any(row.field_key == "attributes.display_name_i18n" for row in field_sources)
 
 
 async def _failed_llm_call(**kwargs):
@@ -199,17 +107,7 @@ async def test_extract_school_does_not_promote_fallback_when_llm_call_fails(
     school.attributes = {"website_data_withheld": True}
     await db_session.commit()
 
-    mock_price = PageFees(
-        lines=[_fee_line("Tuition", 1000.0, quote="Tuition for 2024 is 1000 BGN monthly.")]
-    )
-    calls = iter([(mock_price, 100, 10, 0.001)])
-
-    async def _price_ok_general_fails(**kwargs):
-        if kwargs["result_type"] is PageFees:
-            return next(calls)
-        return await _failed_llm_call(**kwargs)
-
-    with patch("app.scrapers.extractor._run_typed_agent", new=_price_ok_general_fails):
+    with patch("app.scrapers.extractor._run_typed_agent", new=_failed_llm_call):
         result = await extractor_module.extract_school(db_session, school.id, "bg")
 
     assert result["status"] == "extraction_failed"
@@ -349,16 +247,15 @@ async def _recrawled_school_with_prices(db_session, school, *, status):
     return rows
 
 
-@pytest.mark.parametrize("prices_only,status", [(False, "navigated"), (True, "extracted")])
 @pytest.mark.asyncio
 async def test_failed_extraction_keeps_only_prices_the_recrawled_page_still_shows(
-    db_session, client, sample_school_for_extraction, prices_only, status
+    db_session, client, sample_school_for_extraction
 ):
     school = sample_school_for_extraction
-    gone, still = await _recrawled_school_with_prices(db_session, school, status=status)
+    gone, still = await _recrawled_school_with_prices(db_session, school, status="navigated")
 
     with patch("app.scrapers.extractor._run_typed_agent", new=_failed_llm_call):
-        result = await extractor_module.extract_school(db_session, school.id, "bg", prices_only=prices_only)
+        result = await extractor_module.extract_school(db_session, school.id, "bg")
     assert result["status"] == "extraction_failed"
 
     await db_session.refresh(school)
@@ -380,150 +277,9 @@ async def test_failed_extraction_keeps_only_prices_the_recrawled_page_still_show
     page.raw_markdown += " Yearly tuition 900 EUR."
     await db_session.commit()
     with patch("app.scrapers.extractor._run_typed_agent", new=_failed_llm_call):
-        await extractor_module.extract_school(db_session, school.id, "bg", prices_only=prices_only)
+        await extractor_module.extract_school(db_session, school.id, "bg")
     await db_session.refresh(school)
     assert "kept_price_issues" not in school.attributes["data_validation"]
-
-
-@pytest.mark.asyncio
-async def test_prices_only_run_that_finds_no_fees_checks_the_kept_ones(
-    db_session, client, sample_school_for_extraction
-):
-    school = sample_school_for_extraction
-    gone, still = await _recrawled_school_with_prices(db_session, school, status="extracted")
-
-    async def _no_fee_pages(*_args, **_kwargs):
-        return {"success": False, "count": 0, "detail": "No pricing-related content found",
-                "input_tokens": 0, "output_tokens": 0}
-
-    with patch("app.scrapers.extractor._extract_prices", new=_no_fee_pages):
-        result = await extractor_module.extract_school(db_session, school.id, "bg", prices_only=True)
-    assert result["status"] != "extracted"
-
-    response = await client.get(f"/schools/{school.id}")
-    assert [row["id"] for row in response.json()["pricing"]] == [still.id]
-
-
-@pytest.mark.asyncio
-async def test_prices_only_run_on_emptied_pages_withholds_the_kept_prices(
-    db_session, client, sample_school_for_extraction
-):
-    school = sample_school_for_extraction
-    await _recrawled_school_with_prices(db_session, school, status="extracted")
-    pages = (await db_session.execute(select(SourcePage).where(SourcePage.school_id == school.id))).scalars().all()
-    for page in pages:
-        page.raw_markdown = ""
-    await db_session.commit()
-
-    result = await extractor_module.extract_school(db_session, school.id, "bg", prices_only=True)
-    assert result["status"] == "extraction_failed"
-
-    response = await client.get(f"/schools/{school.id}")
-    assert response.json()["pricing"] == []
-    await db_session.refresh(school)
-    assert {issue["code"] for issue in school.attributes["data_validation"]["kept_price_issues"]} == {
-        "pricing_current_page_empty"
-    }
-
-
-@pytest.mark.asyncio
-async def test_pricing_only_success_does_not_republish_withheld_general_data(
-    db_session,
-    sample_school_for_extraction,
-):
-    school = sample_school_for_extraction
-    school.attributes = {
-        "website_data_withheld": True,
-        "extracted": {"programs": ["Stale program"]},
-        "display_name_i18n": {"bg": "Грешно име"},
-    }
-    await db_session.commit()
-
-    with (
-        patch(
-            "app.scrapers.extractor._extract_prices",
-            new=AsyncMock(
-                return_value={
-                    "count": 0,
-                    "success": True,
-                    "detail": "No pricing information found",
-                    "input_tokens": 0,
-                    "output_tokens": 0,
-                    "token_cost_usd": 0.0,
-                }
-            ),
-        ),
-        patch(
-            "app.scrapers.extractor._extract_general_info",
-            new=AsyncMock(
-                return_value={
-                    "success": False,
-                    "detail": "No general-info content found",
-                    "input_tokens": 0,
-                    "output_tokens": 0,
-                    "token_cost_usd": 0.0,
-                }
-            ),
-        ),
-    ):
-        result = await extractor_module.extract_school(db_session, school.id, "bg")
-
-    await db_session.refresh(school)
-    assert result["status"] == "extracted"
-    assert result["general_info_success"] is False
-    assert school.attributes["website_data_withheld"] is True
-    assert "extracted" in school.attributes
-    assert school.attributes["display_name_i18n"] == {"bg": "Грешно име"}
-    assert any("remains withheld" in detail for detail in result["details"])
-
-
-@pytest.mark.asyncio
-async def test_extract_school_pricing_drops_oversized_text_fields(
-    db_session,
-    sample_school_for_extraction,
-):
-    school = sample_school_for_extraction
-
-    # Not converted to PageFees (tech-debt T5): _prices_from_fee_lines cuts a label over 100
-    # characters to 100 (_fee_label(cut=True)) instead of dropping it, so an oversized plan_name
-    # cannot be produced through a FeeLine. The legacy answer still reaches the oversized-field guard.
-    mock_price = PriceExtractionOutput(
-        prices=[
-            ExtractedPrice(
-                category="tuition",
-                amount=1000.0,
-                currency="BGN",
-                period="monthly",
-                academic_year="A" * 64,
-                plan_name="B" * 140,
-                age_group="C" * 80,
-                confidence=0.9,
-            )
-        ],
-        has_pricing_info=True,
-    )
-    mock_general = GeneralInfoExtractionOutput(
-        facilities=["pool"],
-        programs=["stem"],
-        class_size="18 students",
-        founded_year="2001",
-        has_useful_info=True,
-    )
-
-    with patch(
-        "app.scrapers.extractor._run_typed_agent",
-        new=AsyncMock(side_effect=[(mock_price, 100, 10, 0.001), (mock_general, 20, 3, 0.001)]),
-    ):
-        result = await extractor_module.extract_school(db_session, school.id, "bg")
-
-    assert result["status"] == "extracted"
-
-    row = (
-        await db_session.execute(select(Pricing).where(Pricing.school_id == school.id))
-    ).scalars().one()
-    assert row.age_group is None
-    assert row.plan_name is None
-    assert row.academic_year is None
 
 
 @pytest.mark.asyncio
@@ -533,7 +289,6 @@ async def test_extract_school_augments_general_info_with_deterministic_signals(
 ):
     school = sample_school_for_extraction
 
-    mock_price = PageFees(lines=[])
     llm_general = GeneralInfoExtractionOutput(
         languages=[],
         facilities=["pool"],
@@ -547,7 +302,7 @@ async def test_extract_school_augments_general_info_with_deterministic_signals(
 
     with patch(
         "app.scrapers.extractor._run_typed_agent",
-        new=AsyncMock(side_effect=[(mock_price, 10, 2, 0.0), (llm_general, 20, 4, 0.001)]),
+        new=AsyncMock(side_effect=[(llm_general, 20, 4, 0.001)]),
     ):
         result = await extractor_module.extract_school(db_session, school.id, "bg")
 
@@ -589,7 +344,6 @@ async def test_extract_school_recovers_display_name_with_targeted_capable_fallba
     db_session.add(page)
     await db_session.commit()
 
-    mock_price = PageFees(lines=[])
     mock_general = GeneralInfoExtractionOutput(
         languages=[ExtractedLanguageFocus(language="English")],
         facilities=["pool"],
@@ -607,7 +361,6 @@ async def test_extract_school_recovers_display_name_with_targeted_capable_fallba
             "app.scrapers.extractor._run_typed_agent",
             new=AsyncMock(
                 side_effect=[
-                    (mock_price, 10, 2, 0.0),
                     (mock_general, 20, 4, 0.001),
                     (name_only, 8, 2, 0.001),
                 ]
@@ -671,7 +424,6 @@ async def test_extract_school_promotes_repeated_fuller_display_name_from_page_ev
     db_session.add_all(pages)
     await db_session.commit()
 
-    mock_price = PageFees(lines=[])
     mock_general = GeneralInfoExtractionOutput(
         display_name_i18n={"en": "Montessori House"},
         languages=[ExtractedLanguageFocus(language="English")],
@@ -683,7 +435,7 @@ async def test_extract_school_promotes_repeated_fuller_display_name_from_page_ev
 
     with patch(
         "app.scrapers.extractor._run_typed_agent",
-        new=AsyncMock(side_effect=[(mock_price, 10, 2, 0.0), (mock_general, 20, 4, 0.001), (None, 0, 0, 0.0)]),
+        new=AsyncMock(side_effect=[(mock_general, 20, 4, 0.001), (None, 0, 0, 0.0)]),
     ):
         result = await extractor_module.extract_school(db_session, school.id, "bg")
 
@@ -736,7 +488,6 @@ async def test_extract_school_does_not_promote_footer_network_name(db_session):
     db_session.add_all(pages)
     await db_session.commit()
 
-    mock_price = PageFees(lines=[])
     mock_general = GeneralInfoExtractionOutput(
         display_name_i18n={"en": "Maple Bear Sofia"},
         languages=[ExtractedLanguageFocus(language="English")],
@@ -749,7 +500,6 @@ async def test_extract_school_does_not_promote_footer_network_name(db_session):
         "app.scrapers.extractor._run_typed_agent",
         new=AsyncMock(
             side_effect=[
-                (mock_price, 10, 2, 0.0),
                 (mock_general, 20, 4, 0.001),
                 (mock_general, 5, 1, 0.0),
             ]
@@ -1402,7 +1152,6 @@ async def test_extract_school_clears_stale_summary_metadata_on_success(db_sessio
     db_session.add(school)
     await db_session.commit()
 
-    mock_price = PageFees(lines=[])
     mock_general = GeneralInfoExtractionOutput(
         languages=[ExtractedLanguageFocus(language="English")],
         facilities=["pool"],
@@ -1416,7 +1165,6 @@ async def test_extract_school_clears_stale_summary_metadata_on_success(db_sessio
         "app.scrapers.extractor._run_typed_agent",
         new=AsyncMock(
             side_effect=[
-                (mock_price, 10, 2, 0.0),
                 (mock_general, 20, 4, 0.001),
                 (mock_general, 15, 3, 0.001),
             ]
@@ -1489,7 +1237,6 @@ async def test_extract_school_replaces_office_like_registry_address_with_website
     db_session.add(contact_page)
     await db_session.commit()
 
-    mock_price = PageFees(lines=[])
     mock_general = GeneralInfoExtractionOutput(
         facilities=["pool"],
         has_useful_info=True,
@@ -1497,7 +1244,7 @@ async def test_extract_school_replaces_office_like_registry_address_with_website
 
     with patch(
         "app.scrapers.extractor._run_typed_agent",
-        new=AsyncMock(side_effect=[(mock_price, 10, 2, 0.0), (mock_general, 20, 4, 0.001), (None, 0, 0, 0.0)]),
+        new=AsyncMock(side_effect=[(mock_general, 20, 4, 0.001), (None, 0, 0, 0.0)]),
     ):
         result = await extractor_module.extract_school(db_session, school.id, "bg")
 
@@ -1553,7 +1300,6 @@ async def test_extract_school_refreshes_coords_from_website_map_link_when_addres
     db_session.add(contact_page)
     await db_session.commit()
 
-    mock_price = PageFees(lines=[])
     mock_general = GeneralInfoExtractionOutput(
         facilities=["pool"],
         has_useful_info=True,
@@ -1561,7 +1307,7 @@ async def test_extract_school_refreshes_coords_from_website_map_link_when_addres
 
     with patch(
         "app.scrapers.extractor._run_typed_agent",
-        new=AsyncMock(side_effect=[(mock_price, 10, 2, 0.0), (mock_general, 20, 4, 0.001), (None, 0, 0, 0.0)]),
+        new=AsyncMock(side_effect=[(mock_general, 20, 4, 0.001), (None, 0, 0, 0.0)]),
     ):
         result = await extractor_module.extract_school(db_session, school.id, "bg")
 
@@ -1767,7 +1513,6 @@ async def test_extract_school_does_not_replace_with_office_like_website_contact_
     db_session.add(contact_page)
     await db_session.commit()
 
-    mock_price = PageFees(lines=[])
     mock_general = GeneralInfoExtractionOutput(
         facilities=["pool"],
         has_useful_info=True,
@@ -1775,7 +1520,7 @@ async def test_extract_school_does_not_replace_with_office_like_website_contact_
 
     with patch(
         "app.scrapers.extractor._run_typed_agent",
-        new=AsyncMock(side_effect=[(mock_price, 10, 2, 0.0), (mock_general, 20, 4, 0.001), (None, 0, 0, 0.0)]),
+        new=AsyncMock(side_effect=[(mock_general, 20, 4, 0.001), (None, 0, 0, 0.0)]),
     ):
         result = await extractor_module.extract_school(db_session, school.id, "bg")
 
@@ -1821,7 +1566,6 @@ async def test_extract_school_keeps_existing_coords_when_contact_address_changes
     db_session.add(contact_page)
     await db_session.commit()
 
-    mock_price = PageFees(lines=[])
     mock_general = GeneralInfoExtractionOutput(
         facilities=["pool"],
         has_useful_info=True,
@@ -1829,7 +1573,7 @@ async def test_extract_school_keeps_existing_coords_when_contact_address_changes
 
     with patch(
         "app.scrapers.extractor._run_typed_agent",
-        new=AsyncMock(side_effect=[(mock_price, 10, 2, 0.0), (mock_general, 20, 4, 0.001), (None, 0, 0, 0.0)]),
+        new=AsyncMock(side_effect=[(mock_general, 20, 4, 0.001), (None, 0, 0, 0.0)]),
     ):
         result = await extractor_module.extract_school(db_session, school.id, "bg")
 
@@ -1862,24 +1606,13 @@ async def test_run_typed_agent_model_retry_recovers(monkeypatch):
             return fn
 
         async def run(self, _prompt):
-            bad = PriceExtractionOutput(prices=[], has_pricing_info=True)
+            bad = GeneralInfoExtractionOutput(has_useful_info=True)
             for validator in self._validators:
                 try:
                     validator(bad)
                 except Exception:
                     pass
-            good = PriceExtractionOutput(
-                prices=[
-                    ExtractedPrice(
-                        category="tuition",
-                        amount=500,
-                        currency="BGN",
-                        period="monthly",
-                        confidence=0.9,
-                    )
-                ],
-                has_pricing_info=True,
-            )
+            good = GeneralInfoExtractionOutput(programs=["STEM"], has_useful_info=True)
             return FakeAgentResult(good)
 
     monkeypatch.setattr(extractor_module, "Agent", FakeAgent)
@@ -1888,14 +1621,13 @@ async def test_run_typed_agent_model_retry_recovers(monkeypatch):
     parsed, input_tokens, output_tokens, token_cost_usd = await extractor_module._run_typed_agent(
         system_prompt="x",
         user_prompt="y",
-        result_type=PriceExtractionOutput,
+        result_type=GeneralInfoExtractionOutput,
         timeout_seconds=5.0,
         llm_stats=llm_stats,
     )
 
     assert parsed is not None
-    assert parsed.has_pricing_info is True
-    assert len(parsed.prices) == 1
+    assert parsed.programs == ["STEM"]
     assert llm_stats.model_retries == 1
     assert input_tokens == 7
     assert output_tokens == 3
@@ -1953,7 +1685,6 @@ async def test_run_typed_agent_falls_back_from_cheap_to_capable_for_general_info
 
 @pytest.mark.asyncio
 async def test_run_typed_agent_retries_timed_out_call_with_longer_timeout(monkeypatch):
-    from app.config import get_settings
 
     llm_stats = extractor_module.ExtractionLLMStats()
     monkeypatch.setattr(get_settings(), "extraction_llm_retry_timeout_seconds", 5.0)
@@ -1961,7 +1692,7 @@ async def test_run_typed_agent_retries_timed_out_call_with_longer_timeout(monkey
     delays = iter([1.0, 0.2])  # the retry is slower than the first timeout allows
 
     class FakeAgentResult:
-        output = PriceExtractionOutput(prices=[], has_pricing_info=False)
+        output = SummarySourceExtractionOutput(has_useful_info=False)
 
         def usage(self):
             return SimpleNamespace(input_tokens=4, output_tokens=2)
@@ -1983,7 +1714,7 @@ async def test_run_typed_agent_retries_timed_out_call_with_longer_timeout(monkey
     parsed, input_tokens, _output_tokens, _cost = await extractor_module._run_typed_agent(
         system_prompt="x",
         user_prompt="y",
-        result_type=PriceExtractionOutput,
+        result_type=SummarySourceExtractionOutput,
         timeout_seconds=0.05,
         llm_stats=llm_stats,
     )
@@ -1996,7 +1727,6 @@ async def test_run_typed_agent_retries_timed_out_call_with_longer_timeout(monkey
 
 @pytest.mark.asyncio
 async def test_run_typed_agent_gives_up_after_timeout_retries(monkeypatch):
-    from app.config import get_settings
 
     llm_stats = extractor_module.ExtractionLLMStats()
     monkeypatch.setattr(get_settings(), "extraction_llm_retry_timeout_seconds", 0.05)
@@ -2021,7 +1751,7 @@ async def test_run_typed_agent_gives_up_after_timeout_retries(monkeypatch):
     parsed, *_ = await extractor_module._run_typed_agent(
         system_prompt="x",
         user_prompt="y",
-        result_type=PriceExtractionOutput,
+        result_type=SummarySourceExtractionOutput,
         timeout_seconds=0.05,
         llm_stats=llm_stats,
     )
@@ -2203,1233 +1933,6 @@ def test_select_pages_for_summary_source_filters_operational_pages_when_narrativ
 
     assert "Montessori methods" in selected_text
     assert source_urls == ["https://example-school.bg/filosofia"]
-
-
-def test_select_pages_for_pricing_prefers_tseni_slug_even_without_pricing_category():
-    school = School(
-        name_i18n={"bg": "Тест"},
-        website_url="https://example-school.bg",
-        country_code="bg",
-        city="sofia",
-        school_type="private",
-        education_level="primary",
-    )
-    pages = [
-        SourcePage(
-            source_url="https://example-school.bg/zashto-fusion/programa",
-            page_category="programs",
-            raw_markdown="Project-based learning and classroom routines.",
-        ),
-        SourcePage(
-            source_url="https://example-school.bg/priem/grafik-i-tseni",
-            page_category=None,
-            raw_markdown='График и цени\nТакси "Обучение" за 1-4 клас\nТакса "Храна".',
-        ),
-    ]
-
-    selected_text, source_urls = page_selection._select_pages(
-        school=school,
-        pages=pages,
-        preferred_categories=["pricing", "admission", "contact"],
-        use_case="pricing",
-        include_tokens=("price", "pricing", "fees", "tuition", "такси", "цени"),
-    )
-
-    assert 'Такси "Обучение"' in selected_text
-    assert source_urls[0] == "https://example-school.bg/priem/grafik-i-tseni"
-
-
-def test_extract_prices_deterministic_parses_fusion_style_pricing_sections():
-    parsed = price_lines._extract_prices_deterministic(
-        """
-        # График и цени
-        ## Такси „Обучение“ за Предучилищна – учебна 2025-2026 година
-        ### Стандартна такса:
-        За 1 вноска: €6650
-        На 2 вноски: 2 вноски по €3475
-        На 4 вноски: 4 вноски по €1775
-        На 9 вноски: 9 вноски по €811
-        таксата включва обучение до 17:30 ч., без допълнителни такси за удължен ден
-        ## Такси „Обучение“ за 1, 2, 3, 4, 5, 6 и 7 клас – учебна 2025-2026 година
-        ### Стандартна такса:
-        За 1 вноска: €7150
-        На 2 вноски: 2 вноски по €3775
-        ## Учебници и всички необходими консумативи – €545
-        """
-    )
-
-    assert parsed.has_pricing_info is True
-    assert len(parsed.prices) == 3
-    assert parsed.prices[0].category == "tuition"
-    assert parsed.prices[0].amount == 6650
-    assert parsed.prices[0].currency == "EUR"
-    assert parsed.prices[0].period is None
-    assert parsed.prices[0].age_group == "preschool"
-    assert parsed.prices[0].academic_year == "2025-2026"
-    assert any("2 вноски" in item for item in parsed.prices[0].installments)
-    assert parsed.prices[1].age_group == "1-7 клас"
-    assert parsed.prices[2].category == "materials"
-    assert parsed.prices[2].amount == 545
-
-
-def test_extract_prices_deterministic_handles_generic_monthly_fee_page():
-    parsed = price_lines._extract_prices_deterministic(
-        """
-        ## ТАКСИ
-        € 530 | 1037 лв. - целодневно гледане, ежемесечно заплащане
-        € 350 | 685 лв. - половин ден с включен обяд
-        € 265 | 518 лв. – депозит за запазване на място
-        € 510 | 997 лв. - при предплащане за 3 месеца
-        € 490 | 958 лв. - при предплащане над 6 месеца
-        Допълнителните дейности не са включени в таксата и се заплащат отделно.
-        обучение по английски език - € 20 / 39.12 лв. месечна такса
-        """
-    )
-
-    by_amount = {price.amount: price for price in parsed.prices}
-
-    assert parsed.has_pricing_info is True
-    assert by_amount[530].category == "tuition"
-    assert by_amount[530].period is None
-    assert by_amount[350].period is None
-    assert by_amount[265].category == "registration"
-    assert by_amount[265].period is None
-    assert by_amount[510].category == "tuition"
-    assert by_amount[490].category == "tuition"
-    assert by_amount[20].category == "extracurricular"
-    assert by_amount[20].period == "monthly"
-
-
-def test_extract_prices_deterministic_resets_after_optional_services_section():
-    parsed = price_lines._extract_prices_deterministic(
-        """
-        Такса "Обучение, консумативи и образователни ресурси" за една уч. година
-        Първи клас - € 8170
-        Такси за учебната 2025/2026 г. УСЛУГИ ПО ЖЕЛАНИЕ НА РОДИТЕЛИТЕ И С ДОПЪЛНИТЕЛНО ЗАПЛАЩАНЕ
-        Чуждоезиков курс с преподаватели от UK
-        € 300 за 30 уч. часа седмично
-        Отбори по математика 2 - 5 клас - € 360 на срок
-        """
-    )
-
-    tuition_amounts = sorted(price.amount for price in parsed.prices if price.category == "tuition")
-    extracurricular_by_amount = {price.amount: price for price in parsed.prices if price.category == "extracurricular"}
-    tuition_by_amount = {price.amount: price for price in parsed.prices if price.category == "tuition"}
-
-    assert parsed.has_pricing_info is True
-    assert tuition_amounts == [8170]
-    assert tuition_by_amount[8170].period == "yearly"
-    assert extracurricular_by_amount[300].period is None
-    assert extracurricular_by_amount[360].period == "term"
-
-
-def test_extract_prices_deterministic_keeps_registration_and_optional_services_out_of_tuition():
-    parsed = price_lines._extract_prices_deterministic(
-        """
-        School fees
-        TUITION FEES FOR THE ACADEMIC 2025/2026 YEAR
-        5 - 7 grade | € 8890: Students from Bulgarian schools
-        Additional Services
-        Registration fee (for all candidates): € 200
-        School Transport (optional): € 2100
-        Cafeteria Meals (optional): € 345 (per quarter)
-        """
-    )
-
-    by_amount = {price.amount: price for price in parsed.prices}
-    tuition_amounts = sorted(price.amount for price in parsed.prices if price.category == "tuition")
-
-    assert parsed.has_pricing_info is True
-    assert tuition_amounts == [8890]
-    assert by_amount[200].category == "registration"
-    assert by_amount[200].period is None
-    assert by_amount[2100].period is None
-    assert by_amount[345].category == "food"
-    assert by_amount[345].period == "quarter"
-
-
-def test_extract_prices_deterministic_does_not_turn_installments_into_periods():
-    parsed = price_lines._extract_prices_deterministic(
-        """
-        Годишна такса „Обучение“
-        Плащане на пълна такса
-        7,950€
-        Плащане на две вноски
-        2×4,094€
-        Месечно заплащане
-        10×843€
-        """
-    )
-
-    by_amount = {price.amount: price for price in parsed.prices}
-
-    assert by_amount[7950].period == "yearly"
-    assert by_amount[4094].period is None
-    assert by_amount[843].period is None
-
-
-@pytest.mark.parametrize(
-    ("line", "expected_period"),
-    [
-        ("School Transport: €2,100 total, payable in two installments", None),
-        ("Tuition in two installments: €4,000 each", None),
-        ("Обучение на две вноски: по 4 000 EUR", None),
-    ],
-)
-def test_detect_price_period_does_not_infer_from_installment_plans(
-    line,
-    expected_period,
-):
-    assert price_lines._detect_price_period(line) == expected_period
-
-
-@pytest.mark.parametrize(
-    ("line", "expected_period"),
-    [
-        ("Annual tuition fee: EUR 8,000", "yearly"),
-        ("Tuition fee: EUR 800 per month", "monthly"),
-        ("Tuition fee: EUR 2,000 per term", "term"),
-        ("Tuition fee: EUR 4,000 per semester", "semester"),
-        ("Meal fee: EUR 1,000 per quarter", "quarter"),
-        ("One-time registration fee: EUR 200", "one_time"),
-    ],
-)
-def test_detect_price_period_normalizes_explicit_supported_periods(line, expected_period):
-    assert price_lines._detect_price_period(line) == expected_period
-
-
-@pytest.mark.parametrize(
-    ("line", "expected_period"),
-    [
-        ("Annual tuition fee: EUR 8,000, payable quarterly", "yearly"),
-        ("Annual tuition fee: EUR 8,000, payable per quarter", "yearly"),
-        ("Tuition fee: EUR 8,000, payable per quarter", None),
-        ("Quarterly instalment: EUR 2,000", None),
-        ("Quarterly installment: EUR 2,000", None),
-        ("Quarterly meal fee: EUR 400", "quarter"),
-        ("Meal fee: EUR 400 per quarter", "quarter"),
-    ],
-)
-def test_price_period_distinguishes_quarterly_fees_from_payments(line, expected_period):
-    assert price_lines._detect_price_period(line) == expected_period
-
-
-@pytest.mark.parametrize(
-    ("line", "expected_period"),
-    [
-        ("Еднократна регистрационна такса: 450 EUR", "one_time"),
-        ("Регистрационната такса се заплаща еднократно", "one_time"),
-        ("Годишната такса се заплаща еднократно", "yearly"),
-        ("Таксата се заплаща еднократно в началото на всяка учебна година", None),
-        ("Таксата се заплаща еднократно или на две вноски", None),
-    ],
-)
-def test_bulgarian_one_time_fee_wording_distinguishes_fee_from_payment_plan(
-    line, expected_period
-):
-    assert price_lines._detect_explicit_price_period(line) == expected_period
-
-
-def test_price_period_on_following_line_applies_to_preceding_amount():
-    text = "Tuition fee: EUR 8,000\nper year\nRegistration fee: EUR 200"
-
-    parsed = price_lines._extract_prices_deterministic(text)
-    signals = price_lines._iter_price_line_signals(text)
-    supported = price_rows._filter_supported_prices(
-        [ExtractedPrice(category="tuition", amount=8000, currency="EUR", period="yearly", confidence=0.9)],
-        text,
-    )
-
-    assert [(price.amount, price.period) for price in parsed.prices] == [
-        (8000, "yearly"),
-        (200, None),
-    ]
-    assert [(signal["amount"], signal["period"]) for signal in signals] == [
-        (8000, "yearly"),
-        (200, None),
-    ]
-    assert len(supported) == 1
-    assert supported[0].period == "yearly"
-
-
-@pytest.mark.parametrize("line", ["Quarterly instalment: EUR 2,000", "Quarterly payment: EUR 2,000"])
-def test_quarterly_payment_does_not_inherit_fee_period(line):
-    assert price_lines._detect_price_period(line, default_period="yearly") is None
-
-
-def test_annual_heading_survives_payment_cadence_on_amount_line():
-    text = "Annual tuition fee\nEUR 8,000 payable quarterly"
-
-    parsed = price_lines._extract_prices_deterministic(text)
-    signals = price_lines._iter_price_line_signals(text)
-
-    assert [(price.amount, price.period) for price in parsed.prices] == [(8000, "yearly")]
-    assert [(signal["amount"], signal["period"]) for signal in signals] == [
-        (8000, "yearly")
-    ]
-
-
-@pytest.mark.parametrize(
-    "heading",
-    [
-        "Месечнополовин ден",
-        "Месечноцелодневно гледане",
-        "Месечно половин ден",
-        "Месечно целодневно гледане",
-        "Такса за месец",
-        "Такса обучение на месец",
-        "Такса за обучение на месец",
-    ],
-)
-def test_explicit_bulgarian_monthly_headings_set_period(heading):
-    text = f"## Такси\n## {heading}\nEUR 409"
-
-    parsed = price_lines._extract_prices_deterministic(text)
-    signals = price_lines._iter_price_line_signals(text)
-
-    assert [(price.amount, price.period) for price in parsed.prices] == [(409, "monthly")]
-    assert [(signal["amount"], signal["period"]) for signal in signals] == [
-        (409, "monthly")
-    ]
-
-
-@pytest.mark.parametrize(
-    "line",
-    [
-        "Таксите се заплащат месец за месец.",
-        "Таксата се заплаща на месец",
-        "Таксите се внасят на месец",
-    ],
-)
-def test_bulgarian_payment_cadence_does_not_set_monthly_period(line):
-    assert price_lines._detect_explicit_price_period(line) is None
-
-
-def test_price_period_does_not_carry_into_next_tuition_section():
-    text = """
-    Annual tuition fee
-    EUR 8,000
-    Tuition fees for international students
-    EUR 9,000
-    """
-
-    parsed = price_lines._extract_prices_deterministic(text)
-    signals = price_lines._iter_price_line_signals(text)
-
-    assert {price.amount: price.period for price in parsed.prices} == {
-        8000: "yearly",
-        9000: None,
-    }
-    assert {signal["amount"]: signal["period"] for signal in signals} == {
-        8000: "yearly",
-        9000: None,
-    }
-
-
-def test_unrecognised_markdown_heading_ends_price_section():
-    text = """
-    Annual tuition fee
-    EUR 8,000
-    # Other charges
-    EUR 200
-    """
-
-    parsed = price_lines._extract_prices_deterministic(text)
-    signals = price_lines._iter_price_line_signals(text)
-
-    assert [(price.category, price.amount, price.period) for price in parsed.prices] == [
-        ("tuition", 8000, "yearly"),
-    ]
-    assert [(signal["category"], signal["amount"], signal["period"]) for signal in signals] == [
-        ("tuition", 8000, "yearly"),
-    ]
-
-
-def test_normalized_price_fields_preserves_unstated_period():
-    fields = price_step._normalized_price_fields(
-        ExtractedPrice(
-            category="tuition",
-            amount=8000,
-            currency="EUR",
-            period=None,
-            confidence=0.9,
-        )
-    )
-
-    assert fields is not None
-    assert fields["period"] is None
-
-
-def test_normalized_price_fields_still_rejects_unknown_stated_period():
-    fields = price_step._normalized_price_fields(
-        ExtractedPrice(
-            category="tuition",
-            amount=8000,
-            currency="EUR",
-            period="fortnightly",
-            confidence=0.9,
-        )
-    )
-
-    assert fields is None
-
-
-def test_dedupe_price_rows_drops_currency_and_installment_duplicates():
-    prices = [
-        ExtractedPrice(
-            category="food", amount=7880, currency="EUR", period="yearly",
-            academic_year="2026-2027",
-            installments=["8100 € – 2 вноски", "8250 € – 3 вноски"],
-            confidence=0.9,
-        ),
-        ExtractedPrice(category="food", amount=8100, currency="EUR", period="yearly", academic_year="2026-2027", confidence=0.9),
-        ExtractedPrice(category="food", amount=8250, currency="EUR", period="yearly", academic_year="2026-2027", confidence=0.9),
-        ExtractedPrice(category="food", amount=15411.94, currency="BGN", period="yearly", academic_year="2026-2027", confidence=0.9),
-    ]
-
-    deduped = price_rows._dedupe_price_rows(prices)
-    by_amount = {p.amount: p for p in deduped}
-
-    assert 7880 in by_amount
-    assert 8100 not in by_amount
-    assert 8250 not in by_amount
-    assert 15411.94 not in by_amount
-
-
-def test_one_payment_plan_name_is_the_whole_fee_not_an_installment_variant():
-    # Otkrivatel: "Плащане на 1 вноска" is the full yearly fee beside its plans.
-    assert not price_rows._is_installment_plan_name("Плащане на 1 вноска")
-    assert not price_rows._is_installment_plan_name("1 installment")
-    assert price_rows._is_installment_plan_name("Плащане на 2 вноски")
-    assert price_rows._is_installment_plan_name("10 monthly installments")
-
-
-def test_dedupe_price_rows_drops_installment_plan_name_variants():
-    # Pythagoras pattern: per-grade-band, three rows with the same age_group —
-    # one full-pay row (plan_name=None) plus "2 installments" and "10 installments"
-    # variants that hold per-installment amounts rather than annual totals.
-    prices = [
-        ExtractedPrice(
-            category="tuition", amount=7580, currency="EUR", period="yearly",
-            age_group="ПГ - 4 .клас", academic_year="2026-2027",
-            confidence=0.9,
-        ),
-        ExtractedPrice(
-            category="tuition", amount=3975, currency="EUR", period="yearly",
-            age_group="ПГ - 4 .клас", academic_year="2026-2027",
-            plan_name="2 installments",
-            confidence=0.9,
-        ),
-        ExtractedPrice(
-            category="tuition", amount=827, currency="EUR", period="yearly",
-            age_group="ПГ - 4 .клас", academic_year="2026-2027",
-            plan_name="10 installments",
-            confidence=0.9,
-        ),
-    ]
-
-    deduped = price_rows._dedupe_price_rows(prices)
-    amounts = sorted(p.amount for p in deduped)
-
-    assert amounts == [7580]
-
-
-def test_dedupe_price_rows_preserves_a_sole_total_fee():
-    price = ExtractedPrice(
-        category="tuition", amount=12000, currency="EUR", period="yearly",
-        plan_name="Total Fee", confidence=0.9,
-    )
-
-    deduped = price_rows._dedupe_price_rows([price])
-
-    assert [(row.amount, row.plan_name) for row in deduped] == [(12000, "Total Fee")]
-
-
-def test_dedupe_price_rows_drops_total_fee_when_component_sibling_exists():
-    prices = [
-        ExtractedPrice(
-            category="tuition", amount=10000, currency="EUR", period="yearly",
-            plan_name="Tuition Fee", confidence=0.9,
-        ),
-        ExtractedPrice(
-            category="tuition", amount=12000, currency="EUR", period="yearly",
-            plan_name="Total Fee", confidence=0.9,
-        ),
-    ]
-
-    deduped = price_rows._dedupe_price_rows(prices)
-
-    assert [(row.amount, row.plan_name) for row in deduped] == [(10000, "Tuition Fee")]
-
-
-def test_filter_supported_prices_drops_unsupported_llm_rows():
-    text = """
-    # Book a visit
-    Enrollment visits are planned in the Spring.
-    Ad-hoc visits are allowed if we have confirmed that a free space is available.
-    Contact Us
-    """
-    prices = [
-        ExtractedPrice(category="tuition", amount=750, currency="EUR", period="monthly", confidence=0.9),
-        ExtractedPrice(category="tuition", amount=400, currency="EUR", period="monthly", confidence=0.9),
-    ]
-
-    refined = price_rows._filter_supported_prices(prices, text)
-
-    assert refined == []
-
-
-def test_filter_supported_prices_uses_source_line_to_fix_period_and_category():
-    text = """
-    ## ТАКСИ
-    € 530 | 1037 лв. - целодневно гледане, ежемесечно заплащане
-    € 350 | 685 лв. - половин ден с включен обяд
-    € 265 | 518 лв. – депозит за запазване на място
-    """
-    prices = [
-        ExtractedPrice(category="tuition", amount=530, currency="EUR", period="yearly", confidence=0.9),
-        ExtractedPrice(category="tuition", amount=350, currency="EUR", period="yearly", confidence=0.9),
-        ExtractedPrice(category="tuition", amount=265, currency="EUR", period="yearly", confidence=0.9),
-    ]
-
-    refined = price_rows._filter_supported_prices(prices, text)
-    by_amount = {price.amount: price for price in refined}
-
-    assert by_amount[530].period is None
-    assert by_amount[350].period is None
-    assert by_amount[265].category == "registration"
-    assert by_amount[265].period is None
-
-
-def test_filter_supported_prices_clears_llm_period_without_source_evidence():
-    text = "Tuition fee for academic year 2026/2027: EUR 8,000"
-    guessed = ExtractedPrice(
-        category="tuition",
-        amount=8000,
-        currency="EUR",
-        period="yearly",
-        academic_year="2026/2027",
-        confidence=0.9,
-    )
-
-    refined = price_rows._filter_supported_prices([guessed], text)
-
-    assert len(refined) == 1
-    assert refined[0].period is None
-
-
-def test_filter_supported_prices_uses_plan_context_when_amount_repeats():
-    text = """
-    ## Meals
-    Annual meal plan | EUR 2,900
-    ## Transport
-    Full School Bus Service Fee | EUR 2,900
-    """
-    prices = [
-        ExtractedPrice(
-            category="tuition",
-            amount=2900,
-            currency="EUR",
-            period="yearly",
-            plan_name="Full School Bus Service Fee",
-            confidence=0.9,
-        )
-    ]
-
-    refined = price_rows._filter_supported_prices(prices, text)
-
-    assert len(refined) == 1
-    assert refined[0].category == "transport"
-
-
-def test_filter_supported_prices_uses_category_when_amount_repeats():
-    text = """
-    ## Tuition
-    Monthly fee EUR 500
-    ## Transport
-    Monthly fee EUR 500
-    """
-    prices = [
-        ExtractedPrice(
-            category=category, amount=500, currency="EUR", period="monthly", confidence=0.9,
-        )
-        for category in ("tuition", "transport")
-    ]
-
-    refined = price_rows._filter_supported_prices(prices, text)
-
-    assert {price.category for price in refined} == {"tuition", "transport"}
-
-
-def test_filter_supported_prices_clears_guess_when_category_resolves_repeated_amount():
-    text = "Tuition fee EUR 500\nTransport fee EUR 500"
-    price = ExtractedPrice(
-        category="tuition", amount=500, currency="EUR", period="yearly", confidence=0.9,
-    )
-
-    refined = price_rows._filter_supported_prices([price], text)
-
-    assert len(refined) == 1
-    assert refined[0].category == "tuition"
-    assert refined[0].period is None
-
-
-def test_filter_supported_prices_uses_heading_to_fix_high_confidence_category():
-    text = """
-    ## Transport
-    EUR 160
-    """
-    price = ExtractedPrice(
-        category="tuition", amount=160, currency="EUR", period="monthly", confidence=0.9,
-    )
-
-    refined = price_rows._filter_supported_prices([price], text)
-
-    assert len(refined) == 1
-    assert refined[0].category == "transport"
-
-
-def test_filter_supported_prices_keeps_tuition_when_transport_is_included():
-    text = "Tuition fee including transport EUR 10,000"
-    price = ExtractedPrice(
-        category="tuition", amount=10000, currency="EUR", period="yearly", confidence=0.9,
-    )
-
-    refined = price_rows._filter_supported_prices([price], text)
-
-    assert len(refined) == 1
-    assert refined[0].category == "tuition"
-
-
-def test_filter_supported_prices_prefers_food_over_generic_monthly_fee():
-    text = "Месечна такса за храна – 100 лв"
-    price = ExtractedPrice(
-        category="food", amount=100, currency="BGN", period="monthly", confidence=0.9,
-    )
-
-    refined = price_rows._filter_supported_prices([price], text)
-
-    assert len(refined) == 1
-    assert refined[0].category == "food"
-
-
-def test_dedupe_price_rows_keeps_only_latest_academic_year():
-    prices = [
-        ExtractedPrice(
-            category="tuition", amount=9000, currency="EUR", period="yearly",
-            academic_year="2024/2025", confidence=0.9,
-        ),
-        ExtractedPrice(
-            category="tuition", amount=11000, currency="EUR", period="yearly",
-            academic_year="2026/2027", confidence=0.9,
-        ),
-        ExtractedPrice(
-            category="registration", amount=500, currency="EUR", period="one_time",
-            academic_year="2026/2027", confidence=0.9,
-        ),
-    ]
-
-    deduped = price_rows._dedupe_price_rows(prices)
-
-    assert {(row.amount, row.academic_year) for row in deduped} == {
-        (11000, "2026/2027"),
-        (500, "2026/2027"),
-    }
-
-
-def test_dedupe_price_rows_drops_yearless_rows_when_explicit_year_exists():
-    prices = [
-        ExtractedPrice(
-            category="tuition", amount=6000, currency="EUR", period="yearly",
-            academic_year=None, confidence=0.9,
-        ),
-        ExtractedPrice(
-            category="tuition", amount=6000, currency="EUR", period="yearly",
-            academic_year="2026/2027", confidence=0.9,
-        ),
-    ]
-
-    deduped = price_rows._dedupe_price_rows(prices)
-
-    assert [(row.amount, row.academic_year) for row in deduped] == [(6000, "2026/2027")]
-
-
-def test_dedupe_price_rows_preserves_distinct_yearless_fee_in_same_category():
-    prices = [
-        ExtractedPrice(
-            category="registration", amount=500, currency="EUR", period="one_time",
-            confidence=0.9,
-        ),
-        ExtractedPrice(
-            category="registration", amount=1000, currency="EUR", period="one_time",
-            academic_year="2026/2027", confidence=0.9,
-        ),
-    ]
-
-    deduped = price_rows._dedupe_price_rows(prices)
-
-    assert {(row.amount, row.academic_year) for row in deduped} == {
-        (500, None),
-        (1000, "2026/2027"),
-    }
-
-
-def test_dedupe_price_rows_preserves_yearless_fee_in_other_category():
-    prices = [
-        ExtractedPrice(
-            category="tuition", amount=6000, currency="EUR", period="yearly",
-            academic_year="2026/2027", confidence=0.9,
-        ),
-        ExtractedPrice(
-            category="registration", amount=500, currency="EUR", period="one_time",
-            confidence=0.9,
-        ),
-    ]
-
-    deduped = price_rows._dedupe_price_rows(prices)
-
-    assert {(row.category, row.amount) for row in deduped} == {
-        ("tuition", 6000),
-        ("registration", 500),
-    }
-
-
-def test_dedupe_price_rows_keeps_latest_year_per_comparable_fee_group():
-    prices = [
-        ExtractedPrice(
-            category="tuition", amount=6000, currency="EUR", period="yearly",
-            academic_year="2025/2026", confidence=0.9,
-        ),
-        ExtractedPrice(
-            category="registration", amount=500, currency="EUR", period="one_time",
-            academic_year="2026/2027", confidence=0.9,
-        ),
-    ]
-
-    deduped = price_rows._dedupe_price_rows(prices)
-
-    assert {(row.category, row.amount) for row in deduped} == {
-        ("tuition", 6000),
-        ("registration", 500),
-    }
-
-
-def test_price_signals_reset_semantic_state_between_source_pages():
-    text = """
-    --- SOURCE: https://school.test/meals ---
-    Food fees 2024/2025
-    EUR 2,900
-    --- SOURCE: https://school.test/bus ---
-    EUR 1,885
-    """
-
-    signals = price_lines._iter_price_line_signals(text)
-
-    assert [signal for signal in signals if signal["amount"] == 1885] == []
-
-
-def test_filter_supported_prices_uses_academic_year_to_resolve_repeated_amount():
-    text = """
-    --- SOURCE: https://school.test/fees-2025 ---
-    Tuition fees 2025/2026
-    Annual tuition EUR 5,000
-    --- SOURCE: https://school.test/fees-2026 ---
-    Tuition fees 2026/2027
-    Annual tuition EUR 5,000
-    """
-    price = ExtractedPrice(
-        category="tuition", amount=5000, currency="EUR", period="yearly",
-        academic_year="2026-2027", confidence=0.9,
-    )
-
-    refined = price_rows._filter_supported_prices([price], text)
-
-    assert len(refined) == 1
-    assert refined[0].academic_year == "2026-2027"
-
-
-def test_filter_supported_prices_scopes_staleness_to_supporting_page():
-    text = """
-    --- SOURCE: https://school.test/old-fees ---
-    Monthly tuition EUR 500
-    Payment deadline: September 2023
-    --- SOURCE: https://school.test/current-fees ---
-    Current monthly tuition EUR 500
-    """
-    price = ExtractedPrice(
-        category="tuition", amount=500, currency="EUR", period="monthly", confidence=0.9,
-    )
-
-    refined = price_rows._filter_supported_prices([price], text)
-
-    assert len(refined) == 1
-    assert refined[0].amount == 500
-
-
-def test_filter_supported_prices_ignores_unrelated_old_year_on_current_page():
-    text = """
-    --- SOURCE: https://school.test/current-fees ---
-    Archived admissions results for 2023/2024
-    ## Current tuition
-    Monthly tuition EUR 500
-    """
-    price = ExtractedPrice(
-        category="tuition", amount=500, currency="EUR", period="monthly", confidence=0.9,
-    )
-
-    refined = price_rows._filter_supported_prices([price], text)
-
-    assert len(refined) == 1
-    assert refined[0].amount == 500
-
-
-@pytest.mark.parametrize(
-    ("text", "price"),
-    [
-        (
-            "Annual meal plan | EUR 2,900\nFull School Bus Service Fee | EUR 2,900",
-            ExtractedPrice(category="tuition", amount=2900, currency="EUR", period="yearly", confidence=0.9),
-        ),
-        (
-            "English as an Additional Language (EAL) support fee | EUR 1,500",
-            ExtractedPrice(
-                category="tuition", amount=1500, currency="EUR", period="yearly",
-                plan_name="EAL support fee", confidence=0.9,
-            ),
-        ),
-        (
-            "Tuition Fee EUR 10,000\nCapital Fee EUR 2,000\nTotal Fee EUR 12,000",
-            ExtractedPrice(
-                category="tuition", amount=12000, currency="EUR", period="yearly",
-                plan_name="Total Fee", confidence=0.9,
-            ),
-        ),
-    ],
-)
-def test_filter_supported_prices_withholds_ambiguous_or_composite_rows(text, price):
-    assert price_rows._filter_supported_prices([price], text) == []
-
-
-def test_filter_supported_prices_withholds_stale_yearless_fee_table():
-    text = """
-    ## Tuition fees
-    Annual tuition EUR 8,000
-    Payment deadline: 15 September 2023
-    Second payment deadline: 15 January 2024
-    """
-    assert price_lines._yearless_pricing_text_is_stale(text, current_year=2026) is True
-
-
-def test_filter_supported_prices_supports_bulgarian_euro_fee_table():
-    text = """
-    Месечна такса – 580 евро
-    Допълнителни занимания
-    Модерни танци – 25 евро/месец
-    Транспорт - 160 евро/месец
-    """
-    prices = [
-        ExtractedPrice(category="tuition", amount=580, currency="EUR", period="monthly", confidence=0.9),
-        ExtractedPrice(category="extracurricular", amount=25, currency="EUR", period="monthly", confidence=0.9),
-        ExtractedPrice(category="transport", amount=160, currency="EUR", period="monthly", confidence=0.9),
-    ]
-
-    refined = price_rows._filter_supported_prices(prices, text)
-
-    assert [(row.category, row.amount, row.period) for row in refined] == [
-        ("tuition", 580, "monthly"),
-        ("extracurricular", 25, "monthly"),
-        ("transport", 160, "monthly"),
-    ]
-
-
-def test_supported_prices_keep_only_current_fee_structure_across_categories():
-    text = """
-    Fee Structure 2024/2025 & 2025/2026
-    Food (fruit, lunch, PM snack)
-    270 BGN
-    Camps
-    Judo 60 BGN
-    2026/2027
-    Annual Tuition Paid in Full
-    7,820 EUR
-    Monthly paid tuition for families in the region
-    680 EUR
-    Transportation with school buses from and to Sofia
-    250 EUR
-    Volleyball Club
-    20 EUR
-    Second Foreign Language Books
-    80 EUR
-    """
-
-    parsed = price_lines._extract_prices_deterministic(text)
-    supported = price_step._supported_price_rows(parsed.prices, text)
-
-    assert {(row.amount, row.academic_year) for row in supported} == {
-        (7820.0, "2026/2027"),
-        (680.0, "2026/2027"),
-        (250.0, "2026/2027"),
-        (20.0, "2026/2027"),
-        (80.0, "2026/2027"),
-    }
-    by_amount = {row.amount: row for row in supported}
-    assert by_amount[680].period is None
-    assert by_amount[250].period is None
-    assert by_amount[20].period is None
-    assert by_amount[80].category == "materials"
-
-
-@pytest.mark.parametrize(
-    ("text", "price"),
-    [
-        (
-            "2026/2027\nTransportation with school buses from and to Sofia\n250 EUR",
-            ExtractedPrice(
-                category="transport", amount=250, currency="EUR", period="yearly",
-                academic_year="2026/2027", confidence=0.9,
-            ),
-        ),
-        (
-            "2026/2027\nVolleyball Club\n20 EUR",
-            ExtractedPrice(
-                category="extracurricular", amount=20, currency="EUR", period="yearly",
-                academic_year="2026/2027", confidence=0.9,
-            ),
-        ),
-    ],
-)
-def test_filter_supported_prices_preserves_unlabeled_service_with_null_period(text, price):
-    refined = price_rows._filter_supported_prices([price], text)
-
-    assert len(refined) == 1
-    assert refined[0].period is None
-
-
-def test_deterministic_pricing_preserves_bare_transport_with_unstated_period():
-    parsed = price_lines._extract_prices_deterministic(
-        """
-        TUITION FEES FOR THE ACADEMIC 2026/2027 YEAR
-        Grade 1 tuition fee: 8,000 EUR
-        Transportation with school buses from and to Sofia 250 EUR
-        """
-    )
-
-    assert [(row.category, row.amount, row.period) for row in parsed.prices] == [
-        ("tuition", 8000.0, None),
-        ("transport", 250.0, None),
-    ]
-
-
-def test_filter_supported_prices_withholds_late_payment_penalties():
-    text = "There will be a late fee charge of EUR 250 for payments made after July 1."
-    price = ExtractedPrice(
-        category="registration", amount=250, currency="EUR", period="one_time",
-        confidence=0.9,
-    )
-
-    assert price_rows._filter_supported_prices([price], text) == []
-
-
-def test_filter_supported_prices_withholds_yearless_table_with_stale_due_dates():
-    text = """
-    Учебна такса 5700 eur
-    Първа вноска 2850 eur
-    Следваща вноска 2850 eur (до 31.01.2024 г.)
-    Разсрочено плащане 5950 eur от 01.09.2023 г.
-    """
-    prices = [
-        ExtractedPrice(
-            category="tuition", amount=5700, currency="EUR", period="yearly",
-            confidence=0.9,
-        ),
-        ExtractedPrice(
-            category="tuition", amount=5950, currency="EUR", period="yearly",
-            confidence=0.9,
-        ),
-    ]
-
-    assert price_rows._filter_supported_prices(prices, text) == []
-
-
-def test_dedupe_price_rows_drops_exact_indistinguishable_duplicates():
-    rows = [
-        ExtractedPrice(
-            category="registration", amount=250, currency="EUR", period="one_time",
-            academic_year="2026/2027", plan_name="Application fee", confidence=0.9,
-        )
-        for _ in range(2)
-    ]
-
-    deduped = price_rows._dedupe_price_rows(rows)
-
-    assert len(deduped) == 1
-
-
-def test_price_signals_do_not_treat_inclusion_text_as_section_heading():
-    text = """
-    Такса "Образователни услуги"
-    В таксата не е включена храна
-    Предучилищен клас
-    8100 €
-    Месечна такса – 510 евро
-    Храната се заплаща допълнително
-    Модерни танци
-    25 евро/месец
-    """
-    prices = [
-        ExtractedPrice(category="tuition", amount=8100, currency="EUR", period="yearly", confidence=0.9),
-        ExtractedPrice(category="extracurricular", amount=25, currency="EUR", period="monthly", confidence=0.9),
-    ]
-
-    refined = price_rows._filter_supported_prices(prices, text)
-
-    assert [(row.category, row.amount) for row in refined] == [
-        ("tuition", 8100),
-        ("extracurricular", 25),
-    ]
-
-
-@pytest.mark.parametrize("amount, period", [(400, "monthly"), (750, None)])
-def test_find_supporting_price_source_url_returns_page_with_matching_amount(amount, period):
-    school = School(
-        name_i18n={"bg": "Тест"},
-        website_url="https://example-school.bg",
-        country_code="bg",
-        city="sofia",
-        school_type="private",
-        education_level="primary",
-    )
-    pages = [
-        SourcePage(
-            source_url="https://example-school.bg/enroll/book-a-visit",
-            page_category="admission",
-            raw_markdown="Book a visit and contact us for details.",
-        ),
-        SourcePage(
-            source_url="https://example-school.bg/enroll",
-            page_category="admission",
-            raw_markdown="## Tuition Costs\nHalf-day Program\n400 €\n/per month\nFull-day Program\n750 €",
-        ),
-    ]
-    price = ExtractedPrice(
-        category="tuition", amount=amount, currency="EUR", period=period, confidence=0.9
-    )
-
-    source_url = fee_lines._find_supporting_price_source_url(school, pages, price)
-
-    assert source_url == "https://example-school.bg/enroll"
-
-
-def test_find_supporting_price_source_url_uses_semantics_when_amount_repeats():
-    school = School(
-        name_i18n={"bg": "Тест"}, website_url="https://school.test",
-        country_code="bg", city="sofia", school_type="private", education_level="primary",
-    )
-    pages = [
-        SourcePage(
-            source_url="https://school.test/meals", page_category="pricing",
-            raw_markdown="Annual meal plan | EUR 2,900",
-        ),
-        SourcePage(
-            source_url="https://school.test/bus", page_category="pricing",
-            raw_markdown="School Bus Fees 2026/2027\nFull School Bus Service Fee | EUR 2,900",
-        ),
-    ]
-    price = ExtractedPrice(
-        category="transport", amount=2900, currency="EUR", period=None,
-        plan_name="Full School Bus Service Fee", confidence=0.9,
-    )
-
-    source_url = fee_lines._find_supporting_price_source_url(school, pages, price)
-
-    assert source_url == "https://school.test/bus"
-
-
-def test_extract_prices_deterministic_prefers_yearly_when_mixed_fee_table_line_mentions_monthly_installments():
-    parsed = price_lines._extract_prices_deterministic(
-        """
-        #### 02
-        #### Годишна такса „Обучение“
-        Размерът на годишната такса „Обучение“ е различен в зависимост от избрания начин на плащане – еднократно, на две равни вноски или на равни ежемесечни вноски.
-        Клас | Продължителност на обучението | Плащане на пълна такса | Плащане на две вноски | Месечно заплащане*
-        1. - 4. клас | 01.09. - 30.06. | 7,950€ | 2×4,094€ | 10×843€
-        """
-    )
-
-    assert parsed.has_pricing_info is True
-    assert parsed.prices[0].amount == 7950
-    assert parsed.prices[0].period == "yearly"
-
-
-@pytest.mark.asyncio
-async def test_extract_school_keeps_the_models_answer_of_no_pricing(
-    db_session,
-    sample_school_for_extraction,
-):
-    """The keyword extractor used to stand in when the model reported no fees. In the
-    2026-10-08 cohort that stored a project budget as tuition (286) and the school's
-    fees for the kindergarten sharing its page (526), which the model had left out on
-    purpose. It now stands in only when the model call gives no answer."""
-    school = sample_school_for_extraction
-    pricing_page = (
-        await db_session.execute(select(SourcePage).where(SourcePage.school_id == school.id, SourcePage.page_category == "pricing"))
-    ).scalar_one()
-    pricing_page.source_url = "https://test-school.bg/priem/grafik-i-tseni"
-    pricing_page.raw_markdown = """
-        # График и цени
-        ## Такси „Обучение“ за Предучилищна – учебна 2025-2026 година
-        ### Стандартна такса:
-        За 1 вноска: €6650
-        На 2 вноски: 2 вноски по €3475
-        ## Такси „Обучение“ за 1, 2, 3, 4, 5, 6 и 7 клас – учебна 2025-2026 година
-        ### Стандартна такса:
-        За 1 вноска: €7150
-        ## Учебници и всички необходими консумативи – €545
-    """
-    await db_session.commit()
-
-    mock_price = PageFees(lines=[])
-    mock_general = GeneralInfoExtractionOutput(
-        facilities=["pool"],
-        programs=["STEM"],
-        has_useful_info=True,
-    )
-
-    with patch(
-        "app.scrapers.extractor._run_typed_agent",
-        new=AsyncMock(side_effect=[(mock_price, 10, 2, 0.0), (mock_general, 20, 4, 0.001), (None, 0, 0, 0.0)]),
-    ):
-        result = await extractor_module.extract_school(db_session, school.id, "bg")
-
-    assert result["status"] == "extracted"
-    assert result["pricing_count"] == 0
-    assert not any("deterministic fallback" in detail for detail in result["details"])
-
-    pricing_rows = (
-        await db_session.execute(select(Pricing).where(Pricing.school_id == school.id))
-    ).scalars().all()
-    assert pricing_rows == []
-
-
-@pytest.mark.asyncio
-async def test_extract_school_discards_unsupported_llm_pricing_rows(db_session, sample_school_for_extraction):
-    school = sample_school_for_extraction
-    db_session.add(
-        Pricing(
-            school_id=school.id,
-            category="tuition",
-            amount=999,
-            currency="EUR",
-            period="monthly",
-            source=PriceSource.SCRAPED_WEBSITE,
-            source_url="https://test-school.bg/old-prices",
-            pricing_context={"confidence": 0.9},
-        )
-    )
-    pricing_page = (
-        await db_session.execute(select(SourcePage).where(SourcePage.school_id == school.id, SourcePage.page_category == "pricing"))
-    ).scalar_one()
-    pricing_page.raw_markdown = "Monthly tuition EUR 750"
-    await db_session.commit()
-
-    mock_price = PageFees(
-        lines=[_fee_line("Monthly tuition", 750, currency="EUR", quote="Monthly tuition EUR 750")]
-    )
-    mock_general = GeneralInfoExtractionOutput(
-        facilities=["pool"],
-        programs=["STEM"],
-        has_useful_info=True,
-    )
-
-    with patch(
-        "app.scrapers.extractor._run_typed_agent",
-        new=AsyncMock(
-            side_effect=[
-                (mock_price, 10, 2, 0.0),
-                (mock_general, 20, 4, 0.001),
-                (None, 0, 0, 0.0),
-                (None, 0, 0, 0.0),
-            ]
-        ),
-    ), patch.object(
-        fee_lines, "_find_supporting_price_source_url",
-        return_value=None,
-    ):
-        result = await extractor_module.extract_school(db_session, school.id, "bg")
-
-    assert result["status"] == "extracted"
-    assert result["pricing_count"] == 0
-    assert any("kept existing pricing as history" in detail for detail in result["details"])
-    pricing_rows = (await db_session.execute(select(Pricing).where(Pricing.school_id == school.id))).scalars().all()
-    # The unsupported row is not written, and the prior row survives as history.
-    assert [float(row.amount) for row in pricing_rows] == [999.0]
-
-
-@pytest.mark.asyncio
-async def test_successful_no_price_refresh_preserves_historical_scraped_rows(
-    db_session,
-    sample_school_for_extraction,
-):
-    school = sample_school_for_extraction
-    db_session.add_all(
-        [
-            Pricing(
-                school_id=school.id,
-                category="extracurricular",
-                amount=25,
-                currency="EUR",
-                period="monthly",
-                source=PriceSource.SCRAPED_WEBSITE,
-                source_url="https://test-school.bg/old-prices",
-                pricing_context={"confidence": 0.9},
-            ),
-            Pricing(
-                school_id=school.id,
-                category="tuition",
-                amount=1000,
-                currency="EUR",
-                period="yearly",
-                source=PriceSource.OFFICIAL,
-                source_url="https://official.test/fees",
-                pricing_context={"confidence": 1.0},
-            ),
-        ]
-    )
-    await db_session.commit()
-
-    no_prices = PageFees(lines=[])
-    pages = (
-        await db_session.execute(select(SourcePage).where(SourcePage.school_id == school.id))
-    ).scalars().all()
-    next(page for page in pages if page.page_category == "pricing").raw_markdown = (
-        "Contact the school for current pricing."
-    )
-    await db_session.flush()
-    with patch(
-        "app.scrapers.extractor._run_typed_agent",
-        new=AsyncMock(return_value=(no_prices, 10, 2, 0.001)),
-    ):
-        result = await extractor_module._extract_prices(
-            db_session,
-            school,
-            list(pages),
-            20.0,
-            extractor_module.ExtractionLLMStats(),
-        )
-
-    rows = (
-        await db_session.execute(
-            select(Pricing).where(Pricing.school_id == school.id).order_by(Pricing.id)
-        )
-    ).scalars().all()
-    assert result["success"] is True
-    assert result["count"] == 0
-    assert "kept existing pricing as history" in result["detail"]
-    # Finding no pricing supersedes no year, so both rows survive.
-    assert [(row.source, float(row.amount)) for row in rows] == [
-        (PriceSource.SCRAPED_WEBSITE, 25.0),
-        (PriceSource.OFFICIAL, 1000.0),
-    ]
 
 
 def test_prepare_summary_source_page_text_drops_navigation_and_keeps_narrative_lines():
@@ -4060,312 +2563,6 @@ def test_build_openrouter_model_settings_with_routing(monkeypatch):
     }
 
 
-@pytest.mark.asyncio
-async def test_extracted_pricing_links_to_its_evidence_page(
-    db_session,
-    sample_school_for_extraction,
-):
-    """Each new row records the page it came from, which is what makes it publishable."""
-    school = sample_school_for_extraction
-    priced = PageFees(
-        lines=[_fee_line("Tuition", 1000.0, quote="Tuition for 2024 is 1000 BGN monthly.")]
-    )
-    pages = (
-        await db_session.execute(select(SourcePage).where(SourcePage.school_id == school.id))
-    ).scalars().all()
-    pricing_page = next(page for page in pages if page.page_category == "pricing")
-
-    with patch(
-        "app.scrapers.extractor._run_typed_agent",
-        new=AsyncMock(return_value=(priced, 10, 2, 0.001)),
-    ):
-        result = await extractor_module._extract_prices(
-            db_session,
-            school,
-            list(pages),
-            20.0,
-            extractor_module.ExtractionLLMStats(),
-        )
-
-    assert result["success"] is True
-    rows = (
-        await db_session.execute(select(Pricing).where(Pricing.school_id == school.id))
-    ).scalars().all()
-    assert [row.source_page_id for row in rows] == [pricing_page.id]
-
-
-@pytest.mark.asyncio
-async def test_extraction_replaces_only_the_academic_year_it_writes(
-    db_session,
-    sample_school_for_extraction,
-):
-    """Fee history survives a refresh: only the written year is superseded."""
-    school = sample_school_for_extraction
-    db_session.add_all(
-        [
-            Pricing(
-                school_id=school.id,
-                category="tuition",
-                amount=800,
-                currency="BGN",
-                period="monthly",
-                academic_year="2024-2025",
-                source=PriceSource.SCRAPED_WEBSITE,
-                source_url="https://test-school.bg/prices",
-                pricing_context={"confidence": 0.9},
-            ),
-            Pricing(
-                school_id=school.id,
-                category="tuition",
-                amount=900,
-                currency="BGN",
-                period="monthly",
-                # Same logical year as the incoming row, spelled differently.
-                academic_year="2026-2027",
-                source=PriceSource.SCRAPED_WEBSITE,
-                source_url="https://test-school.bg/prices",
-                pricing_context={"confidence": 0.9},
-            ),
-        ]
-    )
-    await db_session.commit()
-
-    priced = PageFees(
-        lines=[
-            _fee_line(
-                "Tuition", 1000.0, academic_year="2026/2027",
-                quote="Tuition for 2026/2027 is 1000 BGN monthly.",
-            )
-        ]
-    )
-    pages = (
-        await db_session.execute(select(SourcePage).where(SourcePage.school_id == school.id))
-    ).scalars().all()
-    next(page for page in pages if page.page_category == "pricing").raw_markdown = (
-        "Tuition for 2026/2027 is 1000 BGN monthly."
-    )
-    await db_session.flush()
-
-    with patch(
-        "app.scrapers.extractor._run_typed_agent",
-        new=AsyncMock(return_value=(priced, 10, 2, 0.001)),
-    ):
-        result = await extractor_module._extract_prices(
-            db_session,
-            school,
-            list(pages),
-            20.0,
-            extractor_module.ExtractionLLMStats(),
-        )
-
-    assert result["success"] is True
-    rows = (
-        await db_session.execute(
-            select(Pricing).where(Pricing.school_id == school.id).order_by(Pricing.id)
-        )
-    ).scalars().all()
-
-    # The earlier year is untouched history; the matching year was replaced once,
-    # even though it was stored with a different spelling.
-    assert sorted((row.academic_year, float(row.amount)) for row in rows) == [
-        ("2024-2025", 800.0),
-        ("2026/2027", 1000.0),
-    ]
-
-
-@pytest.mark.asyncio
-async def test_extraction_preserves_rows_whose_year_is_unrecognised(
-    db_session,
-    sample_school_for_extraction,
-):
-    """An unparseable year must not be deleted as if it were an undated row."""
-    school = sample_school_for_extraction
-    db_session.add(
-        Pricing(
-            school_id=school.id,
-            category="tuition",
-            amount=700,
-            currency="BGN",
-            period="monthly",
-            # Normalizes to None, but it is not the undated bucket.
-            academic_year="2022-2027",
-            source=PriceSource.SCRAPED_WEBSITE,
-            source_url="https://test-school.bg/prices",
-            pricing_context={"confidence": 0.9},
-        )
-    )
-    await db_session.commit()
-
-    priced = PageFees(
-        lines=[_fee_line("Tuition", 1000.0, quote="Tuition for 2024 is 1000 BGN monthly.")]
-    )
-    pages = (
-        await db_session.execute(select(SourcePage).where(SourcePage.school_id == school.id))
-    ).scalars().all()
-
-    with patch(
-        "app.scrapers.extractor._run_typed_agent",
-        new=AsyncMock(return_value=(priced, 10, 2, 0.001)),
-    ):
-        result = await extractor_module._extract_prices(
-            db_session,
-            school,
-            list(pages),
-            20.0,
-            extractor_module.ExtractionLLMStats(),
-        )
-
-    assert result["success"] is True
-    rows = (
-        await db_session.execute(select(Pricing).where(Pricing.school_id == school.id))
-    ).scalars().all()
-    # The undated incoming row does not supersede the unrecognised-year row.
-    assert sorted((row.academic_year or "", float(row.amount)) for row in rows) == [
-        ("", 1000.0),
-        ("2022-2027", 700.0),
-    ]
-
-
-def _historical_scraped_price(school, page, amount=650):
-    """A 2025-26 fee row backed by a still-valid evidence page."""
-    return Pricing(
-        school_id=school.id,
-        category="tuition",
-        amount=amount,
-        currency="BGN",
-        period="monthly",
-        academic_year="2025/2026",
-        source=PriceSource.SCRAPED_WEBSITE,
-        source_url=page.source_url,
-        source_page_id=page.id,
-        pricing_context={"confidence": 0.9},
-    )
-
-
-@pytest.mark.asyncio
-async def test_no_pricing_found_preserves_historical_rows_and_evidence_links(
-    db_session,
-    sample_school_for_extraction,
-):
-    """A later crawl finding no 2026-27 fees must not erase the 2025-26 history.
-
-    Finding nothing supersedes no academic year, so neither the rows nor the links
-    that make them publishable may be touched.
-    """
-    school = sample_school_for_extraction
-    pages = (
-        await db_session.execute(select(SourcePage).where(SourcePage.school_id == school.id))
-    ).scalars().all()
-    pricing_page = next(page for page in pages if page.page_category == "pricing")
-    db_session.add(_historical_scraped_price(school, pricing_page))
-    pricing_page.raw_markdown = "Contact the school for current pricing."
-    await db_session.commit()
-
-    no_prices = PageFees(lines=[])
-    with patch(
-        "app.scrapers.extractor._run_typed_agent",
-        new=AsyncMock(return_value=(no_prices, 10, 2, 0.001)),
-    ):
-        result = await extractor_module._extract_prices(
-            db_session,
-            school,
-            list(pages),
-            20.0,
-            extractor_module.ExtractionLLMStats(),
-        )
-
-    assert result["success"] is True
-    assert result["count"] == 0
-    rows = (
-        await db_session.execute(select(Pricing).where(Pricing.school_id == school.id))
-    ).scalars().all()
-    assert len(rows) == 1
-    assert rows[0].academic_year == "2025/2026"
-    # The evidence link survives, so the row stays publishable as history.
-    assert rows[0].source_page_id == pricing_page.id
-
-
-@pytest.mark.asyncio
-async def test_provider_failure_still_leaves_pricing_untouched(
-    db_session,
-    sample_school_for_extraction,
-):
-    """Unchanged behaviour: a failed LLM call is not an authoritative result."""
-    school = sample_school_for_extraction
-    pages = (
-        await db_session.execute(select(SourcePage).where(SourcePage.school_id == school.id))
-    ).scalars().all()
-    pricing_page = next(page for page in pages if page.page_category == "pricing")
-    db_session.add(_historical_scraped_price(school, pricing_page))
-    pricing_page.raw_markdown = "No prices listed here."
-    await db_session.commit()
-
-    with patch(
-        "app.scrapers.extractor._run_typed_agent",
-        new=AsyncMock(return_value=(None, 0, 0, 0.0)),
-    ):
-        result = await extractor_module._extract_prices(
-            db_session,
-            school,
-            list(pages),
-            20.0,
-            extractor_module.ExtractionLLMStats(),
-        )
-
-    assert result["success"] is False
-    rows = (
-        await db_session.execute(select(Pricing).where(Pricing.school_id == school.id))
-    ).scalars().all()
-    assert [(row.academic_year, row.source_page_id) for row in rows] == [
-        ("2025/2026", pricing_page.id)
-    ]
-
-
-@pytest.mark.asyncio
-async def test_newer_year_extraction_keeps_the_previous_year_alongside_it(
-    db_session,
-    sample_school_for_extraction,
-):
-    """The school publishes 2026-27: last year's fee stays as history beside it."""
-    school = sample_school_for_extraction
-    pages = (
-        await db_session.execute(select(SourcePage).where(SourcePage.school_id == school.id))
-    ).scalars().all()
-    pricing_page = next(page for page in pages if page.page_category == "pricing")
-    db_session.add(_historical_scraped_price(school, pricing_page))
-    pricing_page.raw_markdown = "Tuition for 2026/2027 is 1000 BGN monthly."
-    await db_session.commit()
-
-    priced = PageFees(
-        lines=[
-            _fee_line(
-                "Tuition", 1000.0, academic_year="2026/2027",
-                quote="Tuition for 2026/2027 is 1000 BGN monthly.",
-            )
-        ]
-    )
-    with patch(
-        "app.scrapers.extractor._run_typed_agent",
-        new=AsyncMock(return_value=(priced, 10, 2, 0.001)),
-    ):
-        result = await extractor_module._extract_prices(
-            db_session,
-            school,
-            list(pages),
-            20.0,
-            extractor_module.ExtractionLLMStats(),
-        )
-
-    assert result["success"] is True
-    rows = (
-        await db_session.execute(select(Pricing).where(Pricing.school_id == school.id))
-    ).scalars().all()
-    assert sorted((row.academic_year, float(row.amount)) for row in rows) == [
-        ("2025/2026", 650.0),
-        ("2026/2027", 1000.0),
-    ]
-
-
 def _packing_school():
     return School(
         name_i18n={"bg": "Тест"},
@@ -4377,236 +2574,15 @@ def _packing_school():
     )
 
 
-def _select_pricing_pages(pages):
-    return page_selection._select_pages(
-        school=_packing_school(),
-        pages=pages,
-        preferred_categories=["pricing", "admission", "contact"],
-        use_case="pricing",
-        include_tokens=("price", "pricing", "fees", "tuition", "такси", "цени"),
-    )
-
-
-def test_oversized_page_cannot_starve_a_smaller_pricing_page(monkeypatch):
-    """The school 302 shape: a 15k mis-categorised privacy page hid the real fee page.
-
-    Its privacy policy was categorised `pricing` and filled the entire content budget,
-    so the 1.5k page carrying "680 euro" never reached the model.
-    """
-    settings = get_settings()
-    monkeypatch.setattr(settings, "extraction_max_content_chars", 15000, raising=False)
-
-    fee_text = (
-        "Прием и такса\n"
-        + ("Общи условия за прием и необходими документи. " * 12)
-        + "\nМесечна такса за яслена група за учебната 2025/2026г. е 680 euro\n"
-        + "Месечна такса за детска градина 650 euro\n"
-    )
-    pages = [
-        # Ranked ahead of the fee page and large enough to consume the whole budget.
-        SourcePage(
-            source_url="https://example-school.bg/content/pravila-za-zashtita-danni.php",
-            page_category="pricing",
-            raw_markdown="Правила за защита на личните данни. Такси. " + ("х" * 15000),
-        ),
-        SourcePage(
-            source_url="https://example-school.bg/content/taksa-za-detska-gradina.php",
-            page_category="pricing",
-            raw_markdown=fee_text,
-        ),
-    ]
-
-    selected_text, source_urls = _select_pricing_pages(pages)
-
-    assert "680 euro" in selected_text
-    assert "650 euro" in selected_text
-    assert "https://example-school.bg/content/taksa-za-detska-gradina.php" in source_urls
-    # Budget still respected (the "\n\n" joins between parts are not counted against it).
-    assert len(selected_text) <= 15000 + 4
-
-
-def test_single_long_pricing_page_keeps_effectively_the_whole_budget(monkeypatch):
-    """Guard: the fair-budget rule must not gut a school whose fees really are one long page."""
-    settings = get_settings()
-    monkeypatch.setattr(settings, "extraction_max_content_chars", 15000, raising=False)
-
-    long_fees = "Такси за обучение\n" + ("Клас и такса за учебната 2026/2027 година. " * 340)
-    pages = [
-        SourcePage(
-            source_url="https://example-school.bg/taksi",
-            page_category="pricing",
-            raw_markdown=long_fees,
-        )
-    ]
-
-    selected_text, source_urls = _select_pricing_pages(pages)
-
-    assert source_urls == ["https://example-school.bg/taksi"]
-    # Nothing is queued behind it, so no room is held back.
-    assert len(selected_text) >= 14000
-
-
-def test_long_pricing_page_keeps_most_of_the_budget_beside_small_pages(monkeypatch):
-    """A long genuine fee page loses only the modest reserve held for the pages behind it."""
-    settings = get_settings()
-    monkeypatch.setattr(settings, "extraction_max_content_chars", 15000, raising=False)
-
-    pages = [
-        SourcePage(
-            source_url="https://example-school.bg/taksi",
-            page_category="pricing",
-            raw_markdown="Такси за обучение\n" + ("Такса за учебната 2026/2027 година. " * 500),
-        ),
-        SourcePage(
-            source_url="https://example-school.bg/contact",
-            page_category="contact",
-            raw_markdown="Контакти: 0888 123 456",
-        ),
-    ]
-
-    selected_text, source_urls = _select_pricing_pages(pages)
-
-    assert "https://example-school.bg/taksi" in source_urls
-    # Only the small queued page's own size is reserved, not a fixed quarter share.
-    assert len(selected_text) >= 14000
-
-
-def test_complete_short_fee_page_is_not_dropped_as_a_fragment(monkeypatch):
-    """A whole page under the fragment floor is evidence, not a fragment.
-
-    The 500-char minimum exists to reject truncated scraps. Applying it to a complete
-    page drops terse fee pages ("Tuition EUR 680") behind an oversized page, recreating
-    the starvation this packing rule exists to prevent.
-    """
-    settings = get_settings()
-    monkeypatch.setattr(settings, "extraction_max_content_chars", 15000, raising=False)
-
-    pages = [
-        # Carries the strong pricing slug, so it ranks ahead of the terse fee page.
-        SourcePage(
-            source_url="https://example-school.bg/taksi-i-ceni",
-            page_category="pricing",
-            raw_markdown="Такси и цени. Правила за защита на личните данни. " + ("х" * 15000),
-        ),
-        SourcePage(
-            source_url="https://example-school.bg/info",
-            page_category=None,
-            raw_markdown="Tuition EUR 680",
-        ),
-    ]
-
-    selected_text, source_urls = _select_pricing_pages(pages)
-
-    assert "https://example-school.bg/info" in source_urls
-    assert "Tuition EUR 680" in selected_text
-    # Included whole, not clipped, despite being far below the fragment floor.
-    assert selected_text.rstrip().endswith("Tuition EUR 680")
-
-
-@pytest.mark.parametrize(
-    "raw,expected",
-    [
-        ("Целодневна – 500евро", "Целодневна – 500 евро"),
-        ("Такса храна - 88евро.", "Такса храна - 88 евро."),
-        ("Месечна такса 1200лева", "Месечна такса 1200 лева"),
-        ("1 200ЕВРО", "1 200 ЕВРО"),
-    ],
-)
-def test_glued_bulgarian_currency_word_is_spaced_for_the_prompt(raw, expected):
-    assert price_lines._space_glued_currency_words(raw) == expected
-
-
-@pytest.mark.parametrize(
-    "unchanged",
-    [
-        # Already spaced.
-        "Целодневна – 500 евро",
-        "Месечна такса 1200 лева",
-        # Abbreviations and Latin forms already work glued; deliberately left alone.
-        "Месечно половин ден 888лв",
-        "500eur",
-        "500euro",
-        "500bgn",
-        # The currency word is only the start of a longer word.
-        "5евроклуб",
-        "3левашки",
-        # Not attached to a number at all.
-        "Европа 2026",
-        "",
-    ],
-)
-def test_prompt_normalization_leaves_other_text_alone(unchanged):
-    assert price_lines._space_glued_currency_words(unchanged) == unchanged
-
-
-@pytest.mark.asyncio
-async def test_only_the_llm_prompt_sees_spaced_currency_words(
-    db_session,
-    sample_school_for_extraction,
-):
-    """School 615: the model misses "500евро" but reads "500 евро".
-
-    Deterministic parsing and the evidence filter must keep the original text, because
-    they deliberately do not treat full Bulgarian currency words as currencies.
-    """
-    school = sample_school_for_extraction
-    pages = (
-        await db_session.execute(select(SourcePage).where(SourcePage.school_id == school.id))
-    ).scalars().all()
-    next(page for page in pages if page.page_category == "pricing").raw_markdown = (
-        "# ТАКСИ\n#### Целодневна – 500евро\nМесечна такса\n#### Такса храна - 88евро\n"
-    )
-    await db_session.flush()
-
-    # Return a row so the evidence filter actually runs; with no prices it is skipped and
-    # the check below would pass without testing anything.
-    llm = AsyncMock(
-        return_value=(
-            PageFees(
-                lines=[
-                    _fee_line(
-                        "Целодневна", 500.0, currency="EUR", quote="#### Целодневна – 500евро"
-                    )
-                ]
-            ),
-            1, 1, 0.0,
-        )
-    )
-    with patch("app.scrapers.extractor._run_typed_agent", new=llm), patch.object(
-        price_lines, "_extract_prices_deterministic", wraps=price_lines._extract_prices_deterministic
-    ) as deterministic, patch.object(
-        fee_lines, "_filter_model_prices", wraps=fee_lines._filter_model_prices
-    ) as support:
-        await extractor_module._extract_prices(
-            db_session, school, list(pages), 20.0, extractor_module.ExtractionLLMStats()
-        )
-
-    prompt = llm.call_args.kwargs.get("user_prompt") or llm.call_args.args[1]
-    assert "500 евро" in prompt and "88 евро" in prompt
-    assert "500евро" not in prompt
-
-    deterministic_text = deterministic.call_args.args[0]
-    assert "500евро" in deterministic_text
-    assert "500 евро" not in deterministic_text
-
-    assert support.call_count >= 1
-    for call in support.call_args_list:
-        assert "500евро" in call.args[1]
-        assert "500 евро" not in call.args[1]
-
-
 @pytest.mark.asyncio
 async def test_extract_school_pins_campus_locations_after_its_commit(db_session, sample_school_for_extraction):
     """UF42(b): validation inside extraction creates campus rows; they are geocoded once committed."""
     school = sample_school_for_extraction
     school_id = school.id
-    mock_price = PageFees(lines=[])
     mock_general = GeneralInfoExtractionOutput(
         languages=[ExtractedLanguageFocus(language="English")], has_useful_info=True
     )
     async def fake_agent(**kwargs):
-        if kwargs["result_type"] is PageFees:
-            return mock_price, 1, 1, 0.0
         if kwargs["result_type"] is GeneralInfoExtractionOutput:
             return mock_general, 1, 1, 0.0
         return None, 0, 0, 0.0
@@ -4622,482 +2598,8 @@ async def test_extract_school_pins_campus_locations_after_its_commit(db_session,
     assert geocode.await_args.args[1] == school_id
 
 
-# UF45 rule 6: a re-extraction that loses what the published rows show is held.
-
-_HOLD_PAGE = (
-    "ТАКСИ\n€ 530 | 1037 лв.\n- целодневно гледане, ежемесечно заплащане\n"
-    "€ 350 | 685 лв.\n- половин ден с включен обяд\n"
-    "€ 265 | 518 лв.\n– депозит за запазване на място\n"
-)
-
-
-async def _published_rows_and_page(db_session, school, rows):
-    pages = (
-        await db_session.execute(select(SourcePage).where(SourcePage.school_id == school.id))
-    ).scalars().all()
-    pricing_page = next(page for page in pages if page.page_category == "pricing")
-    pricing_page.raw_markdown = _HOLD_PAGE
-    for category, amount, period in rows:
-        db_session.add(
-            Pricing(
-                school_id=school.id,
-                category=category,
-                amount=amount,
-                currency="EUR",
-                period=period,
-                source=PriceSource.SCRAPED_WEBSITE,
-                source_url=pricing_page.source_url,
-                source_page_id=pricing_page.id,
-                pricing_context={"confidence": 1.0},
-            )
-        )
-    await db_session.commit()
-    return list(pages)
-
-
-async def _run_prices(db_session, school, pages, prices):
-    # The page's own wording for each amount; an amount the page does not show gets a bare label.
-    page_labels = {530.0: "Целодневно гледане", 350.0: "Половин ден с включен обяд", 265.0: "Депозит за запазване на място"}
-    per_of_period = {"monthly": "month", "one_time": "one_time", None: "unstated"}
-    output = PageFees(
-        lines=[
-            _fee_line(
-                page_labels.get(float(amount), "Такса"), amount, currency="EUR", per=per_of_period[period],
-                kind=category,
-            )
-            for category, amount, period in prices
-        ]
-    )  # fmt: skip
-    with patch(
-        "app.scrapers.extractor._run_typed_agent",
-        new=AsyncMock(return_value=(output, 10, 2, 0.001)),
-    ):
-        return await extractor_module._extract_prices(
-            db_session, school, pages, 20.0, extractor_module.ExtractionLLMStats()
-        )
-
-
-async def _stored(db_session, school):
-    rows = (
-        await db_session.execute(select(Pricing).where(Pricing.school_id == school.id))
-    ).scalars().all()
-    return sorted(
-        (row.category.value, float(row.amount), row.period.value if row.period else None) for row in rows
-    )
-
-
-@pytest.mark.asyncio
-async def test_reextraction_dropping_a_fee_the_page_still_shows_is_held(
-    db_session, sample_school_for_extraction
-):
-    school = sample_school_for_extraction
-    published = [("tuition", 530, "monthly"), ("registration", 265, "one_time")]
-    pages = await _published_rows_and_page(db_session, school, published)
-
-    result = await _run_prices(db_session, school, pages, [("tuition", 530.0, "monthly")])
-
-    assert result["held"] is True
-    assert await _stored(db_session, school) == sorted(
-        [("tuition", 530.0, "monthly"), ("registration", 265.0, "one_time")]
-    )
-    hold = school.attributes[price_step.PRICING_HOLD_KEY]
-    assert hold["reasons"] == ["drops REGISTRATION 265.00, which the page still shows"]
-
-
-@pytest.mark.asyncio
-async def test_reextraction_keeps_a_period_the_page_does_not_state(
-    db_session, sample_school_for_extraction
-):
-    """The published row's period, set where the reader cannot see it (171's by hand),
-    carries over to the same fee read again with none."""
-    school = sample_school_for_extraction
-    pages = await _published_rows_and_page(db_session, school, [("tuition", 350, "monthly")])
-
-    result = await _run_prices(db_session, school, pages, [("tuition", 350.0, None)])
-
-    assert result.get("held") is None
-    assert await _stored(db_session, school) == [("tuition", 350.0, "monthly")]
-
-
-@pytest.mark.asyncio
-async def test_reextraction_losing_a_period_the_page_states_is_written(
-    db_session, sample_school_for_extraction
-):
-    """The page says "ежемесечно" next to the amount, so the row gets its period back
-    from the text and nothing is lost."""
-    school = sample_school_for_extraction
-    school.attributes = {price_step.PRICING_HOLD_KEY: {"reasons": ["earlier"]}}
-    pages = await _published_rows_and_page(db_session, school, [("tuition", 530, "monthly")])
-
-    result = await _run_prices(db_session, school, pages, [("tuition", 530.0, None)])
-
-    assert result.get("held") is None
-    assert await _stored(db_session, school) == [("tuition", 530.0, "monthly")]
-    # A replacement that goes through clears the earlier hold.
-    assert price_step.PRICING_HOLD_KEY not in school.attributes
-
-
-@pytest.mark.asyncio
-async def test_reextraction_is_not_held_for_a_fee_the_page_no_longer_shows(
-    db_session, sample_school_for_extraction
-):
-    """525's €560 became €530: the old amount is gone from the page."""
-    school = sample_school_for_extraction
-    pages = await _published_rows_and_page(db_session, school, [("tuition", 560, "monthly")])
-
-    result = await _run_prices(db_session, school, pages, [("tuition", 530.0, "monthly")])
-
-    assert result.get("held") is None
-    assert [row[:2] for row in await _stored(db_session, school)] == [("tuition", 530.0)]
-
-
-def test_pricing_selection_prefers_a_page_that_states_prices_over_preferred_categories():
-    """The school 568 shape: an uncategorised fee.html lost all four slots to
-    admission/contact/home pages, so its fee table never reached the model."""
-    pages = [
-        SourcePage(source_url="https://example-school.bg/admission.html", page_category="admission", raw_markdown="Прием на ученици. " * 20),
-        SourcePage(source_url="https://example-school.bg/contact.html", page_category="contact", raw_markdown="Контакти и адрес. " * 20),
-        SourcePage(source_url="https://example-school.bg", page_category="about", raw_markdown="Начало. " * 20),
-        SourcePage(source_url="https://example-school.bg/apply.html", page_category="admission", raw_markdown="Кандидатстване. " * 20),
-        SourcePage(source_url="https://example-school.bg/team.html", page_category="contact", raw_markdown="Екип и телефон. " * 20),
-        SourcePage(
-            source_url="https://example-school.bg/fee.html",
-            page_category=None,
-            raw_markdown="Годишна такса за учебната 2026/2027 г.\nПГ | EUR 8950 | EUR 9300\nVIII - XII клас | EUR 6700 | EUR 7050",
-        ),
-    ]  # fmt: skip
-
-    selected_text, source_urls = _select_pricing_pages(pages)
-
-    assert source_urls[0] == "https://example-school.bg/fee.html"
-    assert "EUR 6700" in selected_text
-
-
-def test_pricing_selection_counts_url_spellings_of_one_page_once():
-    """`http://host` and `http://host/` (or an escaped and a decoded path) are one page;
-    the newest crawl is the one kept."""
-    old = datetime.datetime(2026, 2, 1, tzinfo=datetime.UTC)
-    new = datetime.datetime(2026, 7, 1, tzinfo=datetime.UTC)
-    pages = [
-        SourcePage(source_url="http://example-school.bg/", page_category="contact", raw_markdown="Начало старо", last_scraped_at=old),
-        SourcePage(source_url="https://www.example-school.bg", page_category="contact", raw_markdown="Начало ново", last_scraped_at=new),
-        SourcePage(source_url="https://example-school.bg/%D1%82%D0%B0%D0%BA%D1%81%D0%B8", page_category="pricing", raw_markdown="Такса 500 евро", last_scraped_at=old),
-        SourcePage(source_url="https://example-school.bg/такси/", page_category="pricing", raw_markdown="Такса 600 евро", last_scraped_at=new),
-    ]  # fmt: skip
-
-    selected_text, source_urls = _select_pricing_pages(pages)
-
-    assert source_urls == ["https://example-school.bg/такси/", "https://www.example-school.bg"]
-    assert "600 евро" in selected_text and "500 евро" not in selected_text
-    assert "Начало старо" not in selected_text
-
-
-def test_long_pricing_page_is_cut_to_its_fee_section_not_its_head(monkeypatch):
-    settings = get_settings()
-    monkeypatch.setattr(settings, "extraction_max_content_chars", 4000, raising=False)
-    fees = "Такса обучение I - IV клас 7000 евро\nТакса обучение V - VII клас 7500 евро\n"
-    pages = [
-        SourcePage(
-            source_url="https://example-school.bg/taksi",
-            page_category="pricing",
-            raw_markdown=("Меню и навигация. " * 500) + fees + ("Общи условия. " * 500),
-        )
-    ]
-
-    selected_text, _ = _select_pricing_pages(pages)
-
-    assert selected_text.startswith("--- SOURCE: https://example-school.bg/taksi ---\n")
-    assert "7000 евро" in selected_text and "7500 евро" in selected_text
-    assert len(selected_text) <= 4000
-
-
-def _model_price(**fields):
-    return ExtractedPrice(currency="EUR", confidence=0.9, **fields)
-
-
-def test_model_row_keeps_its_category_under_an_unrelated_heading():
-    """School 404: the admission-steps heading above the fee list carried "registration"
-    onto every tuition line, and the heading outranked the model."""
-    text = """
-    --- SOURCE: https://school.test/priem-i-taksi ---
-    Необходими документи за записване и регистрация
-    Договор и заплащане
-    За ученици от 1 до 3 клас: 6 750 евро / година / девет вноски
-    За ученици от 4 до 7 клас: 7 500 евро / година / десет вноски
-    """
-    rows = [
-        _model_price(category="tuition", amount=6750, period="yearly", plan_name="Ученици от 1 до 3 клас"),
-        _model_price(category="tuition", amount=7500, period="yearly", plan_name="Ученици от 4 до 7 клас"),
-    ]  # fmt: skip
-
-    refined = fee_lines._filter_model_prices(rows, text)
-
-    assert [(row.category, row.amount, row.period) for row in refined] == [
-        ("tuition", 6750, "yearly"),
-        ("tuition", 7500, "yearly"),
-    ]
-    # The keyword extractor's rows still take the heading's category.
-    by_keywords = price_rows._filter_supported_prices(rows, text)
-    assert {row.category for row in by_keywords} == {"registration"}
-
-
-def test_model_row_needs_no_fee_word_near_its_amount():
-    """School 529: "€ 6.540" stands under a level name; no line near it says what fee."""
-    text = """
-    --- SOURCE: https://school.test/uchebni-taksi ---
-    Правилник за учебната 2026/2027 година
-    Предучилищна
-    € 6.540
-    Гимназия
-    € 6.740
-    """
-    rows = [
-        _model_price(category="tuition", amount=6540, period="yearly", academic_year="2026/2027", plan_name="Предучилищна"),
-        _model_price(category="tuition", amount=6740, period="yearly", academic_year="2026-2027", plan_name="Гимназия"),
-        _model_price(category="tuition", amount=9999, period="yearly", plan_name="Гимназия"),
-    ]  # fmt: skip
-
-    refined = fee_lines._filter_model_prices(rows, text)
-
-    # Both amounts on the page are kept with the year the page names; the period the
-    # page does not state is cleared; an amount that is not on the page is dropped.
-    assert [(row.amount, row.period, row.academic_year) for row in refined] == [
-        (6540, None, "2026/2027"),
-        (6740, None, "2026-2027"),
-    ]
-    assert price_rows._filter_supported_prices(rows, text) == []
-
-
-def test_model_row_in_a_table_of_several_prices_per_line():
-    """School 300's PDF: one line carries five grade bands' fees, and an unrelated
-    sentence further up names the following year."""
-    text = """
-    --- SOURCE: https://school.test/taksi-2026-2027.pdf ---
-    Такси за учебната 2026/2027 г.
-    до 15.01.2027 г. при преустановяване на обучението от учебната 2027/2028 г.
-    За цялата учебна година Подготвителна група Първи клас 2-7 клас
-    при плащане в срок до 31.08.2026г. € 7880 € 8580 €8800
-    """
-    rows = [
-        _model_price(category="tuition", amount=amount, period="yearly", academic_year="2026/2027", age_group=band)
-        for amount, band in ((7880, "Подготвителна група"), (8580, "Първи клас"), (8800, "2-7 клас"))
-    ]  # fmt: skip
-
-    refined = fee_lines._filter_model_prices(rows, text)
-
-    assert [(row.amount, row.academic_year) for row in refined] == [
-        (7880, "2026/2027"),
-        (8580, "2026/2027"),
-        (8800, "2026/2027"),
-    ]
-
-
-def test_model_row_in_a_table_takes_period_and_year_from_the_header():
-    """School 568: the header row says "Годишна такса за учебната 2026/2027 г."."""
-    text = (
-        "--- SOURCE: http://school.test/fee.html ---\n"
-        "Етап на обучение | Годишна такса за учебната 2026/2027 г. | Годишна такса при разсрочено плащане\n"
-        "ПГ | EUR 8950 | EUR 9300\n"
-        "I - VII клас | EUR 8950 | EUR 9300\n"
-        "VIII - XII клас | EUR 6700 | EUR 7050\n"
-    )
-    row = _model_price(category="tuition", amount=6700, age_group="VIII - XII клас")
-
-    refined = fee_lines._filter_model_prices([row], text)
-
-    assert [(r.amount, r.period, r.academic_year) for r in refined] == [(6700, "yearly", "2026/2027")]
-
-
-def test_model_row_year_and_period_come_from_the_page():
-    text = "--- SOURCE: https://school.test/fees ---\nTuition 2025/2026\nGrades 1-4 EUR 9,000 per year\nBus EUR 90"
-    rows = [
-        _model_price(category="tuition", amount=9000, period="monthly", academic_year="2026/2027", plan_name="Grades 1-4"),
-        _model_price(category="transport", amount=90, period="monthly"),
-    ]  # fmt: skip
-
-    refined = fee_lines._filter_model_prices(rows, text)
-
-    # A year the page does not name is not kept; a row without one takes the only year
-    # the page names. The period is the one written next to the amount, or none.
-    assert [(row.amount, row.period, row.academic_year) for row in refined] == [
-        (9000, "yearly", None),
-        (90, None, "2025/2026"),
-    ]
-
-
-@pytest.mark.parametrize(
-    ("text", "row"),
-    [
-        (
-            "Tuition Fee EUR 10,000\nCapital Fee EUR 2,000\nTotal Fee EUR 12,000",
-            _model_price(category="tuition", amount=12000, period="yearly", plan_name="Total Fee"),
-        ),
-        (
-            "Tuition EUR 10,000\nLate payment fee EUR 150",
-            _model_price(category="registration", amount=150),
-        ),
-        ("Tuition 10 000 лв. per year", _model_price(category="tuition", amount=10000)),
-        ("Our campus is at 300 Vitosha Blvd. Tuition EUR 9,000", _model_price(category="materials", amount=300)),
-        (
-            "## Tuition fees\nAnnual tuition EUR 8,000\nPayment deadline: 15 September 2023",
-            _model_price(category="tuition", amount=8000, period="yearly"),
-        ),
-    ],
-    ids=["total", "penalty", "other-currency", "bare-number", "stale-page"],
-)
-def test_model_row_the_page_does_not_bear_out_is_dropped(text, row):
-    text = f"--- SOURCE: https://school.test/fees ---\n{text}"
-
-    assert fee_lines._filter_model_prices([row], text) == []
-
-
-def test_pricing_selection_keeps_the_priced_spelling_from_one_crawl():
-    """Two spellings stamped by the same crawl: the copy that states the prices is kept."""
-    now = datetime.datetime(2026, 10, 1, tzinfo=datetime.UTC)
-    pages = [
-        SourcePage(source_url="https://example-school.bg/taksi", page_category="pricing", raw_markdown="Прием и такси. Стъпки при кандидатстване.", last_scraped_at=now),
-        SourcePage(source_url="https://example-school.bg/taksi/", page_category="pricing", raw_markdown="Такса 6 750 евро / година", last_scraped_at=now),
-    ]  # fmt: skip
-
-    selected_text, source_urls = _select_pricing_pages(pages)
-
-    assert source_urls == ["https://example-school.bg/taksi/"]
-    assert "6 750 евро" in selected_text
-
-
-@pytest.mark.asyncio
-async def test_prices_only_extraction_rereads_fees_and_leaves_the_rest(
-    db_session, sample_school_for_extraction
-):
-    school = sample_school_for_extraction
-    school.school_type = "private"
-    school.scrape_status = "summarized"
-    school.summary_i18n = {"bg": "Обобщение"}
-    await _published_rows_and_page(db_session, school, [])
-    await db_session.commit()
-    output = PageFees(lines=[_fee_line("Целодневно гледане", 530.0, currency="EUR", quote="€ 530 | 1037 лв.")])
-    llm = AsyncMock(return_value=(output, 10, 2, 0.001))
-
-    with patch("app.scrapers.extractor._run_typed_agent", new=llm), patch(
-        "app.scrapers.extractor._extract_general_info",
-        new=AsyncMock(side_effect=AssertionError("general information must not be re-read")),
-    ):
-        result = await extractor_module.extract_school(db_session, school.id, "bg", prices_only=True)
-
-    assert result["status"] == "extracted" and result["pricing_count"] == 1
-    assert llm.call_args.kwargs["preferred_tier"] == "pricing"
-    await db_session.refresh(school)
-    assert school.scrape_status == "summarized"
-    assert school.summary_i18n == {"bg": "Обобщение"}
-    assert await _stored(db_session, school) == [("tuition", 530.0, "monthly")]
-
-
-@pytest.mark.asyncio
-async def test_kindergarten_does_not_take_school_grade_fees(
-    db_session, sample_school_for_extraction
-):
-    """School 510: the kindergarten shares a site with its school and took "8 клас"."""
-    school = sample_school_for_extraction
-    school.education_level = "kindergarten"
-    pages = (
-        await db_session.execute(select(SourcePage).where(SourcePage.school_id == school.id))
-    ).scalars().all()
-    next(page for page in pages if page.page_category == "pricing").raw_markdown = (
-        "Такси\nДетска градина | 600 евро месечно\n8 клас | 8000 евро годишно\n"
-    )
-    await db_session.flush()
-    output = PageFees(
-        lines=[
-            _fee_line("Детска градина", 600.0, currency="EUR", quote="Детска градина | 600 евро месечно"),
-            _fee_line("8 клас", 8000.0, currency="EUR", per="year", quote="8 клас | 8000 евро годишно"),
-        ]
-    )  # fmt: skip
-    llm = AsyncMock(return_value=(output, 10, 2, 0.001))
-
-    with patch("app.scrapers.extractor._run_typed_agent", new=llm):
-        await extractor_module._extract_prices(
-            db_session, school, list(pages), 20.0, extractor_module.ExtractionLLMStats()
-        )
-
-    assert await _stored(db_session, school) == [("tuition", 600.0, "monthly")]
-
-
-def test_model_row_table_period_comes_from_its_own_column():
-    text = (
-        "--- SOURCE: https://school.test/fees ---\n"
-        "Клас | Годишна такса | Храна | Транспорт\n"
-        "1-4 клас | 7000 евро | 150 евро | 90 евро\n"
-    )
-    rows = [
-        _model_price(category="tuition", amount=7000, plan_name="1-4 клас"),
-        _model_price(category="food", amount=150, plan_name="1-4 клас"),
-    ]
-
-    refined = fee_lines._filter_model_prices(rows, text)
-
-    assert [(row.amount, row.period) for row in refined] == [(7000, "yearly"), (150, None)]
-
-
-def test_model_row_is_not_supported_by_a_number_in_a_table_that_is_not_about_fees():
-    text = "--- SOURCE: https://school.test/classes ---\nКлас | Ученици | Паралелки\n1 клас | 24 | 2\n"
-    fee_table = "--- SOURCE: https://school.test/fees ---\nКлас | Такса (EUR)\n1 клас | 7000\n"
-
-    assert fee_lines._filter_model_prices([_model_price(category="materials", amount=24)], text) == []
-    assert len(fee_lines._filter_model_prices([_model_price(category="tuition", amount=7000)], fee_table)) == 1
-
-
-@pytest.mark.asyncio
-async def test_keyword_fallback_does_not_replace_model_rows_the_text_does_not_bear_out(
-    db_session, sample_school_for_extraction
-):
-    """School 300: with the model's rows rejected, the keyword extractor stored its own
-    reading of the same page ("materials 7880")."""
-    school = sample_school_for_extraction
-    pages = await _published_rows_and_page(db_session, school, [])
-
-    result = await _run_prices(db_session, school, pages, [("tuition", 9999.0, "monthly")])
-
-    assert result["count"] == 0
-    assert await _stored(db_session, school) == []
-
-
-@pytest.mark.asyncio
-async def test_prices_only_extraction_failure_leaves_the_status(db_session, sample_school_for_extraction):
-    school = sample_school_for_extraction
-    school.school_type = "private"
-    school.scrape_status = "navigated"
-    await db_session.commit()
-
-    async def failing_prices(db, school, pages, timeout_seconds, llm_stats):
-        llm_stats.hard_failures += 1
-        return {"success": False, "count": 0, "detail": "Price extraction LLM call failed", "input_tokens": 0, "output_tokens": 0}  # fmt: skip
-
-    with patch("app.scrapers.extractor._extract_prices", new=failing_prices):
-        result = await extractor_module.extract_school(db_session, school.id, "bg", prices_only=True)
-
-    assert result["status"] == "extraction_failed"
-    await db_session.refresh(school)
-    assert school.scrape_status == "navigated"
-
-
-def test_bare_table_cell_takes_its_currency_from_its_own_column():
-    """A model row must not move a number from the EUR column into BGN."""
-    text = "--- SOURCE: https://school.test/fees ---\nПлан | EUR | BGN\n1-4 клас | 7000 | 13690\n"
-
-    def kept(amount, currency):
-        row = ExtractedPrice(category="tuition", amount=amount, currency=currency, confidence=0.9)
-        return len(fee_lines._filter_model_prices([row], text))
-
-    assert (kept(7000, "EUR"), kept(13690, "BGN")) == (1, 1)
-    assert (kept(7000, "BGN"), kept(13690, "EUR")) == (0, 0)
-    # Two currencies named, but not per column: the cell is evidence for neither.
-    unnamed = "--- SOURCE: https://school.test/fees ---\nТакси в EUR и BGN | A | B\n1-4 клас | 7000 | 13690\n"
-    row = ExtractedPrice(category="tuition", amount=7000, currency="EUR", confidence=0.9)
-    assert fee_lines._filter_model_prices([row], unnamed) == []
-
-
 def test_extraction_reads_only_the_freshest_copy_of_a_page():
-    """School 593: the fee page stored as /tuition-fees in July and /tuition-fees/ today."""
+    """School 593: a page stored as /tuition-fees in July and /tuition-fees/ today."""
     def page(url, day):
         return SimpleNamespace(source_url=url, last_scraped_at=datetime.datetime(2026, day[0], day[1]))
 
@@ -5114,205 +2616,6 @@ def test_extraction_reads_only_the_freshest_copy_of_a_page():
         "https://izzi.academy/about-us",
         "https://izzi.academy/admissions/tuition-fees/",
     ]
-
-
-def test_model_row_period_must_fit_its_category():
-    text = (
-        "--- SOURCE: https://school.test/fees ---\n"
-        "8. клас ГОДИШНА ТАКСА еднократно плащане 7000 евро\n"
-        "Registration fee: € 200, cafeteria € 345 per quarter\n"
-        "Такса записване 300 евро еднократно\n"
-    )
-    rows = [
-        _model_price(category="tuition", amount=7000, plan_name="8. клас"),
-        _model_price(category="registration", amount=200),
-        _model_price(category="registration", amount=300),
-        _model_price(category="food", amount=345),
-    ]
-
-    refined = fee_lines._filter_model_prices(rows, text)
-
-    assert [(row.category, row.amount, row.period) for row in refined] == [
-        ("tuition", 7000, None),
-        ("registration", 200, None),
-        ("registration", 300, "one_time"),
-        ("food", 345, "quarter"),
-    ]
-
-
-def test_pricing_selection_counts_bare_table_cells_as_prices():
-    """School 594: the transcribed fee picture names its currency once in a heading."""
-    table = (
-        "FINANCIAL CONDITIONS FOR 2026-2027 (all fees are in euro)\n"
-        "GRADE | Admission Fee | TUITION FEE NEW STUDENTS\nGrade 1 | 500 | 15 350\nGrade 2 | 500 | 16 250\n"
-    )
-    pages = [
-        SourcePage(source_url=f"https://example-school.bg/fees/terms-{n}", page_category="pricing", raw_markdown="General terms of the tuition contract. " * 10)
-        for n in range(5)
-    ] + [SourcePage(source_url="https://example-school.bg/uploads/FEES-2026-2027.png", page_category="pricing", raw_markdown=table)]  # fmt: skip
-
-    selected_text, source_urls = _select_pricing_pages(pages)
-
-    assert source_urls[0] == "https://example-school.bg/uploads/FEES-2026-2027.png"
-    assert "15 350" in selected_text
-
-
-def test_model_rows_for_a_past_year_or_a_guessed_lev_are_dropped_and_a_weekly_fee_is_kept_as_weekly():
-    old = "--- SOURCE: https://school.test/fees ---\nТакси за учебната 2024/2025 г.\nПГ и I клас 4 300 евро\n"
-    row = _model_price(category="tuition", amount=4300, academic_year="2024/2025")
-    assert fee_lines._filter_model_prices([row], old) == []
-    assert fee_lines._academic_year_is_over("2025/2026", today=datetime.date(2026, 10, 9)) is False
-    assert fee_lines._academic_year_is_over("2025/2026", today=datetime.date(2027, 9, 1)) is True
-
-    weekly = "--- SOURCE: https://school.test/fees ---\nЦелодневно: 690 евро на месец\n\nДруги услуги\nГост\nПрограма\nСедмично: 190 евро\n"
-    rows = [
-        _model_price(category="tuition", amount=190, plan_name="Седмично"),
-        _model_price(category="tuition", amount=690, plan_name="Целодневно"),
-    ]
-    kept = fee_lines._filter_model_prices(rows, weekly)
-    assert [(r.amount, r.period) for r in kept] == [(190, "weekly"), (690, "monthly")]
-
-    guest = "--- SOURCE: https://school.test/fees ---\nGuest pupils: EUR 80 per day"
-    kept = fee_lines._filter_model_prices([_model_price(category="tuition", amount=80)], guest)
-    assert [(r.amount, r.period) for r in kept] == [(80, "daily")]
-
-    # A fee table that names no currency is in euro: a row calling its cell leva is a guess.
-    table = "--- SOURCE: https://school.test/fees ---\nКлас | Такса\nПодготвителен клас | 7 400\n"
-    lev = ExtractedPrice(category="tuition", amount=7400, currency="BGN", confidence=0.9)
-    euro = ExtractedPrice(category="tuition", amount=7400, currency="EUR", confidence=0.9)
-    assert fee_lines._filter_model_prices([lev], table) == []
-    assert len(fee_lines._filter_model_prices([euro], table)) == 1
-
-
-def _line(label, amount, **fields):
-    from app.schemas.extraction import FeeLine
-
-    defaults = dict(currency="EUR", per="unstated", kind="tuition", role="full", quote=f"{label} {amount}")
-    return FeeLine(label=label, amount=amount, **{**defaults, **fields})
-
-
-def test_fee_lines_become_rows_with_plans_and_discounts_under_their_full_price():
-    """School 404's shape: a yearly price, its discounted one-payment price, and plans."""
-    lines = [
-        _line("За ученици от 1 до 3 клас", 6750, per="year"),
-        _line("При заплащане на цялата такса получавате 10% отстъпка", 6075, role="discounted"),
-        _line("Възможности за плащане на 2 вноски", 6547.5, role="plan"),
-        _line("9 равни месечни вноски", 750, role="plan", per="month"),
-        _line("храна", 9, kind="food", per="day"),
-        _line("учебни материали", 300, kind="materials", per="year", currency="unstated"),
-        _line("Общо за годината", 7050, role="sum"),
-        _line("Неустойка при забавяне", 50, role="penalty", kind="other"),
-        _line("Депозит за запазване на място", 500, kind="deposit", per="one_time"),
-        _line("Изпит Cambridge", 120, kind="exam"),
-    ]
-
-    rows = fee_lines._prices_from_fee_lines(lines)
-
-    assert [(r.category, r.amount, r.currency, r.period) for r in rows] == [
-        ("tuition", 6750, "EUR", "yearly"),
-        ("materials", 300, "EUR", "yearly"),
-        ("registration", 500, "EUR", "one_time"),
-        ("extracurricular", 120, "EUR", None),
-    ]
-    assert rows[0].plan_name == "За ученици от 1 до 3 клас"
-    assert rows[0].discounts == ["При заплащане на цялата такса получавате 10% отстъпка: 6075 EUR"]
-    assert rows[0].installments == [
-        "Възможности за плащане на 2 вноски: 6547.5 EUR",
-        "9 равни месечни вноски: 750 EUR",
-    ]
-
-
-def test_a_plans_yearly_total_is_the_price_where_no_full_price_is_stated():
-    lines = [
-        _line("1-4 клас / 10 вноски", 7000, role="plan", per="year"),
-        _line("1-4 клас / месечна вноска", 700, role="plan", per="month"),
-    ]
-
-    rows = fee_lines._prices_from_fee_lines(lines)
-
-    assert [(r.amount, r.period) for r in rows] == [(7000, "yearly")]
-
-
-@pytest.mark.asyncio
-async def test_price_extraction_asks_for_copied_lines_and_stores_the_rows(
-    db_session, sample_school_for_extraction
-):
-    school = sample_school_for_extraction
-    pages = await _published_rows_and_page(db_session, school, [])
-    copied = PageFees(
-        lines=[
-            _line("целодневно гледане", 530, per="month", quote="€ 530 | 1037 лв."),
-            _line("депозит за запазване на място", 265, kind="deposit", per="one_time"),
-        ]
-    )
-    llm = AsyncMock(return_value=(copied, 10, 2, 0.001))
-
-    with patch("app.scrapers.extractor._run_typed_agent", new=llm):
-        result = await extractor_module._extract_prices(
-            db_session, school, pages, 20.0, extractor_module.ExtractionLLMStats()
-        )
-
-    call = llm.call_args.kwargs
-    assert call["result_type"] is PageFees and call["preferred_tier"] == "pricing"
-    assert call["timeout_seconds"] == extractor_module.PRICE_CALL_TIMEOUT_SECONDS
-    assert call["user_prompt"].startswith("--- SOURCE: ")
-    assert result["count"] == 2
-    # The page does not say the deposit is paid once, so its period is left empty.
-    assert await _stored(db_session, school) == [("registration", 265.0, None), ("tuition", 530.0, "monthly")]
-
-
-@pytest.mark.asyncio
-async def test_fee_copied_from_a_second_language_page_is_stored_once(db_session, sample_school_for_extraction):
-    """School 301: the Bulgarian and the English fee page both went to the model."""
-    school = sample_school_for_extraction
-    pages = (
-        await db_session.execute(select(SourcePage).where(SourcePage.school_id == school.id))
-    ).scalars().all()
-    next(page for page in pages if page.page_category == "pricing").raw_markdown = (
-        "Такси 2026/2027\nПГ | EUR 8950\nI - VII клас | EUR 8950\nVIII - XII клас | EUR 6700\n"
-    )
-    await db_session.flush()
-    copied = PageFees(
-        lines=[
-            _line("ПГ", 8950, per="year"),
-            _line("I - VII клас", 8950, per="year"),
-            _line("Preparatory group", 8950, per="year"),
-            _line("VIII - XII клас", 6700, per="year"),
-            _line("Grades VIII - XII", 6700, per="year"),
-        ]
-    )
-
-    with patch("app.scrapers.extractor._run_typed_agent", new=AsyncMock(return_value=(copied, 10, 2, 0.001))):
-        await extractor_module._extract_prices(
-            db_session, school, list(pages), 20.0, extractor_module.ExtractionLLMStats()
-        )
-
-    rows = (await db_session.execute(select(Pricing).where(Pricing.school_id == school.id))).scalars().all()
-    assert sorted((float(row.amount), row.plan_name) for row in rows) == [
-        (6700.0, "VIII - XII клас"),
-        (8950.0, "I - VII клас"),
-        (8950.0, "ПГ"),
-    ]
-
-
-def test_fee_lines_in_euro_and_leva_are_one_fee_and_the_level_part_of_a_label_is_kept():
-    long_heading = "TUITION FEE RETURNING STUDENTS with signed contracts before 30.04.2025 / FULL DAY PROGRAMME WITH CAMBRIDGE"
-    lines = [
-        _line("Подготвителен клас / Плащане наведнъж", 4230, per="year"),
-        _line("Подготвителен клас / Плащане наведнъж", 8273.16, per="year", currency="BGN"),
-        _line("Транспорт", 300, kind="transport", currency="BGN"),
-        _line(f"{long_heading} / Grade 11", 18250),
-    ]
-
-    rows = fee_lines._prices_from_fee_lines(lines)
-
-    assert [(r.category, r.amount, r.currency) for r in rows] == [
-        ("tuition", 4230, "EUR"),
-        ("transport", 300, "BGN"),
-        ("tuition", 18250, "EUR"),
-    ]
-    assert rows[0].age_group == "Подготвителен клас" and rows[2].age_group == "Grade 11"
-    assert len(rows[2].plan_name) <= 100 and rows[2].notes is None
 
 
 @pytest.mark.asyncio
@@ -5396,222 +2699,6 @@ async def test_site_map_point_stands_for_a_readdressed_location(db_session, samp
     assert "coords_source=website_map_link" in location.location_tags
 
 
-def test_fee_lines_copied_twice_with_the_same_label_are_one_row():
-    """School 155: "Месечната такса 857" came back three times from two pages."""
-    lines = [
-        _line("Месечната такса", 857),
-        _line("Месечна такса", 857, per="month"),
-        _line("I GROUP", 10900),
-        _line("II GROUP", 10900),
-    ]
-
-    rows = fee_lines._prices_from_fee_lines(lines)
-
-    assert [(r.amount, r.plan_name, r.period) for r in rows] == [
-        (857, "Месечната такса", "monthly"),
-        (10900, "I GROUP", None),
-        (10900, "II GROUP", None),
-    ]
-
-
-def test_a_two_installment_total_is_a_plan_of_the_price_before_it():
-    """School 404: every tuition line came back as a plan, the 2-installment totals too."""
-    lines = [
-        _line("За ученици от 1 до 3 клас", 6750, role="plan", per="year"),
-        _line("При заплащане на цялата такса получавате 10% отстъпка", 6075, role="discounted", per="year"),
-        _line("Възможности за плащане на 2 вноски", 6547.5, role="plan", per="year"),
-        _line("Възможност за плащане на 9 равни месечни вноски", 750, role="plan", per="month"),
-        _line("За ученици от 4 до 7 клас", 7500, role="plan", per="year"),
-        _line("Възможности за плащане на 2 вноски", 7275, role="plan", per="year"),
-    ]
-
-    rows = fee_lines._prices_from_fee_lines(lines)
-
-    assert [(r.amount, r.plan_name) for r in rows] == [
-        (6750, "За ученици от 1 до 3 клас"),
-        (7500, "За ученици от 4 до 7 клас"),
-    ]
-    assert rows[0].installments == ["Възможности за плащане на 2 вноски: 6547.5 EUR"]
-
-
-def test_installment_wording_decides_only_where_a_whole_price_is_stated():
-    # Copied as a full price after the full price: a plan of it.
-    rows = fee_lines._prices_from_fee_lines(
-        [_line("Годишна такса", 5900, per="year"), _line("Плащане на 2 вноски", 6000, per="year")]
-    )
-    assert [r.amount for r in rows] == [5900]
-    # Two bands that are both priced by their plan are two fees.
-    rows = fee_lines._prices_from_fee_lines(
-        [
-            _line("1-4 клас / 10 вноски", 7000, role="plan", per="year"),
-            _line("5-7 клас / 10 вноски", 7500, role="plan", per="year"),
-        ]
-    )
-    assert [r.amount for r in rows] == [7000, 7500]
-    # The only price there is stays, and "1 installment" is the fee paid in one go.
-    rows = fee_lines._prices_from_fee_lines(
-        [_line("Месечна такса, 10 вноски", 500, per="month"), _line("Grade 1 / 1 installment", 9000, per="year")]
-    )
-    assert [r.amount for r in rows] == [500, 9000]
-
-
-def test_a_fee_stated_again_under_a_longer_or_a_bare_label_is_one_row():
-    # 214: the band under its table's title as well.
-    rows = fee_lines._prices_from_fee_lines(
-        [
-            _line("1. - 4. клас / Годишна такса „Обучение“ / 1. - 4. клас / Плащане на пълна такса", 7950),
-            _line("1. - 4. клас / Плащане на две вноски", 4094, role="plan"),
-            _line("1. - 4. клас / Плащане на пълна такса", 7950, per="year"),
-            _line("5. - 7. клас / Плащане на пълна такса", 8300),
-        ]
-    )
-    assert [(r.amount, r.plan_name, r.period) for r in rows] == [
-        (7950, "1. - 4. клас / Плащане на пълна такса", "yearly"),
-        (8300, "5. - 7. клас / Плащане на пълна такса", None),
-    ]
-    assert rows[0].installments == ["1. - 4. клас / Плащане на две вноски: 4094 EUR"]
-    # 569: the payment terms repeat the fee without saying whose it is.
-    rows = fee_lines._prices_from_fee_lines(
-        [
-            _line("ПГУ от 15.09.2026 г. до 31.05.2027 г. / Годишна такса обучение **", 5900),
-            _line("1-4 клас от 15.09.2026 г. до 31.05.2027 г. / Годишна такса обучение **", 5900),
-            _line("Годишна такса обучение", 5900, per="year"),
-            _line("Еднократно плащане", 5900),
-        ]
-    )
-    assert [r.plan_name[:8] for r in rows] == ["ПГУ от 1", "1-4 клас"]
-    assert rows[0].period == "yearly"
-    # Bands at one price stay apart, and so does a longer label that names other grades.
-    rows = fee_lines._prices_from_fee_lines(
-        [_line("ПГ", 8950), _line("I - VII клас", 8950), _line("1 клас", 9000), _line("1 - 4 клас", 9000)]
-    )
-    assert len(rows) == 4
-    # 301: two fees at one price whose labels share their words.
-    foreign = "Такса за чуждестранни ученици"
-    returning = "Такса за български ученици, идващи от чуждестранни училища извън страната"
-    rows = fee_lines._prices_from_fee_lines([_line(foreign, 22200), _line(returning, 22200)])
-    assert [r.plan_name for r in rows] == [foreign, returning]
-    # Added words that say which fee make another fee.
-    rows = fee_lines._prices_from_fee_lines(
-        [_line("Grade 1 / annual tuition", 9000), _line("Grade 1 / annual tuition / full day", 9000)]
-    )
-    assert len(rows) == 2
-
-
-def test_later_amounts_of_one_line_under_one_label_are_left_out():
-    """School 505: the company-paid +5% and +10% rates came back under the family price's label."""
-    row = "1st child 7 965,52 EUR 3 186,21 EUR 2 389,66 EUR 2 389,66 EUR 8 363,80 EUR 8 762,07 EUR"
-    lines = [
-        _line("Youngest Class (Très Petite Section)", 7965.52, per="year", quote="1st child 7 965,52 EUR"),
-        _line("Youngest Class (Très Petite Section)", 8363.80, per="year", quote=row),
-        _line("Youngest Class (Très Petite Section)", 8762.07, per="year", quote=row),
-        _line("Grade 1 / new students", 2550, quote="Grade 1 € 2,550 (new) / € 1,950 (returning)"),
-        _line("Grade 1 / returning students", 1950, quote="Grade 1 € 2,550 (new) / € 1,950 (returning)"),
-        # A range for a club is not a fee and its variant.
-        _line("Клубове", 10, kind="extracurricular", quote="от 10 до 20 EUR"),
-        _line("Клубове", 20, kind="extracurricular", quote="от 10 до 20 EUR"),
-        # Labelled as what it is, the employer's rate is listed under the family's price.
-        _line("Youngest Class / 2nd child (-9%) / Company < 50 employees", 7600, per="year", quote="2nd child"),
-        # The same label on another line of the page is another fee.
-        _line("Целодневен престой", 1100, quote="Целодневен престой – 1100 лв."),
-        _line("Целодневен престой", 950, quote="Целодневен престой – 950 лв."),
-    ]
-
-    rows = fee_lines._prices_from_fee_lines(lines)
-
-    assert [r.amount for r in rows] == [7965.52, 2550, 1950, 10, 20, 1100, 950]
-    assert [r.installments for r in rows if r.installments] == [
-        ["Youngest Class / 2nd child (-9%) / Company < 50 employees: 7600 EUR"]
-    ]
-
-
-def test_the_slices_of_a_total_are_not_fees_of_their_own():
-    """Schools 533 and 633: "Такса обучение" is 2960 of the 7400 a year costs."""
-    columns = {"на 1 вноска годишно": (2960, 740, 7400, "full"), "на 3 вноски годишно": (3040, 760, 7600, "plan")}
-    lines = []
-    for column, (half, small, total, role) in columns.items():
-        lines += [
-            _line(f"Такса обучение / {column}", half, per="year", role=role),
-            _line(f"Извънкласни дейности / Изследователска програма / {column}", half, per="year", role=role, kind="extracurricular"),
-            _line(f"Летни въвеждащи и завършващи дейности / {column}", small, per="year", role=role, kind="other"),
-            _line(f"Дарение за развитие ФОТ (препоръчително) / {column}", small, per="year", role=role, kind="other"),
-            _line(f"Общо / {column}", total, per="year", role="sum", kind="other"),
-        ]
-    lines.append(_line("Материали", 100, kind="materials"))
-    # The column heading may come first in the copied label.
-    lines += [
-        _line("на равни месечни вноски / Такса обучение", 3120, per="year", role="plan"),
-        _line("на равни месечни вноски / Изследователска програма", 4680, per="year", role="plan", kind="other"),
-        _line("на равни месечни вноски / Общо", 7800, per="year", role="sum", kind="other"),
-    ]
-
-    assert [(r.category, r.amount) for r in fee_lines._prices_from_fee_lines(lines)] == [("materials", 100)]
-
-    # A total that is mostly tuition leaves its parts as they are.
-    lines = [
-        _line("Такса обучение", 5000, per="year"),
-        _line("Храна", 1000, per="year", kind="food"),
-        _line("Общо", 6000, per="year", role="sum"),
-    ]
-    assert [(r.category, r.amount) for r in fee_lines._prices_from_fee_lines(lines)] == [
-        ("tuition", 5000),
-        ("food", 1000),
-    ]
-
-
-def test_rows_that_share_a_label_take_the_heading_each_stands_under():
-    """School 542: the nursery's prices under the kindergarten's labels."""
-    text = (
-        "--- SOURCE: https://school.test/fees ---\n"
-        "Месечни такси в Частна Детска Ясла:\n"
-        "Целодневен престой – 1100 лв.\n"
-        "Полудневен престой – 800 лв.\n"
-        "Месечни такси в Частна Детска Градина:\n"
-        "Целодневен престой – 950 лв.\n"
-        "Полудневен престой – 750 лв.\n"
-        "Годишна такса за учебни материали – 150лв\n"
-    )
-    prices = [
-        ExtractedPrice(category="tuition", amount=amount, currency="BGN", plan_name=label, confidence=0.9)
-        for label, amount in (
-            ("Целодневен престой", 1100),
-            ("Полудневен престой", 800),
-            ("Целодневен престой", 950),
-            ("Полудневен престой", 750),
-            ("Годишна такса за учебни материали", 150),
-        )
-    ]
-
-    rows = fee_lines._filter_model_prices(prices, text)
-
-    assert [(r.amount, r.plan_name, r.age_group) for r in rows] == [
-        (1100, "Целодневен престой", "Месечни такси в Частна Детска Ясла"),
-        (800, "Полудневен престой", "Месечни такси в Частна Детска Ясла"),
-        (950, "Целодневен престой", "Месечни такси в Частна Детска Градина"),
-        (750, "Полудневен престой", "Месечни такси в Частна Детска Градина"),
-        (150, "Годишна такса за учебни материали", None),
-    ]
-
-    # Under one heading there is nothing to tell them apart by: left as copied.
-    same = "Такси:\nЦелодневен престой – 1100 лв.\nЦелодневен престой – 950 лв.\n"
-    rows = fee_lines._filter_model_prices([p.model_copy() for p in prices[:1] + prices[2:3]], same)
-    assert [(r.plan_name, r.age_group) for r in rows] == [("Целодневен престой", None)] * 2
-
-
-def test_last_years_list_goes_once_this_year_states_tuition():
-    """School 596: the 2025/2026 food and transport prices beside the 2026/2027 tuition."""
-    prices = [
-        ExtractedPrice(category="tuition", amount=8950, currency="EUR", academic_year="2026/2027", plan_name="Grade 0", confidence=0.9),
-        ExtractedPrice(category="tuition", amount=8400, currency="EUR", academic_year="2025/2026", plan_name="Annual Tuition Fee", confidence=0.9),
-        ExtractedPrice(category="food", amount=1290, currency="EUR", academic_year="2025/2026", plan_name="FOOD", confidence=0.9),
-        ExtractedPrice(category="materials", amount=550, currency="EUR", academic_year="2026/2027", confidence=0.9),
-    ]
-
-    deduped = price_rows._dedupe_price_rows(prices)
-
-    assert [(row.category, row.amount) for row in deduped] == [("tuition", 8950), ("materials", 550)]
-
-
 def test_a_page_stored_under_two_session_ids_is_read_once():
     """School 511: July's fee page, with the old prices, was read beside October's."""
     def page(url, month):
@@ -5633,38 +2720,3 @@ def test_a_page_stored_under_two_session_ids_is_read_once():
         "https://www.arty.bg/bg/pages/charges.html?PHPSESSID=bbdfa3fbde8c&lang=bg",
         "https://www.arty.bg/bg/pages/charges.html?PHPSESSID=ecf72ad1383c",
     ]
-
-
-@pytest.mark.asyncio
-async def test_a_templates_sample_prices_are_not_read(db_session, sample_school_for_extraction):
-    """School 590: "$1,800/mo" between lines of lorem ipsum on a site still half template."""
-    school = sample_school_for_extraction
-    pages = (
-        await db_session.execute(select(SourcePage).where(SourcePage.school_id == school.id))
-    ).scalars().all()
-    for page in pages:
-        page.raw_markdown = (
-            "Schedule and tuition\nHalf Days\nEu vestibulum praesent pretium platea fusce amet lobortis ut "
-            "malesuada neque scelerisque pulvinar.\n8:30 - 12:00\n$1,800/mo\nFull Days\n$2,300/mo\n"
-        )
-    await db_session.flush()
-    llm = AsyncMock(return_value=(PageFees(lines=[_line("Half Days", 1800, currency="USD", per="month")]), 1, 1, 0.0))
-
-    with patch("app.scrapers.extractor._run_typed_agent", new=llm):
-        result = await extractor_module._extract_prices(
-            db_session, school, list(pages), 20.0, extractor_module.ExtractionLLMStats()
-        )
-
-    assert (result["success"], result["count"]) == (False, 0)
-    llm.assert_not_called()
-    assert not is_template_filler("Lorem Hall, 5 Ipswich Road. Tuition 500 EUR")
-
-
-def test_a_copied_label_with_a_comma_is_kept_whole():
-    """School 542: 'Детска Ясла ,,Йор Кидс“ / Целодневен престой' was cut to its heading."""
-    label = "Месечни такси в Частна Детска Ясла ,,Йор Кидс“ / Целодневен престой"
-    (row,) = fee_lines._prices_from_fee_lines([_line(label, 1100, currency="BGN")])
-    assert row.plan_name == label and row.age_group == "Месечни такси в Частна Детска Ясла ,,Йор Кидс“"
-    assert price_step._normalized_price_fields(row)["plan_name"] == label
-    row.plan_name = "N/A"
-    assert price_step._normalized_price_fields(row)["plan_name"] is None

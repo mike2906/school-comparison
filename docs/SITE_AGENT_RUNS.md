@@ -163,8 +163,7 @@ two: a run stops with a clear error instead of quietly changing model mid-run.
   empty result, so a cut-off answer now fails the call (the school counts as not read).
 - **Legacy extractor:** `app/scrapers/extractor.py` builds its own OpenRouter model and
   refuses any tier set to `anthropic/` (each school then fails its extraction). It uses
-  `cheap` and `capable` on every run and `pricing` when `EXTRACTION_PIPELINE_PRICES=true`,
-  so keep those on OpenRouter while it runs.
+  `cheap` and `capable`, so keep those on OpenRouter while it runs.
 - **Not switched yet:** every default is still OpenRouter. Haiku replaces GPT-6 Luna on
   the pricing tier only after it scores at least as well on the fee replay eval and a
   facts dry run. First eval (2026-10-16, 6 trials, $0.51, thinking off): wrong 22%,

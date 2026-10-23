@@ -12,7 +12,7 @@ on:
     types: [opened, reopened, ready_for_review, labeled]
     paths:
       - backend/app/scrapers/extraction/agent_fees.py
-      - backend/app/scrapers/extraction/price_step.py
+      - backend/app/scrapers/extraction/price_store.py
       - backend/app/scrapers/stages/fees_agent.py
       - backend/app/ai/client.py
       - backend/app/config.py

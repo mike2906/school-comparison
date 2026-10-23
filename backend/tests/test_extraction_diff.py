@@ -71,12 +71,12 @@ async def test_dump_then_compare(db_session, async_engine, tmp_path, monkeypatch
     assert len(lines) == 1
     row = json.loads(lines[0])
     assert row["school_id"] == school.id
-    assert set(row["result"]) == {"pricing", "general_info", "display_name_evidence"}
+    assert set(row["result"]) == {"general_info", "display_name_evidence"}
     assert seen_urls == ["https://test-school.bg/prices"]
 
     assert extraction_diff.compare(before, before) == 0
 
-    changed = dict(row, result=dict(row["result"], pricing=[{"amount": "1"}]))
+    changed = dict(row, result=dict(row["result"], display_name_evidence={"changed": True}))
     after = tmp_path / "after.jsonl"
     after.write_text(json.dumps(changed) + "\n", encoding="utf-8")
     assert extraction_diff.compare(before, after) == 1

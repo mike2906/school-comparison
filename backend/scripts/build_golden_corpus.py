@@ -4,7 +4,7 @@ Run once (against a populated DB) to (re)generate fixtures under
 ``tests/golden_corpus/cases/``. Each case captures a school's real cached
 website markdown plus a snapshot of the *current* deterministic extraction
 output. The committed snapshots become the regression baseline — future
-pricing/display-name/general-info fixes update snapshots (or add cases)
+display-name/general-info fixes update snapshots (or add cases)
 instead of gambling.
 
     uv run python -m scripts.build_golden_corpus
@@ -179,9 +179,8 @@ async def build_case(session, school_id: int) -> str | None:
         json.dumps(case, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
-    n_prices = len(case["expected"]["pricing"])
     has_display = bool(case["expected"]["general_info"]["display_name_i18n"])
-    print(f"  + {slug}: {len(pages)} pages, {n_prices} price rows, display={has_display}")
+    print(f"  + {slug}: {len(pages)} pages, display={has_display}")
     return slug
 
 

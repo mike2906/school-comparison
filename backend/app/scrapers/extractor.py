@@ -29,8 +29,6 @@ from app.schemas.extraction import (
     AdmissionExtractionOutput,
     GeneralInfoExtractionOutput,
     OperationsExtractionOutput,
-    PageFees,
-    PriceExtractionOutput,
     PricingTermsExtractionOutput,
     ServicesExtractionOutput,
     SummarySourceExtractionOutput,
@@ -42,26 +40,19 @@ from app.scrapers.extraction import (
     general_info_step,
     llm_results,
     page_selection,
-    price_lines,
-    price_step,
     summary_sources,
     text_values,
 )
 from app.scrapers.llm_record import record_answer
-from app.scrapers.price_carry_over import carry_over_periods
 from app.scrapers.shared_site_check import (
     REGISTRY_ADDRESS_SUPERSEDED,
     SHARED_SITE_CHECK_KEY,
     WEBSITE_CONTACT_ADDRESS_TAG,
-    level_family,
     stated_address_for,
 )
 from app.scrapers.summary_pipeline import clear_summary_state
-from app.scrapers.validation.kept_prices import (
-    recheck_after_failed_price_refresh,
-    withhold_unsupported_kept_prices,
-)
-from app.scrapers.validator import school_fee_scope, validate_school_data
+from app.scrapers.validation.kept_prices import withhold_unsupported_kept_prices
+from app.scrapers.validator import validate_school_data
 from app.services.geocoding.base import GeocodingResult
 from app.services.geocoding.bg.address_match import same_building
 from app.services.geocoding.write_gate import (
@@ -140,8 +131,6 @@ GENERAL_INFO_HINT_TOKENS: tuple[str, ...] = (
 # Preferred `_select_pages` category orderings. Kept as module constants (not inline
 # literals) so the deterministic path in `deterministic.py` imports the same lists and
 # page selection can never silently diverge between production and the golden corpus.
-PRICE_CALL_TIMEOUT_SECONDS = 120.0
-PRICING_PAGE_CATEGORIES: list[str] = ["pricing", "admission", "contact"]
 GENERAL_INFO_PAGE_CATEGORIES: list[str] = [
     "about",
     "contact",
@@ -239,8 +228,7 @@ def _build_openrouter_model_settings(tier: str = "cheap") -> dict[str, Any]:
         for model in _csv_items(settings.extraction_openrouter_models)
     ]
     routed_models = [model for model in routed_models if model and model != primary_model]
-    # Price rows from a weaker stand-in model would pass as the pricing model's.
-    if routed_models and tier != "pricing":
+    if routed_models:
         model_settings["openrouter_models"] = routed_models
 
     provider_config: dict[str, Any] = {}
@@ -547,10 +535,6 @@ async def _run_typed_agent(
 
         @agent.output_validator
         def _semantic_output_validator(data: Any) -> Any:
-            if isinstance(data, PriceExtractionOutput):
-                if data.has_pricing_info and not data.prices:
-                    retries_state["count"] += 1
-                    raise ModelRetry("has_pricing_info=true requires at least one pricing row")
             if isinstance(data, GeneralInfoExtractionOutput):
                 has_payload = any(
                     [
@@ -1174,125 +1158,6 @@ def _freshest_url_variants(pages: list[SourcePage]) -> list[SourcePage]:
     return list(freshest.values())
 
 
-async def _extract_prices(
-    db: AsyncSession,
-    school: School,
-    pages: list[SourcePage],
-    timeout_seconds: float,
-    llm_stats: ExtractionLLMStats,
-) -> dict[str, Any]:
-    scope = await school_fee_scope(db, school)
-    family = level_family(school.education_level)
-    pages = price_step._fee_pages_of_this_school(pages, scope, family)
-    selected_text, _source_urls = page_selection._select_pages(
-        school=school,
-        pages=pages,
-        preferred_categories=PRICING_PAGE_CATEGORIES,
-        use_case="pricing",
-    )
-    if not selected_text:
-        return {
-            "success": False,
-            "count": 0,
-            "detail": "No pricing-related content found",
-            "input_tokens": 0,
-            "output_tokens": 0,
-        }
-
-    # Only the prompt gets glued currency words spaced; deterministic extraction and the
-    # evidence checks below keep the original page text.
-    user_prompt = price_lines._space_glued_currency_words(selected_text)
-    deterministic_pricing = price_lines._extract_prices_deterministic(selected_text)
-    used_deterministic_pricing = False
-
-    parsed, input_tokens, output_tokens, token_cost_usd = await _run_typed_agent(
-        system_prompt=price_step.PRICE_SYSTEM_PROMPT,
-        user_prompt=user_prompt,
-        result_type=PageFees,
-        # A long fee table takes the model over a minute to copy out.
-        timeout_seconds=max(timeout_seconds, PRICE_CALL_TIMEOUT_SECONDS),
-        llm_stats=llm_stats,
-        preferred_tier="pricing",
-        school_id=school.id,
-    )
-    parsed, listed_under_a_fee = price_step._fees_from_model_answer(parsed)
-
-    if parsed is None:
-        if deterministic_pricing.has_pricing_info:
-            parsed = deterministic_pricing
-            used_deterministic_pricing = True
-        else:
-            return price_step._price_result(
-                False, 0, "Price extraction LLM call failed", input_tokens, output_tokens, token_cost_usd
-            )
-
-    parsed, used_deterministic_pricing = price_step._apply_evidence_filters(
-        parsed, deterministic_pricing, used_deterministic_pricing, selected_text, scope, family
-    )
-
-    if not parsed.has_pricing_info:
-        # Finding no pricing this run supersedes no academic year, so earlier rows and
-        # their evidence links are kept as fee history. They stay year-labelled and can
-        # never be presented as current; the evidence gate withholds them only if their
-        # own source page becomes invalid.
-        # Provider failures return above and likewise preserve old rows.
-        await price_step._clear_pricing_evidence(db, school)
-        return price_step._price_result(
-            True,
-            0,
-            "No pricing info detected (kept existing pricing as history)",
-            input_tokens,
-            output_tokens,
-            token_cost_usd,
-        )
-
-    pricing_rows, source_rows = price_step._build_price_rows(school, pages, parsed, used_deterministic_pricing)
-
-    if not pricing_rows:
-        # Same reasoning as above: nothing was written, so nothing is superseded.
-        await price_step._clear_pricing_evidence(db, school)
-        return price_step._price_result(
-            True,
-            0,
-            "Pricing info detected but no valid rows after normalization (kept existing pricing as history)",
-            input_tokens,
-            output_tokens,
-            token_cost_usd,
-        )
-
-    superseded = await price_step._find_superseded_rows(db, school, pricing_rows)
-    superseded_ids = [existing.id for existing in superseded]
-    carry_over_periods(school, pages, superseded, pricing_rows, source_rows)
-
-    regressions = price_step._pricing_replacement_regressions(
-        school, pages, superseded, pricing_rows, listed_under_a_fee
-    )
-    if price_step._update_pricing_hold(school, regressions, len(pricing_rows)):
-        return price_step._price_result(
-            True,
-            0,
-            "Re-extracted pricing held for review (kept published rows): " + "; ".join(regressions),
-            input_tokens,
-            output_tokens,
-            token_cost_usd,
-            held=True,
-        )
-
-    await price_step._write_price_rows(db, school, superseded_ids, pricing_rows, source_rows)
-
-    return price_step._price_result(
-        True,
-        len(pricing_rows),
-        (
-            f"Extracted {len(pricing_rows)} pricing rows"
-            + (" (deterministic fallback)" if used_deterministic_pricing else "")
-        ),
-        input_tokens,
-        output_tokens,
-        token_cost_usd,
-    )
-
-
 async def _extract_general_info(
     db: AsyncSession,
     school: School,
@@ -1707,15 +1572,9 @@ async def extract_school(
     db: AsyncSession,
     school_id: int,
     country_code: str,
-    *,
-    prices_only: bool = False,
 ) -> dict[str, Any]:
-    """Extract pricing + general information for one school (canonical path).
-
-    ``prices_only`` re-reads the fees and nothing else: general information, the
-    school's status and its summary state are left as they are. Validation still runs
-    over the result before the commit.
-    """
+    """Extract general information for one school (canonical path). Fees come from
+    the fees-agent stage."""
     settings = get_settings()
 
     school_result = await db.execute(select(School).where(School.id == school_id))
@@ -1740,12 +1599,8 @@ async def extract_school(
     content_pages = [page for page in pages if (page.raw_markdown or "").strip()]
 
     if not content_pages:
-        if not prices_only:
-            school.scrape_status = "extraction_failed"
-            await db.commit()
-        else:
-            # The stored fees stay up on the old report; their pages may now be empty.
-            await recheck_after_failed_price_refresh(db, school_id)
+        school.scrape_status = "extraction_failed"
+        await db.commit()
         return {
             "school_id": school_id,
             "status": "extraction_failed",
@@ -1757,8 +1612,6 @@ async def extract_school(
     stats: dict[str, Any] = {
         "school_id": school_id,
         "status": "extraction_failed",
-        "pricing_count": 0,
-        "pricing_success": False,
         "general_info_success": False,
         "validation_status": None,
         "details": [],
@@ -1769,42 +1622,19 @@ async def extract_school(
         "llm_stats": llm_stats.as_dict(),
     }
 
-    # The fees-agent stage owns website fees, so a pipeline run no longer overwrites its rows.
-    should_extract_prices = settings.extraction_pipeline_prices and school.school_type in {
-        "private",
-        "international",
-    }
-
-    if should_extract_prices:
-        price_result = await _extract_prices(
-            db=db,
-            school=school,
-            pages=content_pages,
-            timeout_seconds=settings.extraction_llm_timeout_seconds,
-            llm_stats=llm_stats,
-        )
-        stats["pricing_count"] = price_result["count"]
-        stats["pricing_success"] = price_result["success"]
-        stats["input_tokens"] += price_result["input_tokens"]
-        stats["output_tokens"] += price_result["output_tokens"]
-        stats["token_cost_usd"] += float(price_result.get("token_cost_usd", 0.0) or 0.0)
-        if price_result.get("detail"):
-            stats["details"].append(price_result["detail"])
-
-    if not prices_only:
-        general_result = await _extract_general_info(
-            db=db,
-            school=school,
-            pages=content_pages,
-            timeout_seconds=settings.extraction_llm_timeout_seconds,
-            llm_stats=llm_stats,
-        )
-        stats["general_info_success"] = general_result["success"]
-        stats["input_tokens"] += general_result["input_tokens"]
-        stats["output_tokens"] += general_result["output_tokens"]
-        stats["token_cost_usd"] += float(general_result.get("token_cost_usd", 0.0) or 0.0)
-        if general_result.get("detail"):
-            stats["details"].append(general_result["detail"])
+    general_result = await _extract_general_info(
+        db=db,
+        school=school,
+        pages=content_pages,
+        timeout_seconds=settings.extraction_llm_timeout_seconds,
+        llm_stats=llm_stats,
+    )
+    stats["general_info_success"] = general_result["success"]
+    stats["input_tokens"] += general_result["input_tokens"]
+    stats["output_tokens"] += general_result["output_tokens"]
+    stats["token_cost_usd"] += float(general_result.get("token_cost_usd", 0.0) or 0.0)
+    if general_result.get("detail"):
+        stats["details"].append(general_result["detail"])
 
     if llm_stats.hard_failures:
         # An extraction LLM call failed or was refused after its retries: the
@@ -1812,24 +1642,17 @@ async def extract_school(
         await db.rollback()
         stats["status"] = "extraction_failed"
         stats["error"] = "Extraction LLM call failed after retries; fallback output not promoted"
-        if not prices_only:  # a prices-only run never moved the school's status
-            kept_status = await keep_previous_website_data(db, school_id)
-            stats["details"].append(
-                "Kept previously published website data"
-                if kept_status in {"extracted", "summarized"}
-                else "No previously published website data; website data stays withheld"
-            )
-        else:
-            # The crawl before a prices-only run rewrites the pages just the same.
-            await recheck_after_failed_price_refresh(db, school_id)
+        kept_status = await keep_previous_website_data(db, school_id)
+        stats["details"].append(
+            "Kept previously published website data"
+            if kept_status in {"extracted", "summarized"}
+            else "No previously published website data; website data stays withheld"
+        )
         stats["token_cost_usd"] = round(float(stats["token_cost_usd"] or 0.0), 6)
         stats["llm_stats"] = llm_stats.as_dict()
         return stats
 
-    if prices_only:
-        if stats["pricing_success"]:
-            stats["status"] = "extracted"
-    elif stats["pricing_success"] or stats["general_info_success"]:
+    if stats["general_info_success"]:
         clear_summary_state(school)
         school.scrape_status = "extracted"
         stats["status"] = "extracted"
@@ -1882,9 +1705,6 @@ async def extract_school(
             await geocode_campus_locations(db, school_id, country_code=country_code)
         except Exception as exc:  # a missing pin must not fail the extraction
             logger.warning("Campus geocoding failed for school %s: %s", school_id, exc)
-    elif prices_only:
-        # No fees were read, so the stored ones stay up on the old report: check them.
-        await recheck_after_failed_price_refresh(db, school_id)
 
     stats["token_cost_usd"] = round(float(stats["token_cost_usd"] or 0.0), 6)
     stats["llm_stats"] = llm_stats.as_dict()

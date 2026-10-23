@@ -9,17 +9,17 @@ from unittest.mock import patch
 import pytest
 
 from app.config import get_settings
-from app.schemas.extraction import PageFees
+from app.schemas.extraction import SummarySourceExtractionOutput as Answer
 from app.scrapers import extractor
 from app.scrapers.llm_record import record_answer, record_key
 
 
-def _answer() -> PageFees:
-    return PageFees(lines=[])
+def _answer() -> Answer:
+    return Answer()
 
 
 def test_record_key_changes_with_every_part():
-    base = dict(system_prompt="s", user_prompt="u", result_type=PageFees, tier="cheap")
+    base = dict(system_prompt="s", user_prompt="u", result_type=Answer, tier="cheap")
     key = record_key(**base)
     assert key == record_key(**base)
     for change in (
@@ -39,7 +39,7 @@ def test_record_answer_writes_the_parsed_answer_without_the_prompts(tmp_path):
         str(tmp_path),
         system_prompt="secret system",
         user_prompt="page text",
-        result_type=PageFees,
+        result_type=Answer,
         tier="cheap",
         parsed=_answer(),
         school_id=7,
@@ -48,16 +48,16 @@ def test_record_answer_writes_the_parsed_answer_without_the_prompts(tmp_path):
     [path] = list(tmp_path.iterdir())
     payload = json.loads(path.read_text(encoding="utf-8"))
     assert path.stem == payload["key"]
-    assert payload["result_type"] == "PageFees"
+    assert payload["result_type"] == "SummarySourceExtractionOutput"
     assert payload["school_id"] == 7
-    assert PageFees.model_validate(payload["output"]) == _answer()
+    assert Answer.model_validate(payload["output"]) == _answer()
     assert "page text" not in path.read_text(encoding="utf-8")
 
 
 def test_record_answer_fills_in_the_date(tmp_path):
     for day in ("2026-10-12", "2026-10-13"):
         with patch("app.scrapers.llm_record._RUN_DATE", day):
-            record_answer(str(tmp_path / "{date}"), system_prompt="s", user_prompt="u", result_type=PageFees,
+            record_answer(str(tmp_path / "{date}"), system_prompt="s", user_prompt="u", result_type=Answer,
                           tier="cheap", parsed=_answer(), school_id=None)
 
     # Each run day gets its own folder, so a second run's answers are kept, not skipped.
@@ -66,9 +66,9 @@ def test_record_answer_fills_in_the_date(tmp_path):
 
 
 def test_record_answer_is_off_without_a_dir_and_skips_failed_parses(tmp_path):
-    record_answer("", system_prompt="s", user_prompt="u", result_type=PageFees,
+    record_answer("", system_prompt="s", user_prompt="u", result_type=Answer,
                   tier="cheap", parsed=_answer(), school_id=None)
-    record_answer(str(tmp_path), system_prompt="s", user_prompt="u", result_type=PageFees,
+    record_answer(str(tmp_path), system_prompt="s", user_prompt="u", result_type=Answer,
                   tier="cheap", parsed=None, school_id=None)
     assert list(tmp_path.iterdir()) == []
 
@@ -77,24 +77,24 @@ def test_record_answer_never_raises(tmp_path):
     blocker = tmp_path / "file"
     blocker.write_text("not a directory")
     record_answer(str(blocker / "sub"), system_prompt="s", user_prompt="u",
-                  result_type=PageFees, tier="cheap", parsed=_answer(), school_id=None)
+                  result_type=Answer, tier="cheap", parsed=_answer(), school_id=None)
 
 
 def test_record_answer_never_raises_on_unencodable_prompts_or_dump_errors(tmp_path):
     record_answer(str(tmp_path), system_prompt="s", user_prompt="lone surrogate \ud800",
-                  result_type=PageFees, tier="cheap", parsed=_answer(), school_id=None)
+                  result_type=Answer, tier="cheap", parsed=_answer(), school_id=None)
 
-    class Broken(PageFees):
+    class Broken(Answer):
         def model_dump(self, **_kwargs):
             raise ValueError("cannot dump")
 
     record_answer(str(tmp_path / "broken"), system_prompt="s", user_prompt="u",
-                  result_type=PageFees, tier="cheap", parsed=Broken(lines=[]), school_id=None)
+                  result_type=Answer, tier="cheap", parsed=Broken(), school_id=None)
     assert not (tmp_path / "broken").exists()
 
 
 def test_record_answer_keeps_the_first_recording(tmp_path):
-    common = dict(system_prompt="s", user_prompt="u", result_type=PageFees, tier="cheap")
+    common = dict(system_prompt="s", user_prompt="u", result_type=Answer, tier="cheap")
     record_answer(str(tmp_path), **common, parsed=_answer(), school_id=1)
     record_answer(str(tmp_path), **common, parsed=_answer(), school_id=2)
 
@@ -130,7 +130,7 @@ async def test_run_typed_agent_records_when_enabled(tmp_path, monkeypatch):
             parsed, *_ = await extractor._run_typed_agent(
                 system_prompt="system",
                 user_prompt="user",
-                result_type=PageFees,
+                result_type=Answer,
                 timeout_seconds=5,
                 llm_stats=extractor.ExtractionLLMStats(),
                 school_id=3,
@@ -140,7 +140,7 @@ async def test_run_typed_agent_records_when_enabled(tmp_path, monkeypatch):
 
     assert parsed == _answer()
     expected_key = record_key(
-        system_prompt="system", user_prompt="user", result_type=PageFees, tier="cheap",
+        system_prompt="system", user_prompt="user", result_type=Answer, tier="cheap",
         model=extractor.get_model("cheap"),
     )
     payload = json.loads((tmp_path / f"{expected_key}.json").read_text(encoding="utf-8"))

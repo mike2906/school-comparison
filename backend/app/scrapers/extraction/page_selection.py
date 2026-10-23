@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import re
-from urllib.parse import unquote
 
 from app.config import get_settings
 from app.models.school import School
@@ -19,11 +18,6 @@ from app.scrapers.extraction.text_values import (
     _canonical_host,
     _host_matches,
 )
-from app.scrapers.fee_pages import page_key
-from app.scrapers.price_evidence import (
-    currency_price_starts,
-    fee_number_starts,
-)
 
 # A queued page at or under this size has room held back for it in full while packing,
 # because a small page is the one an oversized page can starve completely. Larger queued
@@ -32,82 +26,15 @@ from app.scrapers.price_evidence import (
 _SMALL_QUEUED_PAGE_CHARS = 2000
 
 
-# Never hold back more than this share of the budget, so a school whose fees genuinely are
-# one long page keeps the bulk of it even behind several small pages.
+# Never hold back more than this share of the budget, so a school whose content genuinely
+# is one long page keeps the bulk of it even behind several small pages.
 _MAX_RESERVE_FRACTION = 3
 
 
-# A *truncated* fragment below this size cannot carry a usable fee, so it is skipped.
+# A *truncated* fragment below this size carries nothing usable, so it is skipped.
 # A complete page is never measured against this: a short page is whole evidence, not
 # a fragment, and dropping it recreates the starvation this packing rule prevents.
 _MIN_USABLE_PAGE_CHARS = 500
-
-
-# URL words (matched against the decoded URL) that mark a fee page.
-_PRICING_URL_TOKENS = (
-    "pricing", "price", "fee", "tuition", "taksi", "ceni", "tseni", "цени", "такс",
-    "tarif", "frais", "schulgeld", "gebuehr", "gebühr",
-)  # fmt: skip
-
-
-# Pricing selection: score per currency-attached price in the page text, up to a cap, so
-# four prices outweigh the preferred-category and URL bonuses together.
-_PRICE_EVIDENCE_SCORE = 45
-
-
-_PRICE_EVIDENCE_MAX_PRICES = 4
-
-
-# Text kept in front of the first price when a long page is cut to its fee section.
-_PRICE_WINDOW_LEAD_CHARS = 1200
-
-
-def _drop_url_variant_pages(pages: list[SourcePage]) -> list[SourcePage]:
-    """Keep one crawl of each page, so two spellings do not take two prompt slots.
-
-    The spellings differ in scheme, ``www.``, trailing slash or escaping. The newest
-    crawl wins; of two crawls from the same run, the one stating more prices.
-    """
-    best: dict[tuple[str, str, str], SourcePage] = {}
-    for page in pages:
-        try:
-            key = page_key(page.source_url or "")
-        except ValueError:
-            key = ("", page.source_url or "", "")
-        kept = best.get(key)
-        if kept is None or _variant_rank(page) > _variant_rank(kept):
-            best[key] = page
-    return list(best.values())
-
-
-def _variant_rank(page: SourcePage) -> tuple[float, int, int]:
-    scraped_at = getattr(page, "last_scraped_at", None)
-    text = page.raw_markdown or ""
-    return (
-        scraped_at.timestamp() if scraped_at is not None else 0.0,
-        len(currency_price_starts(text)),
-        len(text),
-    )
-
-
-def _price_dense_window(candidate: str, allowance: int) -> str:
-    """Cut a ``--- SOURCE ---`` page to ``allowance`` chars around its densest run of prices.
-
-    Cutting at the head keeps a long page's navigation and drops a fee table further
-    down. With no price beyond the head, the head is kept.
-    """
-    header, separator, body = candidate.partition("\n")
-    room = allowance - len(header) - len(separator)
-    starts = fee_number_starts(body)
-    if room <= 0 or not starts or starts[-1] < room:
-        return candidate[:allowance]
-    best_start, best_count = 0, 0
-    for first in starts:
-        start = max(0, first - _PRICE_WINDOW_LEAD_CHARS)
-        count = sum(1 for position in starts if start <= position < start + room)
-        if count > best_count:
-            best_start, best_count = start, count
-    return header + separator + body[best_start : best_start + room]
 
 
 def _select_pages(
@@ -224,15 +151,6 @@ def _select_pages(
                 score -= 90
             if category in {"admission", "pricing"}:
                 score -= 35
-        elif use_case == "pricing":
-            if any(token in unquote(page_url) for token in _PRICING_URL_TOKENS):
-                score += 60
-            # The page text is the evidence: a page that states prices outranks a
-            # preferred-category page that states none (school 568's fee.html had no
-            # category and lost to admission/contact pages).
-            score += _PRICE_EVIDENCE_SCORE * min(
-                len(fee_number_starts(page.raw_markdown or "")), _PRICE_EVIDENCE_MAX_PRICES
-            )
         elif use_case == "general_summary_source":
             classification = summary_page_classifications.get(id(page))
             if classification == "narrative":
@@ -258,8 +176,6 @@ def _select_pages(
                 score -= 90
         return score
 
-    if use_case == "pricing":
-        candidate_pages = _drop_url_variant_pages(candidate_pages)
     sorted_pages = sorted(candidate_pages, key=score_page, reverse=True)
 
     max_pages = 3 if (use_case == "general_info" or use_case.startswith("general_")) else 4
@@ -286,8 +202,7 @@ def _select_pages(
     current_chars = 0
 
     for index, (source_url, candidate) in enumerate(queued):
-        # One oversized page must not swallow the whole budget and starve a small page
-        # that carries the actual fees.
+        # One oversized page must not swallow the whole budget and starve a small page.
         reserved = min(
             sum(
                 len(later)
@@ -303,10 +218,7 @@ def _select_pages(
                 # Only a useless fragment would fit; skip it and keep going, so pages
                 # behind it can still use the room reserved for them.
                 continue
-            if use_case == "pricing":
-                candidate = _price_dense_window(candidate, allowance)
-            else:
-                candidate = candidate[:allowance]
+            candidate = candidate[:allowance]
 
         content_parts.append(candidate)
         urls_used.append(source_url)

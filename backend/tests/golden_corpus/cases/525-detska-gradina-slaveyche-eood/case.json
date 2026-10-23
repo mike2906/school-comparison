@@ -92,64 +92,7 @@
           ]
         }
       }
-    },
-    "pricing": [
-      {
-        "academic_year": null,
-        "age_group": null,
-        "amount": 530.0,
-        "amount_max": null,
-        "amount_min": null,
-        "category": "tuition",
-        "currency": "EUR",
-        "period": null,
-        "plan_name": null
-      },
-      {
-        "academic_year": null,
-        "age_group": null,
-        "amount": 510.0,
-        "amount_max": null,
-        "amount_min": null,
-        "category": "tuition",
-        "currency": "EUR",
-        "period": null,
-        "plan_name": null
-      },
-      {
-        "academic_year": null,
-        "age_group": null,
-        "amount": 490.0,
-        "amount_max": null,
-        "amount_min": null,
-        "category": "tuition",
-        "currency": "EUR",
-        "period": null,
-        "plan_name": null
-      },
-      {
-        "academic_year": null,
-        "age_group": null,
-        "amount": 350.0,
-        "amount_max": null,
-        "amount_min": null,
-        "category": "food",
-        "currency": "EUR",
-        "period": null,
-        "plan_name": null
-      },
-      {
-        "academic_year": null,
-        "age_group": null,
-        "amount": 265.0,
-        "amount_max": null,
-        "amount_min": null,
-        "category": "registration",
-        "currency": "EUR",
-        "period": null,
-        "plan_name": null
-      }
-    ]
+    }
   },
   "known_issues": [],
   "name_aliases": [],

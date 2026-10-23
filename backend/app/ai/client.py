@@ -32,9 +32,8 @@ from app.services.provider_costs import (
 MODEL_TIERS = {
     "cheap": "openrouter/google/gemini-2.5-flash-lite",  # lightweight tier for validation/classification
     "capable": "openrouter/openai/gpt-4o-mini",  # stronger tier for spot-check validation
-    # Fee lines and fee pictures. The model copies priced lines (schemas.extraction.FeeLine)
-    # and code decides what they mean. On 16 hard Sofia fee pages read twice (2026-10-09)
-    # this model's lines gave the same tuition set both times on 14 and held every tuition
+    # The fees agent's reader. On 16 hard Sofia fee pages read twice (2026-10-09) this
+    # model's lines gave the same tuition set both times on 14 and held every tuition
     # amount GPT-6.1 Sol had found, at about $0.003 a school against Sol's $0.02.
     "pricing": "openrouter/openai/gpt-6-luna",
     # Reading a fee table off a picture. GPT-6 Luna's two readings of St George's tables

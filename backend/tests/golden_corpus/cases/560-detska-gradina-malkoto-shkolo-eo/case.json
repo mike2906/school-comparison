@@ -141,42 +141,7 @@
           ]
         }
       }
-    },
-    "pricing": [
-      {
-        "academic_year": "2026/2027",
-        "age_group": null,
-        "amount": 7950.0,
-        "amount_max": null,
-        "amount_min": null,
-        "category": "tuition",
-        "currency": "EUR",
-        "period": "yearly",
-        "plan_name": null
-      },
-      {
-        "academic_year": "2026/2027",
-        "age_group": null,
-        "amount": 7200.0,
-        "amount_max": null,
-        "amount_min": null,
-        "category": "tuition",
-        "currency": "EUR",
-        "period": "yearly",
-        "plan_name": "Standard"
-      },
-      {
-        "academic_year": "2026/2027",
-        "age_group": "preschool",
-        "amount": 7950.0,
-        "amount_max": null,
-        "amount_min": null,
-        "category": "tuition",
-        "currency": "EUR",
-        "period": "yearly",
-        "plan_name": "Standard"
-      }
-    ]
+    }
   },
   "known_issues": [],
   "name_aliases": [],

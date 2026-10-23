@@ -142,75 +142,7 @@
           ]
         }
       }
-    },
-    "pricing": [
-      {
-        "academic_year": null,
-        "age_group": null,
-        "amount": 1100.0,
-        "amount_max": null,
-        "amount_min": null,
-        "category": "tuition",
-        "currency": "BGN",
-        "period": "monthly",
-        "plan_name": null
-      },
-      {
-        "academic_year": null,
-        "age_group": null,
-        "amount": 800.0,
-        "amount_max": null,
-        "amount_min": null,
-        "category": "tuition",
-        "currency": "BGN",
-        "period": "monthly",
-        "plan_name": null
-      },
-      {
-        "academic_year": null,
-        "age_group": null,
-        "amount": 950.0,
-        "amount_max": null,
-        "amount_min": null,
-        "category": "tuition",
-        "currency": "BGN",
-        "period": "monthly",
-        "plan_name": null
-      },
-      {
-        "academic_year": null,
-        "age_group": null,
-        "amount": 750.0,
-        "amount_max": null,
-        "amount_min": null,
-        "category": "tuition",
-        "currency": "BGN",
-        "period": "monthly",
-        "plan_name": null
-      },
-      {
-        "academic_year": null,
-        "age_group": null,
-        "amount": 400.0,
-        "amount_max": null,
-        "amount_min": null,
-        "category": "registration",
-        "currency": "BGN",
-        "period": null,
-        "plan_name": null
-      },
-      {
-        "academic_year": null,
-        "age_group": null,
-        "amount": 150.0,
-        "amount_max": null,
-        "amount_min": null,
-        "category": "tuition",
-        "currency": "BGN",
-        "period": "yearly",
-        "plan_name": null
-      }
-    ]
+    }
   },
   "known_issues": [],
   "name_aliases": [

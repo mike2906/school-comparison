@@ -230,7 +230,7 @@ take over **reading** websites; the rest stays.
 | --- | --- |
 | Registry discovery, website discovery, URL validation, shared-site and campus checks | No. Agents start from `website_url`; a wrong URL gives confident facts about the wrong school |
 | Navigation (stage 4, `navigator.py`) | Yes: both agents find their own pages |
-| Fee extraction | Done (fees agent); old code kept until Mike is confident (`EXTRACTION_PIPELINE_PRICES`) |
+| Fee extraction | Done (fees agent); the old code was deleted |
 | Other extraction (stage 5): languages, facilities, programmes, teaching approach, admissions, school day, meals, transport, support, class size, founding year | Yes, once the gaps below are closed |
 | Contact details (`contact_details.py`) and display names (`display_naming.py`) | Later, separately (see below) |
 | Stage 6 validation and publish gates | No: agents keep their own checks in code and still go through the gates |
