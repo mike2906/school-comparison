@@ -4,17 +4,19 @@
  * anywhere. One entry per calculator tab, plus the home address checked against the
  * official address table, which the catchment maps reuse.
  *
- * Shape: { version, home: { streetId, number } | null,
+ * Shape: { version, child: { birthYear } | null, home: { streetId, number } | null,
  *          kindergarten: { startYear, answers, siblings?, savedOn } | null,
  *          grade_1: { startYear, addresses, answers, siblings?, savedOn } | null }
  * `siblings` maps a school id to that school's sibling answers (see siblingsWith).
+ * `child` is the one child the answers are for, shared by every page that needs the birth
+ * year (read it with childBirthYear), so a parent gives it once.
  */
 
 const STORAGE_KEY = 'admissionAnswers'
 const VERSION = 1
 export const SAVED_STAGES = ['kindergarten', 'grade_1']
 
-const EMPTY = Object.freeze({ version: VERSION, home: null, kindergarten: null, grade_1: null })
+const EMPTY = Object.freeze({ version: VERSION, child: null, home: null, kindergarten: null, grade_1: null })
 
 function storage() {
   try {
@@ -31,6 +33,7 @@ export function parseSaved(text) {
     if (!value || value.version !== VERSION) return EMPTY
     return {
       version: VERSION,
+      child: isChild(value.child) ? { birthYear: value.child.birthYear } : legacyChild(value.kindergarten),
       home: isHome(value.home) ? value.home : null,
       kindergarten: isEntry(value.kindergarten) ? value.kindergarten : null,
       grade_1: isEntry(value.grade_1) && Array.isArray(value.grade_1.addresses) ? value.grade_1 : null,
@@ -38,6 +41,20 @@ export function parseSaved(text) {
   } catch {
     return EMPTY
   }
+}
+
+function isChild(child) {
+  return Boolean(child && isBirthYear(child.birthYear))
+}
+
+function isBirthYear(year) {
+  return Number.isInteger(year) && year > 1900
+}
+
+// Answers saved before `child` existed: the kindergarten answers held the birth year.
+function legacyChild(kindergarten) {
+  const birthYear = kindergarten?.answers?.birthYear
+  return isBirthYear(birthYear) ? { birthYear } : null
 }
 
 function isHome(home) {
@@ -66,7 +83,7 @@ function read() {
 
 function write(next) {
   current = next
-  const empty = !next.home && SAVED_STAGES.every(stage => !next[stage])
+  const empty = !next.child && !next.home && SAVED_STAGES.every(stage => !next[stage])
   try {
     if (empty) storage()?.removeItem(STORAGE_KEY)
     else storage()?.setItem(STORAGE_KEY, JSON.stringify(next))
@@ -93,7 +110,26 @@ export function getSaved() {
 export function saveStage(stage, entry, { home } = {}) {
   const next = { ...read(), [stage]: { ...entry, savedOn: new Date().toISOString().slice(0, 10) } }
   if (home !== undefined) next.home = home
+  const birthYear = entry.answers?.birthYear
+  if (isBirthYear(birthYear)) next.child = { ...next.child, birthYear }
   write(next)
+}
+
+/**
+ * The child's birth year as the parent gave it, or null. Never guessed from first-grade
+ * answers: a child may start first grade at six or eight.
+ */
+export function childBirthYear(saved = read()) {
+  return saved.child?.birthYear ?? null
+}
+
+/**
+ * Saves the child's birth year. Saved calculator answers keep their own: a family may have
+ * saved kindergarten answers for a younger child and first-grade ones for an older one.
+ */
+export function saveChild({ birthYear }) {
+  if (!isBirthYear(birthYear)) return
+  write({ ...read(), child: { birthYear } })
 }
 
 /**
@@ -120,12 +156,15 @@ export function saveHome(home) {
 }
 
 /**
- * Forgets one tab's answers, or everything without a stage. First-grade answers hold the
- * home address too, so forgetting them forgets it.
+ * Forgets one tab's answers, or everything (the child too) without a stage. First-grade
+ * answers hold the home address too, so forgetting them forgets it. Forgetting the last
+ * saved tab forgets the child as well, so no "forget" leaves a birth year behind.
  */
 export function forgetSaved(stage = null) {
-  if (!stage) write(EMPTY)
-  else write({ ...read(), [stage]: null, ...(stage === 'grade_1' ? { home: null } : {}) })
+  if (!stage) return write(EMPTY)
+  const next = { ...read(), [stage]: null, ...(stage === 'grade_1' ? { home: null } : {}) }
+  if (SAVED_STAGES.every(other => !next[other])) next.child = null
+  write(next)
 }
 
 /** Tests only: drop the in-memory copy. */
