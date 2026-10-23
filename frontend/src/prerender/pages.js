@@ -13,9 +13,11 @@ import {
   rowLabel,
   shortCampaign,
 } from '../admission/calculator.js'
-import { districtAt, districtByName, districtLabel } from '../admission/catchments.js'
+import { districtLabel } from '../admission/catchments.js'
+import { kindergartenDistrictFeature } from '../admission/schoolVerdict.js'
 import { getAddress, getSchoolName } from '../utils/i18n.js'
 import { formatPercent } from '../utils/nvoDisplay.js'
+import { parseCoordinate } from '../utils/coordinates.js'
 import { parsePhones } from '../utils/phone.js'
 import { URL_LANGUAGES, alternateLinks, canonicalUrl, languagePath } from '../utils/languageUrl.js'
 import { schoolLevelLabel, schoolTypeLabel } from '../utils/levelLabel.js'
@@ -278,18 +280,6 @@ export function fixedPages(t, language, listedSchools = []) {
   ]
 }
 
-/**
- * The Sofia district a school is in: the one its source names, else the one its main
- * building's pin falls in. `districts` is the catchment GeoJSON (`districts.json`).
- */
-export function schoolDistrict(school, districts) {
-  if (!districts?.features) return null
-  const named = districtByName(districts, school?.admission_info?.admin_district)
-  if (named) return named.properties.name
-  const primary = primaryLocation(school)
-  return districtAt(districts, Number(primary?.lat), Number(primary?.lng))?.properties.name ?? null
-}
-
 function primaryLocation(school) {
   const locations = Array.isArray(school?.locations) ? school.locations : []
   return locations.find((location) => location.is_primary) || locations[0]
@@ -299,11 +289,12 @@ function primaryLocation(school) {
  * schema.org data for a school page: a Preschool or School with its address, pin and
  * phone, so search engines and assistants read the facts without parsing the text.
  */
-function schoolJsonLd(school, { name, url, language, district, t }) {
+function schoolJsonLd(school, { name, url, language, district, listed, t }) {
   const primary = primaryLocation(school)
   const other = URL_LANGUAGES.filter((code) => code !== language).map((code) => getSchoolName(school, code))
-  const lat = Number(primary?.lat)
-  const lng = Number(primary?.lng)
+  const address = getAddress(primary, language)
+  const lat = parseCoordinate(primary?.lat)
+  const lng = parseCoordinate(primary?.lng)
   return {
     '@context': 'https://schema.org',
     '@type': school.education_level === 'kindergarten' ? 'Preschool' : 'School',
@@ -311,17 +302,18 @@ function schoolJsonLd(school, { name, url, language, district, t }) {
     alternateName: other.filter((value) => value && value !== name)[0],
     url,
     sameAs: /^https?:\/\//.test(school.website_url || '') ? school.website_url : undefined,
-    telephone: parsePhones(primary?.phone)[0]?.href?.replace(/^tel:/, '') || undefined,
-    address: getAddress(primary, language)
+    telephone: parsePhones(primary?.phone).find((phone) => phone.href)?.href.replace(/^tel:/, '') || undefined,
+    address: address
       ? {
         '@type': 'PostalAddress',
-        streetAddress: getAddress(primary, language),
-        addressLocality: t('seo.city'),
+        streetAddress: address,
+        // Listed schools are in the launch city; the rest only keep a working URL.
+        addressLocality: listed ? t('seo.city') : undefined,
         addressRegion: district ? t('seo.district', { district: districtLabel(district, language) }) : undefined,
         addressCountry: 'BG',
       }
       : undefined,
-    geo: Number.isFinite(lat) && Number.isFinite(lng) && (lat || lng)
+    geo: lat != null && lng != null && (lat || lng)
       ? { '@type': 'GeoCoordinates', latitude: lat, longitude: lng }
       : undefined,
   }
@@ -334,7 +326,7 @@ function schoolJsonLd(school, { name, url, language, district, t }) {
  */
 export function schoolPage(school, t, language, { listed = true, districts = null, origin = null } = {}) {
   const name = getSchoolName(school, language)
-  const district = schoolDistrict(school, districts)
+  const district = listed ? kindergartenDistrictFeature(school, districts)?.properties.name ?? null : null
   const districtText = district ? t('seo.district', { district: districtLabel(district, language) }) : ''
   const facts = t('seo.schoolFacts', {
     type: schoolTypeLabel(school, t),
@@ -379,7 +371,7 @@ export function schoolPage(school, t, language, { listed = true, districts = nul
     title: `${[name, districtText].filter(Boolean).join(', ')} · ${t('nav.title')}`,
     description: truncate(description),
     canonicalPath: `/schools/${school.id}`,
-    jsonLd: origin ? schoolJsonLd(school, { name, url: canonicalUrl(`/schools/${school.id}`, language, origin), language, district, t }) : null,
+    jsonLd: origin ? schoolJsonLd(school, { name, url: canonicalUrl(`/schools/${school.id}`, language, origin), language, district, listed, t }) : null,
     noindex: !listed || isThinSchool(school),
     sitemap: listed && !isThinSchool(school),
     body: mainBlock([

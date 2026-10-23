@@ -26,7 +26,7 @@ function schoolPoint(school) {
   return location ? [parseCoordinate(location.lat), parseCoordinate(location.lng)] : null
 }
 
-/** A kindergarten's district feature: the one kg.sofia.bg gives, else the polygon its pin is in. */
+/** A school's district feature: the one its source names (kg.sofia.bg for kindergartens), else the polygon its pin is in. */
 export function kindergartenDistrictFeature(school, districts) {
   if (!districts) return null
   const point = schoolPoint(school)
