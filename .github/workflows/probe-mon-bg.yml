@@ -6,14 +6,14 @@ jobs:
   probe:
     runs-on: ubuntu-latest
     steps:
-      - name: cdx
+      - name: discovery
         run: |
-          mkdir -p f
-          curl -s --max-time 120 "https://web.archive.org/cdx/search/cdx?url=ruo.mon.bg/sofia-grad/files/sites/2/&matchType=prefix&filter=statuscode:200&collapse=urlkey&fl=timestamp,original,mimetype&limit=20000" -o f/cdx.txt; wc -l f/cdx.txt
-          curl -s --max-time 120 "https://web.archive.org/cdx/search/cdx?url=ruo.mon.bg/files/sites/2/&matchType=prefix&collapse=urlkey&fl=timestamp,original,mimetype&limit=20000" -o f/cdx2.txt; wc -l f/cdx2.txt
-          curl -s --max-time 120 "https://web.archive.org/cdx/search/cdx?url=ruo.mon.bg/sofia-grad/registri/*&fl=timestamp,original,statuscode&limit=200" -o f/cdx3.txt; wc -l f/cdx3.txt
-          curl -s --max-time 60 "https://index.commoncrawl.org/collinfo.json" -o f/cc.json; head -c 300 f/cc.json
-          echo "::notice::cdx $(wc -l < f/cdx.txt) cdx2 $(wc -l < f/cdx2.txt) cdx3 $(wc -l < f/cdx3.txt); $(grep -ci 'spisak\|gradin\|uchilish' f/cdx.txt) list-like"
+          mkdir -p f; n=0
+          B=https://ruo.mon.bg/sofia-grad
+          for u in "$B/wp-sitemap.xml" "$B/sitemap.xml" "$B/sitemap_index.xml" "$B/attachment-sitemap.xml" "$B/wp-json/wp/v2/media?search=spisak&per_page=50" "$B/wp-json/wp/v2/media?search=detski&per_page=50" "$B/feed/" "$B/files/sites/2/2026/10/" "$B/files/sites/2/2025/10/spisak-na-uchilisthata-v-oblast-sofiya-grad-2025_2026.xlsx" "$B/files/sites/2/2025/09/spisak-na-uchilisthata-v-oblast-sofiya-grad-2025_2026.xlsx" "https://web.archive.org/cdx/search/cdx?url=ruo.mon.bg/sofia-grad/files/sites/2/&matchType=prefix&filter=statuscode:200&collapse=urlkey&fl=timestamp,original&limit=20000"; do
+            n=$((n+1)); code=$(curl -s -o f/$n -D f/$n.h -w "%{http_code} %{content_type} %{size_download}" -A "Mozilla/5.0" -L --max-time 120 "$u")
+            echo "::notice::$n $code | $(file -b f/$n | cut -c1-40) | $(grep -i '^cf-mitigated' f/$n.h | tr -d '\r\n') | $u"
+          done
       - uses: actions/upload-artifact@v4
         with:
           name: probe-cdx
