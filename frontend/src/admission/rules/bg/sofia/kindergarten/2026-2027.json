@@ -57,7 +57,62 @@
       "2026-06-19"
     ],
     "current_rankings_until": "2026-11-27",
-    "source": "sofia-bg-2026-schedule"
+    "source": "sofia-bg-2026-schedule",
+    "milestones": [
+      {
+        "key": "free_places",
+        "date": "2026-03-30"
+      },
+      {
+        "key": "applications_lock",
+        "date": "2026-05-21",
+        "time": "12:00"
+      },
+      {
+        "key": "ranking",
+        "round": 1,
+        "date": "2026-05-22"
+      },
+      {
+        "key": "enrol",
+        "round": 1,
+        "date": "2026-05-26",
+        "end": "2026-06-05",
+        "time": "16:00"
+      },
+      {
+        "key": "ranking",
+        "round": 2,
+        "date": "2026-06-05"
+      },
+      {
+        "key": "enrol",
+        "round": 2,
+        "date": "2026-06-08",
+        "end": "2026-06-19",
+        "time": "16:00"
+      },
+      {
+        "key": "ranking",
+        "round": 3,
+        "date": "2026-06-19"
+      },
+      {
+        "key": "enrol",
+        "round": 3,
+        "date": "2026-06-22",
+        "end": "2026-07-03",
+        "time": "16:00"
+      },
+      {
+        "key": "current_rankings",
+        "date": "2026-09-04",
+        "end": "2026-11-27"
+      }
+    ],
+    "milestones_source": "isodz-calendar-2026",
+    "published_by": "01-05",
+    "estimate_by": "weekday"
   },
   "verified": {
     "status": "verified",
@@ -98,6 +153,12 @@
       "title": "Столична община: график на класиранията 2026/2027",
       "url": "https://www.sofia.bg/en/w/7283210",
       "retrieved": "2026-10-14"
+    },
+    {
+      "id": "isodz-calendar-2026",
+      "title": "ИСОДЗ (kg.sofia.bg): календар на класиранията 2026",
+      "url": "https://kg.sofia.bg/",
+      "retrieved": "2026-10-23"
     }
   ],
   "params": {

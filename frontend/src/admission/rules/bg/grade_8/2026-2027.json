@@ -28,7 +28,80 @@
       "2026-07-29",
       "2026-08-05"
     ],
-    "source": "ruo-sofia-2026-minmax"
+    "source": "ruo-sofia-2026-minmax",
+    "milestones": [
+      {
+        "key": "nvo_bg",
+        "date": "2026-06-17"
+      },
+      {
+        "key": "nvo_math",
+        "date": "2026-06-19"
+      },
+      {
+        "key": "applications",
+        "round": 1,
+        "date": "2026-07-08",
+        "end": "2026-07-10"
+      },
+      {
+        "key": "ranking",
+        "round": 1,
+        "date": "2026-07-14"
+      },
+      {
+        "key": "enrol",
+        "round": 1,
+        "date": "2026-07-15",
+        "end": "2026-07-17"
+      },
+      {
+        "key": "ranking",
+        "round": 2,
+        "date": "2026-07-21"
+      },
+      {
+        "key": "enrol",
+        "round": 2,
+        "date": "2026-07-22",
+        "end": "2026-07-23"
+      },
+      {
+        "key": "applications",
+        "round": 3,
+        "date": "2026-07-27",
+        "end": "2026-07-28"
+      },
+      {
+        "key": "ranking",
+        "round": 3,
+        "date": "2026-07-29"
+      },
+      {
+        "key": "enrol",
+        "round": 3,
+        "date": "2026-07-30"
+      },
+      {
+        "key": "applications",
+        "round": 4,
+        "date": "2026-08-03",
+        "end": "2026-08-04"
+      },
+      {
+        "key": "ranking",
+        "round": 4,
+        "date": "2026-08-05"
+      },
+      {
+        "key": "enrol",
+        "round": 4,
+        "date": "2026-08-06",
+        "end": "2026-08-07"
+      }
+    ],
+    "milestones_source": "mon-2026-grade8-schedule",
+    "estimate_by": "weekday"
   },
   "verified": {
     "status": "verified",
@@ -50,6 +123,12 @@
       "title": "РУО София-град: справка за минималния и максималния бал по паралелки, 2026",
       "url": "https://ruo.mon.bg/sofia-grad/student-admission/spravka-za-minimalniya-i-maksimalniya-bal-po-paralelki-v-ruo-sofiya-grad-kam-data-21-07-2026-g/",
       "retrieved": "2026-10-14"
+    },
+    {
+      "id": "mon-2026-grade8-schedule",
+      "title": "График на дейностите по приемане на ученици след VII клас за 2026/2027 (заповед на министъра, копие в презентация на ППМГ Видин)",
+      "url": "https://pmg-vd.org/wp-content/uploads/2026/04/PPMG-1.pdf",
+      "retrieved": "2026-10-23"
     }
   ],
   "params": {

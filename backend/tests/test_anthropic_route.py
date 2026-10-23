@@ -27,6 +27,7 @@ def _settings(**tiers):
         model_tier_vision=tiers.get("vision", ""),
         model_tier_fee_check=tiers.get("fee_check", ""),
         model_tier_translation=tiers.get("translation", ""),
+        model_tier_facts=tiers.get("facts", ""),
     )
 
 

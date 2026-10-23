@@ -37,6 +37,7 @@ class TestModelTier:
             "vision": "openrouter/openai/gpt-6.1-sol",
             "fee_check": "anthropic/claude-sonnet-5-5",
             "translation": "anthropic/claude-haiku-5-5",
+            "facts": "anthropic/claude-haiku-5-5",
         }
 
     def test_model_costs_defined(self):
@@ -47,6 +48,7 @@ class TestModelTier:
             "vision": (2.00, 10.00),
             "fee_check": (2.00, 10.00),
             "translation": (0.10, 0.50),
+            "facts": (0.10, 0.50),
         }
 
     def test_get_model_cheap(self):

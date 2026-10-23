@@ -14,6 +14,12 @@ stores one (:func:`app.scrapers.stages.website.store_given_site`). A school sear
 the last ``retry_days`` is skipped, so the monthly run does not repeat a search that found
 nothing until sites may have changed. The default is a dry run that writes nothing.
 
+Validation counts a school's profile words as its name ("програмиране", "роботика"), so
+a search for 150 ЧПГ по програмиране и роботика "Стив Джобс" found SoftUni Будител's site
+valid. A run with nobody watching it also needs the school's own name, a part of its
+register name in quotes ("Стив Джобс"), on the page (:func:`brand_named`); a name with
+no quoted part is not checked.
+
 A stored site's fees and facts come with the next scheduled reads (monthly fees, the
 twice-yearly facts) or a thread's run for the schools found.
 """
@@ -21,6 +27,7 @@ twice-yearly facts) or a thread's run for the schools found.
 from __future__ import annotations
 
 import logging
+import re
 from collections.abc import Sequence
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
@@ -30,6 +37,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.models import School
+from app.utils.transliteration import transliterate_bulgarian
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +45,45 @@ RETRY_DAYS = 90
 # Candidates validated per school: search often ranks a directory or a news page first.
 MAX_CANDIDATES = 3
 SEARCHED_AT_KEY = "website_search_checked_at"
+
+
+_QUOTES_RE = re.compile(r'["„“”«»]')
+_LEGAL_FORM_RE = re.compile(r"^(?:е?оод|ад|еад|кд|сд|ет|ltd|llc)?$", re.IGNORECASE)
+_TYPE_RE = re.compile(r"^(?:ч?(?:дг|оу|су|ну|пг|пгдн|сои|ег)|частн\w*\b.*)$", re.IGNORECASE)
+
+
+def brands(name: Optional[str]) -> list[str]:
+    """The quoted parts of a register name that name the school itself: "Стив Джобс" in
+    ЧПГ ... "СТИВ ДЖОБС" ЕООД, "Ян Бибиян" and "Мега-Х" in "ЧДГ "ЯН БИБИЯН" - МЕГА-Х" ООД.
+    Empty when the name has no part besides its type, its legal form or one long name."""
+    parts = [" ".join(part.split()).strip(" -,") for part in _QUOTES_RE.split(name or "")]
+    parts = [part for part in parts if part and not _LEGAL_FORM_RE.match(part)]
+    if len(parts) < 2:
+        return []
+    return [part for part in parts if not _TYPE_RE.match(part) and len(part.split()) <= 4]
+
+
+def brand_named(name: Optional[str], page_text: str) -> bool:
+    """True when the page names one of the school's quoted names (either script), or it has none."""
+    own = brands(name)
+    if not own:
+        return True
+    text = (page_text or "").casefold()
+    for spelling in {variant for part in own for variant in (part, transliterate_bulgarian(part))}:
+        words = [word for word in re.findall(r"[^\W\d_]+|\d+", spelling.casefold()) if len(word) >= 3]
+        if words and all(re.search(rf"(?<![^\W\d_]){re.escape(word)}(?![^\W\d_])", text) for word in words):
+            return True
+    return False
+
+
+async def _page_text(url: str) -> str:
+    import httpx
+
+    try:
+        async with httpx.AsyncClient(timeout=20, follow_redirects=True) as client:
+            return (await client.get(url)).text
+    except httpx.HTTPError:
+        return ""
 
 
 def _searched_recently(attributes: Any, now: datetime, retry_days: int) -> bool:
@@ -128,6 +175,9 @@ async def run_find_websites(
                     school_aliases=extract_validation_aliases(school.attributes),
                 )
                 result["tried"].append({"url": url, "result": verdict.value, "reason": reason})
+                if verdict is ValidationResult.VALID and not brand_named(name, await _page_text(final_url or url)):
+                    result["tried"][-1].update(result="invalid", reason=f"The page does not name {' or '.join(brands(name))}")
+                    continue
                 if verdict is ValidationResult.VALID:
                     result["found"] = final_url or url
                     if apply:

@@ -192,6 +192,9 @@ export function saveHomePoint(point) {
     label: point.label || null,
     ...(point.fromHome ? { fromHome: point.fromHome } : {}),
   }
+  // A different home is a fresh start: the list starts from it again even if its location
+  // was turned off.
+  if (homePoint && !samePoint(homePoint, read().homePoint) && locationTurnedOff()) writeLocation(null)
   write({ ...read(), homePoint })
 }
 
@@ -268,6 +271,21 @@ export function writeLocation(location) {
     else storage()?.removeItem(LOCATION_KEY)
   } catch {
     // Full or blocked storage: the location lives for this page view only.
+  }
+}
+
+/**
+ * The parent turned the list's location off (`writeLocation(LOCATION_OFF)`): the list does
+ * not start from the saved home until a location or a different home is set. A marker,
+ * since a missing key means "never set". Other pages still measure from the saved home.
+ */
+export const LOCATION_OFF = { off: true }
+
+export function locationTurnedOff() {
+  try {
+    return JSON.parse(storage()?.getItem(LOCATION_KEY) || 'null')?.off === true
+  } catch {
+    return false
   }
 }
 

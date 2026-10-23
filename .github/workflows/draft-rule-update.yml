@@ -190,6 +190,9 @@ jobs:
                  change the meaning of an existing file: old cut-offs are read against it.
                - A schedule, status event or confirmation for a campaign already on file may
                  update that file's `schedule`, `status_events`, `sources` and `verified`.
+                 An official schedule also fills `schedule.milestones` (the keys and form in
+                 docs/ADMISSION_CALENDAR.md, every date from the official calendar) and
+                 removes `schedule.estimated`: the parents' admission calendar reads them.
                  Mark `verified.status` "verified" only after reading the full official text;
                  otherwise keep "provisional" and say in `verified.note` what is missing.
                - When a version date changes, update RULE_VERSIONS in

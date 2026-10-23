@@ -729,6 +729,53 @@ class TestURLValidatorHeuristics:
             assert final_url is None
             assert "Weak expected-school name match" in reason
 
+    async def _validate_page(self, html_content, url, school_name):
+        validator = URLValidator("bg")
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.url = url
+        mock_response.text = html_content
+        with patch("httpx.AsyncClient") as mock_client_class:
+            mock_client = AsyncMock()
+            mock_client.__aenter__.return_value = mock_client
+            mock_client.__aexit__.return_value = None
+            mock_client.get.return_value = mock_response
+            mock_client_class.return_value = mock_client
+            return await validator.validate_url(url, use_llm_fallback=False, school_name=school_name)
+
+    async def test_validate_url_accepts_a_one_word_name_in_the_title(self):
+        """618 "Евростандарт": its long title names it, and a menu item is no rival school."""
+        html_content = """
+        <html>
+            <head><title>Евростандарт - частна английска бизнес гимназия, икономическа, банкова и арт гимназия</title></head>
+            <body>
+                <a>Училищен живот - Галерия</a>
+                <p>Прием на ученици след 7 клас. Учители, класове и образователна програма.</p>
+            </body>
+        </html>
+        """
+        result, _, reason = await self._validate_page(
+            html_content, "http://www.eurostandart.org/", 'ЧАСТНА ПРОФЕСИОНАЛНА ГИМНАЗИЯ "ЕВРОСТАНДАРТ" ЕООД'
+        )
+        assert result == ValidationResult.VALID, reason
+
+    async def test_validate_url_does_not_take_a_menu_item_for_a_one_word_name(self):
+        """540 "Детската": "Лиценз на детската градина" is on every kindergarten's site."""
+        html_content = """
+        <html>
+            <head><title>ДГ Слънчице</title></head>
+            <body>
+                <h1>ДГ Слънчице</h1>
+                <a>Лиценз на детската градина</a>
+                <p>Прием на деца. Учители, групи и занимания за детска градина.</p>
+            </body>
+        </html>
+        """
+        result, _, _ = await self._validate_page(
+            html_content, "https://slanchice.bg/", '"Частна детска градина "Детската" ЕООД'
+        )
+        assert result == ValidationResult.INVALID
+
     async def test_validate_url_rejects_wrong_school_identity_before_llm(self):
         """Clear wrong-school identity labels should fail before LLM fallback."""
         validator = URLValidator("bg")

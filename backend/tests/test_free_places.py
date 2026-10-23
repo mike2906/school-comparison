@@ -180,3 +180,41 @@ def test_first_grade_records_match_by_school_number_never_by_kindergarten_id():
     assert unmatched == 0
     assert list(out) == [20]
     assert out[20][0]["free"] == 3 and out[20][0]["stage"] == "grade_1"
+
+
+async def _matchable_schools_read_only_what_matching_needs(db_session):
+    from app.models.country import Country
+
+    if await db_session.get(Country, "bg") is None:
+        db_session.add(Country(code="bg", name_i18n={"bg": "България", "en": "Bulgaria"}, education_config={}, map_config={},
+                               supported_languages=["bg", "en"], default_language="bg", default_currency="EUR"))
+        await db_session.flush()
+    db_session.add_all([
+        School(name_i18n={"bg": "ДГ 1"}, country_code="bg", city="sofia", school_type="state",
+               education_level="kindergarten", attributes={"kg_sofia_id": 171, "kg_sofia_ids": [171, 479], "school_facts": {"x": 1}},
+               admission_info={"cutoffs": [{"round_id": 1}] * 50}),
+        School(name_i18n={"bg": "5 ОУ Иван Вазов"}, country_code="bg", city="sofia", school_type="state",
+               education_level="primary", institutional_id="2205005"),
+    ])
+    await db_session.commit()
+    schools = sorted(await free_places.matchable_schools(db_session), key=lambda s: s.education_level)
+    assert schools[0].attributes == {"kg_sofia_id": 171, "kg_sofia_ids": [171, 479]}
+    assert schools[1].attributes == {"kg_sofia_id": None, "kg_sofia_ids": None}
+    assert schools[1].institutional_id == "2205005"
+    snapshot = _snapshot([
+        building_free_places(_dz([FIRST], dz_id=479, name="ДГ 1, филиал"), "kindergarten"),
+        building_free_places(_dz([PRESCHOOL], dz_id=366, name="5. ОУ \"Иван Вазов\""), "preparatory"),
+    ])
+    out, unmatched = free_places.places_by_school(snapshot, schools)
+    assert unmatched == 0 and len(out) == 2
+
+
+@pytest.mark.asyncio
+async def test_matchable_schools(db_session):
+    await _matchable_schools_read_only_what_matching_needs(db_session)
+
+
+@pytest.mark.asyncio
+@pytest.mark.postgres
+async def test_matchable_schools_postgres(db_session):
+    await _matchable_schools_read_only_what_matching_needs(db_session)
