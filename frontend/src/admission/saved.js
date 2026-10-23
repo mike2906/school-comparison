@@ -129,7 +129,7 @@ export function getSaved() {
 
 export function saveStage(stage, entry, { home } = {}) {
   const next = { ...read(), [stage]: { ...entry, savedOn: new Date().toISOString().slice(0, 10) } }
-  if (home !== undefined) Object.assign(next, withoutStalePoint({ ...next, home }))
+  if (home !== undefined) Object.assign(next, withoutStalePoint(next, { ...next, home }))
   const birthYear = entry.answers?.birthYear
   // Another birth year is another plan: its start year is not this one's.
   if (isBirthYear(birthYear) && next.child?.birthYear !== birthYear) next.child = { birthYear }
@@ -156,7 +156,9 @@ export function childStartYear(saved = read()) {
  */
 export function saveChild({ birthYear, startYear }) {
   if (!isBirthYear(birthYear)) return
-  write({ ...read(), child: childFrom({ birthYear, startYear }) })
+  const saved = read()
+  const keep = startYear === undefined && saved.child?.birthYear === birthYear ? saved.child.startYear : startYear
+  write({ ...saved, child: childFrom({ birthYear, startYear: keep }) })
 }
 
 /** `home` as one string, to tie a point found from it to it. */
@@ -177,10 +179,16 @@ export function saveHomePoint(point) {
   write({ ...read(), homePoint })
 }
 
-// A point looked up from an address that is no longer the home goes with it.
-function withoutStalePoint(next) {
-  const fromHome = next.homePoint?.fromHome
-  return fromHome && fromHome !== homeKey(next.home) ? { ...next, homePoint: null } : next
+// A new home address replaces the home point, wherever it came from (the newest home
+// wins); forgetting the address takes only a point that was looked up from it.
+function withoutStalePoint(before, next) {
+  const point = next.homePoint
+  if (!point) return next
+  const key = homeKey(next.home)
+  const stale = key
+    ? key !== homeKey(before.home) && point.fromHome !== key
+    : Boolean(point.fromHome)
+  return stale ? { ...next, homePoint: null } : next
 }
 
 /**
@@ -203,7 +211,8 @@ export function withSiblings(entry, siblings) {
 }
 
 export function saveHome(home) {
-  write(withoutStalePoint({ ...read(), home }))
+  const before = read()
+  write(withoutStalePoint(before, { ...before, home }))
 }
 
 /**
@@ -214,16 +223,36 @@ export function saveHome(home) {
 export function forgetSaved(stage = null) {
   if (!stage) {
     // The search page's last location too: "forget" leaves no place behind.
-    try {
-      storage()?.removeItem(LOCATION_KEY)
-    } catch {
-      // Blocked storage holds nothing to forget.
-    }
+    writeLocation(null)
     return write(EMPTY)
   }
-  const next = withoutStalePoint({ ...read(), [stage]: null, ...(stage === 'grade_1' ? { home: null } : {}) })
+  const before = read()
+  const next = withoutStalePoint(before, { ...before, [stage]: null, ...(stage === 'grade_1' ? { home: null } : {}) })
   if (SAVED_STAGES.every(other => !next[other])) next.child = null
   write(next)
+}
+
+/**
+ * The search page's current location ({ lat, lng, address, ... } as it saved it), or null.
+ * Not part of the saved answers: the list keeps it for the next visit by itself.
+ */
+export function readLocation() {
+  try {
+    const parsed = JSON.parse(storage()?.getItem(LOCATION_KEY) || 'null')
+    return isPoint(parsed) ? parsed : null
+  } catch {
+    return null
+  }
+}
+
+/** Keeps (or with null, removes) the search page's current location. */
+export function writeLocation(location) {
+  try {
+    if (location) storage()?.setItem(LOCATION_KEY, JSON.stringify(location))
+    else storage()?.removeItem(LOCATION_KEY)
+  } catch {
+    // Full or blocked storage: the location lives for this page view only.
+  }
 }
 
 /**
@@ -232,14 +261,8 @@ export function forgetSaved(stage = null) {
  * else null.
  */
 export function tripOrigin(saved = read()) {
-  try {
-    const parsed = JSON.parse(storage()?.getItem(LOCATION_KEY) || 'null')
-    if (isPoint(parsed)) {
-      return { lat: parsed.lat, lng: parsed.lng, label: parsed.address || null, isHome: samePoint(parsed, saved.homePoint) }
-    }
-  } catch {
-    // Unreadable or blocked: fall back to the home.
-  }
+  const location = readLocation()
+  if (location) return { lat: location.lat, lng: location.lng, label: location.address || null, isHome: samePoint(location, saved.homePoint) }
   return saved.homePoint ? { ...saved.homePoint, isHome: true } : null
 }
 

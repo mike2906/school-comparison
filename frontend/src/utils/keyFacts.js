@@ -75,8 +75,8 @@ export function getShifts(locations = []) {
 }
 
 /**
- * Where distances start, as `{ lat, lng }`: the saved home on the map, else the search
- * page's last location (src/admission/saved.js, tripOrigin), or null.
+ * Where distances start, as `{ lat, lng }`: the search page's last location, else the saved
+ * home on the map (src/admission/saved.js, tripOrigin), or null.
  */
 export function readSavedLocation() {
   const origin = tripOrigin()
