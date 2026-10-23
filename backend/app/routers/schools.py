@@ -1,5 +1,6 @@
 import asyncio
 import gzip
+import json
 import logging
 import time
 from functools import partial
@@ -22,6 +23,7 @@ from app.schemas.school import (
     SchoolListResponse,
 )
 from app.scrapers.shared_site_check import level_family
+from app.services import free_places
 from app.services.country_service import get_valid_keys
 from app.services.school_relations import continued_from, continues_to, same_place_by_school
 from app.services.school_service import SchoolService
@@ -47,6 +49,9 @@ _filters_cache: dict[tuple, tuple[float, dict[str, list[str]]]] = {}
 # schools sharing a building), so those are kept the same way, per country and city.
 _search_index_cache: dict[tuple, tuple[float, dict]] = {}
 _same_place_cache: dict[tuple, tuple[float, dict[int, list[dict]]]] = {}
+# Free kindergarten places come from a snapshot outside the DB (free_places): re-read every
+# TTL, so the capture's new numbers arrive within minutes without a publish.
+_free_places_cache: dict[tuple, tuple[float, bytes]] = {}
 # School pages, one gzipped body each (about 6 KB), so a visit costs no query or projection.
 # A publish restarts the API, which empties this cache.
 # Cold builds share a few locks by id: a burst on one page waits for a single build, while
@@ -388,6 +393,51 @@ async def get_available_filters(
         raise HTTPException(
             status_code=500,
             detail="An error occurred while fetching available filters. Please try again later."
+        ) from e
+
+
+async def _build_free_places(db: AsyncSession, *, country_code, city) -> bytes:
+    payload: dict = {"as_of": None, "schools": {}}
+    if (country_code, city) == ("bg", "sofia"):
+        snapshot = await free_places.fetch_snapshot(settings.free_places_url)
+        meta = snapshot.get("meta") or {}
+        payload.update({key: meta.get(key) for key in ("as_of", "retrieved_at", "source_url")})
+        if free_places.snapshot_is_fresh(snapshot):
+            schools = (await db.execute(select(School).where(School.country_code == "bg"))).scalars().all()
+            by_school, unmatched = free_places.places_by_school(snapshot, schools)
+            if unmatched:
+                logger.info("Free places: %d ИСОДЗ buildings match no school", unmatched)
+            payload["schools"] = {str(school_id): entries for school_id, entries in by_school.items()}
+        else:
+            logger.warning("Free places snapshot from %s is too old to show", meta.get("retrieved_at"))
+    return await asyncio.to_thread(gzip.compress, json.dumps(payload, ensure_ascii=False).encode())
+
+
+@router.get("/free-places")
+async def get_free_places(
+    request: Request,
+    country_code: str = Query("bg", description="Country code (ISO 3166-1 alpha-2)"),
+    city: Optional[str] = Query("sofia", description="City"),
+    db: AsyncSession = Depends(get_db),
+):
+    """Today's free places in municipal kindergartens and ПГУ, per school id (aggregates
+    from ИСОДЗ; empty when the latest snapshot is too old)."""
+    try:
+        gzipped = await _cached_or_build(
+            _free_places_cache,
+            (country_code, city),
+            partial(_build_free_places, country_code=country_code, city=city),
+            db,
+            _city_build_lock,
+            # If GitHub stays unreachable, stop serving the last answer after a few hours.
+            max_age=6 * 3600,
+        )
+        return _gzipped_json_response(request, gzipped)
+    except Exception as e:
+        logger.error(f"Error getting free places: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail="An error occurred while fetching free places. Please try again later."
         ) from e
 
 

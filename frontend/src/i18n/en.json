@@ -1258,6 +1258,33 @@
       "preparatory": "preparatory group"
     }
   },
+  "freePlaces": {
+    "title": "Free places today",
+    "intro": "Places still free in each group, as the Sofia municipality's admission system (ИСОДЗ) showed them on {{date}}.",
+    "listLabel": "Free places per group",
+    "free_one": "{{count}} free place",
+    "free_other": "{{count}} free places",
+    "full": "No free places",
+    "capacity_one": "{{count}} place, {{enrolled}} enrolled",
+    "capacity_other": "{{count}} places, {{enrolled}} enrolled",
+    "rankedNotEnrolled_one": "{{count}} ranked, not yet enrolled",
+    "rankedNotEnrolled_other": "{{count}} ranked, not yet enrolled",
+    "sop_one": "also {{count}} place for children with special educational needs",
+    "sop_other": "also {{count}} places for children with special educational needs",
+    "chronic_one": "also {{count}} place for children with a chronic illness",
+    "chronic_other": "also {{count}} places for children with a chronic illness",
+    "howTheyFill": "A free place goes to the child with the most points at the next ranking. A child ranked but not yet enrolled keeps their place until the enrolment deadline; if they do not take it, it comes free.",
+    "sideQueues": "Places for special educational needs and chronic illness are ranked separately, only among children applying for them.",
+    "source": "Source: ИСОДЗ,",
+    "child_one": "{{count}} free place for born {{year}} today",
+    "child_other": "{{count}} free places for born {{year}} today",
+    "childFull": "No free place for born {{year}} today",
+    "calculatorNote": "A free place goes to the child with the most points at the next ranking (ИСОДЗ, Sofia municipality).",
+    "childRanked_one": "{{count}} ranked, not yet enrolled",
+    "childRanked_other": "{{count}} ranked, not yet enrolled",
+    "inBuildings_one": "(in {{count}} of its {{total}} buildings)",
+    "inBuildings_other": "(in {{count}} of its {{total}} buildings)"
+  },
   "calendar": {
     "title": "Admission calendar",
     "intro": "Every date to act on in Sofia, from nursery to 8th grade, for your child's birth year. Add it to your phone's calendar and it updates itself when the official dates come out.",
