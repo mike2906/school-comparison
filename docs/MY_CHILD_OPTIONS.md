@@ -130,3 +130,50 @@ lookup that exists today.
 2. `/my-child` page with car times and the fees-only cost, live flow and coverage test.
 3. Public transport spike, then the GTFS job and the transit option.
 4. Swap in the yearly cost estimate when it is merged.
+
+## Revision after review (overrides the sections above where they differ)
+
+Codex on #481 and the yearly cost design (thread "Rastem.bg competitor analysis",
+`/mnt/project-files/yearly-cost/design.md`) changed these points.
+
+1. **No v2 migration; additive fields at version 1.** `child: { birthYear, startYear }`
+   is a top-level field (#484 adds `birthYear`; `startYear` follows so the page's chosen
+   year survives a reload without calculator answers). Saved calculator entries keep their
+   own birth year and start year: a device can hold kindergarten answers for a younger
+   child and first-grade answers for an older one, so nothing is folded or rewritten. The
+   page is about `child`; a stage entry whose year disagrees is shown as "saved for a child
+   born in N" with a choice to use it, never silently applied.
+2. **`userLocation` is not promoted to home.** It is written on every GPS fix, search and
+   map tap, so it is not consent to a home. Only a location the parent marks as home (a new
+   "this is my home" action on the list, or the existing `savedHome` lookup) becomes
+   `home.point`. Every reader of `userLocation` (`ComparePage.jsx`, `keyFacts.js`,
+   `SchoolAdmissionArea.jsx`, `useUserLocation.js`) moves to one helper that prefers the
+   profile home, and every "forget" clears both keys.
+3. **Every verdict has a group.** Above: `above`, `everyone`, `sameGroup` where the group
+   was admitted in full. Close: `tie`, `unsure`, `mixed`, and a range that straddles the
+   cut-off. Unknown: `noCutoff`, `needsAddress` (with a prompt to add the address),
+   private schools. Below: `below`, `noPlaces`. A unit test pins the mapping for every value
+   `compareWithCutoff` and `compareRows` can return, so a new verdict fails the build.
+4. **Cost shows the stated fee, never an invented yearly total.** The column is the stated
+   fee with its period, as the list shows it today. The budget is "tuition per month up to
+   X" and filters only schools whose fee converts to a month (`tuitionSortValue`); schools
+   with a fee of unknown period are kept and marked "fee period not published". The yearly
+   estimate replaces this only when the cost thread's audited pilot says it is reliable.
+5. **Trips arrive by the start of the child's shift.** The search runs as arrive-by: the
+   school's shift start for the age group where we store it, else 08:00, said on the row.
+   Car times use the same rush-hour factor as now.
+6. **Public transport uses a real walking network.** Access, transfers and egress use an
+   OSM foot graph (the road-graph builder with a pedestrian profile), not scaled straight
+   lines, so rivers, railways and fenced areas are respected. The spike measures whether the
+   foot graph plus the timetable stays under ~3 MB gzipped; if not, walking links are
+   precomputed per stop from the foot graph at build time and only the user's own access
+   walk runs in the browser.
+7. **Pinned GTFS service date.** The build picks one representative school day (a Tuesday
+   to Thursday in term, not a holiday), resolves `calendar.txt` plus `calendar_dates.txt`
+   for that date only, keeps whole trips that cross the 06:00-09:30 window, and ships the
+   date and the feed's validity end. The page shows "timetable of <date>"; the monthly job
+   rebuilds before validity ends and the page hides transit times if the file is expired.
+8. **Parent check before done (Mike, 2026-10-23).** Before calling the page done: use it
+   on the live site at phone width in both languages as a parent would, and check its data
+   against the source for a sample of schools (cut-offs, catchments, fees, travel times
+   against a journey planner), and report what was checked.
