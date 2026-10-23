@@ -82,16 +82,3 @@ export function readSavedLocation() {
   const origin = tripOrigin()
   return origin ? { lat: origin.lat, lng: origin.lng } : null
 }
-
-export function parseSavedLocation(raw) {
-  if (!raw) return null
-  try {
-    const parsed = JSON.parse(raw)
-    if (typeof parsed?.lat === 'number' && typeof parsed?.lng === 'number') {
-      return { lat: parsed.lat, lng: parsed.lng }
-    }
-  } catch {
-    // Malformed storage is treated as no saved location.
-  }
-  return null
-}

@@ -3,11 +3,11 @@ import { geocodeAddress, reverseGeocode, cancelGeocode } from '../../utils/geoco
 import { mapSearchQuery } from '../../admission/catchments.js'
 import { loadAddresses } from '../../admission/loadCatchments.js'
 import { useSavedAdmission } from '../../hooks/useSavedAdmission.js'
-import { getSaved, saveHomePoint } from '../../admission/saved.js'
+import { getSaved, homeKey, LOCATION_KEY, samePoint, saveHomePoint } from '../../admission/saved.js'
 
-function readStoredUserLocation(fallbackAddress) {
+function readStoredUserLocation(fallbackAddress, homeLabel) {
   try {
-    const parsed = JSON.parse(localStorage.getItem('userLocation') || 'null')
+    const parsed = JSON.parse(localStorage.getItem(LOCATION_KEY) || 'null')
     if (typeof parsed?.lat === 'number' && typeof parsed?.lng === 'number') {
       return { lat: parsed.lat, lng: parsed.lng, address: parsed.address || fallbackAddress, savedHome: parsed.savedHome }
     }
@@ -16,19 +16,21 @@ function readStoredUserLocation(fallbackAddress) {
   }
   // No location of its own yet: start from the home the parent saved.
   const home = getSaved().homePoint
-  return home ? { lat: home.lat, lng: home.lng, address: home.label || fallbackAddress } : null
+  return home ? { lat: home.lat, lng: home.lng, address: home.label || homeLabel } : null
 }
 
-const samePoint = (a, b) => Boolean(a && b && a.lat === b.lat && a.lng === b.lng)
-
 const persistLocation = (location) => {
-  localStorage.setItem('userLocation', JSON.stringify(location))
+  try {
+    localStorage.setItem(LOCATION_KEY, JSON.stringify(location))
+  } catch {
+    // Full or blocked storage: the location lives for this page view only.
+  }
 }
 
 // The parent's location: GPS, an address lookup or a point picked on the map, kept in
 // localStorage. View changes around picking on the map stay with the page.
 export function useUserLocation({ t, geocodingConfig, arriveNearSavedHome = false, onArrivalHandled = () => {} }) {
-  const [userLocation, setUserLocation] = useState(() => readStoredUserLocation(t('location.currentLocation')))
+  const [userLocation, setUserLocation] = useState(() => readStoredUserLocation(t('location.currentLocation'), t('location.home')))
   const [addressInput, setAddressInput] = useState('')
   const [locationError, setLocationError] = useState(null)
   const [isLocating, setIsLocating] = useState(false)
@@ -167,7 +169,7 @@ export function useUserLocation({ t, geocodingConfig, arriveNearSavedHome = fals
   const saved = useSavedAdmission()
   const savedHome = saved.home
   const homePoint = saved.homePoint
-  const savedHomeKey = savedHome ? `${savedHome.streetId}|${savedHome.number}` : null
+  const savedHomeKey = homeKey(savedHome)
   const locateSavedHome = () => {
     if (homePoint) {
       startLocationRequest()
@@ -203,15 +205,20 @@ export function useUserLocation({ t, geocodingConfig, arriveNearSavedHome = fals
         // OpenStreetMap lacks many house numbers; the street is close enough for distances.
         fallback: mapSearchQuery(street, '').replace(/\s+,/, ','),
       })
-      if (isCurrent()) saveHomePoint({ lat: result.lat, lng: result.lng, label: result.address })
+      if (isCurrent()) saveHomePoint({ lat: result.lat, lng: result.lng, label: result.address, fromHome: savedHomeKey })
       return result
     }, { savedHome: savedHomeKey }, 'saved')
   }
 
   // "This is my home": the parent's own choice to keep the current location as the home.
   const isHome = samePoint(userLocation, homePoint)
+  // Placeholders ("current location", "selected on the map") are not the home's name, and
+  // would stay in the language they were saved in: such a home shows as "Home".
+  const placeholders = [t('location.currentLocation'), t('location.selectedOnMap')]
   const saveAsHome = () => {
-    if (userLocation) saveHomePoint({ lat: userLocation.lat, lng: userLocation.lng, label: userLocation.address })
+    if (!userLocation) return
+    const label = placeholders.includes(userLocation.address) ? null : userLocation.address
+    saveHomePoint({ lat: userLocation.lat, lng: userLocation.lng, label })
   }
   const forgetHome = () => saveHomePoint(null)
 
@@ -222,7 +229,11 @@ export function useUserLocation({ t, geocodingConfig, arriveNearSavedHome = fals
     setUserLocation(null)
     setAddressInput('')
     setLocationError(null)
-    localStorage.removeItem('userLocation')
+    try {
+      localStorage.removeItem(LOCATION_KEY)
+    } catch {
+      // Blocked storage holds nothing to remove.
+    }
   }
 
   const setLocationFromMap = (lat, lng) => {

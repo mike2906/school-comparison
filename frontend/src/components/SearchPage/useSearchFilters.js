@@ -26,8 +26,10 @@ export function useUrlFilters({ searchParams, locationSearch, navigate }) {
     navigate(`/search?${params.toString()}`, { replace: true })
     // A parent who chose to save on this device gives the birth year once: a new one here
     // is the child's for every page. Without a saved profile nothing is stored.
+    // The start year is kept only once the parent picked one (not the default year).
     if (nextFilters.birthYear && hasSaved(getSaved()) && (newFilters.birthYear !== undefined || newFilters.targetYear !== undefined)) {
-      saveChild({ birthYear: nextFilters.birthYear, startYear: nextFilters.targetYear })
+      const yearChosen = searchParams.has('target_year') || nextFilters.targetYear !== filters.targetYear
+      saveChild({ birthYear: nextFilters.birthYear, ...(yearChosen ? { startYear: nextFilters.targetYear } : {}) })
     }
   }
 

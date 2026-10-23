@@ -15,7 +15,7 @@ import {
   schoolCatchmentIds,
 } from '../../admission/catchments'
 import { CATCHMENT_CAMPAIGNS, loadAddresses, loadCatchments, loadDistricts } from '../../admission/loadCatchments'
-import { saveHome } from '../../admission/saved'
+import { LOCATION_KEY, saveHome } from '../../admission/saved'
 import { useSavedAdmission } from '../../hooks/useSavedAdmission'
 import { readSavedLocation } from '../../utils/keyFacts'
 import { usesSofiaKindergartenSystem } from '../../utils/admission'
@@ -145,7 +145,7 @@ function useCurrentLocation({ catchments, onPoint, onAddress }) {
         const { latitude: lat, longitude: lng } = position.coords
         onPoint([lat, lng])
         try {
-          window.localStorage.setItem('userLocation', JSON.stringify({ lat, lng, address: null }))
+          window.localStorage.setItem(LOCATION_KEY, JSON.stringify({ lat, lng, address: null }))
         } catch {
           // Blocked storage: the location is used on this page only.
         }

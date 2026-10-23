@@ -5,14 +5,15 @@
  * official address table, which the catchment maps reuse.
  *
  * Shape: { version, child: { birthYear, startYear? } | null, home: { streetId, number } | null,
- *          homePoint: { lat, lng, label } | null,
+ *          homePoint: { lat, lng, label, fromHome? } | null,
  *          kindergarten: { startYear, answers, siblings?, savedOn } | null,
  *          grade_1: { startYear, addresses, answers, siblings?, savedOn } | null }
  * `siblings` maps a school id to that school's sibling answers (see siblingsWith).
  * `child` is the one child the pages plan for, shared by every page that needs the birth
  * year (read it with childBirthYear), so a parent gives it once. `homePoint` is the home on
  * the map, for distances and travel times; `home` is the same home in the official address
- * table, for catchments. Either can exist without the other.
+ * table, for catchments. Either can exist without the other; a point found from `home` names
+ * it in `fromHome` and goes when that address changes or is forgotten.
  */
 
 const STORAGE_KEY = 'admissionAnswers'
@@ -128,9 +129,10 @@ export function getSaved() {
 
 export function saveStage(stage, entry, { home } = {}) {
   const next = { ...read(), [stage]: { ...entry, savedOn: new Date().toISOString().slice(0, 10) } }
-  if (home !== undefined) next.home = home
+  if (home !== undefined) Object.assign(next, withoutStalePoint({ ...next, home }))
   const birthYear = entry.answers?.birthYear
-  if (isBirthYear(birthYear)) next.child = { ...next.child, birthYear }
+  // Another birth year is another plan: its start year is not this one's.
+  if (isBirthYear(birthYear) && next.child?.birthYear !== birthYear) next.child = { birthYear }
   write(next)
 }
 
@@ -157,10 +159,28 @@ export function saveChild({ birthYear, startYear }) {
   write({ ...read(), child: childFrom({ birthYear, startYear }) })
 }
 
-/** Saves the home's map point ({ lat, lng, label }), or forgets it with null. */
+/** `home` as one string, to tie a point found from it to it. */
+export const homeKey = home => (home ? `${home.streetId}|${home.number}` : null)
+
+/**
+ * Saves the home's map point ({ lat, lng, label, fromHome? }), or forgets it with null.
+ * `fromHome` is homeKey(home) when the point was looked up from the saved address.
+ */
 export function saveHomePoint(point) {
   if (point !== null && !isPoint(point)) return
-  write({ ...read(), homePoint: point && { lat: point.lat, lng: point.lng, label: point.label || null } })
+  const homePoint = point && {
+    lat: point.lat,
+    lng: point.lng,
+    label: point.label || null,
+    ...(point.fromHome ? { fromHome: point.fromHome } : {}),
+  }
+  write({ ...read(), homePoint })
+}
+
+// A point looked up from an address that is no longer the home goes with it.
+function withoutStalePoint(next) {
+  const fromHome = next.homePoint?.fromHome
+  return fromHome && fromHome !== homeKey(next.home) ? { ...next, homePoint: null } : next
 }
 
 /**
@@ -183,7 +203,7 @@ export function withSiblings(entry, siblings) {
 }
 
 export function saveHome(home) {
-  write({ ...read(), home })
+  write(withoutStalePoint({ ...read(), home }))
 }
 
 /**
@@ -201,25 +221,29 @@ export function forgetSaved(stage = null) {
     }
     return write(EMPTY)
   }
-  const next = { ...read(), [stage]: null, ...(stage === 'grade_1' ? { home: null } : {}) }
+  const next = withoutStalePoint({ ...read(), [stage]: null, ...(stage === 'grade_1' ? { home: null } : {}) })
   if (SAVED_STAGES.every(other => !next[other])) next.child = null
   write(next)
 }
 
 /**
- * Where trips start: the saved home on the map, else the search page's last location, else
- * null. `{ lat, lng, label, isHome }`.
+ * Where trips start, as `{ lat, lng, label, isHome }`: the location the parent last set on
+ * the search page (it may be somewhere other than home on purpose), else the saved home,
+ * else null.
  */
 export function tripOrigin(saved = read()) {
-  if (saved.homePoint) return { ...saved.homePoint, isHome: true }
   try {
     const parsed = JSON.parse(storage()?.getItem(LOCATION_KEY) || 'null')
-    if (isPoint(parsed)) return { lat: parsed.lat, lng: parsed.lng, label: parsed.address || null, isHome: false }
+    if (isPoint(parsed)) {
+      return { lat: parsed.lat, lng: parsed.lng, label: parsed.address || null, isHome: samePoint(parsed, saved.homePoint) }
+    }
   } catch {
-    // Unreadable or blocked: no location.
+    // Unreadable or blocked: fall back to the home.
   }
-  return null
+  return saved.homePoint ? { ...saved.homePoint, isHome: true } : null
 }
+
+export const samePoint = (a, b) => Boolean(a && b && a.lat === b.lat && a.lng === b.lng)
 
 /** Tests only: drop the in-memory copy. */
 export function resetSavedForTests() {
