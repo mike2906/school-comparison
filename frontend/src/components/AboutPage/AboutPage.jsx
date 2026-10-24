@@ -94,7 +94,9 @@ function AboutPage() {
           </p>
         ))}
 
-        <h2 className="mt-10 text-xl font-semibold text-neutral-900">{t('about.sourceCodeTitle')}</h2>
+        <h2 id="source-code" className="mt-10 scroll-mt-20 text-xl font-semibold text-neutral-900">
+          {t('about.sourceCodeTitle')}
+        </h2>
         <p className="mt-3 text-neutral-700">{t('about.sourceCodeBody')}</p>
         <a
           href={SOURCE_CODE}
