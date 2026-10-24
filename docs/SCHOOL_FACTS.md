@@ -233,13 +233,13 @@ schools state their start in a school-day fact ("първа смяна от 7:30
   child joining the school, from the school-day facts that write a clock time
   (`app/scrapers/extraction/school_start.py`): keys `preschool`, `grade_1_4`, `grade_5_7`,
   `grade_8_12` mean the preparatory group and first, fifth and eighth grade, the grades a
-  child joins in (НМУ: 1st-2nd grade in the morning, 3rd-4th in the afternoon). The first
+  child joins in (НМУ: 1st-2nd grade at 9:10 in the first shift, 3rd-4th in the afternoon). The first
   lesson (not "посрещане", often optional morning care), in the first term's shift.
 - No start comes from a timetable line whose hours were lost on the page ("00 – 08.35 08.55
   – 09.30", 19 СУ: the reader took the second lesson for the first), at read time or when
   shown (`app/utils/school_start.py` `garbled`). Code keeps a time only when the named fact writes it and it is
   between 07:00 and 14:00, and checks again when shown; a list of grades is no time ("за 1, 2, 9, 10
-  клас" gave НМУ a 09:10 start in the refill) (the timetable keeps trips to 14:00). Stored in the facts block as `start_times`, each with its fact.
+  клас" is no 09:10) (the timetable keeps trips to 14:00). Stored in the facts block as `start_times`, each with its fact.
 - `school-start` fills them in from stored facts without reading the sites
   (`--apply` to store, `--all` to redo every school): about $0.0005 a school.
 - First fill 2026-10-24 (published 08:49 UTC): 74 schools, $0.016. Against the schools' own
