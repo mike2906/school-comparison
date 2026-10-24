@@ -16,12 +16,15 @@ or the keep rules. A row counts as:
   a fee published twice is an error a parent sees.
 
 A key fee is found when a row, or one of a row's payment options, matches its amount and
-category. Amounts are compared in euro (BGN at 1.95583) within 1 %.
+category. Amounts are compared in euro (BGN at 1.95583) within 1 %. The main-price rate is
+the share of schools whose key lists tuition where a row found at least one tuition fee: whether a
+parent sees the school's price at all. ``--rescore`` adds it to a report saved before it existed.
 
     uv run python scripts/fees_eval.py                       # one trial, report + baseline check
     uv run python scripts/fees_eval.py --trials 3            # repeat, scores averaged
     uv run python scripts/fees_eval.py --write-baseline      # store this run as the baseline (use --trials 5)
     MODEL_TIER_PRICING=openrouter/... uv run python scripts/fees_eval.py --no-check   # try a model
+    uv run python scripts/fees_eval.py --rescore report.json   # main price of a saved report (no model)
 
 Calls the model directly (no DB, no ledger); ``--max-usd`` stops the run. Exit code 1 when the
 score falls past the margins below the baseline.
@@ -174,7 +177,15 @@ def score_school(rows: list[Any], fees: list[dict[str, Any]]) -> dict[str, Any]:
                     if fee["category"] == _value(row.category)
                     and _same(value, _euro(fee.get("amount"), fee.get("currency")))
                 }
-    return {"rows": verdicts, "found": sorted(found), "site_fees": len(fees)}
+    return {"rows": verdicts, "found": sorted(found), "site_fees": len(fees)} | main_price(found, fees)
+
+
+def main_price(found: set[str] | list[str], fees: list[dict[str, Any]]) -> dict[str, bool]:
+    """Whether the key lists tuition for the school, and whether a row found any of it: the
+    parent's question "does the site show this school's price at all", which found_rate (every
+    grade, plan and period a separate fee) does not answer."""
+    tuition = {fee["fid"] for fee in fees if fee["category"] == "tuition"}
+    return {"has_tuition": bool(tuition), "tuition_shown": bool(tuition & set(found))}
 
 
 async def read_school(saved: dict[str, Any], spend: Spend, unpublished: list | None = None) -> list[Any]:
@@ -232,8 +243,13 @@ def _note(fee: Any, checks: list[str]) -> dict[str, Any]:
 
 
 def summarize(schools: dict[int, dict[str, Any]]) -> dict[str, Any]:
-    counts = {name: 0 for name in ("rows", "right", "blank", "wrong", "duplicate", "found", "site_fees")}
+    counts = {
+        name: 0
+        for name in ("rows", "right", "blank", "wrong", "duplicate", "found", "site_fees", "price_schools", "price_shown")
+    }
     for school in schools.values():
+        counts["price_schools"] += school["has_tuition"]
+        counts["price_shown"] += school["tuition_shown"]
         counts["rows"] += len(school["rows"])
         for row in school["rows"]:
             counts[row["verdict"]] += 1
@@ -242,6 +258,7 @@ def summarize(schools: dict[int, dict[str, Any]]) -> dict[str, Any]:
     return counts | {
         "wrong_rate": round((counts["wrong"] + counts["duplicate"]) / counts["rows"], 4) if counts["rows"] else 0.0,
         "found_rate": round(counts["found"] / counts["site_fees"], 4) if counts["site_fees"] else 0.0,
+        "main_price_rate": round(counts["price_shown"] / counts["price_schools"], 4) if counts["price_schools"] else 0.0,
     }
 
 
@@ -279,6 +296,19 @@ def check(summary: dict[str, Any], baseline: dict[str, Any]) -> list[str]:
     return failures
 
 
+def rescore(report: dict[str, Any], key: dict[int, list]) -> int:
+    """The main-price measure for a report saved before it existed: from each school's found fees."""
+    rates = []
+    for i, trial in enumerate(report["per_trial"], 1):
+        schools = [main_price(school["found"], key[int(school_id)]) for school_id, school in trial["schools"].items()]
+        priced = [school for school in schools if school["has_tuition"]]
+        shown = sum(school["tuition_shown"] for school in priced)
+        rates.append(shown / len(priced) if priced else 0.0)
+        print(f"  trial {i}: main price {shown}/{len(priced)} schools ({rates[-1]:.0%}), errors {len(trial['errors'])}")
+    print(f"Model {report['model']}: main price {sum(rates) / len(rates):.0%} over {len(rates)} trial(s)")
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--trials", type=int, default=1)
@@ -288,9 +318,12 @@ def main() -> int:
     parser.add_argument("--out", type=Path, help="Write the full report here")
     parser.add_argument("--write-baseline", action="store_true", help="Store this run's averages as the baseline")
     parser.add_argument("--no-check", action="store_true", help="Report only; do not compare with the baseline")
+    parser.add_argument("--rescore", type=Path, help="Score a saved --out report again (no model calls) and print it")
     args = parser.parse_args()
 
     key = load_key()
+    if args.rescore:
+        return rescore(json.loads(args.rescore.read_text(encoding="utf-8")), key)
     cases = [
         json.loads(path.read_text(encoding="utf-8"))
         for path in sorted(PAGES_DIR.glob("*.json"))
@@ -314,7 +347,8 @@ def main() -> int:
 
     trials = asyncio.run(all_trials())
     rates = {
-        name: round(sum(t["summary"][name] for t in trials) / len(trials), 4) for name in ("wrong_rate", "found_rate")
+        name: round(sum(t["summary"][name] for t in trials) / len(trials), 4)
+        for name in ("wrong_rate", "found_rate", "main_price_rate")
     }
     settings = get_settings()
     report = {
@@ -335,11 +369,15 @@ def main() -> int:
         print(
             f"  trial {i}: rows {s['rows']}, right {s['right']}, blank {s['blank']}, wrong {s['wrong']} "
             f"({s['wrong_rate']:.0%}), duplicates {s['duplicate']}, found {s['found']}/{s['site_fees']} "
-            f"({s['found_rate']:.0%}), errors {len(trial['errors'])}"
+            f"({s['found_rate']:.0%}), main price {s['price_shown']}/{s['price_schools']} schools "
+            f"({s['main_price_rate']:.0%}), errors {len(trial['errors'])}"
         )
         for school_id, error in trial["errors"].items():
             print(f"    {school_id}: {error}")
-    print(f"Average: wrong {rates['wrong_rate']:.0%}, found {rates['found_rate']:.0%}")
+    print(
+        f"Average: wrong {rates['wrong_rate']:.0%}, found {rates['found_rate']:.0%}, "
+        f"main price {rates['main_price_rate']:.0%}"
+    )
     found_by_school = ", ".join(
         f"{school_id} {len(school['found'])}/{school['site_fees']}"
         for school_id, school in trials[-1]["schools"].items()

@@ -29,4 +29,8 @@ workflow by hand with `model` set (no baseline check), or locally with `MODEL_TI
 Refresh the pages and the key together, about twice a year: a key read today against pages
 saved months ago scores the age gap, not the agent.
 
+The report also gives a main-price rate: of the schools whose key lists tuition, the share where
+the read found at least one tuition fee (does a parent see the price at all). `--rescore <report>`
+works it out for a report saved before it existed, with no model calls.
+
 Not covered: the finder (needs live sites), the re-read (needs stored rows), the keep rules.

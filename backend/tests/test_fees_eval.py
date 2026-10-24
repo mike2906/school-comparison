@@ -56,6 +56,17 @@ def test_score_school_verdicts():
     assert summary["found_rate"] == 1.0
 
 
+def test_main_price_counts_schools_with_any_key_tuition_found():
+    key = [_fee("t1", "tuition", 7300, "yearly"), _fee("t2", "tuition", 650, "monthly"), _fee("r", "registration", 500)]
+    shown = fees_eval.score_school([_row("tuition", 650, "monthly")], key)  # one tuition variant is enough
+    missed = fees_eval.score_school([_row("registration", 500)], key)  # extras but no price
+    no_tuition = fees_eval.score_school([], [_fee("m", "materials", 40)])  # the key has no tuition: not counted
+    summary = fees_eval.summarize({1: shown, 2: missed, 3: no_tuition})
+    assert (summary["price_shown"], summary["price_schools"], summary["main_price_rate"]) == (1, 2, 0.5)
+    # A saved report scores the same from its found fees alone.
+    assert fees_eval.main_price(shown["found"], key) == {"has_tuition": True, "tuition_shown": True}
+
+
 def test_same_amount_for_several_groups():
     key = [_fee("f1", "tuition", 9000, "yearly"), _fee("f2", "tuition", 9000, "yearly"), _fee("f3", "tuition", 9000)]
     rows = [_row("tuition", 9000, "yearly"), _row("tuition", 9000, "yearly"), _row("tuition", 9000, "yearly")]
