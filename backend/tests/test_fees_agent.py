@@ -282,7 +282,12 @@ def test_deposit_filed_as_registration_publishes():
         ("Ако желаете да запазите своето място при нас се заплаща капаро в размер на 150€", 150, "такса", True),
         ("Заплаща се при подписване на договора: 300 €", 300, "Депозит", True),
         # 300: a guarantee taken off the last fee is a deposit by another name.
-        ("Договорът се сключва с внасяне на гаранционна вноска в размер на 1500 евро,", 1500, "такса", True),
+        ("Договорът се сключва с внасяне на гаранционна вноска в размер на 1500 евро,\n"
+         "която се приспада от последната дължима такса.", 1500, "такса", True),
+        # 569: a guarantee fee paid once and never returned is an enrolment fee.
+        ("Гаранционна такса записване: 70 € еднократно при сключване на договор", 70, "Гаранционна такса записване", False),
+        ("Гаранционна такса записване – 70 €, невъзстановима", 70, "Гаранционна такса записване", False),
+        ("Guarantee fee: 70 EUR, non-refundable", 70, "гаранционна такса", False),
         ("Registration fee guarantees your child a place: 500 EUR, non-refundable", 500, "fee", False),
         # Only the amount the word stands before: the enrolment fee on the deposit's line is a fee.
         ("Такса за записване 200 €, депозит 500 €", 200, "Такса за записване", False),

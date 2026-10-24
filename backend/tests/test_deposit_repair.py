@@ -60,3 +60,29 @@ async def test_flags_only_stored_registration_rows_that_name_a_deposit(db_sessio
     assert "deposit" not in stored[rows[3].id].pricing_context
     assert "deposit" not in stored[old_extractor.id].pricing_context
     assert await flag_deposits(db_session, apply=False) == []
+
+
+@pytest.mark.asyncio
+async def test_a_stored_guarantee_is_a_deposit_only_when_it_is_returned(db_session, sample_schools):
+    school_id = sample_schools[0].id
+    # 300: the notes say it comes off the last fee
+    returned = _row(
+        school_id,
+        PriceCategory.REGISTRATION,
+        1500,
+        "Гаранционна вноска",
+        "Договорът се сключва с внасяне на гаранционна вноска в размер на 1500 евро,",
+        notes="Гарантира място до завършване на VII клас; приспада се от последната дължима такса.",
+    )
+    # 569: paid once at the contract, never returned
+    kept = _row(
+        school_id,
+        PriceCategory.REGISTRATION,
+        70,
+        "Гаранционна такса записване",
+        "Гаранционна такса записване – 70 € еднократно при сключване на договор",
+    )
+    db_session.add_all([returned, kept])
+    await db_session.commit()
+
+    assert [row.amount for row in await flag_deposits(db_session, apply=False)] == [1500]
