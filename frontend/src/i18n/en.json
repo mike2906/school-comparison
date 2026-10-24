@@ -1234,7 +1234,7 @@
       "metro": "metro"
     },
     "leave": "leave {{leave}} for {{deadline}}",
-    "startUnknown": "school start time not known, 8:00 assumed"
+    "startUnknown": "start not known, 8:00 assumed"
   },
   "savedAdmission": {
     "yoursPoints": "Your points: {{points}}",

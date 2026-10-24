@@ -1234,7 +1234,7 @@
       "metro": "метро"
     },
     "leave": "тръгване {{leave}} за {{deadline}}",
-    "startUnknown": "не знаем кога започват часовете, приемаме 8:00"
+    "startUnknown": "не знаем началото, приемаме 8:00"
   },
   "savedAdmission": {
     "yoursPoints": "Вашите точки: {{points}}",
