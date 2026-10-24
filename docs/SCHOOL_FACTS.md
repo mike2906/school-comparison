@@ -229,13 +229,23 @@ and a blanket 8:00 told a parent to leave 20-30 minutes late at a 7:30 school; 1
 schools state their start in a school-day fact ("първа смяна от 7:30", "часовете започват
 в 8:00"), with first shifts from 7:30 to 8:30.
 
-- After a facts read keeps facts, one cheap call (same tier) gets the start of the first
-  lesson per band (preschool, grades 1-4, 5-7, 8-12) from the school-day facts that write a
-  clock time (`app/scrapers/extraction/school_start.py`). A band in two shifts gets the first
-  shift in the first term. Code keeps a time only when the named fact writes it and it is
+- After a facts read keeps facts, one cheap call (same tier) gets when the day starts for a
+  child joining the school, from the school-day facts that write a clock time
+  (`app/scrapers/extraction/school_start.py`): keys `preschool`, `grade_1_4`, `grade_5_7`,
+  `grade_8_12` mean the preparatory group and first, fifth and eighth grade, the grades a
+  child joins in (НМУ: 1st-2nd grade in the morning, 3rd-4th in the afternoon). The first
+  lesson (not "посрещане", often optional morning care), in the first term's shift.
+- No start comes from a timetable line whose hours were lost on the page ("00 – 08.35 08.55
+  – 09.30", 19 СУ: the reader took the second lesson for the first), at read time or when
+  shown (`app/utils/school_start.py` `garbled`). Code keeps a time only when the named fact writes it and it is
   between 07:00 and 14:00 (the timetable keeps trips to 14:00). Stored in the facts block as `start_times`, each with its fact.
 - `school-start` fills them in from stored facts without reading the sites
   (`--apply` to store, `--all` to redo every school): about $0.0005 a school.
+- First fill 2026-10-24 (published 08:49 UTC): 74 schools, $0.016. Against the schools' own
+  pages: 15 of 17 checked right; 19 СУ wrong (lost hours, above), НМУ's 1-4 band held two
+  shifts (now first grade). 7 of ~80 schools answered differently between two runs.
+  Times stored before the first-grade keys keep the old meaning until `school-start --city
+  sofia --all --apply` and a publish refill them.
 - The list response's `start_times` (`{band: "HH:MM"}`, `app/utils/school_start.py`) shows a
   time only while its fact shows. A failed call stores the facts without start times.
 

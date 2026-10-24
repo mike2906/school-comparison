@@ -19,21 +19,27 @@ from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, Field
 
+from app.utils.school_start import garbled
+
 BANDS = ("preschool", "grade_1_4", "grade_5_7", "grade_8_12")
 EARLIEST = "07:00"
 LATEST = "14:00"  # the timetable keeps trips to 14:00 (tools/transit/build_timetable.mjs)
 
 PROMPT = """You get numbered facts about one school's day, read from its own website, each with the page line
-it comes from. For each age band, give the time the first lesson of the day starts, but only when a fact
-states it:
+it comes from. A parent choosing a school for a child who starts there asks when the child must be at
+school. For each key below, give the time the day starts for that child, but only when a fact states it:
 - preschool: the preparatory group before first grade (подготвителна група, ПГ, 5 and 6 year olds)
-- grade_1_4, grade_5_7, grade_8_12: grades I-IV, V-VII and VIII-XII
+- grade_1_4: first grade (I клас)
+- grade_5_7: fifth grade (V клас)
+- grade_8_12: eighth grade (VIII клас)
 Rules:
-- A fact about the whole school ("lessons start at 8:00", "one shift, from 7:30") holds for every band the
-  school teaches; a fact about some grades holds only for their bands.
-- A band taught in two shifts, or in other shifts by term, gets the first shift's start in the first term.
-- Only lessons. Not the building's opening hours, morning care before lessons, after-school groups
-  (занималня, целодневна организация) or a kindergarten's working hours ("from 7:00 to 19:00").
+- A fact about the whole school ("lessons start at 8:00", "one shift, from 7:30") holds for every grade the
+  school teaches; a fact about some grades ("I–II клас", "V–VII клас", "прогимназиален етап") holds only for
+  them. When first grade has its own time and grades III-IV another, give first grade's.
+- The start of the first lesson. In two shifts, or other shifts by term, the first term's shift for that
+  grade.
+- Not the building's opening hours, optional morning care, after-school groups (занималня, целодневна
+  организация, ГЦОУД) or a kindergarten's working hours ("from 7:00 to 19:00").
 - "time": the start as the fact writes it, as HH:MM. "fact": that fact's number.
 - No fact states a start: return an empty list."""
 
@@ -67,6 +73,7 @@ def day_facts(facts: Sequence[Any]) -> list[Mapping[str, Any]]:
         if isinstance(fact, Mapping)
         and fact.get("topic") == "school_day"
         and clock_times(_written(fact))
+        and not garbled(fact.get("quote"))
     ]
 
 
