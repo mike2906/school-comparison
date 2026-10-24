@@ -471,6 +471,7 @@ async def run_validate_url(
     apply: bool = True,
     replace: bool = False,
     section: bool = False,
+    aliases: tuple[str, ...] = (),
 ):
     """Run URL validation for a single school.
 
@@ -480,7 +481,10 @@ async def run_validate_url(
     lets a valid given site replace an accepted one (587's sibling school's drujba.org),
     the way the shared-site check replaces a brand hub with a campus. ``section`` lets
     it replace a site with the school's own section of it (574's novigradini.com/anika/
-    on its group's home page); otherwise another path on the same site is no replace."""
+    on its group's home page); otherwise another path on the same site is no replace.
+    ``aliases`` are other names the school goes by on its site (303 "Детски оазис" is
+    Kinderoase, 567 "Булпрогрес" writes BULPROGRESS): they count in the name checks, and a
+    site stored with them keeps them in ``name_aliases`` for later checks."""
     from sqlalchemy import select
 
     from app.models import School
@@ -533,7 +537,7 @@ async def run_validate_url(
         country_code=country,
         update_db=apply and not given,
         school_name=(school.name_i18n or {}).get("bg") or (school.name_i18n or {}).get("en"),
-        school_aliases=extract_validation_aliases(school.attributes),
+        school_aliases=[*extract_validation_aliases(school.attributes), *aliases],
         school_city=school.city,
     )
 
@@ -543,6 +547,12 @@ async def run_validate_url(
             await _replace_accepted_site(db, school, given_url)
         method = "check_website_replace" if replacing else "check_website"
         await store_given_site(db, school, url, final_url, reason, method=method)
+        if aliases:
+            attrs = dict(school.attributes or {})
+            known = [str(value) for value in attrs.get("name_aliases") or []]
+            attrs["name_aliases"] = known + [alias for alias in aliases if alias.casefold() not in {k.casefold() for k in known}]
+            school.attributes = attrs
+            await db.commit()
     console.print(f"  Result: {validation_result.value} - {reason}")
     if given:
         console.print("  Stored." if stored else "  Not stored" + ("." if apply else " (dry run; --apply stores a valid site)."))

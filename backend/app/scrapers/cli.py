@@ -946,14 +946,16 @@ def osm_check_command(city, country, report_path, issue_path):
 @click.option("--apply", "apply_changes", is_flag=True, help="Store the site if it is valid (default writes nothing)")
 @click.option("--replace", is_flag=True, help="Let a valid site replace the school's accepted one")
 @click.option("--section", is_flag=True, help="With --replace: the URL is the school's own section of its current site")
-def check_website_command(school_id, url, country, apply_changes, replace, section):
+@click.option("--alias", "aliases", multiple=True, help="Another name the school uses on its site (repeatable); kept when stored")
+def check_website_command(school_id, url, country, apply_changes, replace, section, aliases):
     """Validate a given site for a school with the usual checks; with --apply a valid one is stored."""
     from app.database import async_session_maker
 
     async def _run():
         async with async_session_maker() as db:
             return await website_stage.run_validate_url(
-                db, school_id, country, url=url, apply=apply_changes, replace=replace, section=section
+                db, school_id, country, url=url, apply=apply_changes, replace=replace, section=section,
+                aliases=tuple(aliases),
             )
 
     asyncio.run(_run())
