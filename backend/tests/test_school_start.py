@@ -125,7 +125,9 @@ async def test_the_list_shows_the_start_times_of_shown_facts(seeded_db, seeded_c
     school = _school(school_facts=_block([_fact(SHIFTS_BG)], start_times=starts))
     seeded_db.add(school)
     await seeded_db.flush()
-    seeded_db.add(SchoolLocation(school_id=school.id, address_i18n={"bg": "София"}, lat=42.7, lng=23.3, is_primary=True))
+    seeded_db.add(
+        SchoolLocation(school_id=school.id, address_i18n={"bg": "София"}, lat=42.7, lng=23.3, is_primary=True)
+    )
     await seeded_db.commit()
     rows = (await seeded_client.get("/schools")).json()
     listed = next(row for row in rows if row["id"] == school.id)
@@ -160,3 +162,17 @@ def test_a_start_stored_before_the_lost_hours_check_is_not_shown():
     fact = _fact(bg, quote="I и II клас 00 – 08.35 08.55 – 09.30")
     attrs = {"school_facts": _block([fact], start_times={"grade_1_4": {"time": "08:55", "fact_bg": bg}})}
     assert shown_start_times(attrs, publishable_school_facts(attrs, HOME)) is None
+
+
+NMU_BG = "Две смени: първа смяна от 7.30ч. за 1, 2, 9, 10, 11 и 12 клас; втора смяна от 13.30ч. за 3–8 клас"
+
+
+def test_a_list_of_grades_is_no_time():
+    assert clock_times(NMU_BG) == {"07:30", "13:30"}
+    assert clock_times("от 7,30 до 12,40 ч.") == {"07:30", "12:40"}
+
+
+def test_a_start_stored_from_a_list_of_grades_is_not_shown():
+    starts = {"grade_1_4": {"time": "09:10", "fact_bg": NMU_BG}, "grade_8_12": {"time": "13:30", "fact_bg": NMU_BG}}
+    attrs = {"school_facts": _block([_fact(NMU_BG)], start_times=starts)}
+    assert shown_start_times(attrs, publishable_school_facts(attrs, HOME)) == {"grade_8_12": "13:30"}
