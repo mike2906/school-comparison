@@ -26,6 +26,7 @@ from app.models import School
 from app.models.pipeline_run import PipelineRun
 from app.scrapers.extraction import school_facts as facts_rules
 from app.scrapers.extraction.school_facts import Fact, Facts, Graded
+from app.scrapers.extraction.school_start import read_start_times
 from app.scrapers.fee_pages import fee_http_client
 from app.scrapers.stages import common as stage_common
 from app.scrapers.stages import school_pool
@@ -33,6 +34,7 @@ from app.scrapers.stages.fees_agent import PageRead, Spend, SpendCapReached, fin
 from app.services.pipeline_runs import finalize_pipeline_run, pipeline_run_heartbeat, start_pipeline_run
 from app.services.provider_costs import ProviderCostError, execute_billable_request, provider_cost_scope
 from app.utils.school_facts import ATTRIBUTE_KEY, LANGUAGES_READ_KEY, SITE_ACCEPTED_STATUSES
+from app.utils.school_start import START_TIMES_KEY
 
 logger = logging.getLogger(__name__)
 
@@ -238,6 +240,18 @@ def facts_block(facts: list[dict], model: str, website_url: Optional[str]) -> di
     }
 
 
+async def start_times(facts: list[dict], call: Caller, school_id: int) -> Optional[dict[str, dict[str, str]]]:
+    """The start times the facts state (``extraction/school_start.py``), or None when the
+    call failed: the facts are stored without them rather than lost."""
+    try:
+        return await read_start_times(facts, call, school_id)
+    except (SpendCapReached, ProviderCostError):
+        raise
+    except Exception:
+        logger.exception("start times failed for school %s", school_id)
+        return None
+
+
 async def run_school(db: AsyncSession, school: School, *, find: Finder, call: Caller, apply: bool) -> dict[str, Any]:
     report = {
         "school_id": school.id,
@@ -254,8 +268,14 @@ async def run_school(db: AsyncSession, school: School, *, find: Finder, call: Ca
     # only shows facts read from the school's current website.
     if facts is None or (not facts and stored and report.get("pages_read", 0) < FULL_READ_PAGES):
         report["kept_stored_facts"] = bool(stored)
-    elif apply:
+        return report
+    starts = await start_times(facts, call, school.id)
+    if starts is not None:
+        report["start_times"] = {band: start["time"] for band, start in starts.items()}
+    if apply:
         block = facts_block(facts, get_model(TIER), school.website_url)
+        if starts is not None:
+            block[START_TIMES_KEY] = starts
         # Only a full read can list every taught language: not a partial crawl whose language
         # pages timed out, nor the open-days check's block (open_days.py).
         if report.get("pages_read", 0) >= FULL_READ_PAGES:

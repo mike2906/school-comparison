@@ -1,13 +1,17 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { arriveBySeconds, clock, linesText, timetableFresh, tripMinutes } from './transitTimes.js'
+import { arrivalTarget, clock, linesText, timetableFresh, tripMinutes } from './transitTimes.js'
 
-test('arrive by the shift start for the age group, else 08:00', () => {
-  const location = { age_group_shifts: [{ age_group: 'grade_5_7', shift: 'afternoon' }, { age_group: 'grade_1_4', shift: 'morning' }] }
-  assert.equal(clock(arriveBySeconds(location, 'grade_5_7')), '13:30')
-  assert.equal(clock(arriveBySeconds(location, 'grade_1_4')), '07:30')
-  assert.equal(clock(arriveBySeconds(location, 'third')), '08:00')
-  assert.equal(clock(arriveBySeconds(null, 'third')), '08:00')
+test('arrive by the start the school gives for the age group, else its shift, else 08:00', () => {
+  const school = { education_level: 'secondary', start_times: { grade_1_4: '07:30', grade_8_12: '08:20' } }
+  const location = { age_group_shifts: [{ age_group: 'grade_5_7', shift: 'afternoon' }] }
+  const at = (...args) => { const target = arrivalTarget(...args); return [clock(target.seconds), target.known] }
+  assert.deepEqual(at(school, location, 'grade_1_4'), ['07:30', true])
+  assert.deepEqual(at(school, location, 'grade_5_7'), ['13:30', true])
+  assert.deepEqual(at({ education_level: 'secondary' }, null, 'grade_1_4'), ['08:00', false])
+  // A kindergarten's children arrive over the morning: no start to know.
+  assert.deepEqual(at({ education_level: 'kindergarten' }, null, 'preschool'), ['08:00', null])
+  assert.deepEqual(at(null, null, 'third'), ['08:00', null])
 })
 
 test('a trip in whole minutes', () => {

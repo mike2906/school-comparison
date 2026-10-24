@@ -221,6 +221,24 @@ stored facts:
    matches the address words of an accepted website, ranked with addresses below every name
    match. No model, nothing shown.
 
+## Start of the school day (`start_times`, `school-start` stage)
+
+Public transport times (`docs/TRANSIT_TIMES.md`) aim at the start of lessons. The shift
+table (`location_age_group_shifts.shift`) is empty for every school (checked 2026-10-24),
+and a blanket 8:00 told a parent to leave 20-30 minutes late at a 7:30 school; 130 Sofia
+schools state their start in a school-day fact ("първа смяна от 7:30", "часовете започват
+в 8:00"), with first shifts from 7:30 to 8:30.
+
+- After a facts read keeps facts, one cheap call (same tier) gets the start of the first
+  lesson per band (preschool, grades 1-4, 5-7, 8-12) from the school-day facts that write a
+  clock time (`app/scrapers/extraction/school_start.py`). A band in two shifts gets the first
+  shift in the first term. Code keeps a time only when the named fact writes it and it is
+  between 07:00 and 14:00 (the timetable keeps trips to 14:00). Stored in the facts block as `start_times`, each with its fact.
+- `school-start` fills them in from stored facts without reading the sites
+  (`--apply` to store, `--all` to redo every school): about $0.0005 a school.
+- The list response's `start_times` (`{band: "HH:MM"}`, `app/utils/school_start.py`) shows a
+  time only while its fact shows. A failed call stores the facts without start times.
+
 ## Retiring the website reading pipeline
 
 Mike asked (2026-10-13) what else the pipeline does before going agent-only. Agents should

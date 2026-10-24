@@ -5,14 +5,25 @@
 export const FOOT_GRAPH_URL = '/routing/sofia-foot.bin.gz'
 export const TIMETABLE_URL = '/routing/sofia-timetable.bin.gz'
 
-// When the day starts, by the shift a school runs for the age group (none stored yet: 08:00).
+// When the day starts, by the shift a school runs for the age group (none stored yet).
 const SHIFT_START = { morning: 7 * 3600 + 30 * 60, afternoon: 13 * 3600 + 30 * 60 }
 export const DEFAULT_START = 8 * 3600
+const SCHOOL_BANDS = new Set(['preschool', 'grade_1_4', 'grade_5_7', 'grade_8_12'])
+const KINDERGARTEN_LEVELS = new Set(['kindergarten', 'nursery'])
 
-/** Seconds after midnight the child should arrive by at this building. */
-export function arriveBySeconds(location, ageGroup) {
+/**
+ * When the child should arrive at this building, in seconds after midnight: the start the
+ * school's website gives for the age group (`start_times`, from its facts), else its shift,
+ * else 08:00. `known` says whether the school gave it; it is null where one start does not
+ * apply (a kindergarten's children arrive over the morning).
+ */
+export function arrivalTarget(school, location, ageGroup) {
+  const [h, m] = String(school?.start_times?.[ageGroup] || '').split(':').map(Number)
+  if (Number.isInteger(h) && Number.isInteger(m)) return { seconds: h * 3600 + m * 60, known: true }
   const shift = (location?.age_group_shifts || []).find(item => item.age_group === ageGroup)?.shift
-  return SHIFT_START[shift] ?? DEFAULT_START
+  if (SHIFT_START[shift]) return { seconds: SHIFT_START[shift], known: true }
+  const applies = SCHOOL_BANDS.has(ageGroup) && !KINDERGARTEN_LEVELS.has(school?.education_level)
+  return { seconds: DEFAULT_START, known: applies ? false : null }
 }
 
 /** "07:05" from seconds after midnight. */

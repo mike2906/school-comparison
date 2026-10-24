@@ -8,7 +8,7 @@ import DriveTimeNote from '../../routing/DriveTimeNote'
 import TransitTimeNote from '../../routing/TransitTimeNote'
 import { useDriveTimes } from '../../routing/useDriveTimes'
 import { useTransitTimes } from '../../routing/useTransitTimes'
-import { arriveBySeconds } from '../../routing/transitTimes'
+import { arrivalTarget } from '../../routing/transitTimes'
 import { useCountry } from '../../context/CountryContext'
 import { useSchools } from '../../hooks/useSchools'
 import { useSavedAdmission, useVerdictData } from '../../hooks/useSavedAdmission'
@@ -103,7 +103,8 @@ function MyChildPage() {
     const distance = homePoint && distanceLocation
       ? calculateDistance(homePoint.lat, homePoint.lng, distanceLocation.lat, distanceLocation.lng)
       : null
-    return { ...school, distance, distanceLocation, arriveBy: arriveBySeconds(distanceLocation, ageGroup) }
+    const target = arrivalTarget(school, distanceLocation, ageGroup)
+    return { ...school, distance, distanceLocation, arriveBy: target.seconds, startKnown: target.known }
   }), [schools, homePoint, ageGroup])
   const driveTimes = useDriveTimes(byTransit ? null : homePoint, placed)
   const transitTimes = useTransitTimes(homePoint, placed, byTransit)
