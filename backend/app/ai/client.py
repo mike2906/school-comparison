@@ -47,6 +47,10 @@ MODEL_TIERS = {
     # Translating the fee names, class names and list items a page shows as the website
     # wrote them (stages/text_translations.py): short labels, on the Max plan's API credit.
     "translation": "anthropic/claude-haiku-5-5",
+    # School facts and open days (stages/school_facts.py, stages/open_days.py), on the Max
+    # plan's API credit: the Sofia facts re-read published 2026-10-20 ran on it. Before, they
+    # shared the fee reader's OpenRouter tier, so an empty OpenRouter balance stopped them (339).
+    "facts": "anthropic/claude-haiku-5-5",
 }
 
 # Cost per 1M tokens (input/output), verified against OpenRouter 2026-07-13.
@@ -57,6 +61,7 @@ MODEL_COSTS = {
     "vision": (2.00, 10.00),  # OpenRouter, 2026-10-09
     "fee_check": (2.00, 10.00),  # Sonnet 5.5, if the tier is pointed at OpenRouter
     "translation": (0.10, 0.50),  # Haiku 5.5, if the tier is pointed at OpenRouter
+    "facts": (0.10, 0.50),  # Haiku 5.5, if the tier is pointed at OpenRouter
 }
 
 # Anthropic's API reports tokens, not a cost, so a tier routed there needs its model's
@@ -66,7 +71,14 @@ MODEL_COSTS = {
 ANTHROPIC_PRICES = {
     "claude-haiku-5-5": (0.10, 0.50),
     "claude-sonnet-5-5": (2.00, 10.00),
+    "claude-opus-5-5": (4.00, 20.00),
 }
+# Prompt caching: the stages' system prompts are cached (create_agent), so a run's calls after
+# the first read them back. A cache write costs 1.25x the input price (5-minute TTL), a read
+# 0.1x (0.05x on Opus 5.5), per the claude-api reference 2026-10-06.
+ANTHROPIC_CACHE_WRITE_FACTOR = 1.25
+ANTHROPIC_CACHE_READ_FACTORS = {"claude-opus-5-5": 0.05}
+ANTHROPIC_CACHE_READ_FACTOR = 0.10
 ANTHROPIC_LONG_PROMPT_TOKENS = 100_000
 ANTHROPIC_LONG_PROMPT_PRICES = {
     "claude-haiku-5-5": (0.50, 2.50),
@@ -85,19 +97,24 @@ _ANTHROPIC_SAMPLING_SETTINGS = ("temperature", "top_p", "top_k")
 # answers use by default: they think and answer through structured outputs
 # (output_config.format). pydantic-ai 1.107 doesn't know them yet, so their profile is
 # given here; drop an entry once pydantic-ai's own profile covers the model.
+_THINKING_PROFILE = AnthropicModelProfile(
+    supports_json_schema_output=True,
+    anthropic_supports_adaptive_thinking=True,
+    anthropic_supports_effort=True,
+    anthropic_supports_xhigh_effort=True,
+    anthropic_disallows_budget_thinking=True,
+    anthropic_disallows_sampling_settings=True,
+    anthropic_supports_forced_tool_choice=False,
+)
 ANTHROPIC_THINKING_PROFILES = {
-    "claude-sonnet-5-5": AnthropicModelProfile(
-        supports_json_schema_output=True,
-        anthropic_supports_adaptive_thinking=True,
-        anthropic_supports_effort=True,
-        anthropic_supports_xhigh_effort=True,
-        anthropic_disallows_budget_thinking=True,
-        anthropic_disallows_sampling_settings=True,
-        anthropic_supports_forced_tool_choice=False,
-    ),
+    "claude-sonnet-5-5": _THINKING_PROFILE,
+    "claude-opus-5-5": _THINKING_PROFILE,
 }
+# Haiku 5.5 runs with thinking off unless ANTHROPIC_THINKING=adaptive (a per-run trial
+# setting): then it thinks and answers through structured outputs as the models above do.
+ANTHROPIC_OPTIONAL_THINKING = ("claude-haiku-5-5",)
 
-ModelTier = Literal["cheap", "capable", "pricing", "vision", "fee_check", "translation"]
+ModelTier = Literal["cheap", "capable", "pricing", "vision", "fee_check", "translation", "facts"]
 
 
 def get_model(tier: ModelTier) -> str:
@@ -146,13 +163,19 @@ def _anthropic_model_name(tier: ModelTier) -> str:
     return name
 
 
-def anthropic_cost_usd(model_name: str, input_tokens: int, output_tokens: int) -> float:
-    """Anthropic's price for one request, from its token counts."""
+def anthropic_cost_usd(
+    model_name: str, input_tokens: int, output_tokens: int, cache_write_tokens: int = 0, cache_read_tokens: int = 0
+) -> float:
+    """Anthropic's price for one request, from its token counts. ``input_tokens`` is the whole
+    prompt (pydantic-ai's count), cache writes and reads included."""
     prices = ANTHROPIC_PRICES[model_name]
     if input_tokens > ANTHROPIC_LONG_PROMPT_TOKENS and model_name in ANTHROPIC_LONG_PROMPT_PRICES:
         prices = ANTHROPIC_LONG_PROMPT_PRICES[model_name]
     input_price, output_price = prices
-    return input_tokens / 1_000_000 * input_price + output_tokens / 1_000_000 * output_price
+    read_factor = ANTHROPIC_CACHE_READ_FACTORS.get(model_name, ANTHROPIC_CACHE_READ_FACTOR)
+    uncached = max(input_tokens - cache_write_tokens - cache_read_tokens, 0)
+    prompt = uncached + cache_write_tokens * ANTHROPIC_CACHE_WRITE_FACTOR + cache_read_tokens * read_factor
+    return prompt / 1_000_000 * input_price + output_tokens / 1_000_000 * output_price
 
 
 def get_model_costs(tier: ModelTier) -> tuple[float, float]:
@@ -268,7 +291,9 @@ class PricedAnthropicModel(AnthropicModel):
                 raise ProviderCreditsExhausted(f"Anthropic refused the request: {exc}") from exc
             raise
         usage = response.usage
-        cost = anthropic_cost_usd(self.model_name, usage.input_tokens, usage.output_tokens)
+        cost = anthropic_cost_usd(
+            self.model_name, usage.input_tokens, usage.output_tokens, usage.cache_write_tokens, usage.cache_read_tokens
+        )
         # "cost" is what the ledger and caps read; cost_source records that it was computed
         # from Anthropic's token counts, not reported in dollars like OpenRouter's.
         response.provider_details = {
@@ -303,6 +328,13 @@ def _is_account_error(exc: ModelHTTPError) -> bool:
     return exc.status_code == 400 and any(message in body for message in _ACCOUNT_LIMIT_MESSAGES)
 
 
+def anthropic_thinks(model_name: str) -> bool:
+    """Whether calls to this Anthropic model run with adaptive thinking (and structured outputs)."""
+    if model_name in ANTHROPIC_THINKING_PROFILES:
+        return True
+    return model_name in ANTHROPIC_OPTIONAL_THINKING and get_settings().anthropic_thinking == "adaptive"
+
+
 def get_anthropic_model(tier: ModelTier) -> PricedAnthropicModel:
     settings = get_settings()
     if not settings.anthropic_api_key:
@@ -310,8 +342,8 @@ def get_anthropic_model(tier: ModelTier) -> PricedAnthropicModel:
     provider = AnthropicProvider(api_key=settings.anthropic_api_key)
     name = _anthropic_model_name(tier)
     profile = provider.model_profile(name)
-    if name in ANTHROPIC_THINKING_PROFILES:
-        profile = AnthropicModelProfile.from_profile(profile).update(ANTHROPIC_THINKING_PROFILES[name])
+    if anthropic_thinks(name):
+        profile = AnthropicModelProfile.from_profile(profile).update(_THINKING_PROFILE)
     return PricedAnthropicModel(name, provider=provider, profile=profile)
 
 
@@ -355,9 +387,12 @@ def create_agent(
         model = get_anthropic_model(tier)
         for setting in _ANTHROPIC_SAMPLING_SETTINGS:
             model_settings.pop(setting, None)
-        if model.model_name in ANTHROPIC_THINKING_PROFILES:
+        if anthropic_thinks(model.model_name):
             # Thinking on makes pydantic-ai answer through structured outputs, not a tool call.
             model_settings.setdefault("anthropic_thinking", {"type": "adaptive"})
+            # A stage that sets its own effort (fee_check) keeps it; ANTHROPIC_EFFORT sets the rest.
+            if get_settings().anthropic_effort:
+                model_settings.setdefault("anthropic_effort", get_settings().anthropic_effort)
         else:
             # Haiku 5.5 thinks by default; off keeps the forced tool call that returns the
             # structured answer (Anthropic refuses forced tool calls while thinking).
@@ -365,6 +400,9 @@ def create_agent(
         # pydantic-ai's Anthropic default is 4,096 output tokens, below the 6,000 the fee and
         # facts reads budget for; OpenRouter calls have no such default.
         model_settings.setdefault("max_tokens", ANTHROPIC_MAX_OUTPUT_TOKENS)
+        # Each stage sends one system prompt to every school, so a run's later calls read it
+        # from the cache. A prompt under the model's minimum (512+ tokens) just isn't cached.
+        model_settings.setdefault("anthropic_cache_instructions", True)
     else:
         model = get_openrouter_model(tier)
         model_settings.setdefault("openrouter_usage", {"include": True})
@@ -393,6 +431,7 @@ __all__ = [
     "get_model",
     "get_provider",
     "anthropic_cost_usd",
+    "anthropic_thinks",
     "get_anthropic_model",
     "get_model_costs",
     "calculate_cost",

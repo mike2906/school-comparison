@@ -403,7 +403,7 @@ async def _build_free_places(db: AsyncSession, *, country_code, city) -> bytes:
         meta = snapshot.get("meta") or {}
         payload.update({key: meta.get(key) for key in ("as_of", "retrieved_at", "source_url")})
         if free_places.snapshot_is_fresh(snapshot):
-            schools = (await db.execute(select(School).where(School.country_code == "bg"))).scalars().all()
+            schools = await free_places.matchable_schools(db)
             by_school, unmatched = free_places.places_by_school(snapshot, schools)
             if unmatched:
                 logger.info("Free places: %d ИСОДЗ buildings match no school", unmatched)

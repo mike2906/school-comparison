@@ -7,7 +7,7 @@
  * pages only. `--strict` (`npm run build:production`) refuses to build a site that would
  * deploy without its school pages or with a guessed origin.
  */
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { loadEnv } from 'vite'
 
@@ -22,6 +22,8 @@ import {
   renderPage,
   schoolPage,
 } from '../src/prerender/pages.js'
+import { calendarFeeds } from '../src/prerender/calendars.js'
+import { sofiaToday } from '../src/admission/calculator.js'
 import { catchmentUrl } from '../src/admission/catchments.js'
 import { CATCHMENT_CAMPAIGNS } from '../src/admission/loadCatchments.js'
 import { DEFAULT_SITE_ORIGIN, URL_LANGUAGES } from '../src/utils/languageUrl.js'
@@ -106,6 +108,13 @@ async function write(file, content) {
   await writeFile(target, content)
 }
 
+/** Every admission rule file, read from disk (the app bundles them through Vite). */
+async function readRuleSets() {
+  const dir = path.resolve('src/admission/rules')
+  const files = (await readdir(dir, { recursive: true })).filter((name) => name.endsWith('.json'))
+  return Promise.all(files.map(async (name) => JSON.parse(await readFile(path.join(dir, name), 'utf8'))))
+}
+
 async function main() {
   const env = loadEnv('production', process.cwd(), '')
   const origin = siteOrigin(env.VITE_SITE_ORIGIN)
@@ -120,10 +129,15 @@ async function main() {
   const template = await readFile(path.join(DIST, 'index.html'), 'utf8')
   const districts = JSON.parse(await readFile(path.join(DIST, DISTRICTS_FILE), 'utf8'))
 
+  const ruleSets = await readRuleSets()
+  const now = new Date()
   let sitemapPaths = []
   for (const language of URL_LANGUAGES) {
     const dictionary = JSON.parse(await readFile(path.resolve(`src/i18n/${language}.json`), 'utf8'))
     const t = createTranslator(dictionary, language)
+    const feeds = calendarFeeds(ruleSets, { t, language, origin, today: sofiaToday(now), now })
+    for (const feed of feeds) await write(feed.file, feed.content)
+    console.log(`prerender: ${feeds.length} admission calendar feeds (${language})`)
     const listed = schools.filter((school) => listedIds.has(school.id))
     const pages = [
       ...fixedPages(t, language, listed),

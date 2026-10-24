@@ -42,6 +42,7 @@ BACKEND = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND))
 
 from app.ai.client import extract_provider_cost_usd, get_model, get_model_costs  # noqa: E402
+from app.config import get_settings  # noqa: E402
 from app.models import School  # noqa: E402
 from app.scrapers.extraction.agent_fees import check_fee  # noqa: E402
 from app.scrapers.stages.fees_agent import (  # noqa: E402
@@ -315,8 +316,11 @@ def main() -> int:
     rates = {
         name: round(sum(t["summary"][name] for t in trials) / len(trials), 4) for name in ("wrong_rate", "found_rate")
     }
+    settings = get_settings()
     report = {
         "model": get_model("pricing"),
+        # The per-run Anthropic trial settings, when set (app/config.py).
+        **{name: value for name in ("anthropic_thinking", "anthropic_effort") if (value := getattr(settings, name))},
         "schools": len(cases),
         "schools_without_pages": missing,
         "trials": args.trials,
@@ -324,7 +328,8 @@ def main() -> int:
         **rates,
         "per_trial": trials,
     }
-    print(f"Model {report['model']}, {len(cases)} schools, {args.trials} trial(s), ${report['spent_usd']:.4f}")
+    tuned = "".join(f", {name} {report[name]}" for name in ("anthropic_thinking", "anthropic_effort") if name in report)
+    print(f"Model {report['model']}{tuned}, {len(cases)} schools, {args.trials} trial(s), ${report['spent_usd']:.4f}")
     for i, trial in enumerate(trials, 1):
         s = trial["summary"]
         print(

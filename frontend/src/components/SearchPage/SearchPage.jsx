@@ -61,6 +61,7 @@ import {
 } from '../../utils/searchViewState'
 import { LANGUAGE_SWITCH_EVENT, languageSwitchArrival } from '../../utils/languageSwitch'
 import { pinnedLocation } from '../../utils/coordinates'
+import { locationForAgeGroup, locationsForAgeGroup } from '../../utils/schoolLocation'
 import { useDriveTimes } from '../../routing/useDriveTimes'
 import DriveTimeNote from '../../routing/DriveTimeNote'
 import { useFreePlaces } from '../../hooks/useFreePlaces'
@@ -130,6 +131,9 @@ function SearchPage() {
     searchAddress,
     canUseSavedHome,
     locateSavedHome,
+    isHome,
+    saveAsHome,
+    forgetHome,
     clearLocation,
     setLocationFromMap,
   } = useUserLocation({
@@ -602,22 +606,6 @@ function SearchPage() {
     if (rawSchoolType !== 'international') return
     handleFilterChange({ schoolType: 'private' })
   }, [rawSchoolType])
-
-  const locationsForAgeGroup = (school, ageGroupValue) => {
-    const all = school.locations || []
-    if (!ageGroupValue) return all
-    const matching = all.filter(location => {
-      if (Array.isArray(location.age_groups)) return location.age_groups.includes(ageGroupValue)
-      if (location.age_group) return location.age_group === ageGroupValue
-      return false
-    })
-    return matching.length ? matching : all
-  }
-
-  const getLocationForAgeGroup = (school, ageGroupValue) => {
-    const locations = locationsForAgeGroup(school, ageGroupValue)
-    return locations.find(location => location.is_primary) || locations[0]
-  }
 
   const schoolsWithDistance = useMemo(() => {
     if (!userLocation) return schools
@@ -1278,6 +1266,9 @@ function SearchPage() {
                     setIsPickingLocation(false)
                     locateSavedHome()
                   } : null}
+                  isHome={isHome}
+                  onSaveAsHome={saveAsHome}
+                  onForgetHome={forgetHome}
                   onAddressSearch={handleAddressSearch}
                   onStartMapPick={handleStartMapPick}
                   onClear={handleClearLocation}
@@ -1425,7 +1416,7 @@ function SearchPage() {
                     key={school.id}
                     school={school}
                     samePlace={samePlace}
-                    location={getLocationForAgeGroup(school, filters.ageGroup)}
+                    location={locationForAgeGroup(school, filters.ageGroup)}
                     isSelected={(samePlaceHostById.get(detailSchoolId || selectedSchoolId) ?? (detailSchoolId || selectedSchoolId)) === school.id}
                     onClick={handleListSchoolSelect}
                     onOpenDetails={handleOpenDetails}

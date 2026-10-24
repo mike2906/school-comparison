@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { inBounds, isQuarterMatch, pickInBounds, quarterQuery } from './geocoding.js'
+import { inBounds, isQuarterMatch, pickInBounds, quarterQuery, withoutStreetWord } from './geocoding.js'
 
 const SOFIA = [[42.5, 23.1], [42.86, 23.6]]
 
@@ -27,6 +27,16 @@ test('isQuarterMatch needs a quarter of exactly the typed name', () => {
   assert.equal(isQuarterMatch({ name: 'ж.к. Дружба', addresstype: 'suburb' }, 'Дружба 2'), false)
   assert.equal(isQuarterMatch({ name: 'ж.к. Люлин 5', addresstype: 'railway' }, 'Люлин 5'), false)
   assert.equal(isQuarterMatch(undefined, 'Люлин 5'), false)
+})
+
+test('withoutStreetWord drops a leading "ул." for a second try', () => {
+  assert.equal(withoutStreetWord('ул. Шипка 5'), 'Шипка 5')
+  assert.equal(withoutStreetWord('улица Оборище 20'), 'Оборище 20')
+  assert.equal(withoutStreetWord('ул.Шипка 5'), 'Шипка 5')
+  assert.equal(withoutStreetWord('ул. 6-ти септември 10'), '6-ти септември 10')
+  assert.equal(withoutStreetWord('Шипка 5'), null)
+  assert.equal(withoutStreetWord('бул. Витоша 10'), null)
+  assert.equal(withoutStreetWord('Улан Батор 3'), null)
 })
 
 test('pickInBounds skips matches outside the city', () => {

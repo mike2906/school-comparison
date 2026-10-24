@@ -1,0 +1,6 @@
+stop_id,stop_code,stop_name,stop_lat,stop_lon,location_type
+S1,0001,Node 1,42.70005,23.3001,0
+S3,0003,Node 3,42.70005,23.3099,0
+S5,0005,Node 5,42.70005,23.3199,0
+N3,0013,Node 3 north,42.7001,23.3101,0
+N11,0011,Node 11,42.7149,23.3101,0

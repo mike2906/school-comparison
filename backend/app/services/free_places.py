@@ -15,10 +15,14 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timedelta, timezone
+from types import SimpleNamespace
 from typing import Any, Iterable, Optional
 
 import httpx
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.school import School
 from app.scrapers.sources.bg.isodz_school_match import match_school, number_index
 from app.services.admission_cutoffs import school_index
 
@@ -59,6 +63,34 @@ def _entry(group: dict[str, Any], building: Optional[str]) -> Optional[dict[str,
         if free:
             entry[f"free_{queue}"] = free
     return {key: value for key, value in entry.items() if value is not None}
+
+
+async def matchable_schools(db: AsyncSession) -> list[SimpleNamespace]:
+    """What matching needs of each school, and nothing else. A whole ``School`` row carries
+    its admission history and website data (megabytes across the city), and loading every
+    one of them in the request blocked the API long enough to fail #485's deploy check."""
+    rows = await db.execute(
+        select(
+            School.id,
+            School.institutional_id,
+            School.school_type,
+            School.education_level,
+            School.name_i18n,
+            School.attributes["kg_sofia_id"].label("kg_sofia_id"),
+            School.attributes["kg_sofia_ids"].label("kg_sofia_ids"),
+        ).where(School.country_code == "bg")
+    )
+    return [
+        SimpleNamespace(
+            id=row.id,
+            institutional_id=row.institutional_id,
+            school_type=row.school_type,
+            education_level=row.education_level,
+            name_i18n=row.name_i18n,
+            attributes={"kg_sofia_id": row.kg_sofia_id, "kg_sofia_ids": row.kg_sofia_ids},
+        )
+        for row in rows
+    ]
 
 
 def places_by_school(snapshot: dict[str, Any], schools: Iterable[Any]) -> tuple[dict[int, list[dict[str, Any]]], int]:

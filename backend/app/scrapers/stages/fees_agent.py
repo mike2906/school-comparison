@@ -248,6 +248,7 @@ async def _pick(
     spend: Spend,
     prompt: str = PICK_PROMPT,
     stage: str = STAGE,
+    tier: str = "cheap",
 ) -> list[str]:
     if not spend.allows(PICK_COST_ESTIMATE_USD):
         raise SpendCapReached(f"spent ${spend.spent_usd:.4f} of ${spend.cap_usd}")
@@ -255,7 +256,7 @@ async def _pick(
     # One output call: 517/616's picker sent 23 parallel calls that Google ended with an
     # error and OpenRouter returned with no cost or usage.
     agent = create_agent(
-        "cheap",
+        tier,
         prompt,
         Picks,
         retries=1,
@@ -272,14 +273,14 @@ async def _pick(
         with spend.hold(PICK_COST_ESTIMATE_USD):
             result = await execute_billable_request(
                 lambda: agent.run(f"Institution: {name}\n\nRead so far:\n{pages}\n\nLinks:\n{shown}"),
-                model=get_model("cheap"),
+                model=get_model(tier),
                 school_id=school.id,
                 stage=stage,
                 timeout_seconds=60,
             )
     except ProviderResponseUnattributed:
         # Counted at its assumed maximum, as the ledger counts it; the caller falls back to keyword links.
-        spend.spent_usd += request_reserves().get(get_model("cheap"), float(settings.provider_request_reserve_usd))
+        spend.spent_usd += request_reserves().get(get_model(tier), float(settings.provider_request_reserve_usd))
         raise
     spend.spent_usd += extract_provider_cost_usd(result)
     allowed = {url for url, _ in links}
@@ -299,6 +300,7 @@ async def find_pages(
     read_pictures: bool = False,
     must_read: Optional[re.Pattern] = None,
     first_urls: Sequence[str] = (),
+    pick_tier: str = "cheap",
 ) -> list[PageRead]:
     """Up to 3 hops and 12 pages from the home page; robots.txt is respected.
 
@@ -306,8 +308,9 @@ async def find_pages(
     The school-facts stage passes its own link prompt, fallback keywords and stage name, and
     ``must_read``: links whose URL or text it matches are opened ahead of the picker's choices
     and on top of ``MAX_FETCHES`` (``MAX_MUST_READ`` in all), since the picker can fill its
-    places with other pages; and ``first_urls``, same-site pages read right after the home page,
-    also on top (``MAX_FIRST_URLS`` at most): the pages its stored facts came from."""
+    places with other pages; ``first_urls``, same-site pages read right after the home page,
+    also on top (``MAX_FIRST_URLS`` at most): the pages its stored facts came from; and
+    ``pick_tier``, its own model tier for the link picker."""
     from crawl4ai.utils import RobotsParser  # type: ignore
 
     robots = RobotsParser()
@@ -400,7 +403,7 @@ async def find_pages(
         if not unopened:
             break
         try:
-            queue = await _pick(school, read, unopened, spend, pick_prompt, stage)
+            queue = await _pick(school, read, unopened, spend, pick_prompt, stage, pick_tier)
         except ProviderResponseUnattributed as exc:  # an errored pick (517, 616): no cost to read
             logger.warning("%s link pick came back without a cost for school %s: %s", stage, school.id, exc)
             queue = []

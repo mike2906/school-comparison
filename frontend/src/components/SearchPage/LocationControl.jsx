@@ -25,6 +25,9 @@ function LocationControl({
   onAddressInputChange,
   onUseMyLocation,
   onUseSavedHome = null,
+  isHome = false,
+  onSaveAsHome = null,
+  onForgetHome = null,
   onAddressSearch,
   onStartMapPick,
   onClear,
@@ -145,6 +148,25 @@ function LocationControl({
             </div>
           ) : (
             <p className="text-sm text-neutral-600">{t('location.whyShort')}</p>
+          )}
+          {/* The home is kept only when the parent says so (saved on this device). */}
+          {userLocation && isHome && onForgetHome && (
+            <p className="text-sm text-neutral-700">
+              {t('location.isHome')}{' '}
+              <button type="button" onClick={onForgetHome} className="text-neutral-600 underline">{t('location.forgetHome')}</button>
+            </p>
+          )}
+          {userLocation && !isHome && onSaveAsHome && (
+            <div>
+              <button
+                type="button"
+                onClick={onSaveAsHome}
+                className="h-11 w-full rounded-lg border border-neutral-300 px-3 text-sm font-medium text-neutral-800 hover:bg-neutral-50"
+              >
+                {t('location.saveAsHome')}
+              </button>
+              <p className="mt-1 text-xs text-neutral-500">{t('location.saveAsHomeNote')}</p>
+            </div>
           )}
           {onUseSavedHome && (
             <button

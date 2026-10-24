@@ -122,18 +122,24 @@ export function savedVerdictsFor(school, saved, ageGroup, data) {
 }
 
 /**
+ * A "below" with no other way in: not a cut-off ranked under other rules, and no social
+ * priority or SEN places, separate ways in that the cut-off says nothing about.
+ */
+export function isClearlyBelow(verdict) {
+  return verdict.verdict === 'below' && !verdict.lines.some(line => line.otherRules) &&
+    !(verdict.stage === 'kindergarten' && verdict.socialPriority !== false) && !verdict.specialPlaces
+}
+
+/**
  * Ids of the schools where every saved result is below the last admitted child. Schools
  * without a cut-off, with a tie, mixed rounds, a cut-off ranked under other rules or a
  * possible priority path stay listed: only a clear "below" counts.
  */
 export function clearlyBelowIds(schools, saved, ageGroup, data) {
-  const below = verdict => verdict.verdict === 'below' && !verdict.lines.some(line => line.otherRules) &&
-    // Social priority and SEN places are separate ways in that the cut-off says nothing about.
-    !(verdict.stage === 'kindergarten' && verdict.socialPriority !== false) && !verdict.specialPlaces
   const ids = new Set()
   for (const school of schools) {
     const verdicts = savedVerdictsFor(school, saved, ageGroup, data)
-    if (verdicts.length > 0 && verdicts.every(below)) ids.add(school.id)
+    if (verdicts.length > 0 && verdicts.every(isClearlyBelow)) ids.add(school.id)
   }
   return ids
 }

@@ -34,7 +34,7 @@ some picks were trivia, yearly counts go stale, the paragraph only restated the 
    (514 lost 3 key facts from /school-of-arts/ that way): on 2026-10-14, 27 of
    the 40 private Sofia schools with no admissions fact never had their admissions page
    read (172's picker took the pupils' testimonials over /kandidatstvane/).
-2. **Read.** One `pricing`-tier call lists up to 20 facts, each under one fixed topic
+2. **Read.** One `facts`-tier call (Haiku 5.5 on Anthropic's API) lists up to 20 facts, each under one fixed topic
    (`app/utils/school_facts.py` `TOPICS`: curriculum, languages, school_day, class_size,
    meals, transport, activities, facilities, support, admissions), in Bulgarian and English,
    with the page line it came from. Fees, exam results, slogans, news and yearly counts are
