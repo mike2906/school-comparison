@@ -63,7 +63,7 @@ the CARTO dashboard instead.
 **Prerendering** — `npm run build` runs `scripts/prerender.js` after Vite: it writes a real
 HTML file per valid URL and language (title, description, canonical, hreflang, Open Graph,
 a static content block with the school's NVO results, fees, site facts and admission
-rankings), plus `sitemap.xml`, `robots.txt` and the 404 pages. The
+rankings; the district pages list each district's schools), plus `sitemap.xml`, `robots.txt` and the 404 pages. The
 builders are in `src/prerender/pages.js`; school data comes from the public API
 (`PRERENDER_API_URL`). Because a top-level `404.html` ends the host's SPA fallback, **a new
 route needs an entry in `fixedPages`** or it will return 404 in production. Deploys use
