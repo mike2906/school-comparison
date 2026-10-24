@@ -347,6 +347,34 @@ def _names_period(period: PricePeriod, evidence: str, amounts: list[Decimal], ca
     )
 
 
+# A price for one item, not for a stretch of time: "2,30 euro per juice" (555's fresh juice,
+# in a paragraph whose food fee is "paid in one (annual) or two instalments"). Not a person:
+# "€ 500 per child per year" is yearly.
+_PER_ITEM_RE = re.compile(
+    r"^\s*(?:€|eur(?:os?)?\b|евро|лв\.?|лева|bgn)?\s*"
+    r"(?:per\s+(?:a\s+|one\s+)?(?!(?:child|children|student|pupil|person|kid|family)\b)|(?:на|за)\s+(?=брой|бр\.|порция|чаша))"
+    r"(?P<unit>[^\W\d_]+)"
+)
+_CLAUSE_END_RE = re.compile(r"[;|]|\.(?:\s|$)")
+
+
+def _priced_per_item(evidence: str, amounts: list[Decimal]) -> bool:
+    """The amount's own words price one item ("per juice", "за брой"), and the rest of
+    that clause names no period."""
+    wanted = set(amounts)
+    for line in evidence.casefold().splitlines():
+        for _, end, values in number_spans(line):
+            match = _PER_ITEM_RE.match(line[end:]) if values & wanted else None
+            if match is None:
+                continue
+            rest = line[end:]
+            stop = _CLAUSE_END_RE.search(rest, match.end())
+            clause = rest[: stop.start() if stop else len(rest)]
+            if not any(re.search(words, clause) for words in _PERIOD_WORDS.values()):
+                return True
+    return False
+
+
 # A page titled for one period of tuition: 596's PDFs open with "ANNUAL TUITION FEES 2026-2027",
 # and a read that quoted a row without that title lost the period of every tuition in them.
 _TITLE_LINES = 5
@@ -498,6 +526,9 @@ def check_fee(fee: AgentFee, page_text: str) -> CheckedFee:
         period = None
     if period is PricePeriod.ONE_TIME and fee.category is not PriceCategory.REGISTRATION:
         checks.append(f"one_time cleared: not valid for {fee.category.value}")
+        period = None
+    if period is not None and _priced_per_item(evidence, fee_amounts(fee)):
+        checks.append(f"period {period.value} cleared: the amount is priced per item")
         period = None
     if period is not None and fee.amount is not None and _is_first_instalment(evidence, fee_amounts(fee)[0]):
         checks.append(f"period {period.value} cleared: first instalment of '1 x A + N x B'")

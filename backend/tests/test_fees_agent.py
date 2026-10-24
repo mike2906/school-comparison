@@ -353,6 +353,36 @@ def test_quarter_term_and_semester_need_their_words():
     assert semester.fee.period is PricePeriod.SEMESTER
 
 
+LINE_555_FOOD = (
+    "food fee is calculated and paid separately from the annual tuition fee and is in the amount of 13,90 euro per "
+    "day. The fee is paid in one (annual) or two instalments (prior to the beginning of each term). The parents can "
+    "request the addition of fresh juice once per day with the afternoon snack, the cost is 2,30 euro per juice."
+)
+
+
+def test_a_price_per_item_has_no_period():
+    juice = check_fee(fee(PriceCategory.FOOD, LINE_555_FOOD, amount=Decimal("2.30"), period=PricePeriod.YEARLY), LINE_555_FOOD)
+    assert juice.kept and juice.fee.period is None
+    assert "period yearly cleared: the amount is priced per item" in juice.checks
+    food = check_fee(fee(PriceCategory.FOOD, LINE_555_FOOD, amount=Decimal("13.90"), period=PricePeriod.DAILY), LINE_555_FOOD)
+    assert food.fee.period is PricePeriod.DAILY
+
+
+@pytest.mark.parametrize(
+    ("line", "amount", "period", "kept"),
+    [
+        ("€ 500 per child per year", 500, PricePeriod.YEARLY, True),  # a person, then the period
+        ("Tuition: € 9 000 per year", 9000, PricePeriod.YEARLY, True),
+        ("Учебни тетрадки: 3 евро за брой, годишно", 3, PricePeriod.YEARLY, True),  # the clause names it
+        ("Учебни тетрадки годишно: 3 евро за брой", 3, PricePeriod.YEARLY, False),
+        ("Swimming: € 20 per lesson, booked monthly", 20, PricePeriod.MONTHLY, True),
+    ],
+)
+def test_a_per_item_price_keeps_a_period_its_clause_names(line, amount, period, kept):
+    result = check_fee(fee(PriceCategory.EXTRACURRICULAR, line, amount=amount, period=period), line)
+    assert (result.fee.period is period) is kept
+
+
 # ---------------------------------------------------------------------------------------
 # Number normalisation
 # ---------------------------------------------------------------------------------------
@@ -533,16 +563,117 @@ async def test_apply_replaces_only_the_years_it_read(db_session, pages, frozen_t
     assert rows[0].pricing_context == {"confidence": 0.9} and rows[2].pricing_context["extractor"] == "agent"
 
 
+def _counting(fees):
+    calls = []
+
+    async def read(school, pages, missed):
+        calls.append([page.url for page in pages])
+        return fees
+
+    return read, calls
+
+
 async def test_page_another_stage_ruled_invalid_keeps_the_old_rows(db_session, pages, frozen_today):
+    school = await _school(db_session)
+    school.scrape_status = "failed_validate"  # e.g. the shared-site check withheld the site
+    await _old_rows(db_session, school, "2025/2026", [650])
+    page = (await db_session.execute(select(SourcePage))).scalar_one()
+    page.is_valid = False
+    await db_session.commit()
+    read, calls = _counting(FEES_STAGE)
+    report = await fees_agent.run_school(db_session, school, find=_find(pages), read=read, apply=True)
+    assert report["outcome"] == "kept_old_rows" and "ruled invalid" in report["reason"]
+    assert calls == []  # nothing is paid for a read that cannot be used
+    assert [float(r.amount) for r in await _rows(db_session, school)] == [650.0]
+    assert page.is_valid is False
+
+
+async def test_a_ruled_out_page_does_not_hold_back_the_schools_other_price_pages(db_session, frozen_today):
+    # 574: its site is the /anika/ section of a shared domain; a page outside it stays ruled out.
+    school = await _school(db_session)
+    school.website_url = "https://school.example/anika/"
+    other = "https://school.example/pbk/ceni/"
+    own = "https://school.example/anika/ceni/"
+    db_session.add(
+        SourcePage(school_id=school.id, scrape_type=ScrapeType.WEBSITE, source_url=other, content_hash="x", is_valid=False)
+    )
+    await db_session.commit()
+    found = [PageRead(other, "Месечна такса: 990 евро", True), PageRead(own, PAGE_STAGE, True)]
+    fees = [f.model_copy(update={"source_url": own}) for f in FEES_STAGE]
+    read, calls = _counting(fees)
+    report = await fees_agent.run_school(db_session, school, find=_find(found), read=read, apply=True)
+    assert calls == [[own]]
+    assert report["pages_ruled_out"] == [other] and report["outcome"] == "written", report
+    assert {r.source_url for r in await _rows(db_session, school)} == {own}
+
+
+async def test_a_verdict_the_fresh_fetch_outlived_is_lifted(db_session, pages, frozen_today):
+    # 574: a site replace left /anika/ruled out after check-website gave the section back.
     school = await _school(db_session)
     await _old_rows(db_session, school, "2025/2026", [650])
     page = (await db_session.execute(select(SourcePage))).scalar_one()
-    page.is_valid = False  # e.g. the shared-site check found the site belongs to another school
+    page.is_valid = False
     await db_session.commit()
     report = await fees_agent.run_school(db_session, school, find=_find(pages), read=_read(FEES_STAGE), apply=True)
-    assert report["outcome"] == "kept_old_rows" and "ruled invalid" in report["reason"]
-    assert [float(r.amount) for r in await _rows(db_session, school)] == [650.0]
+    assert report["outcome"] == "written" and report["pages_revalidated"] == [URL], report
+    assert page.is_valid is True
+    rows = await _rows(db_session, school)
+    assert [(r.academic_year, float(r.amount)) for r in rows] == [("2025/2026", 650.0), ("2026/2027", 200.0), ("2026/2027", 700.0)]
+    assert all(r.source_page_id == page.id for r in rows)
+
+
+async def test_a_dry_run_lifts_no_verdict(db_session, pages, frozen_today):
+    school = await _school(db_session)
+    await _old_rows(db_session, school, "2025/2026", [650])
+    page = (await db_session.execute(select(SourcePage))).scalar_one()
+    page.is_valid = False
+    await db_session.commit()
+    report = await fees_agent.run_school(db_session, school, find=_find(pages), read=_read(FEES_STAGE))
+    assert report["outcome"] == "would_write" and report["pages_revalidated"] == [URL]
+    await db_session.refresh(page)
     assert page.is_valid is False
+
+
+@pytest.mark.parametrize(
+    ("change", "text"),
+    [
+        ({"attributes": {"website_data_withheld": True}}, PAGE_STAGE),
+        ({"scrape_status": "pending"}, PAGE_STAGE),
+        ({}, PAGE_STAGE + "\nChecking your browser before accessing school.example"),
+    ],
+)
+async def test_a_verdict_stands_without_an_accepted_site_or_on_a_bot_check(db_session, frozen_today, change, text):
+    from app.utils.website_data import WEBSITE_DATA_WITHHELD_KEY
+
+    school = await _school(db_session)
+    for name, value in change.items():
+        if name == "attributes":
+            value = {WEBSITE_DATA_WITHHELD_KEY: True}
+        setattr(school, name, value)
+    await _old_rows(db_session, school, "2025/2026", [650])
+    page = (await db_session.execute(select(SourcePage))).scalar_one()
+    page.is_valid = False
+    await db_session.commit()
+    found = [PageRead(HOME, "Начало", False), PageRead(URL, text, True)]
+    report = await fees_agent.run_school(db_session, school, find=_find(found), read=_read(FEES_STAGE), apply=True)
+    assert report["outcome"] == "kept_old_rows" and "ruled invalid" in report["reason"]
+    assert page.is_valid is False
+
+
+async def test_a_page_stored_twice_is_matched_to_its_valid_copy(db_session, pages, frozen_today):
+    # 199: /taksi/ stored twice; the invalid copy held the school back while its rows showed.
+    school = await _school(db_session)
+    school.scrape_status = "failed_validate"  # no verdict is lifted: only the copy chosen counts
+    await _old_rows(db_session, school, "2026/2027", [700])
+    db_session.add(
+        SourcePage(school_id=school.id, scrape_type=ScrapeType.WEBSITE, source_url=URL.replace("https", "http"),
+                   content_hash="x", is_valid=False)
+    )  # fmt: skip
+    await db_session.commit()
+    report = await fees_agent.run_school(db_session, school, find=_find(pages), read=_read(FEES_STAGE), apply=True)
+    assert report["outcome"] == "written", report
+    valid = (await db_session.execute(select(SourcePage).where(SourcePage.source_url == URL))).scalar_one()
+    assert {r.source_page_id for r in await _rows(db_session, school)} == {valid.id}
 
 
 async def test_page_with_an_unsettled_verdict_keeps_the_published_rows(db_session, pages, frozen_today):
@@ -587,6 +718,23 @@ async def test_fewer_than_half_the_published_rows_keeps_the_old_rows(db_session,
     assert (await fees_agent.run_school(db_session, school, find=_find(pages), read=_read(two_fees), apply=True))[
         "outcome"
     ] == "written"
+
+
+async def test_rows_rule_6_keeps_do_not_count_against_a_read(db_session, frozen_today):
+    # 300: the read gave each fee once and left out the instalment rows the page still shows.
+    # Those stay; set against every published row, the read was held, new fee and all.
+    school = await _school(db_session)
+    instalments = [2090, 2170, 2280, 2335, 4100, 4260]
+    page_text = PAGE_STAGE + "\n" + "\n".join(f"вноска: {a} евро" for a in instalments)
+    await _old_rows(db_session, school, "2026/2027", instalments)
+    page = (await db_session.execute(select(SourcePage))).scalar_one()
+    page.raw_markdown = page_text
+    await db_session.commit()
+    found = [PageRead(HOME, "Начало", False), PageRead(URL, page_text, True)]
+    report = await fees_agent.run_school(db_session, school, find=_find(found), read=_read(FEES_STAGE), apply=True)
+    assert report["outcome"] == "written", report
+    assert (report["rows_new_publishable"], report["rows_old_published"], report["rows_old_removed"]) == (2, 6, 0)
+    assert sorted(float(r.amount) for r in await _rows(db_session, school)) == [200.0, 700.0, *map(float, instalments)]
 
 
 async def test_a_read_with_nothing_publishable_keeps_the_old_rows(db_session, pages, frozen_today):

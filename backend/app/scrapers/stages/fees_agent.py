@@ -64,6 +64,8 @@ from app.scrapers.extraction.agent_fees import (
     read_amounts,
 )
 from app.scrapers.fee_pages import fee_http_client, page_key, pdf_text
+from app.scrapers.navigator import WebsiteNavigator
+from app.scrapers.page_content import is_parked_domain
 from app.scrapers.price_evidence import _PRICE_RE, PriceRow, _amount_key
 from app.scrapers.shared_site_check import registrable_domain
 from app.scrapers.stages import common as stage_common
@@ -82,7 +84,7 @@ from app.services.provider_costs import (
 )
 from app.utils.academic_year import current_academic_year, normalize_academic_year
 from app.utils.display_gating import _BGN_PER_EUR, blocked_pricing_row_ids, pricing_row_is_publishable
-from app.utils.website_data import prepare_validation_rollover
+from app.utils.website_data import SITE_ACCEPTED_STATUSES, WEBSITE_DATA_WITHHELD_KEY, prepare_validation_rollover
 
 logger = logging.getLogger(__name__)
 
@@ -181,6 +183,17 @@ def _same_site(url: str, site: str) -> bool:
     host = (urlparse(site).hostname or "").lower().removeprefix("www.")
     name, home_name = domain.split(".", 1)[0], home.split(".", 1)[0]
     return host == home and len(home_name) >= 5 and name == home_name
+
+
+def _on_home_host(url: str, site: str) -> Optional[str]:
+    """The same page on the school's own host, for a link to its sister domain; None for a
+    link on the school's own domain. 552's home on meridian22.org links every school's
+    pages on meridian22.bg, a domain that no longer resolves (2026-10-24), while
+    meridian22.org serves the same paths."""
+    if registrable_domain(url) == registrable_domain(site):
+        return None
+    home = urlparse(site)
+    return urlparse(url)._replace(scheme=home.scheme or "https", netloc=home.netloc, fragment="").geturl()
 
 
 async def _fetch(
@@ -329,7 +342,8 @@ async def find_pages(
             and not unquote(urlparse(url).path).lower().endswith(_SKIPPED)  # a fee picture's address
         )
     )[:MAX_FIRST_URLS]
-    queue = [site, *first]
+    # A fragment names a spot on the page, not a page: 574's "/anika/#dipipopup-27586290".
+    queue = [urldefrag(site)[0], *first]
     pictures: list[tuple[str, str, str]] = []
     picture_pages: list[PageRead] = []  # read after the pages, so they take none of the page slots
     must_left = MAX_MUST_READ
@@ -349,10 +363,13 @@ async def find_pages(
             if not await robots.can_fetch(url, CRAWLER_USER_AGENT):
                 read.append(PageRead(url, "", False, "robots.txt"))
                 continue
+            twin = _on_home_host(url, site)
             try:
                 final, text, page_links, page_pictures = await _fetch(crawler, run_config, client, url)
             except Exception as exc:  # a failed page is recorded and skipped
                 read.append(PageRead(url, "", False, str(exc)[:120]))
+                if twin and page_key(twin) not in seen:
+                    queue.append(twin)
                 continue
             if page_key(final) != page_key(url) and page_key(final) in seen:
                 continue  # a second link to a page already read (often a percent-encoded redirect)
@@ -367,6 +384,8 @@ async def find_pages(
                 api_text = await _wordpress_text(client, final)
                 wordpress = api_text is not None
                 text = api_text or text
+            if twin and not text.strip() and page_key(twin) not in seen:
+                queue.append(twin)  # read in this hop, after the pages already queued
             read.append(PageRead(final, text, bool(_PRICE_RE.search(text))))
             if read_pictures:
                 for picture in page_pictures:
@@ -608,8 +627,58 @@ def _store_discounts(school: School, report: dict[str, Any]) -> None:
     school.attributes = {**(school.attributes or {}), "fee_discounts": block}
 
 
-def _new_source_page(school: School, page: PageRead, stored: Optional[SourcePage], new_id: int) -> SourcePage:
-    """A stand-in for the page; a stored page keeps its id and its validity verdict."""
+def _stored_by_key(stored_pages: Iterable[SourcePage]) -> dict[tuple, SourcePage]:
+    """The school's stored website pages by ``page_key``, so a trailing slash, scheme or
+    fragment difference finds the stored page. When several rows share a key, a valid one
+    wins, then an unsettled one: 199's /taksi/ is stored twice, and the invalid copy held
+    the whole school back while its rows showed from the valid one."""
+    rank = {True: 0, None: 1, False: 2}
+    stored: dict[tuple, SourcePage] = {}
+    for page in stored_pages:
+        if page.scrape_type != ScrapeType.WEBSITE:
+            continue
+        key = page_key(page.source_url)
+        if key not in stored or rank[page.is_valid] < rank[stored[key].is_valid]:
+            stored[key] = page
+    return stored
+
+
+def _under_site(url: str, site: str) -> bool:
+    """The page is on the school's site and, for a site that is a section of a shared
+    domain (574's novigradini.com/anika/), under that section."""
+    section = unquote(urlparse(site).path).strip("/").casefold()
+    path = unquote(urlparse(url).path).strip("/").casefold()
+    return _same_site(url, site) and (not section or path == section or path.startswith(section + "/"))
+
+
+def _verdict_outlived(school: School, page: PageRead) -> bool:
+    """A stored page another stage ruled invalid that this fetch shows to be the school's
+    price page again: the school's site is one validation accepted, with no withholding
+    marker, the page is under it, and today's text shows prices and is neither a bot check
+    nor a parked domain. The verdicts stored as ``is_valid = False`` are about a site or a
+    fetch that has since changed (an empty page at navigation, a host that failed
+    validation before a person gave it back with ``check-website``, the pages a site
+    replace left behind): none is lifted by anything else, so 574's own section stayed
+    ruled out after ``check-website --replace --section`` gave it back.
+    """
+    attrs = school.attributes if isinstance(school.attributes, dict) else {}
+    lowered = page.text.casefold()
+    return bool(
+        school.website_url
+        and (school.scrape_status or "") in SITE_ACCEPTED_STATUSES
+        and not attrs.get(WEBSITE_DATA_WITHHELD_KEY)
+        and _under_site(page.url, school.website_url)
+        and page.prices
+        and not any(marker in lowered for marker in WebsiteNavigator.BOT_PROTECTION_TEXT_MARKERS)
+        and not is_parked_domain(page.text)
+    )
+
+
+def _new_source_page(
+    school: School, page: PageRead, stored: Optional[SourcePage], new_id: int, *, revalidated: bool = False
+) -> SourcePage:
+    """A stand-in for the page; a stored page keeps its id and its validity verdict, unless
+    this fetch outlived it (``revalidated``)."""
     now = text_values._utcnow_naive()
     return SourcePage(
         id=stored.id if stored else new_id,
@@ -619,7 +688,8 @@ def _new_source_page(school: School, page: PageRead, stored: Optional[SourcePage
         content_hash=hashlib.sha256(page.text.encode()).hexdigest(),
         page_category="pricing" if page.prices else None,
         raw_markdown=page.text,
-        is_valid=stored.is_valid if stored else True,  # an unsettled verdict keeps its rows withheld
+        # An unsettled verdict keeps its rows withheld.
+        is_valid=True if revalidated or stored is None else stored.is_valid,
         last_scraped_at=now,
         last_changed_at=now,
         scrape_count=1,
@@ -820,7 +890,10 @@ async def _upsert_pages(db: AsyncSession, pages: dict[str, SourcePage], stored: 
             continue
         if existing.content_hash != new.content_hash:
             existing.content_hash, existing.last_changed_at = new.content_hash, new.last_changed_at
-        # Validity stays as other stages set it; run_school skips pages they ruled out.
+        # Validity stays as other stages set it, unless this fetch outlived their verdict
+        # (run_school leaves out the pages they ruled out otherwise).
+        if new.is_valid is True and existing.is_valid is False:
+            existing.is_valid = True
         existing.raw_markdown, existing.last_scraped_at = new.raw_markdown, new.last_scraped_at
         existing.scrape_count = (existing.scrape_count or 0) + 1
         existing.page_category = new.page_category or existing.page_category
@@ -1235,8 +1308,7 @@ async def run_school(
     report["pages"] = [{"url": p.url, "chars": len(p.text), "prices": p.prices, "note": p.note} for p in pages]
     # A known page keeps its id; a new one gets a negative placeholder until ``apply`` stores it.
     stored_pages = (await db.execute(select(SourcePage).where(SourcePage.school_id == school.id))).scalars().all()
-    # Matched by page_key so a trailing slash or encoding difference finds the stored page.
-    stored = {page_key(page.source_url): page for page in stored_pages if page.scrape_type == ScrapeType.WEBSITE}
+    stored = _stored_by_key(stored_pages)
     # A price page the finder did not reach may be gone: 538's old fees address answers 404 and
     # its last-year rows stayed beside the new ones. Marked invalid, its rows stop being published
     # and the keep rule no longer holds them. A dry run only reports it.
@@ -1264,20 +1336,39 @@ async def run_school(
         report["outcome"] = "kept_old_rows"
         report["reason"] = "no page showing prices"
         return report
+    # A page another stage ruled out is left out of the read, before it is paid for; the
+    # school's other price pages are still read (574's home page held back /anika/ceni/).
+    # A verdict the fresh fetch has outlived is lifted instead (_verdict_outlived).
+    ruled_out: list[str] = []
+    revalidated: set[tuple] = set()
+    for page in priced:
+        known = stored.get(page_key(page.url))
+        if known is None or known.is_valid is not False:
+            continue
+        if _verdict_outlived(school, page):
+            revalidated.add(page_key(page.url))
+        else:
+            ruled_out.append(page.url)
+    if revalidated:
+        report["pages_revalidated"] = [page.url for page in priced if page_key(page.url) in revalidated]
+    if ruled_out:
+        report["pages_ruled_out"] = ruled_out
+        priced = [page for page in priced if page.url not in ruled_out]
+        if not priced:
+            report["outcome"] = "kept_old_rows"
+            report["reason"] = f"page ruled invalid by an earlier stage: {ruled_out[0]}"
+            return report
 
     fees = await read(school, priced, ())
     # The first read's; a reread only adds fees. None (a reader that gives no discounts)
     # leaves the stored ones alone; an empty list means the pages offer none now.
     discounts = getattr(fees, "discounts", None)
-    ruled_out = [page.url for page in priced if getattr(stored.get(page_key(page.url)), "is_valid", None) is False]
-    if ruled_out:
-        report["outcome"] = "kept_old_rows"
-        report["reason"] = f"page ruled invalid by an earlier stage: {ruled_out[0]}"
-        return report
     source_pages = {
-        page.url: _new_source_page(school, page, stored.get(page_key(page.url)), -(index + 1))
+        page.url: _new_source_page(
+            school, page, stored.get(page_key(page.url)), -(index + 1), revalidated=page_key(page.url) in revalidated
+        )
         for index, page in enumerate(pages)
-        if page.text.strip()
+        if page.text.strip() and page.url not in ruled_out
     }
     # The reader can stop part way down a fee table: at 170 it gave the same 5 of 14 fees in
     # three runs. When the pages still show amounts the published rows have and the read left
@@ -1374,14 +1465,9 @@ async def run_school(
         "rows_old_published": len(published_before),
     }
 
-    # A thin or failed read must not wipe good prices or make them flicker.
-    if not publishable or 2 * len(publishable) < len(published_before):
+    if not publishable:
         report["outcome"] = "kept_old_rows"
-        report["reason"] = (
-            "nothing publishable read"
-            if not publishable
-            else f"{len(publishable)} publishable rows against {len(published_before)} published"
-        )
+        report["reason"] = "nothing publishable read"
         return report
 
     # Old rows the read would lose (a fee it missed, a period it dropped) stay, instead of
@@ -1393,6 +1479,16 @@ async def run_school(
         publishable,
         [(category, amount) for category, _, amount in listed],
     )
+    # A thin or failed read must not wipe good prices or make them flicker. Counted against
+    # the published rows the write would remove: the rows rule 6 keeps stay published. 300's
+    # read gave 25 fees and left out its instalment rows, which the page still shows and so
+    # stay; set against all 62, the read was held, and with it the new 8 800 tuition.
+    removed = [row for row in published_before if row not in kept]
+    report["rows_old_removed"] = len(removed)
+    if 2 * len(publishable) < len(removed):
+        report["outcome"] = "kept_old_rows"
+        report["reason"] = f"{len(publishable)} publishable rows against {len(removed)} published rows it would remove"
+        return report
     if kept:  # by amount alone: a refiled category or currency is still the same fee
         superseded = [row for row in superseded if row not in kept]
         pairs = [(row, source) for row, source in zip(rows, sources) if _amount_group(row) not in kept_amounts]
