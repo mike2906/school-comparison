@@ -238,14 +238,14 @@ schools state their start in a school-day fact ("първа смяна от 7:30
 - No start comes from a timetable line whose hours were lost on the page ("00 – 08.35 08.55
   – 09.30", 19 СУ: the reader took the second lesson for the first), at read time or when
   shown (`app/utils/school_start.py` `garbled`). Code keeps a time only when the named fact writes it and it is
-  between 07:00 and 14:00 (the timetable keeps trips to 14:00). Stored in the facts block as `start_times`, each with its fact.
+  between 07:00 and 14:00, and checks again when shown; a list of grades is no time ("за 1, 2, 9, 10
+  клас" gave НМУ a 09:10 start in the refill) (the timetable keeps trips to 14:00). Stored in the facts block as `start_times`, each with its fact.
 - `school-start` fills them in from stored facts without reading the sites
   (`--apply` to store, `--all` to redo every school): about $0.0005 a school.
 - First fill 2026-10-24 (published 08:49 UTC): 74 schools, $0.016. Against the schools' own
   pages: 15 of 17 checked right; 19 СУ wrong (lost hours, above), НМУ's 1-4 band held two
   shifts (now first grade). 7 of ~80 schools answered differently between two runs.
-  Times stored before the first-grade keys keep the old meaning until `school-start --city
-  sofia --all --apply` and a publish refill them.
+  Refill with the first-grade keys published 2026-10-24 11:21 UTC: 73 schools, $0.016.
 - The list response's `start_times` (`{band: "HH:MM"}`, `app/utils/school_start.py`) shows a
   time only while its fact shows. A failed call stores the facts without start times.
 

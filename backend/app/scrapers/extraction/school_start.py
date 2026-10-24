@@ -13,13 +13,12 @@ shift's start (``EARLIEST``-``LATEST``). Publication: ``app/utils/school_start.p
 
 from __future__ import annotations
 
-import re
 from collections.abc import Awaitable, Callable, Mapping, Sequence
-from typing import Any, Literal, Optional
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
-from app.utils.school_start import garbled
+from app.utils.school_start import clock_times, garbled, written
 
 BANDS = ("preschool", "grade_1_4", "grade_5_7", "grade_8_12")
 EARLIEST = "07:00"
@@ -56,14 +55,6 @@ class Starts(BaseModel):
 
 Caller = Callable[[str, type, str, int], Awaitable[Any]]
 
-# "7:30", "07.30", "7,30 ч.", "8.00"; not part of a date ("01.09.2026") or a longer number.
-_TIME_RE = re.compile(r"(?<![\d.:,])([01]?\d|2[0-3])\s?[.:,]\s?([0-5]\d)(?![\d]|[.:,]\d)")
-
-
-def clock_times(text: Optional[str]) -> set[str]:
-    """Every clock time ``text`` writes, as HH:MM."""
-    return {f"{int(h):02d}:{m}" for h, m in _TIME_RE.findall(text or "")}
-
 
 def day_facts(facts: Sequence[Any]) -> list[Mapping[str, Any]]:
     """The stored school-day facts that write a clock time."""
@@ -72,14 +63,9 @@ def day_facts(facts: Sequence[Any]) -> list[Mapping[str, Any]]:
         for fact in facts
         if isinstance(fact, Mapping)
         and fact.get("topic") == "school_day"
-        and clock_times(_written(fact))
+        and clock_times(written(fact))
         and not garbled(fact.get("quote"))
     ]
-
-
-def _written(fact: Mapping[str, Any]) -> str:
-    text = fact.get("text_i18n") if isinstance(fact.get("text_i18n"), Mapping) else {}
-    return "\n".join(str(part) for part in (fact.get("quote"), text.get("bg"), text.get("en")) if part)
 
 
 def message(facts: Sequence[Mapping[str, Any]]) -> str:
@@ -103,7 +89,7 @@ def checked(answer: Starts, facts: Sequence[Mapping[str, Any]]) -> dict[str, dic
         if len(times) != 1:
             continue
         time = times.pop()
-        if time in clock_times(_written(fact)) and EARLIEST <= time <= LATEST:
+        if time in clock_times(written(fact)) and EARLIEST <= time <= LATEST:
             kept[start.band] = {"time": time, "fact_bg": str((fact.get("text_i18n") or {}).get("bg") or "")}
     return kept
 
