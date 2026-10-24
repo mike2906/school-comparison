@@ -14,6 +14,14 @@ from app.utils.school_facts import ATTRIBUTE_KEY
 
 START_TIMES_KEY = "start_times"
 _HHMM_RE = re.compile(r"^(?:[01]\d|2[0-3]):[0-5]\d$")
+# A timetable row whose hours were lost on the page: "00 – 08.35 | 08.55 – 09.30" (19 СУ). The
+# reader then takes the second lesson for the first: no start time comes from such a line.
+_LOST_HOUR_RE = re.compile(r"(?<![\d.:,])\d{2}\s?[–—-]\s?\d{1,2}[.:,]\d{2}(?!\d)")
+
+
+def garbled(quote: Any) -> bool:
+    """The page line is a timetable with lost hours (``_LOST_HOUR_RE``)."""
+    return isinstance(quote, str) and bool(_LOST_HOUR_RE.search(quote))
 
 
 def shown_start_times(attributes: Any, shown_facts: Optional[Mapping[str, Any]]) -> Optional[dict[str, str]]:
@@ -25,11 +33,17 @@ def shown_start_times(attributes: Any, shown_facts: Optional[Mapping[str, Any]])
     starts = block.get(START_TIMES_KEY) if isinstance(block, Mapping) else None
     if not isinstance(starts, Mapping):
         return None
+    # Stored before the lost-hours check: the stored quote decides here too.
+    lost = {
+        (fact.get("text_i18n") or {}).get("bg")
+        for fact in block.get("facts") or []
+        if isinstance(fact, Mapping) and garbled(fact.get("quote"))
+    }
     shown = {
         (fact.get("text_i18n") or {}).get("bg")
         for fact in shown_facts.get("facts") or []
         if isinstance(fact, Mapping) and fact.get("topic") == "school_day"
-    }
+    } - lost
     times = {
         band: start["time"]
         for band, start in starts.items()

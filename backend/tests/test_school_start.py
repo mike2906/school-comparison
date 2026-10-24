@@ -131,3 +131,29 @@ async def test_the_list_shows_the_start_times_of_shown_facts(seeded_db, seeded_c
     listed = next(row for row in rows if row["id"] == school.id)
     assert listed["start_times"] == {"grade_1_4": "07:30"}
     assert "fact_bg" not in str(listed) and all("start_times" in row for row in rows)
+
+
+@pytest.mark.parametrize(
+    ("quote", "lost"),
+    [
+        ("I и II клас 00 – 08.35 08.55 – 09.30 09.40 – 10.15 25 – 11.00", True),  # 19 СУ's page
+        ("1. 8.00 – 8.35 2. 8.45 – 9.20", False),
+        ("първа смяна от 7:30 до 13:10, втора смяна 13:50 – 19:30", False),
+        ("1-2 7:30 – 8:50 /1. 7:30 – 8:10/", False),
+        ("Прием 2026/2027 – 8:00 ч.", False),
+    ],
+)
+def test_a_timetable_line_with_lost_hours_gives_no_start(quote, lost):
+    from app.utils.school_start import garbled
+
+    assert garbled(quote) is lost
+    facts = [_fact("I и II клас: учебните часове са от 08:55 до 12:25", quote=quote + " 08:55")]
+    answer = Starts(starts=[Start(band="grade_1_4", time="08:55", fact=1)])
+    assert bool(checked(answer, facts)) is not lost
+
+
+def test_a_start_stored_before_the_lost_hours_check_is_not_shown():
+    bg = "I и II клас: учебните часове са от 08:55 до 12:25"
+    fact = _fact(bg, quote="I и II клас 00 – 08.35 08.55 – 09.30")
+    attrs = {"school_facts": _block([fact], start_times={"grade_1_4": {"time": "08:55", "fact_bg": bg}})}
+    assert shown_start_times(attrs, publishable_school_facts(attrs, HOME)) is None
