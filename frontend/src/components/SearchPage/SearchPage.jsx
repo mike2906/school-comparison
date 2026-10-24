@@ -65,7 +65,8 @@ import { locationForAgeGroup, locationsForAgeGroup } from '../../utils/schoolLoc
 import { useDriveTimes } from '../../routing/useDriveTimes'
 import DriveTimeNote from '../../routing/DriveTimeNote'
 import { useFreePlaces } from '../../hooks/useFreePlaces'
-import { childFreePlacesBySchool } from '../../utils/freePlaces'
+import { childFreePlacesBySchool, freePlacesFilterApplies, hasFreePlaceToday } from '../../utils/freePlaces'
+import FreePlacesToggle from './FreePlacesToggle'
 
 const TYPE_SORT_ORDER = {
   state: 0,
@@ -636,11 +637,21 @@ function SearchPage() {
   )
   const searchHits = useSearchHits(nameQuery, !nameMatchesHere)
   useReportSearchMiss(nameQuery, !nameMatchesHere)
-  const matchingSchools = useMemo(() => {
+  const nearMatchingSchools = useMemo(() => {
     return filterByName(schoolsWithDrive, nameQuery, searchHits).filter(school => (
       !distanceLimit || (typeof school.distance === 'number' && school.distance <= distanceLimit)
     ))
   }, [schoolsWithDrive, distanceLimit, nameQuery, searchHits])
+  // "Only with a free place today", once there is today's snapshot for the child's group.
+  const freePlacesFilterOn = freePlacesFilterApplies(filters, freePlacesById)
+  const freePlaceCount = useMemo(
+    () => nearMatchingSchools.filter(school => !hiddenBelow.has(school.id) && hasFreePlaceToday(freePlacesById, school.id)).length,
+    [nearMatchingSchools, hiddenBelow, freePlacesById]
+  )
+  const matchingSchools = useMemo(
+    () => (freePlacesFilterOn ? nearMatchingSchools.filter(school => hasFreePlaceToday(freePlacesById, school.id)) : nearMatchingSchools),
+    [nearMatchingSchools, freePlacesFilterOn, freePlacesById]
+  )
   const filteredSchools = useMemo(
     () => (hiddenBelow.size ? matchingSchools.filter(school => !hiddenBelow.has(school.id)) : matchingSchools),
     [matchingSchools, hiddenBelow]
@@ -1311,6 +1322,15 @@ function SearchPage() {
                     </p>
                   )}
                 </div>
+
+                {freePlacesById.size > 0 && (
+                  <FreePlacesToggle
+                    active={freePlacesFilterOn}
+                    count={freePlaceCount}
+                    birthYear={filters.birthYear}
+                    onChange={freePlacesOnly => handleFilterChange({ freePlacesOnly })}
+                  />
+                )}
 
                 {searchInBounds && !loading && (
                   <p className="text-xs text-neutral-500">

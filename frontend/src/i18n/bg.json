@@ -1313,7 +1313,9 @@
     "childRanked_one": "{{count}} класирано, още незаписано",
     "childRanked_other": "{{count}} класирани, още незаписани",
     "inBuildings_one": "(в {{count}} от {{total}} сгради)",
-    "inBuildings_other": "(в {{count}} от {{total}} сгради)"
+    "inBuildings_other": "(в {{count}} от {{total}} сгради)",
+    "filter_one": "Само със свободно място днес ({{count}})",
+    "filter_other": "Само със свободно място днес ({{count}})"
   },
   "myChild": {
     "title": "Възможностите за моето дете",

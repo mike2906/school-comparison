@@ -28,6 +28,8 @@ export function readFiltersFromUrl(params) {
     specialPrograms: getParamList('special_programs'),
     facilities: getParamList('facilities'),
     teachingApproach: getParamList('teaching_approach'),
+    // Only schools with a free place today for the child's birth year (docs/FREE_PLACES.md).
+    freePlacesOnly: params.get('free_places') === 'true',
   }
 }
 
@@ -86,6 +88,13 @@ export function filterSearchParams(searchParams, newFilters, nextFilters) {
       params.set('include_crossover', 'true')
     } else {
       params.delete('include_crossover')
+    }
+  }
+  if (newFilters.freePlacesOnly !== undefined) {
+    if (newFilters.freePlacesOnly) {
+      params.set('free_places', 'true')
+    } else {
+      params.delete('free_places')
     }
   }
   if (nextFilters.ageGroup === 'preschool' && !nextFilters.includeCrossover && nextFilters.educationLevel) {
