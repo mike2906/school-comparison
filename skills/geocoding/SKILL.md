@@ -142,7 +142,9 @@ run's publish and `recover-failed-urls` looks for the real site. When search doe
 `cli check-website --school-id N --url <site>` runs the same checks on a site you know (dry
 run; `--apply` stores it only if valid, and the school starts clean: the withholding marker
 an earlier failed site left, which would hide its facts, goes with that site's pages and the
-old Stage 6 report). Private schools with no site are searched for by `find-websites`
+old Stage 6 report). A school whose site spells its name otherwise (303 "Детски оазис" is
+Kinderoase) takes `--alias <name>` (repeatable): it counts in the name checks and is kept in
+`name_aliases` with the stored site. Private schools with no site are searched for by `find-websites`
 (below). A school whose accepted site is wrong (587, a
 kindergarten on its sibling school's drujba.org) takes `--replace --apply`: the old site's
 pages, site-copied addresses and extraction are dropped as in the shared-site check's

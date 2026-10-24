@@ -286,3 +286,26 @@ async def test_a_given_site_keeps_its_facts_when_nothing_was_withheld(db_session
 
     await db_session.refresh(school)
     assert "school_facts" in school.attributes and "social_links" in school.attributes
+
+
+async def test_an_alias_counts_in_the_check_and_is_kept_with_the_site(db_session):
+    """303 "Детски оазис" calls itself Kinderoase on its site."""
+    school = School(
+        country_code="bg", city="sofia", name_i18n={"bg": '"ЧАСТНА ДЕТСКА ГРАДИНА ДЕТСКИ ОАЗИС" ЕООД'},
+        school_type="private", education_level="kindergarten", scrape_status="no_official_website",
+        attributes={"name_aliases": ["Детски оазис"]},
+    )
+    db_session.add(school)
+    await db_session.commit()
+
+    validate = AsyncMock(return_value=(ValidationResult.VALID, "https://kinderoase.eu/", "match"))
+    with patch.object(url_validator, "validate_school_url", validate), patch.object(
+        url_validator, "_update_validation_result", AsyncMock()
+    ):
+        await website_stage.run_validate_url(
+            db_session, school.id, "bg", url="https://kinderoase.eu/", apply=True, aliases=("Kinderoase", "детски ОАЗИС")
+        )
+
+    assert "Kinderoase" in validate.await_args.kwargs["school_aliases"]
+    await db_session.refresh(school)
+    assert school.attributes["name_aliases"] == ["Детски оазис", "Kinderoase"]
