@@ -36,8 +36,7 @@ Rules:
 - A fact about the whole school ("lessons start at 8:00", "one shift, from 7:30") holds for every grade the
   school teaches; a fact about some grades ("I–II клас", "V–VII клас", "прогимназиален етап") holds only for
   them. When first grade has its own time and grades III-IV another, give first grade's.
-- The start of the first lesson, or an earlier time the school says children must arrive (посрещане, прием
-  на учениците) when it gives one. In two shifts, or other shifts by term, the first term's shift for that
+- The start of the first lesson. In two shifts, or other shifts by term, the first term's shift for that
   grade.
 - Not the building's opening hours, optional morning care, after-school groups (занималня, целодневна
   организация, ГЦОУД) or a kindergarten's working hours ("from 7:00 to 19:00").
@@ -74,6 +73,7 @@ def day_facts(facts: Sequence[Any]) -> list[Mapping[str, Any]]:
         if isinstance(fact, Mapping)
         and fact.get("topic") == "school_day"
         and clock_times(_written(fact))
+        and not garbled(fact.get("quote"))
     ]
 
 
@@ -103,8 +103,6 @@ def checked(answer: Starts, facts: Sequence[Mapping[str, Any]]) -> dict[str, dic
         if len(times) != 1:
             continue
         time = times.pop()
-        if garbled(fact.get("quote")):
-            continue
         if time in clock_times(_written(fact)) and EARLIEST <= time <= LATEST:
             kept[start.band] = {"time": time, "fact_bg": str((fact.get("text_i18n") or {}).get("bg") or "")}
     return kept
