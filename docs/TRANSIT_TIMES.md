@@ -33,6 +33,10 @@ leaves it.
 
 ## Rules a parent would recognise
 
+- Arrive by the start of lessons the school's website gives for the age group
+  (`start_times`, `docs/SCHOOL_FACTS.md` → Start of the school day); a school that gives
+  none is aimed at 8:00 and its card says the start is not known. Kindergartens: 8:00.
+
 - Walking pace 4 km/h, a parent with a young child (OSRM uses 5).
 - Be at the first stop 2 min before the vehicle leaves; 2 min for every change on top of the walk
   between stops.

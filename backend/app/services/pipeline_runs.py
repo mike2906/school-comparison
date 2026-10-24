@@ -40,6 +40,7 @@ _CLI_STAGE_TO_ENUM: dict[str, PipelineStage] = {
     "pin-agent": PipelineStage.EXTRACT,  # tracked for the provider cost ledger; not part of "all"
     "open-days": PipelineStage.SUMMARIZE,  # tracked for the provider cost ledger; not part of "all"
     "website-name": PipelineStage.SUMMARIZE,  # tracked for the provider cost ledger; not part of "all"
+    "school-start": PipelineStage.SUMMARIZE,  # tracked for the provider cost ledger; not part of "all"
     "translate-texts": PipelineStage.SUMMARIZE,  # tracked for the provider cost ledger; not part of "all"
     "validate-data": PipelineStage.VALIDATE_DATA,
     "summarize": PipelineStage.SUMMARIZE,

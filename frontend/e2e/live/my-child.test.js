@@ -74,6 +74,18 @@ describe("my child's options", () => {
       assert.ok(leaves.length >= 5, `only ${leaves.length} places have a trip`)
       assert.ok(leaves.every(leave => leave >= '05:30' && leave <= '08:00'), `odd times to leave: ${leaves.join(', ')}`)
       assert.deepEqual(leaves, [...leaves].sort().reverse(), `not latest first: ${leaves.join(', ')}`)
+      // A first-grade child: each school is aimed at the start its website gives, and only a
+      // school that gives none says so, at 8:00.
+      await page.locator('#my-child-birth-year').selectOption(String(planningYear() - 7))
+      await page.locator('[data-chance-group] [data-transit-deadline]').first().waitFor({ timeout: 45_000 })
+      const targets = await page.locator('[data-chance-group] article').evaluateAll(cards => cards.flatMap(card => {
+        const chip = card.querySelector('[data-transit-deadline]')
+        return chip ? [{ deadline: chip.dataset.transitDeadline, unknown: Boolean(card.querySelector('[data-start-unknown]')) }] : []
+      }))
+      assert.ok(targets.length >= 5, `only ${targets.length} schools have a trip`)
+      assert.ok(targets.every(x => !x.unknown || x.deadline === '08:00'), 'an unknown start is shown as 8:00')
+      assert.ok(targets.every(x => x.deadline >= '07:00' && x.deadline <= '14:00'), `odd starts: ${targets.map(x => x.deadline).join(', ')}`)
+      testContext.diagnostic(`First grade: ${targets.filter(x => !x.unknown).length} of ${targets.length} schools give their start time.`)
       const longestTask = await page.evaluate(() => Math.round(window.__longestTask))
       testContext.diagnostic(`Public transport times shown ${shownAfter} ms after choosing it; longest main-thread task ${longestTask} ms.`)
       assert.ok(longestTask < 1000, `the page was blocked for ${longestTask} ms`)

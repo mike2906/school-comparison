@@ -160,7 +160,7 @@ Codex on #481 and the yearly cost design (thread "Rastem.bg competitor analysis"
    with a fee of unknown period are kept and marked "fee period not published". The yearly
    estimate replaces this only when the cost thread's audited pilot says it is reliable.
 5. **Trips arrive by the start of the child's shift.** The search runs as arrive-by: the
-   school's shift start for the age group where we store it, else 08:00, said on the row.
+   start of lessons the school's website gives for the age group (`start_times`), else 08:00, said on the row.
    Car times use the same rush-hour factor as now.
 6. **Public transport uses a real walking network.** Access, transfers and egress use an
    OSM foot graph (the road-graph builder with a pedestrian profile), not scaled straight

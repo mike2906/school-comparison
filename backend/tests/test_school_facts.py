@@ -9,6 +9,7 @@ import pytest
 
 from app.models import School
 from app.scrapers.extraction.school_facts import Fact, Facts, Graded, LanguageLabel, judge_message, quote_on_page
+from app.scrapers.extraction.school_start import Start, Starts
 from app.scrapers.stages import school_facts as stage
 from app.scrapers.stages.fees_agent import PageRead
 from app.utils.school_facts import _labels, publishable_school_facts
@@ -52,12 +53,15 @@ def test_short_quote_is_not_evidence():
 class _Calls:
     """The reader returns ``facts``; the judge grades ``passed`` key, ``more`` more, ``minor`` minor."""
 
-    def __init__(self, facts, passed, more=(), minor=()):
+    def __init__(self, facts, passed, more=(), minor=(), starts=()):
         self.facts, self.messages = facts, []
         self.grades = Graded(key=list(passed), more=list(more), minor=list(minor))
+        self.starts = Starts(starts=list(starts))
 
     async def __call__(self, prompt, schema, message, school_id):
         self.messages.append((schema, message))
+        if schema is Starts:
+            return self.starts
         return Facts(facts=self.facts) if schema is Facts else self.grades
 
 
@@ -186,6 +190,27 @@ async def test_apply_replaces_stored_facts_and_dry_run_writes_nothing():
     # Two pages read is a partial crawl: it may have missed the language pages.
     assert "languages_read" not in stored
     assert "languages_read" not in stage.facts_block([], "m", HOME)  # the open-days check's block
+
+
+@pytest.mark.asyncio
+async def test_a_read_also_reads_the_start_of_the_day():
+    quote = "Учебният ден започва в 08:00 часа и приключва в 14:00 часа."
+    school, db = _school(), _Db()
+    calls = _Calls([_fact("school_day", quote)], passed=[1], starts=[Start(band="grade_1_4", time="08:00", fact=1)])
+    report = await stage.run_school(db, school, find=await _find(PAGES), call=calls, apply=True)
+    assert report["start_times"] == {"grade_1_4": "08:00"}
+    assert school.attributes["school_facts"]["start_times"] == {"grade_1_4": {"time": "08:00", "fact_bg": "Факт."}}
+
+
+@pytest.mark.asyncio
+async def test_a_failed_start_times_call_still_stores_the_facts():
+    quote = "Учебният ден започва в 08:00 часа и приключва в 14:00 часа."
+    school, db = _school(), _Db()
+    calls = _Calls([_fact("school_day", quote)], passed=[1])
+    calls.starts = None  # the call's answer does not parse
+    await stage.run_school(db, school, find=await _find(PAGES), call=calls, apply=True)
+    stored = school.attributes["school_facts"]
+    assert [f["topic"] for f in stored["facts"]] == ["school_day"] and "start_times" not in stored
 
 
 @pytest.mark.asyncio

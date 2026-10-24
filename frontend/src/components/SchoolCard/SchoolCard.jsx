@@ -327,7 +327,7 @@ const SchoolCard = memo(function SchoolCard({
   const transit = school.transit
   const transitLabel = transit && t(transit.lines.length ? 'transitTime.aria' : 'transitTime.ariaWalk', {
     minutes: tripMinutes(transit), leave: clock(transit.leave), deadline: clock(transit.deadline), lines: linesText(transit.lines, t),
-  })
+  }) + (school.startKnown === false ? ` (${t('transitTime.startUnknown')})` : '')
   const statusStyle = statusInfo ? {
     backgroundColor: statusInfo.color,
     boxShadow: `0 0 8px ${hexToRgba(statusInfo.color, 0.4)}`,
@@ -442,14 +442,18 @@ const SchoolCard = memo(function SchoolCard({
                 aria-label={transitLabel}
                 title={transitLabel}
                 data-transit-leave={clock(transit.leave)}
+                data-transit-deadline={clock(transit.deadline)}
               >
                 <span className="inline-flex flex-shrink-0 items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-neutral-100 text-neutral-700">
                   {transit.lines.length ? '🚌' : '🚶'} {t('driveTime.minutes', { minutes: tripMinutes(transit) })}
                 </span>
-                <span className="mt-0.5 px-2 text-[11px] text-neutral-500">{t('transitTime.leave', { leave: clock(transit.leave) })}</span>
+                <span className="mt-0.5 px-2 text-[11px] text-neutral-500">{t('transitTime.leave', { leave: clock(transit.leave), deadline: clock(transit.deadline) })}</span>
                 {/* Which lines, in view: a phone shows no title. */}
                 {transit.lines.length > 0 && (
                   <span className="max-w-[11rem] px-2 text-right text-[11px] leading-tight text-neutral-500" aria-hidden="true">{linesText(transit.lines, t)}</span>
+                )}
+                {school.startKnown === false && (
+                  <span className="max-w-[11rem] px-2 text-right text-[11px] leading-tight text-amber-700" aria-hidden="true" data-start-unknown>{t('transitTime.startUnknown')}</span>
                 )}
               </span>
             )}
