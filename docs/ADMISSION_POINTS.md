@@ -59,7 +59,10 @@ grade) and the catchment map. Research: `/mnt/project-files/admission-points/res
    **Saving is opt-in and stays on the device** (Mike, 2026-10-15, reversing "no
    storage"): "Save on this device" keeps the answers and the checked home address in
    localStorage (`src/admission/saved.js`), so the search list and school pages can
-   compare every school. Every place that uses them has "forget". Sending them to our
+   compare every school. Every place that uses them has "forget".
+   Answers about one school are not saved, except a sibling: answered "yes" on a
+   school's own calculator, it is kept for that school (`siblings` in the saved entry),
+   and the list counts it there only (parent check, 2026-10-21). Sending them to our
    server would be collecting user data and needs Mike's own decision.
 8. **Unknown is an answer.** A question left unanswered counts as unknown, and the result
    is then a range; its maximum assumes every unknown is favourable, so the page says "up
@@ -108,7 +111,10 @@ The page is `/admission?stage=kindergarten|grade_1|grade_8&school=<id>`. Only th
 stage and the school id go in the URL; with a school, its district, catchment and
 cut-offs fill in the school-specific questions. Address durations are counted to the
 date the rules name: the ranking date for kindergartens (чл. 18 т. 1 "към датата на
-класиране"), the application deadline for first grade. Eighth grade shows the score
+класиране"), the application deadline for first grade (`applications_close`: чл. 10
+counts to the day the parent applies, so the calculator assumes the last day the ИСОДЗ
+system takes applications, the same day the admission calendar shows; 1 June 2026, when
+the system locked at 18:00). Eighth grade shows the score
 under every formula the law allows, because each class's formula is in the school's
 admission plan, which we do not have.
 
@@ -229,10 +235,12 @@ below): above, below, tie
 ranked under other rules are marked. Eighth grade has no comparison, since the class's
 formula isn't known.
 
-**Which year opens.** Each tab opens on the earliest campaign still ranking today
-(`campaignEnd` reads the rule file's schedule: Sofia kindergartens rank for the current
-school year until `current_rankings_until`), and the notice says until when, after which
-the next campaign applies. Address durations for kindergartens are counted to today
+**Which year opens.** Every tab opens on the September the search also starts from
+(`planningYear`: from October on, next year's; Mike, 2026-10-21, so the calculator and
+the list agree on the child's group). A campaign still ranking today (`campaignEnd` reads
+the rule file's schedule: Sofia kindergartens rank free places for the current school year
+until `current_rankings_until`) is offered beside the year with one tap, and its notice
+says until when. Address durations for kindergartens are counted to today
 while those later rankings run.
 
 ## Saved answers across schools

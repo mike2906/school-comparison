@@ -22,6 +22,12 @@ function Footer({ clearCompareBar }) {
           <Link to="/admission" className="text-primary-700 underline">
             {t('nav.admission')}
           </Link>
+          <Link to="/my-child" className="text-primary-700 underline">
+            {t('nav.myChild')}
+          </Link>
+          <Link to="/calendar" className="text-primary-700 underline">
+            {t('nav.calendar')}
+          </Link>
           <Link to="/about" className="text-primary-700 underline">
             {t('nav.about')}
           </Link>
@@ -100,6 +106,14 @@ function Layout({ children, hideNavOnMobile = false, compactNavOnMobile = false,
                 {t('nav.allSchools')}
               </NavLink>
               <NavLink
+                to="/my-child"
+                className={({ isActive }) => `inline-flex h-9 items-center whitespace-nowrap rounded-lg px-2 sm:px-3 text-sm font-medium ${
+                  isActive ? 'bg-primary-50 text-primary-800' : 'text-neutral-700 hover:bg-neutral-100'
+                }`}
+              >
+                {t('nav.myChild')}
+              </NavLink>
+              <NavLink
                 to="/admission"
                 className={({ isActive }) => `hidden md:inline-flex h-9 items-center whitespace-nowrap rounded-lg px-3 text-sm font-medium ${
                   isActive ? 'bg-primary-50 text-primary-800' : 'text-neutral-700 hover:bg-neutral-100'
@@ -107,9 +121,11 @@ function Layout({ children, hideNavOnMobile = false, compactNavOnMobile = false,
               >
                 {t('nav.admission')}
               </NavLink>
+              {/* Below sm the row has room for one page link: "My child" takes it, and
+                  "About the data" stays in the footer. */}
               <NavLink
                 to="/about"
-                className={({ isActive }) => `inline-flex h-9 items-center whitespace-nowrap rounded-lg px-2 sm:px-3 text-sm font-medium ${
+                className={({ isActive }) => `hidden sm:inline-flex h-9 items-center whitespace-nowrap rounded-lg px-2 sm:px-3 text-sm font-medium ${
                   isActive ? 'bg-primary-50 text-primary-800' : 'text-neutral-700 hover:bg-neutral-100'
                 }`}
               >

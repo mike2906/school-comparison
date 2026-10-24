@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       peak:
-        description: "Parents at the peak (the test holds half of it first)"
+        description: "Parents at the peak (the test holds half of it first). The edge rate limit blocks one runner past a few dozen; see the README"
         type: number
         default: 1000
         required: true

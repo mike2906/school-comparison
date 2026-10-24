@@ -61,8 +61,11 @@ import {
 } from '../../utils/searchViewState'
 import { LANGUAGE_SWITCH_EVENT, languageSwitchArrival } from '../../utils/languageSwitch'
 import { pinnedLocation } from '../../utils/coordinates'
+import { locationForAgeGroup, locationsForAgeGroup } from '../../utils/schoolLocation'
 import { useDriveTimes } from '../../routing/useDriveTimes'
 import DriveTimeNote from '../../routing/DriveTimeNote'
+import { useFreePlaces } from '../../hooks/useFreePlaces'
+import { childFreePlacesBySchool } from '../../utils/freePlaces'
 
 const TYPE_SORT_ORDER = {
   state: 0,
@@ -128,6 +131,9 @@ function SearchPage() {
     searchAddress,
     canUseSavedHome,
     locateSavedHome,
+    isHome,
+    saveAsHome,
+    forgetHome,
     clearLocation,
     setLocationFromMap,
   } = useUserLocation({
@@ -192,6 +198,12 @@ function SearchPage() {
   // can say when its fees are for an earlier year. A group picked without a birth year has none.
   const childYear = filters.birthYear ? filters.targetYear : null
   const { availableFilters, examAverages } = useFilterData(countryCode)
+  // Today's free places for the child's birth year, when the year asked about is one ИСОДЗ has.
+  const freePlacesData = useFreePlaces(Boolean(filters.birthYear && childYear))
+  const freePlacesById = useMemo(
+    () => childFreePlacesBySchool(freePlacesData, filters.birthYear, childYear),
+    [freePlacesData, filters.birthYear, childYear]
+  )
 
   const effectiveEducationLevel =
     filters.ageGroup === 'preschool' && !filters.includeCrossover
@@ -594,22 +606,6 @@ function SearchPage() {
     if (rawSchoolType !== 'international') return
     handleFilterChange({ schoolType: 'private' })
   }, [rawSchoolType])
-
-  const locationsForAgeGroup = (school, ageGroupValue) => {
-    const all = school.locations || []
-    if (!ageGroupValue) return all
-    const matching = all.filter(location => {
-      if (Array.isArray(location.age_groups)) return location.age_groups.includes(ageGroupValue)
-      if (location.age_group) return location.age_group === ageGroupValue
-      return false
-    })
-    return matching.length ? matching : all
-  }
-
-  const getLocationForAgeGroup = (school, ageGroupValue) => {
-    const locations = locationsForAgeGroup(school, ageGroupValue)
-    return locations.find(location => location.is_primary) || locations[0]
-  }
 
   const schoolsWithDistance = useMemo(() => {
     if (!userLocation) return schools
@@ -1270,6 +1266,9 @@ function SearchPage() {
                     setIsPickingLocation(false)
                     locateSavedHome()
                   } : null}
+                  isHome={isHome}
+                  onSaveAsHome={saveAsHome}
+                  onForgetHome={forgetHome}
                   onAddressSearch={handleAddressSearch}
                   onStartMapPick={handleStartMapPick}
                   onClear={handleClearLocation}
@@ -1417,7 +1416,7 @@ function SearchPage() {
                     key={school.id}
                     school={school}
                     samePlace={samePlace}
-                    location={getLocationForAgeGroup(school, filters.ageGroup)}
+                    location={locationForAgeGroup(school, filters.ageGroup)}
                     isSelected={(samePlaceHostById.get(detailSchoolId || selectedSchoolId) ?? (detailSchoolId || selectedSchoolId)) === school.id}
                     onClick={handleListSchoolSelect}
                     onOpenDetails={handleOpenDetails}
@@ -1434,6 +1433,7 @@ function SearchPage() {
                     onFocusLocation={handleFocusLocation}
                     onClearLocations={clearLocationOverlay}
                     examAverages={examAverages}
+                    freePlaces={freePlacesById.get(school.id) || null}
                   />
                 ))}
                 {visibleCount < listCards.length && (

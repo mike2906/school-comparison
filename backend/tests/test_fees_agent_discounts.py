@@ -302,3 +302,39 @@ def test_the_reader_is_asked_for_the_discount_text_in_named_fields():
     schema = AgentDiscount.model_json_schema()
     text = schema["$defs"][schema["properties"]["text_i18n"]["$ref"].rsplit("/", 1)[-1]]
     assert text["required"] == ["bg", "en"]
+
+
+WAIVER = "Всички кандидати, подписали договор до 31.01.2027 г, се освобождават от такса кандидатстване и такса регистрация."
+
+
+def test_a_waived_fee_is_kept_as_a_full_discount():
+    # 595: signing by 31.01.2027 waives the 100 EUR application and 490 EUR registration fees.
+    waiver = discount(
+        kind="other",
+        percent=100,
+        child=None,
+        applies_to="такса кандидатстване и такса регистрация",
+        evidence=WAIVER,
+        text_i18n={
+            "bg": "Без такса кандидатстване и регистрация при договор до 31.01.2027 г.",
+            "en": "No application or registration fee when the contract is signed by 31.01.2027.",
+        },
+    )
+    assert check_discount(waiver, PAGE + WAIVER + "\n") is not None
+    # A 100% with no waiving words, or a waiver at another percent, still needs its number.
+    assert check_discount(waiver.model_copy(update={"evidence": SIBLING_EN}), PAGE) is None
+    assert check_discount(waiver.model_copy(update={"percent": 50}), PAGE + WAIVER + "\n") is None
+
+
+def test_a_denied_waiver_or_the_wrong_child_is_dropped():
+    waiver = discount(
+        kind="other",
+        percent=100,
+        child=None,
+        evidence="Tuition cannot be waived.",
+        text_i18n={"bg": "Без такса.", "en": "No fee."},
+    )
+    assert check_discount(waiver, PAGE + "Tuition cannot be waived.\n") is None
+    third = waiver.model_copy(update={"kind": "sibling", "child": 2, "evidence": "The third child's tuition is waived."})
+    assert check_discount(third, PAGE + "The third child's tuition is waived.\n") is None
+    assert check_discount(third.model_copy(update={"child": 3}), PAGE + "The third child's tuition is waived.\n") is not None

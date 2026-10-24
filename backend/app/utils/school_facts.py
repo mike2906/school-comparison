@@ -14,6 +14,7 @@ from typing import Any, Optional
 from urllib.parse import urlparse
 
 from app.utils.academic_year import current_academic_year
+from app.utils.class_languages import OFFICIAL_LANGUAGES_KEY, official_intensive_languages
 from app.utils.display_lists import canonical_language
 from app.utils.facility_vocabulary import APPROACH_VOCAB, FACILITY_VOCAB, PROGRAM_VOCAB
 from app.utils.website_data import (  # noqa: F401 (SITE_ACCEPTED_STATUSES is imported from here)
@@ -703,12 +704,20 @@ def shown_school_facts(
 
 
 def publication_attributes(
-    attributes: Any, scrape_status: Any, website_url: Optional[str], education_level: Optional[str] = None
+    attributes: Any,
+    scrape_status: Any,
+    website_url: Optional[str],
+    education_level: Optional[str] = None,
+    admission_info: Any = None,
 ) -> dict[str, Any]:
     """``attributes_for_publication``, plus the shown facts under ``PUBLISHED_KEY`` so the
     display and filter projections can use their tags, languages and class size, and the
-    shown website name for the English name (``app.utils.i18n_resolver``)."""
+    shown website name for the English name (``app.utils.i18n_resolver``). With
+    ``admission_info``, the official 8th-grade classes' intensive languages join the
+    language focus."""
     attrs = attributes_for_publication(attributes, scrape_status)
+    if official := official_intensive_languages(admission_info):
+        attrs[OFFICIAL_LANGUAGES_KEY] = official
     if str(education_level or "").casefold() in KINDERGARTEN_LEVELS:
         attrs = _kindergarten_lists(attrs)
     facts = shown_school_facts(attributes, scrape_status, website_url, education_level)

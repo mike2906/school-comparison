@@ -599,6 +599,43 @@ def social_links_command(school_ids, city, country, limit, apply_changes, report
         console.print(f"Report: {report_path}")
 
 
+@cli.command("school-start")
+@click.option("--school-id", "school_ids", type=int, multiple=True, help="Run these schools (repeatable)")
+@click.option("--city", default=None, help="Only schools in this city")
+@click.option("--country", default="bg", show_default=True, help="Country code")
+@click.option("--limit", type=int, default=None, help="Maximum schools")
+@click.option("--max-usd", type=float, default=0.30, show_default=True, help="Spend cap for the run")
+@click.option("--all", "redo", is_flag=True, help="Also schools whose start times are stored already")
+@click.option("--apply", "apply_changes", is_flag=True, help="Store start times (default is a dry run)")
+@click.option("--out", "report_path", type=click.Path(dir_okay=False, path_type=Path), help="Write the JSON report")
+def school_start_command(school_ids, city, country, limit, max_usd, redo, apply_changes, report_path):
+    """Read the start of the school day from stored facts, for public transport times."""
+    import json
+
+    from app.database import async_session_maker
+    from app.scrapers.stages import school_start as school_start_stage
+
+    async def _run():
+        async with async_session_maker() as db:
+            return await school_start_stage.run_school_start(
+                db, country=country, city=city, school_ids=school_ids, limit=limit, max_usd=max_usd,
+                missing_only=not redo, apply=apply_changes,
+            )
+
+    report = asyncio.run(_run())
+    mode = "Applied" if apply_changes else "Dry run"
+    console.print(f"{mode}: {report['schools']} schools, {report['outcomes']}, ${report['spent_usd']:.4f}")
+    for result in report["results"]:
+        if result.get("start_times"):
+            console.print(f"  {result['school_id']}: {result['start_times']}")
+    if report["stopped"]:
+        console.print(f"[yellow]{report['stopped']}[/yellow]")
+    if report_path is not None:
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        report_path.write_text(json.dumps(report, ensure_ascii=False, indent=1, default=str), encoding="utf-8")
+        console.print(f"Report: {report_path}")
+
+
 @cli.command("website-name")
 @click.option("--school-id", "school_ids", type=int, multiple=True, help="Run these schools (repeatable)")
 @click.option("--city", default=None, help="Only schools in this city")
@@ -946,17 +983,61 @@ def osm_check_command(city, country, report_path, issue_path):
 @click.option("--apply", "apply_changes", is_flag=True, help="Store the site if it is valid (default writes nothing)")
 @click.option("--replace", is_flag=True, help="Let a valid site replace the school's accepted one")
 @click.option("--section", is_flag=True, help="With --replace: the URL is the school's own section of its current site")
-def check_website_command(school_id, url, country, apply_changes, replace, section):
+@click.option("--alias", "aliases", multiple=True, help="Another name the school uses on its site (repeatable); kept when stored")
+def check_website_command(school_id, url, country, apply_changes, replace, section, aliases):
     """Validate a given site for a school with the usual checks; with --apply a valid one is stored."""
     from app.database import async_session_maker
 
     async def _run():
         async with async_session_maker() as db:
             return await website_stage.run_validate_url(
-                db, school_id, country, url=url, apply=apply_changes, replace=replace, section=section
+                db, school_id, country, url=url, apply=apply_changes, replace=replace, section=section,
+                aliases=tuple(aliases),
             )
 
     asyncio.run(_run())
+
+
+@cli.command("find-websites")
+@click.option("--school-id", "school_ids", type=int, multiple=True, help="Search for these schools, any type (repeatable)")
+@click.option("--city", default="sofia", show_default=True, help="City")
+@click.option("--country", default="bg", show_default=True, help="Country code")
+@click.option("--limit", type=int, default=None, help="Maximum schools")
+@click.option(
+    "--retry-days", type=int, default=90, show_default=True, help="Skip a school searched this many days ago or less"
+)
+@click.option("--apply", "apply_changes", is_flag=True, help="Store the sites found (default is a dry run that writes nothing)")
+@click.option("--out", "report_path", type=click.Path(dir_okay=False, path_type=Path), help="Write the JSON report")
+def find_websites_command(school_ids, city, country, limit, retry_days, apply_changes, report_path):
+    """Search for the websites of private schools that have none; store only those validation accepts (free)."""
+    import json
+
+    from app.database import async_session_maker
+    from app.scrapers.stages import find_websites
+
+    async def _run():
+        async with async_session_maker() as db:
+            return await find_websites.run_find_websites(
+                db,
+                country=country,
+                city=city,
+                school_ids=school_ids,
+                limit=limit,
+                retry_days=retry_days,
+                apply=apply_changes,
+            )
+
+    report = asyncio.run(_run())
+    console.print(
+        f"{'Applied' if apply_changes else 'Dry run'}: {report['searched']} of {report['schools_without_site']} "
+        f"schools without a site searched, {report['found']} found, {report['errors']} errors"
+    )
+    for school in report["schools"]:
+        if school.get("found"):
+            console.print(f"  {school['school_id']} {school['name_bg']}: {school['found']}", markup=False)
+    if report_path is not None:
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        report_path.write_text(json.dumps(report, ensure_ascii=False, indent=1), encoding="utf-8")
 
 
 @cli.command("flag-deposits")
@@ -974,7 +1055,7 @@ def flag_deposits_command(apply_changes):
 @click.option("--apply", "apply_changes", is_flag=True, help="Withhold the sites hit (default is a dry run that writes nothing)")
 @click.option("--out", "report_path", type=click.Path(dir_okay=False, path_type=Path), help="Write the JSON report")
 def site_city_command(school_ids, city, country, limit, apply_changes, report_path):
-    """Withhold accepted websites whose home page title names another town."""
+    """Withhold accepted websites whose home page title names another town or numbered school."""
     import json
 
     from app.database import async_session_maker
@@ -987,10 +1068,12 @@ def site_city_command(school_ids, city, country, limit, apply_changes, report_pa
             )
 
     report = asyncio.run(_run())
-    console.print(f"Checked {report['checked']} sites ({report['unread']} not read); another town on {len(report['hits'])}")
+    console.print(
+        f"Checked {report['checked']} sites ({report['unread']} not read); another town or school on {len(report['hits'])}"
+    )
     for hit in report["hits"]:
         state = "withheld" if hit.get("withheld") else "would withhold"
-        console.print(f"  {hit['school_id']} {hit['name_bg']}: {hit['website']} names {hit['town']} ({state})")
+        console.print(f"  {hit['school_id']} {hit['name_bg']}: {hit['website']} names {hit['town'] or hit['school']} ({state})")
     if report_path is not None:
         report_path.parent.mkdir(parents=True, exist_ok=True)
         report_path.write_text(json.dumps(report, ensure_ascii=False, indent=1), encoding="utf-8")
@@ -1018,7 +1101,7 @@ def site_grades_command(school_ids, city, country, apply_changes, report_path):
     report = asyncio.run(_run())
     console.print(f"Checked {report['checked']} schools; bands change on {len(report['changes'])}")
     for change in report["changes"]:
-        console.print(f"  {change['school_id']} {change['name_bg']}: register {change['register']}, add {change['add']}, hide {change['hide']}")
+        console.print(f"  {change['school_id']} {change['name_bg']}: register {change['register']}, add {change['add']}, hide {change['hide']}, remove {change['remove']}")
     if report_path is not None:
         report_path.parent.mkdir(parents=True, exist_ok=True)
         report_path.write_text(json.dumps(report, ensure_ascii=False, indent=1), encoding="utf-8")

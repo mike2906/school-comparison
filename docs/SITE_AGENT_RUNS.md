@@ -141,10 +141,17 @@ for one run to move one job, e.g. `MODEL_TIER_PRICING=anthropic/claude-haiku-5-5
 python -m app.scrapers.cli school-facts ...`. There is no automatic fallback between the
 two: a run stops with a clear error instead of quietly changing model mid-run.
 
-- **Models:** only priced models are accepted (`ANTHROPIC_PRICES`). Today that is
-  Claude Haiku 5.5, sent with thinking off and no temperature (it refuses a non-default
-  one). Sonnet 5.5 and Opus 5.5 refuse the forced tool call the structured answers use,
-  so they need NativeOutput before they can be added.
+- **Models:** only priced models are accepted (`ANTHROPIC_PRICES`): Claude Haiku 5.5,
+  Sonnet 5.5 and Opus 5.5, all sent with no temperature. Haiku is sent with thinking off
+  and answers through a forced tool call; Sonnet and Opus can't turn thinking off, so
+  they think (adaptive) and answer through structured outputs. Two per-run settings for
+  trials: `ANTHROPIC_THINKING=adaptive` makes Haiku think the same way, and
+  `ANTHROPIC_EFFORT` sets the effort of thinking calls whose stage sets none (the fee
+  check keeps its `medium`).
+- **Prompt caching:** every Anthropic call caches its system prompt (5-minute TTL), so a
+  run's later calls read the stage's instructions back at 0.1x the input price (0.05x on
+  Opus); a write costs 1.25x. A prompt under the model's minimum is simply not cached.
+  The cost each response carries prices cache writes and reads at those rates.
 - **Spend:** Anthropic reports tokens, not dollars, so `PricedAnthropicModel` puts the
   price × tokens into each response's `provider_details["cost"]`, where the run caps and
   the provider ledger already read OpenRouter's cost. The Claude Console usage page shows
@@ -165,9 +172,15 @@ two: a run stops with a clear error instead of quietly changing model mid-run.
   refuses any tier set to `anthropic/` (each school then fails its extraction). It uses
   `cheap` and `capable` on every run and `pricing` when `EXTRACTION_PIPELINE_PRICES=true`,
   so keep those on OpenRouter while it runs.
-- **Not switched yet:** every default is still OpenRouter. Haiku replaces GPT-6 Luna on
+- **On Anthropic by default:** `fee_check` (Sonnet 5.5), `translation` and `facts` (Haiku
+  5.5; school facts and open days, 2026-10-22). The other tiers default to OpenRouter.
+- **Not switched yet:** Haiku replaces GPT-6 Luna on
   the pricing tier only after it scores at least as well on the fee replay eval and a
   facts dry run. First eval (2026-10-16, 6 trials, $0.51, thinking off): wrong 22%,
   found 30%, against Luna's 10% and 52%; leaving out the cut-off school, found 41% vs
-  45%, and wrong was still about double. Fee pictures stay on GPT-6.1 Sol until a Claude model passes the same
+  45%, and wrong was still about double. Second eval (2026-10-23, $4.01, #490's settings): Haiku with
+  adaptive thinking at medium effort, 5 trials, wrong 6% / found 32%; at high effort 7% / 29%,
+  and school 300 cut off at 32K output tokens in every trial; Sonnet 5.5 at medium, 2 trials,
+  9% / 43% at about $0.03 a school. Every Claude setting writes fewer wrong rows than Luna but
+  misses more fees (Haiku most of 583, 609, 505 and 300), so the reader stays on Luna. Fee pictures stay on GPT-6.1 Sol until a Claude model passes the same
   digits check.

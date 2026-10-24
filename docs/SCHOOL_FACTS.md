@@ -34,7 +34,7 @@ some picks were trivia, yearly counts go stale, the paragraph only restated the 
    (514 lost 3 key facts from /school-of-arts/ that way): on 2026-10-14, 27 of
    the 40 private Sofia schools with no admissions fact never had their admissions page
    read (172's picker took the pupils' testimonials over /kandidatstvane/).
-2. **Read.** One `pricing`-tier call lists up to 20 facts, each under one fixed topic
+2. **Read.** One `facts`-tier call (Haiku 5.5 on Anthropic's API) lists up to 20 facts, each under one fixed topic
    (`app/utils/school_facts.py` `TOPICS`: curriculum, languages, school_day, class_size,
    meals, transport, activities, facilities, support, admissions), in Bulgarian and English,
    with the page line it came from. Fees, exam results, slogans, news and yearly counts are
@@ -86,7 +86,10 @@ tags join `filter_tags` (so the search filters and the compare page's meals, tra
 after-school rows see them), its languages join `language_focus` (a read made since 2026-10-20 lists every foreign language the
 school teaches, and one of at least 4 pages is marked `languages_read`; its languages then replace the old extraction's
 unchecked list, unless it kept no language at all: 32 Sofia schools, НПМГ among them, would
-have lost real languages to a miss), and its class size is
+have lost real languages to a miss); a language the school's official 8th-grade classes teach
+intensively (RUO class names such as "Чужди езици - НЕ интензивно, АЕ",
+`app/utils/class_languages.py`) is added as enrichment unless the reading already names it,
+after the website gate, since it comes from RUO and not the site (73 СУ and 31 СУ, 2026-10-21), and its class size is
 used when no curated one exists (before the old extraction's), unless the fact is about one
 grade, intake, profile or course, or a summer programme: the fact still shows, but the
 class-size tile is for the whole school. The response also carries
@@ -217,6 +220,24 @@ stored facts:
    so the address is their one Latin spelling (busy-school.com, questjunior.bg). Search
    matches the address words of an accepted website, ranked with addresses below every name
    match. No model, nothing shown.
+
+## Start of the school day (`start_times`, `school-start` stage)
+
+Public transport times (`docs/TRANSIT_TIMES.md`) aim at the start of lessons. The shift
+table (`location_age_group_shifts.shift`) is empty for every school (checked 2026-10-24),
+and a blanket 8:00 told a parent to leave 20-30 minutes late at a 7:30 school; 130 Sofia
+schools state their start in a school-day fact ("първа смяна от 7:30", "часовете започват
+в 8:00"), with first shifts from 7:30 to 8:30.
+
+- After a facts read keeps facts, one cheap call (same tier) gets the start of the first
+  lesson per band (preschool, grades 1-4, 5-7, 8-12) from the school-day facts that write a
+  clock time (`app/scrapers/extraction/school_start.py`). A band in two shifts gets the first
+  shift in the first term. Code keeps a time only when the named fact writes it and it is
+  between 07:00 and 14:00 (the timetable keeps trips to 14:00). Stored in the facts block as `start_times`, each with its fact.
+- `school-start` fills them in from stored facts without reading the sites
+  (`--apply` to store, `--all` to redo every school): about $0.0005 a school.
+- The list response's `start_times` (`{band: "HH:MM"}`, `app/utils/school_start.py`) shows a
+  time only while its fact shows. A failed call stores the facts without start times.
 
 ## Retiring the website reading pipeline
 

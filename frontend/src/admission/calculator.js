@@ -8,6 +8,7 @@ import { schoolCatchmentIds } from './catchments.js'
 import i18next from 'i18next'
 import { usesSofiaKindergartenSystem } from '../utils/admission.js'
 import { formatAmount } from '../utils/format.js'
+import { planningYear } from '../utils/ageSelection.js'
 
 /** Calculator tabs: the rule-file stage and the cut-off stages read with it. */
 export const STAGES = [
@@ -54,15 +55,21 @@ export function campaignEnd(ruleSet) {
 }
 
 /**
- * The September a parent is most likely planning for. With a tab, it is the earliest
- * campaign from this year on that is still taking applications or ranking on `today`
- * (Sofia kindergartens rank for this school year until late November), so the rules
- * shown are the ones a parent applying now is ranked under. Otherwise, from October on
- * the next campaign is the open question.
+ * The September a parent is most likely planning for, the same as the search's: from
+ * October on, next year's (Mike, 2026-10-21; the tab used to stay on a campaign still
+ * ranking, so the calculator and the list disagreed on the child's group).
  */
-export function defaultStartYear(now = new Date(), { ruleSets = [], stage = null, today = sofiaToday(now) } = {}) {
-  const next = now.getMonth() >= 9 ? now.getFullYear() + 1 : now.getFullYear()
-  if (!stage) return next
+export function defaultStartYear(now = new Date()) {
+  return planningYear(now)
+}
+
+/**
+ * An earlier campaign than the default that is still taking applications or ranking on
+ * `today` (Sofia kindergartens rank free places for this school year until late
+ * November), or null. The calculator offers it with one tap.
+ */
+export function campaignStillRanking(now = new Date(), { ruleSets = [], stage, today = sofiaToday(now) } = {}) {
+  const next = planningYear(now)
   for (let year = now.getFullYear(); year < next; year += 1) {
     const campaign = `${year}/${year + 1}`
     // The same file the tab would show, and only if it was written for that campaign.
@@ -70,7 +77,7 @@ export function defaultStartYear(now = new Date(), { ruleSets = [], stage = null
     const end = ruleSet?.campaign === campaign ? campaignEnd(ruleSet) : null
     if (end && today <= end) return year
   }
-  return next
+  return null
 }
 
 /** Start years to offer: this calendar year's campaign, the default and the one after. */
@@ -168,6 +175,65 @@ export function cutoffValue(round) {
   }
   if (round.last_admitted_points != null) return { kind: 'points', points: round.last_admitted_points }
   return null
+}
+
+/** Cut-off kinds that name the last child admitted, not a fact about the whole ranking. */
+export const LAST_ADMITTED_KINDS = new Set(['score', 'points', 'group', 'quota'])
+
+/** A ranking's cut-off in words ("16 points", "Nobody turned down"), or '' when unknown. */
+export function cutoffText(round, t, language) {
+  const value = cutoffValue(round)
+  const number = n => (n == null ? '—' : formatAmount(n, language, 2))
+  if (!value) {
+    // Places to fill, and nobody on the list was admitted to them.
+    return round?.places > 0 && round.admitted_count === 0 ? t('cutoffs.noneAdmitted') : ''
+  }
+  if (value.kind === 'everyone') return round.applicants_count === 0 ? t('cutoffs.noApplicants') : t('cutoffs.everyone')
+  if (value.kind === 'noPlaces') return t('cutoffs.noPlaces')
+  if (value.kind === 'score') return t('cutoffs.score', { score: number(value.score) })
+  if (value.kind === 'quota') return t('cutoffs.quotaScores', { boys: number(value.boys), girls: number(value.girls) })
+  if (value.kind === 'group') {
+    if (value.points == null) return t('cutoffs.groupOnly', { group: value.group })
+    return value.points === 0
+      ? t('cutoffs.groupNoPoints', { group: value.group })
+      : t('cutoffs.groupAndPoints', { group: value.group, points: number(value.points) })
+  }
+  return t('cutoffs.points', { points: number(value.points) })
+}
+
+/** The size of a round in a few words: "66 places · 110 applicants · 66 admitted". */
+export function roundCounts(round, t) {
+  return [
+    round.places > 0 ? t('cutoffs.places', { count: round.places }) : null,
+    round.places > 0 && round.applicants_count != null ? t('cutoffs.applicants', { count: round.applicants_count }) : null,
+    round.places > 0 && round.admitted_count != null ? t('cutoffs.admitted', { count: round.admitted_count }) : null,
+  ].filter(Boolean).join(' · ')
+}
+
+/** Which ranking a row's headline reads: "First ranking, 2 October 2026", "Free-place ranking, …". */
+export function rankingLabel(row, round, t, language) {
+  const date = formatRankingDay(round.classified_on, language)
+  if (round.round_kind === 'current') return t('cutoffs.ref.free', { date })
+  return t(round === row.first ? 'cutoffs.ref.main' : 'cutoffs.ref.other', { date })
+}
+
+/** What a cut-off row is for: age group or class, birth year and building. */
+export function rowLabel(row, t, language = i18next.language) {
+  // The ministry's class and building names are Bulgarian; the API adds English ones it has.
+  const english = String(language || '').startsWith('en')
+  const className = (english && row.class_name_en) || row.class_name
+  const building = (english && row.building_en) || row.building
+  // An 8th-grade class by its name; the ministry's code only when it has none.
+  const what = row.stage === 'grade_8'
+    ? `${t('cutoffs.stage.grade_8')}: ${[className, row.class_code && (className ? `(${row.class_code})` : row.class_code)].filter(Boolean).join(' ')}`
+    : row.stage === 'grade_1'
+      ? t('cutoffs.stage.grade_1')
+      : row.stage === 'preparatory'
+        ? t('cutoffs.stage.preparatory')
+        : t(`ageGroups.${row.age_group}`, { defaultValue: row.age_group || '' })
+  // A nursery ranks two birth years separately, so each year is its own row.
+  const born = row.birth_year && row.stage !== 'grade_8' ? t('cutoffs.bornIn', { year: row.birth_year }) : null
+  return [what, born, building].filter(Boolean).join(' · ')
 }
 
 /** `2026/2027` → `2026/27`, as parents write a school year. */

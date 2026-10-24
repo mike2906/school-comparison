@@ -22,9 +22,15 @@ READINESS_TIMEOUT_SECONDS = 3.0
 
 # Every GET answer is public data that only changes when a snapshot is published, so
 # Cloudflare may keep it for a few minutes (the cache rule in infra/main.tf) and most
-# visits never reach the server. After a publish the edge serves the old answer for at
-# most `s-maxage`; the site build asks past it (scripts/prerender.js).
-EDGE_CACHE_CONTROL = "public, max-age=60, s-maxage=300"
+# visits never reach the server. Browsers keep it a minute (Cache-Control). The edge
+# (CDN-Cache-Control, which Cloudflare reads first) keeps it five minutes, then answers
+# from the old copy while it fetches a new one in the background, and also while the
+# API restarts or fails: so no visitor waits on a cold or busy server for an answer the
+# edge has seen. Not `s-maxage`: it turns both of those off. After a publish a visitor
+# can get the old answer once for up to `max-age` + `stale-while-revalidate`; the site
+# build asks past it (scripts/prerender.js).
+EDGE_CACHE_CONTROL = "public, max-age=60"
+CDN_CACHE_CONTROL = "max-age=300, stale-while-revalidate=600, stale-if-error=3600"
 # Only these routes' answers are public data; any other GET (health, docs, a later route)
 # is marked no-store.
 PUBLIC_PATH_PREFIXES = ("/schools", "/countries", "/compare")
@@ -54,6 +60,7 @@ class PublicCacheHeaders:
                 # The edge keeps a GET answer with no Cache-Control for hours: say no-store.
                 if cacheable and message["status"] == 200:
                     headers["Cache-Control"] = EDGE_CACHE_CONTROL
+                    headers["CDN-Cache-Control"] = CDN_CACHE_CONTROL
                     headers["Access-Control-Allow-Origin"] = "*"
                     if "access-control-allow-credentials" in headers:
                         del headers["Access-Control-Allow-Credentials"]

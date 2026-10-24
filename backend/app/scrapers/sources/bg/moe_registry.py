@@ -12,6 +12,7 @@ import hashlib
 import json
 import logging
 import re
+from contextlib import AsyncExitStack
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Optional
 
@@ -23,10 +24,12 @@ from app.schemas.scraping import DiscoveredLocation, DiscoveredSchool
 from app.scrapers.base import BaseScraper
 from app.scrapers.sources import register_adapter
 from app.scrapers.sources.base_adapter import BaseSourceAdapter
+from app.scrapers.sources.bg.registry_browser import BrowserClient
 from app.scrapers.sources.bg.school_kinds import child_bands
 from app.services.geocoding.base import GeocodingResult
 from app.services.geocoding.bg import GeoJSONProvider, city_storage_value
 from app.services.geocoding.nominatim import NominatimProvider
+from app.utils.website_data import safe_website_url
 
 if TYPE_CHECKING:
     from app.models.source_page import SourcePage
@@ -37,6 +40,10 @@ logger = logging.getLogger(__name__)
 def is_cloudflare_challenge(response: httpx.Response) -> bool:
     """Cloudflare's bot check ("Just a moment..."), which only a real browser passes."""
     return response.status_code == 403 and response.headers.get("cf-mitigated") == "challenge"
+
+
+class RegisterBlocked(RuntimeError):
+    """The register stopped answering mid-run: stop the import rather than keep schools without details."""
 _LOCALITY_MARKER_RE = re.compile(r"\b(?:гр\.?|с\.?|село|район|кв\.|ж\.к\.)\b", flags=re.IGNORECASE)
 
 
@@ -211,7 +218,7 @@ class MoeRegistryAdapter(BaseSourceAdapter):
                 resolved[code] = label.strip()
         return resolved
 
-    async def _load_reference_labels(self, client: httpx.AsyncClient) -> None:
+    async def _load_reference_labels(self, client: httpx.AsyncClient | BrowserClient) -> None:
         if self._region_labels and self._municipality_labels and self._town_labels:
             return
 
@@ -360,9 +367,7 @@ class MoeRegistryAdapter(BaseSourceAdapter):
             if instid
         }
 
-        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
-            await self._load_reference_labels(client)
-
+        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client, AsyncExitStack() as stack:
             # Step 1: Fetch schools from Sofia city and Sofia region
             logger.info(f"Fetching schools from MoE API: {self.PUBLIC_REGISTER_URL}")
 
@@ -372,21 +377,23 @@ class MoeRegistryAdapter(BaseSourceAdapter):
                 "isRIActive": 1,  # Only active institutions
             }
 
-            response = await client.post(
-                self.PUBLIC_REGISTER_URL,
-                json=request_body,
-                headers={
-                    "Accept": "application/json, text/plain, */*",
-                    "Content-Type": "application/json",
-                },
-            )
+            register_headers = {
+                "Accept": "application/json, text/plain, */*",
+                "Content-Type": "application/json",
+            }
+            response = await client.post(self.PUBLIC_REGISTER_URL, json=request_body, headers=register_headers)
+            if is_cloudflare_challenge(response):
+                # Cloudflare screens out scripts, not browsers: send every request from a headless one.
+                logger.warning("%s answered with a Cloudflare challenge; retrying through a browser", self.API_BASE_URL)
+                client = await stack.enter_async_context(BrowserClient(self.API_BASE_URL))
+                response = await client.post(self.PUBLIC_REGISTER_URL, json=request_body, headers=register_headers)
             if is_cloudflare_challenge(response):
                 raise RuntimeError(
                     f"{self.API_BASE_URL} answered with a Cloudflare challenge (HTTP {response.status_code},"
-                    " cf-mitigated: challenge), so the ministry now screens out scripts; a header change"
-                    " cannot get past it"
+                    " cf-mitigated: challenge) even to a headless browser"
                 )
             response.raise_for_status()
+            await self._load_reference_labels(client)
 
             # Step 2: Parse response
             data = response.json()
@@ -476,6 +483,8 @@ class MoeRegistryAdapter(BaseSourceAdapter):
                     if fetch_details and (changed or sampled):
                         await self._delay()
 
+                except RegisterBlocked:
+                    raise
                 except Exception as e:
                     logger.error(f"Error processing institution {inst_data.get('id')}: {e}")
                     continue
@@ -704,7 +713,7 @@ class MoeRegistryAdapter(BaseSourceAdapter):
                 attrs.setdefault("moe_registry_inactive_since", now_iso)
             school.attributes = attrs
 
-    async def _fetch_institution_detail(self, client: httpx.AsyncClient, inst_data: dict) -> Optional[dict]:
+    async def _fetch_institution_detail(self, client: httpx.AsyncClient | BrowserClient, inst_data: dict) -> Optional[dict]:
         """
         Fetch detailed data for a specific institution.
 
@@ -735,6 +744,8 @@ class MoeRegistryAdapter(BaseSourceAdapter):
                     "Content-Type": "application/json",
                 },
             )
+            if is_cloudflare_challenge(response):
+                raise RegisterBlocked(f"{self.API_BASE_URL} started answering with a Cloudflare challenge mid-run")
             response.raise_for_status()
 
             data = response.json()
@@ -751,6 +762,8 @@ class MoeRegistryAdapter(BaseSourceAdapter):
             # Return first item (should only be one)
             return detail_list[0]
 
+        except RegisterBlocked:
+            raise
         except Exception as e:
             logger.error(f"Error fetching detail for institution {inst_data.get('instid')}: {e}")
             return None
@@ -847,7 +860,7 @@ class MoeRegistryAdapter(BaseSourceAdapter):
 
             if detail_data:
                 # Extract website URL
-                website_url = (detail_data.get("website") or "").strip() or None
+                website_url = safe_website_url(detail_data.get("website"))
 
                 # Extract primary location
                 primary_address = self._address_with_locality_hint(

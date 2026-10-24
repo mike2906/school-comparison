@@ -224,6 +224,21 @@ class TestSchoolsEndpoint:
         }
 
     @pytest.mark.asyncio
+    async def test_one_off_keys_never_evict_a_warm_entry(self, seeded_client, monkeypatch):
+        from app.routers import schools as schools_router
+
+        monkeypatch.setattr(schools_router, "LIST_CACHE_MAX_ENTRIES", 2)
+        default_key = ("bg", "sofia", None, None, None, False)
+
+        await seeded_client.get("/schools")
+        schools_router._warm_keys.add((id(schools_router._list_cache), default_key))
+        for n in range(4):  # made-up values, each a cold key
+            await seeded_client.get(f"/schools?education_level=junk-{n}")
+
+        assert default_key in schools_router._list_cache
+        assert len(schools_router._list_cache) == 2
+
+    @pytest.mark.asyncio
     async def test_failed_refresh_keeps_the_cached_body(self, seeded_client, monkeypatch):
         from app.routers import schools as schools_router
 
@@ -299,6 +314,21 @@ class TestSchoolsEndpoint:
         assert schools_router._list_cache == {}
 
     @pytest.mark.asyncio
+    async def test_advanced_filter_builds_take_their_own_lock(self, seeded_client, monkeypatch):
+        from app.routers import schools as schools_router
+
+        seen = []
+        real_build = schools_router._build_list_body
+
+        async def watched(db, **kwargs):
+            seen.append((schools_router._uncached_build_lock.locked(), schools_router._build_lock.locked()))
+            return await real_build(db, **kwargs)
+
+        monkeypatch.setattr(schools_router, "_build_list_body", watched)
+        assert (await seeded_client.get("/schools?facilities=pool")).status_code == 200
+        assert seen == [(True, False)]
+
+    @pytest.mark.asyncio
     async def test_filters_are_cached_per_city(self, seeded_client, monkeypatch):
         from app.services.school_service import SchoolService
 
@@ -320,6 +350,61 @@ class TestSchoolsEndpoint:
 
         await seeded_client.get("/schools/filters?city=all")
         assert calls == 2
+
+    @pytest.mark.asyncio
+    async def test_school_page_is_cached_per_school(self, seeded_client, monkeypatch):
+        from app.services.school_service import SchoolService
+
+        calls = 0
+        original = SchoolService.get_school_with_details
+
+        async def counting(self, school_id):
+            nonlocal calls
+            calls += 1
+            return await original(self, school_id)
+
+        monkeypatch.setattr(SchoolService, "get_school_with_details", counting)
+        school_id = (await seeded_client.get("/schools")).json()[0]["id"]
+
+        first = await seeded_client.get(f"/schools/{school_id}")
+        second = await seeded_client.get(f"/schools/{school_id}", headers={"Accept-Encoding": "identity"})
+        assert first.status_code == second.status_code == 200
+        assert first.headers["content-encoding"] == "gzip"
+        assert "content-encoding" not in second.headers
+        assert second.json() == first.json()
+        assert first.json()["id"] == school_id
+        assert calls == 1
+
+        # A page nobody opened for two TTLs is rebuilt before it is served, not after.
+        from app.routers import schools as schools_router
+
+        built_at, body = schools_router._detail_cache[(school_id,)]
+        schools_router._detail_cache[(school_id,)] = (built_at - 2 * schools_router.LIST_CACHE_TTL_SECONDS, body)
+        assert (await seeded_client.get(f"/schools/{school_id}")).status_code == 200
+        assert calls == 2
+        assert schools_router._background_tasks == set()
+
+        # A page whose optional links failed is shown but not kept, so the next visitor
+        # gets the complete page.
+        from app.routers import schools as schools_router
+
+        async def failing(*args, **kwargs):
+            raise RuntimeError("database hiccup")
+
+        schools_router._detail_cache.clear()
+        working = schools_router.continued_from
+        monkeypatch.setattr(schools_router, "continued_from", failing)
+        assert (await seeded_client.get(f"/schools/{school_id}")).json()["id"] == school_id
+        assert (school_id,) not in schools_router._detail_cache
+        monkeypatch.setattr(schools_router, "continued_from", working)
+        assert (await seeded_client.get(f"/schools/{school_id}")).status_code == 200
+        assert (school_id,) in schools_router._detail_cache
+        calls = 0
+
+        # An id with no school is a 404, and stays one without another query.
+        assert (await seeded_client.get("/schools/999999")).status_code == 404
+        assert (await seeded_client.get("/schools/999999")).status_code == 404
+        assert calls == 1
 
     @pytest.mark.asyncio
     async def test_list_schools_serializes_exam_results_used_by_school_cards(
@@ -2048,6 +2133,7 @@ class TestDisplayGating:
         self, seeded_db, seeded_client, monkeypatch
     ):
         from app.config import get_settings
+        from app.routers import schools as schools_router
 
         school = School(
             name_i18n={"bg": "Прием", "en": "Admission"},
@@ -2084,6 +2170,7 @@ class TestDisplayGating:
         assert "Internal extra child" not in str(hidden)
 
         monkeypatch.setattr(get_settings(), "publish_website_admission_fields", True)
+        schools_router._detail_cache.clear()  # settings change with a restart
         shown = (await seeded_client.get(f"/schools/{school.id}")).json()
         for locale in ("bg", "en"):
             assert shown["attributes_i18n"][locale]["entry_requirements"] == ["Website test"]

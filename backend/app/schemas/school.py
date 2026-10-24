@@ -9,6 +9,7 @@ from pydantic import (
     JsonValue,
     PrivateAttr,
     computed_field,
+    field_serializer,
     field_validator,
     model_validator,
 )
@@ -32,11 +33,13 @@ from app.utils.i18n_resolver import resolve_address_i18n, resolve_name_i18n
 from app.utils.location_tags import semantic_location_tags
 from app.utils.school_attributes import build_display_attributes, publishable_display_i18n
 from app.utils.school_facts import SITE_ACCEPTED_STATUSES, publication_attributes, shown_school_facts
+from app.utils.school_start import shown_start_times
 from app.utils.social_links import shown_social_links
 from app.utils.text_translations import stored as stored_translations
 from app.utils.text_translations import translate_cutoffs, translate_price_context
 from app.utils.website_data import (
     agent_fees_publishable,
+    public_website_url,
     website_data_is_publishable,
     website_data_withheld_reasons,
 )
@@ -173,7 +176,11 @@ class SchoolAttributesMixin(BaseModel):
         # display and filter projections.
         website_url = getattr(self, "website_url", None) or getattr(self, "raw_website_url", None)
         return publication_attributes(
-            self.raw_attributes, self.raw_scrape_status, website_url, getattr(self, "education_level", None)
+            self.raw_attributes,
+            self.raw_scrape_status,
+            website_url,
+            getattr(self, "education_level", None),
+            self.raw_admission_info,
         )
 
     @cached_property
@@ -420,6 +427,11 @@ class SchoolBase(SchoolAttributesMixin):
     num_pupils: Optional[int] = None
     model_config = ConfigDict(populate_by_name=True)
 
+    @field_serializer("website_url")
+    def _public_website_url(self, value: Optional[str]) -> Optional[str]:
+        # The publish gates read the stored address; only the wire copy is withheld.
+        return public_website_url(value, self.raw_attributes, self.raw_scrape_status)
+
     @computed_field(return_type=Optional[SummaryI18n])
     @property
     def summary_i18n(self) -> Optional[SummaryI18n]:
@@ -653,3 +665,11 @@ class SchoolListResponse(SchoolPricingMixin):
     @property
     def resolved_name_i18n(self) -> dict[str, str]:
         return resolve_name_i18n(self.name_i18n, self.public_attributes_input)
+
+    @computed_field(return_type=Optional[dict[str, str]])
+    @property
+    def start_times(self) -> Optional[dict[str, str]]:
+        """When the day starts by age band, from the school's shown facts, for public
+        transport times (``app/utils/school_start.py``)."""
+        shown = shown_school_facts(self.raw_attributes, self.raw_scrape_status, self.raw_website_url, self.education_level)
+        return shown_start_times(self.raw_attributes, shown)

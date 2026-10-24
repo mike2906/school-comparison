@@ -18,6 +18,7 @@ import { schoolLevelLabel, schoolTypeLabel } from '../../utils/levelLabel'
 import { useCountry } from '../../context/CountryContext'
 import { orderAgeGroups } from '../../utils/ageGroupOrder'
 import { useCompare } from '../../context/CompareContext'
+import { safeWebsiteUrl } from '../../utils/priceSources'
 import {
   getNvoDetail,
   getAmenityFlags,
@@ -40,6 +41,7 @@ import PhoneLinks from './PhoneLinks'
 import SocialLinks from './SocialLinks'
 import SchoolAdmissionArea from '../Admission/SchoolAdmissionArea'
 import SchoolCutoffs from '../Admission/SchoolCutoffs'
+import FreePlaces from '../Admission/FreePlaces'
 
 // The chart library is large and only schools with exam results need it. If the chunk
 // cannot be loaded (a tab that outlived a deploy), the page stays usable without the chart.
@@ -146,7 +148,10 @@ function SchoolDetailPage({ schoolId = null, embedded = false, onClose = null })
   useEffect(() => {
     if (!school) return undefined
     const previousTitle = document.title
-    document.title = `${getSchoolName(school, i18n.language)} · ${t('nav.title')}`
+    const name = getSchoolName(school, i18n.language)
+    // Landing straight on the page keeps the prerendered title, which adds the district
+    // (src/prerender/pages.js): it is the one search engines index.
+    if (!previousTitle.startsWith(`${name}, `)) document.title = `${name} · ${t('nav.title')}`
     return () => {
       document.title = previousTitle
     }
@@ -282,6 +287,8 @@ function SchoolDetailPage({ schoolId = null, embedded = false, onClose = null })
     )
   }
 
+  const websiteHref = safeWebsiteUrl(school.website_url)
+
   return (
     <Shell>
       <div className={`max-w-5xl mx-auto px-4 md:px-6 py-6 md:py-8 ${compareBarVisible ? 'pb-40' : 'pb-24 md:pb-8'}`}>
@@ -403,9 +410,9 @@ function SchoolDetailPage({ schoolId = null, embedded = false, onClose = null })
           )}
 
           <div className="flex flex-wrap items-center gap-3">
-            {school.website_url && (
+            {websiteHref && (
               <a
-                href={school.website_url}
+                href={websiteHref}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 px-4 py-2 bg-primary-50 text-primary-700 rounded-lg hover:bg-primary-100 transition-colors border border-primary-200"
@@ -663,6 +670,7 @@ function SchoolDetailPage({ schoolId = null, embedded = false, onClose = null })
         )}
 
         <SchoolAdmissionArea school={school} />
+        <FreePlaces school={school} />
         <SchoolCutoffs school={school} />
 
         {/* Academic Performance (NVO Results) */}

@@ -22,7 +22,9 @@
     "allSchools": "All schools",
     "about": "About the data",
     "language": "Language",
-    "admission": "Admission points"
+    "admission": "Admission points",
+    "myChild": "My child",
+    "calendar": "Admission calendar"
   },
   "landing": {
     "categoryKindergarten": "Kindergarten",
@@ -43,7 +45,7 @@
   },
   "location": {
     "useMyLocation": "Use my location",
-    "useSavedHome": "Use the home address saved in the calculator",
+    "useSavedHome": "Use my saved home",
     "selectOnMap": "Choose on map",
     "cancelMapPick": "Cancel map selection",
     "mapPickHint": "Click anywhere on the map to set your location.",
@@ -72,7 +74,12 @@
     "setShort": "Set your location",
     "setShortSaved": "Near my saved address?",
     "whyShort": "See distances, sort by the nearest and limit by distance.",
-    "changeShort": "Change location"
+    "changeShort": "Change location",
+    "home": "Home",
+    "isHome": "This is your saved home.",
+    "forgetHome": "Forget home",
+    "saveAsHome": "This is my home",
+    "saveAsHomeNote": "Kept only in this browser, for distances and travel times on every page."
   },
   "sorting": {
     "sortBy": "Sort by",
@@ -777,6 +784,8 @@
     "searchTitle": "Schools and kindergartens in Sofia: map and comparison",
     "searchDescription": "Find and compare kindergartens and schools in Sofia: map, official NVO exam results, private school fees and admissions.",
     "schoolFacts": "{{type}} · {{level}}",
+    "district": "{{district}} district",
+    "city": "Sofia",
     "nvoHeading": "Official NVO results",
     "nvoLine": "{{exam}} {{year}}: {{scores}}",
     "nvoBulgarian": "Bulgarian {{value}}",
@@ -955,6 +964,8 @@
     "preparatoryLink": "Calculate preparatory-group points",
     "startYear": "Starting in September of",
     "startYearOption": "{{year}} (school year {{year}}/{{next}})",
+    "stillRanking": "The {{year}}/{{next}} ranking is still running for free places.",
+    "useStillRanking": "Calculate for {{year}}/{{next}}",
     "forSchool": "For",
     "anySchool": "any school",
     "noRules": "There are no rules for this stage yet.",
@@ -1048,6 +1059,7 @@
       "thisKindergarten": "At {{name}}",
       "perKindergartenIntro": "These differ for each kindergarten or school on your list.",
       "siblingThere": "Will a brother or sister attend the same kindergarten or school at the same time?",
+      "siblingListHint": "The list counts this only at that kindergarten: open the calculator from its page and answer there.",
       "wishRank": "Where is it on your list?",
       "wishRankHint": "Your first three wishes get 3, 2 and 1 points.",
       "wish": "Wish {{n}}",
@@ -1079,6 +1091,7 @@
       "thisSchool": "At {{name}}",
       "perSchoolIntro": "These differ for each school on your list.",
       "siblingAtSchool": "Does a brother or sister study at this school?",
+      "siblingListHint": "The list counts this only at that school: open the calculator from its page and answer there.",
       "siblingYoung": "Is that brother or sister {{max}} or younger in {{year}}?",
       "preparatoryGroupHere": "Did the child attend the preparatory group at this school?",
       "familyTitle": "Family",
@@ -1118,7 +1131,8 @@
       "invalid": "Check the numbers: NVO results are 0 to 100 and the exam is 0 to 50.",
       "tieBreak": "Equal scores are ordered by the NVO total, then the two grades, then the average 7th-grade grade."
     },
-    "runsUntil": "Rankings for {{campaign}} continue until {{date}}; after that, applications are for {{next}}: choose that year above."
+    "runsUntil": "Rankings for {{campaign}} continue until {{date}}; after that, applications are for {{next}}: choose that year above.",
+    "calendarLink": "Every admission date for your child's birth year, in your calendar"
   },
   "cutoffs": {
     "title": "Who got in before",
@@ -1202,6 +1216,26 @@
     "outside": "Drive times are only available in and around Sofia.",
     "unavailable": "Drive times could not be loaded."
   },
+  "transitTime": {
+    "aria": "About {{minutes}} minutes by public transport ({{lines}}): leave home at {{leave}} to arrive by {{deadline}}",
+    "ariaWalk": "About {{minutes}} minutes on foot: leave home at {{leave}} to arrive by {{deadline}}",
+    "note": "Public transport by the timetable for {{day}}, arriving by the start of lessons the school's website gives, or 8:00 where it gives none: walking at a child's pace, 2 min early at the stop, 2 min for each change. Places with no trip in time come last.",
+    "timetableCredit": "Timetable: Център за градска мобилност / Столична община (modified)",
+    "licence": "CC BY 4.0",
+    "walkCredit": "footpaths © OpenStreetMap contributors",
+    "loading": "Working out public transport times…",
+    "outside": "Public transport times are only available in and around Sofia.",
+    "unavailable": "Public transport times could not be loaded.",
+    "then": ", then ",
+    "mode": {
+      "bus": "bus",
+      "tram": "tram",
+      "trolleybus": "trolleybus",
+      "metro": "metro"
+    },
+    "leave": "leave {{leave}} for {{deadline}}",
+    "startUnknown": "start not known, 8:00 assumed"
+  },
   "savedAdmission": {
     "yoursPoints": "Your points: {{points}}",
     "yoursGroup": "You: group {{group}}, {{points}} points",
@@ -1220,8 +1254,8 @@
     },
     "panelTitle": "Your saved answers at this school",
     "assumed": {
-      "kindergarten": "Assumes it's your 1st wish, with no sibling there.",
-      "grade_1": "Uses your first address and assumes no sibling or preparatory group at the school."
+      "kindergarten": "Assumes it's your 1st wish, and a sibling only where you said so in that kindergarten's own calculator.",
+      "grade_1": "Uses your first address, assumes no preparatory group at the school, and a sibling only where you said so in that school's own calculator."
     },
     "banner": {
       "kindergarten": "Each kindergarten shows your saved points (child born {{year}}) against the last child admitted.",
@@ -1250,6 +1284,167 @@
       "kindergarten": "kindergarten",
       "grade_1": "1st grade",
       "preparatory": "preparatory group"
+    }
+  },
+  "freePlaces": {
+    "title": "Free places today",
+    "intro": "Places still free in each group, as the Sofia municipality's admission system (ИСОДЗ) showed them on {{date}}.",
+    "listLabel": "Free places per group",
+    "free_one": "{{count}} free place",
+    "free_other": "{{count}} free places",
+    "full": "No free places",
+    "capacity_one": "{{count}} place, {{enrolled}} enrolled",
+    "capacity_other": "{{count}} places, {{enrolled}} enrolled",
+    "rankedNotEnrolled_one": "{{count}} ranked, not yet enrolled",
+    "rankedNotEnrolled_other": "{{count}} ranked, not yet enrolled",
+    "sop_one": "also {{count}} place for children with special educational needs",
+    "sop_other": "also {{count}} places for children with special educational needs",
+    "chronic_one": "also {{count}} place for children with a chronic illness",
+    "chronic_other": "also {{count}} places for children with a chronic illness",
+    "howTheyFill": "A free place goes to the child with the most points at the next ranking. A child ranked but not yet enrolled keeps their place until the enrolment deadline; if they do not take it, it comes free.",
+    "sideQueues": "Places for special educational needs and chronic illness are ranked separately, only among children applying for them.",
+    "source": "Source: ИСОДЗ,",
+    "child_one": "{{count}} free place for children born in {{year}} today",
+    "child_other": "{{count}} free places for children born in {{year}} today",
+    "childFull": "No free place for children born in {{year}} today",
+    "calculatorNote": "A free place goes to the child with the most points at the next ranking (ИСОДЗ, Sofia municipality).",
+    "childRanked_one": "{{count}} ranked, not yet enrolled",
+    "childRanked_other": "{{count}} ranked, not yet enrolled",
+    "inBuildings_one": "(in {{count}} of its {{total}} buildings)",
+    "inBuildings_other": "(in {{count}} of its {{total}} buildings)"
+  },
+  "myChild": {
+    "title": "My child's options",
+    "intro": "Tell us about your child once: the birth year, when they start, where you live, the languages you want and your budget. You get every kindergarten or school for that start, grouped by your chances and sorted by the trip from home.",
+    "profile": "About your child",
+    "choose": "Choose",
+    "startYear": "Starts in September",
+    "group": "Group: {{group}}",
+    "languages": "Languages (optional)",
+    "languagesNote": "Shows only places that list a language focus. Many state schools teach these languages without listing it, so they are hidden too.",
+    "budget": "Tuition per month up to, € (optional)",
+    "noLimit": "No limit",
+    "budgetNote": "Tuition only, as each private school states it; a yearly fee counts as 12 equal months, so a school billing in 10 instalments may cost a little more a month. Schools whose fee is not given per month or year are never hidden.",
+    "saved": "Saved on this device. The calculator and the school list use it too.",
+    "forget": "Forget all of it",
+    "save": "Save on this device",
+    "saveNote": "Kept only in this browser, never sent to us. Without saving, everything here is forgotten when you leave.",
+    "needBirthYear": "Choose the birth year to see the options.",
+    "results": "Options",
+    "answersMissing": "To see your chances, answer the points questions for this start (about 2 minutes).",
+    "answersOther": "Your saved points answers are for another child or another start year, so they are not used here.",
+    "answersLink": "Open the calculator",
+    "noCalculator": "There is no points calculator for this start, so chances are not shown.",
+    "noHome": "Add your home to sort by the trip.",
+    "hiddenLanguage_one": "{{count}} place without the chosen languages is hidden.",
+    "hiddenLanguage_other": "{{count}} places without the chosen languages are hidden.",
+    "overBudget_one": "{{count}} private place above your budget is hidden.",
+    "overBudget_other": "{{count}} private places above your budget are hidden.",
+    "overBudgetShown_one": "{{count}} private place above your budget is shown.",
+    "overBudgetShown_other": "{{count}} private places above your budget are shown.",
+    "showThem": "Show them",
+    "hideThem": "Hide them",
+    "seeOnMap": "See these on the map",
+    "changeHome": "Change",
+    "homeNote": "The address is looked up on OpenStreetMap when you press search. Trips are worked out in your browser.",
+    "group_likely": "Above last year's cut-off",
+    "group_close": "Close to the cut-off",
+    "group_unknown": "No cut-off to compare",
+    "group_below": "Below last year's cut-off",
+    "groupNote_likely": "Your points are above the last child admitted last year, or everyone who applied got in.",
+    "groupNote_close": "Your points are near the last child admitted, ties are drawn by lot, or another way in (priority, special places) may apply.",
+    "groupNote_unknown": "Private places, places with no published cut-off, or no points answers for this start.",
+    "groupNote_below": "Your points are below the last child admitted last year. Cut-offs change every year.",
+    "summaryChild": "Born {{birthYear}}, starts {{startYear}}",
+    "summaryNoHome": "no home set",
+    "summaryBudget": "up to €{{amount}}/month",
+    "changeProfile": "Change",
+    "done": "Done",
+    "moreLanguages": "More languages",
+    "showMore": "Show {{count}} more",
+    "travel": "How do you get there?",
+    "travel_car": "By car",
+    "travel_transit": "Public transport"
+  },
+  "calendar": {
+    "title": "Admission calendar",
+    "intro": "Every date to act on in Sofia, from nursery to 8th grade, for your child's birth year. Add it to your phone's calendar and it updates itself when the official dates come out.",
+    "birthYear": "Year your child was born",
+    "pickYear": "Choose a year",
+    "fromSaved": "From the answers you saved on this device.",
+    "saveYear": "Remember this year on this device",
+    "subscribeTitle": "Add to your calendar",
+    "google": "Google Calendar",
+    "apple": "Apple Calendar or Outlook",
+    "download": "Download a copy (.ics, does not update)",
+    "subscribeNote": "The calendar link says only the birth year, so it holds nothing about you. A subscribed calendar checks it about once a day, so when the official dates come out the estimated ones move by themselves (Google Calendar can take up to a day). A downloaded copy stays as it is: download it again when the dates change.",
+    "officialBadge": "Official dates",
+    "estimatedBadge": "Estimated dates",
+    "estimatedUntil": "Estimated from the last official schedule. The official dates are published by {{date}}.",
+    "estimated": "Estimated from the last official schedule. The official dates are not out yet.",
+    "estimatedShort": "estimated",
+    "rulesProvisional": "The admission rules for this year may still change.",
+    "official": "Official system: {{url}}",
+    "optional": "Optional",
+    "empty": "Every admission for children born in {{year}} has ended.",
+    "calculatorLink": "Work out your points",
+    "feedName": "Admissions · born {{year}}",
+    "feedDescription": "Sofia admission dates for children born in {{year}}: {{url}}",
+    "stepTitle": "{{step}} · September {{year}}",
+    "rounds": {
+      "1": "1st",
+      "2": "2nd",
+      "3": "3rd",
+      "4": "4th",
+      "5": "5th"
+    },
+    "steps": {
+      "nursery": "Nursery",
+      "kindergarten": "Kindergarten (first group)",
+      "preparatory": "Preparatory group at a school",
+      "grade_1": "1st grade",
+      "grade_8": "8th grade"
+    },
+    "stepsShort": {
+      "nursery": "Nursery",
+      "kindergarten": "Kindergarten",
+      "preparatory": "Preparatory group",
+      "grade_1": "1st grade",
+      "grade_8": "8th grade"
+    },
+    "stepNotes": {
+      "nursery": "Free nursery places are also ranked every two weeks in autumn, so you can apply later too.",
+      "kindergarten": "Children start the first group in the year they turn 3. Applications are made in the city's online system, kg.sofia.bg.",
+      "preparatory": "A preparatory group at a school gives 4 extra points for 1st grade at that school. The group for 6-year-olds is ranked a year later on the same dates.",
+      "grade_1": "Children start 1st grade in the year they turn 7. Applications are made in the city's online system, kg.sofia.bg.",
+      "grade_8": "Classes with an aptitude exam (arts, sport) hold it in May or June: check the school."
+    },
+    "milestones": {
+      "kindergarten": {
+        "schedule_due": "Official dates due out: check them",
+        "free_places": "Free places for September announced",
+        "applications_lock": "Last day to apply or change your application (until {{time}})",
+        "ranking": "{{round}} ranking published",
+        "enrol": "Enrol a child who got a place (until {{time}} on the last day)",
+        "current_rankings": "Rankings for the places left, every two weeks"
+      },
+      "grade_1": {
+        "schedule_due": "Official dates due out: check them",
+        "free_places": "Free places for 1st grade announced",
+        "applications_lock": "Last day to apply or change your application (until {{time}})",
+        "ranking": "{{round}} ranking published",
+        "enrol": "Enrol a child who got a place (until {{time}} on the last day)",
+        "current_rankings": "September rankings for the places left"
+      },
+      "grade_8": {
+        "schedule_due": "Official dates due out: check them",
+        "nvo_bg": "National exam (NVO): Bulgarian language and literature",
+        "nvo_math": "National exam (NVO): maths",
+        "applications": "Apply for stage {{stage}}",
+        "ranking": "Stage {{stage}} results",
+        "enrol": "Enrol a pupil ranked in stage {{stage}}",
+        "enrol_1": "Enrol a pupil ranked in stage I, or apply for stage II"
+      }
     }
   }
 }

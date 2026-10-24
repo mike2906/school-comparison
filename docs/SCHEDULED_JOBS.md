@@ -8,7 +8,7 @@ at the next hour. Each opens one GitHub issue when it stops.
 |---|---|---|---|---|
 | `watch_open_days.sh` | daily (weekly in July and August) | $0.30 a run, $0.60 a day | when dates changed | Open-days check stopped |
 | `publish_cutoffs.sh` | when the `cutoff-data` branch moves | none (no model) | new rounds | Automatic cut-off publish stopped |
-| `refresh_fees.sh` | monthly, from the 1st | $1.50 a month | what it wrote | Scheduled fees re-read stopped |
+| `refresh_fees.sh` | monthly, from the 1st (first: `find-websites`, free) | $1.50 a month | what it wrote | Scheduled fees re-read stopped |
 | `refresh_facts.sh` | twice a year, from 1 Feb and 25 Aug, 120 schools a night | $1.70 a night, $5 a cycle | each night | Scheduled facts re-read stopped |
 | `refresh_register.sh` | monthly, from the 5th | $0.30 a month: three tries of two $0.05 pin-agent passes | always (via `refresh_pins.sh`) | Scheduled register refresh stopped |
 
@@ -25,7 +25,17 @@ They share `backend/scripts/lib/scheduled_job.sh`:
 - **Merged code only.** Cron runs whatever is checked out. A job stops (with its issue) when the
   checkout has local edits to tracked files, an untracked file under `backend/` that git does
   not ignore, or its HEAD is not on `origin/main` as last
-  fetched. Nothing pulls main by itself: a thread updates the checkout with Mike's go.
+  fetched.
+- **Up to main before a run.** Once a job is due and has claimed the day, it fast-forwards the
+  checkout to `origin/main`, so merged fixes reach the schedule without a go (Mike,
+  2026-10-21). It does not pull when main changes `job_files` in `lib/scheduled_job.sh` (the
+  scheduled scripts, `publish_snapshot.sh`, the spend guard `app/services/provider_costs.py`,
+  and `backend/alembic`: a pull does not apply migrations), when the fetch fails, or when the
+  checkout is on a branch other than `main`. It then runs on the code it has and opens one
+  issue, "Scheduled fees re-read: checkout not updated" (or the facts or register job's).
+  Those changes reach the PC only through a thread's pull with Mike's go (with the migration
+  applied). It also skips the pull, without an issue, while the open-days check or a publish
+  is running from the checkout.
 - **Installing starts nothing.** The first run records the current month or cycle as done, so
   the first scheduled run is the next one.
 - **One at a time, one start a day.** One lock (`scheduled.lock`) for the three, and at most
@@ -62,10 +72,21 @@ early; each school's write stands on its own, as with the open-days check.
 pinned, and `refresh_pins.sh` publishes at the end. A publish in between ships new schools
 before their pins, which then show "Not on the map yet" until the chain's publish.
 
+### Websites for schools without one
+
+The register import brings private schools in with the register's website, usually blank,
+and no website stage runs after it (33 of 174 private institutions had none on 2026-10-23).
+So the fees job's first run of a month, after its backup, runs `find-websites --apply`:
+SearXNG search and URL validation without the model (free) for each private school with no
+site that was not searched in the last 90 days; a site validation accepts is stored and its
+fees are read in the same run. It counts as written, so the month publishes even when no fee
+changed. A failed search is logged and the fee read goes ahead. Facts for a site found come
+with the next facts cycle, or a thread's run.
+
 ### The register chain
 
-After the backup: `run --stage discover --city sofia` (the ministry register and kg.sofia.bg; a
-crashed source now exits non-zero, and the issue quotes its error, such as the ministry API answering with a Cloudflare challenge, as it has since October 2026; its output is kept in `$state/register-discover-<stamp>.log`; a school keeps its scrape status unless its website
+After the backup: `playwright install chromium` (a no-op once installed), then `run --stage discover --city sofia` (the ministry register and kg.sofia.bg; a
+crashed source now exits non-zero, and the issue quotes its error; the ministry API has answered scripts with a Cloudflare challenge since October 2026, so the import retries it through headless Chromium, which a home connection gets through; its output is kept in `$state/register-discover-<stamp>.log`; a school keeps its scrape status unless its website
 changed, so the import never withholds website data it has no stage to re-check), `scripts/import_sofia_municipal_points.py --apply`,
 `register-pins --apply`, `site-address --apply`, `confirm-pins --apply` (all free, hidden
 locations only), then `refresh_pins.sh` with `PINS_FORCE=1`: `website-pins`, `pin-agent`

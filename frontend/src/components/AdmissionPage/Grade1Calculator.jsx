@@ -1,10 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { formatRange, measuredOnFor } from '../../admission/calculator'
 import { addressFactsForSchool } from '../../admission/catchments'
 import { EMPTY_ADDRESS, evaluateGrade1, GRADE1_INITIAL } from '../../admission/inputs'
 import { loadCatchments } from '../../admission/loadCatchments'
-import { getSaved, saveStage } from '../../admission/saved'
+import { getSaved, saveStage, siblingsWith, withSiblings } from '../../admission/saved'
 import { useSavedAdmission } from '../../hooks/useSavedAdmission'
 import AddressCheck from '../Admission/AddressCheck'
 import CutoffComparison from '../Admission/CutoffComparison'
@@ -142,9 +142,23 @@ function Grade1Calculator({ selected, startYear, school, cutoffRows = [], isCurr
   })
   const [a, setA] = useState(() => {
     const entry = getSaved().grade_1
-    return entry ? { ...GRADE1_INITIAL, ...withoutPlace(entry.answers) } : GRADE1_INITIAL
+    const sibling = entry?.siblings?.[school?.id]
+    const here = sibling ? { siblingAtSchool: true, siblingYoung: sibling.siblingUnderAgeAtSchool } : {}
+    return entry ? { ...GRADE1_INITIAL, ...withoutPlace(entry.answers), ...here } : GRADE1_INITIAL
   })
   const set = (key, value) => setA(prev => ({ ...prev, [key]: value }))
+  // The school loads after the form: put back the sibling saved for it, and clear an
+  // answer given for another school.
+  const placeId = school?.id ?? null
+  const placeRef = useRef(placeId)
+  useEffect(() => {
+    const before = placeRef.current
+    placeRef.current = placeId
+    if (placeId == null || before === placeId) return
+    const sibling = getSaved().grade_1?.siblings?.[placeId]
+    if (sibling) setA(prev => ({ ...prev, siblingAtSchool: true, siblingYoung: sibling.siblingUnderAgeAtSchool }))
+    else if (before != null) setA(prev => ({ ...prev, siblingAtSchool: null, siblingYoung: null }))
+  }, [placeId])
   const updateAddress = (i, update) => setAddresses(prev => prev.map((old, j) => (j === i ? update(old) : old)))
 
   const context = {
@@ -156,8 +170,12 @@ function Grade1Calculator({ selected, startYear, school, cutoffRows = [], isCurr
   const results = addresses.map(evaluate)
 
   // Only what the list can reuse: the checked address and dates, not yes/no answers
-  // about whichever school was on the page.
-  const toSave = () => ({ startYear, addresses: addresses.map(restoredAddress), answers: withoutPlace(a) })
+  // about whichever school was on the page, except a sibling there, kept for that school.
+  const siblingPlace = a.siblingAtSchool === true ? { siblingAtSchool: true, siblingUnderAgeAtSchool: context.siblingUnderAgeAtSchool } : null
+  const toSave = () => withSiblings(
+    { startYear, addresses: addresses.map(restoredAddress), answers: withoutPlace(a) },
+    siblingsWith(saved, startYear, placeId, siblingPlace),
+  )
   const home = addresses[0]?.check ? { streetId: addresses[0].check.streetId, number: addresses[0].check.number } : undefined
   const save = () => saveStage('grade_1', toSave(), { home })
   const dirty = !saved || JSON.stringify({ ...toSave(), savedOn: saved.savedOn }) !== JSON.stringify(saved)
@@ -205,6 +223,7 @@ function Grade1Calculator({ selected, startYear, school, cutoffRows = [], isCurr
           intro={t('admissionCalc.g1.perSchoolIntro')}
         >
           <YesNo label={t('admissionCalc.g1.siblingAtSchool')} value={a.siblingAtSchool} onChange={v => set('siblingAtSchool', v)} />
+          {!school && a.siblingAtSchool === true && <p className="text-xs text-neutral-600">{t('admissionCalc.g1.siblingListHint')}</p>}
           {a.siblingAtSchool === true && (
             <YesNo
               label={t('admissionCalc.g1.siblingYoung', { max: params.groups.sibling_max_age, year: startYear })}

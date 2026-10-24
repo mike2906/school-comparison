@@ -136,18 +136,31 @@ lead: fix from the school's site or an official source, never by copying OSM (OD
 
 The weekly run also runs `site-city` (free, no model): an accepted website whose home page
 title, main heading or site name names another town ("гр.Варна" on a Sofia school's site,
-2026-10-19) takes the URL-validation failure path, so its data leaves the site with that
+2026-10-19) or numbers another school ("ДГ 59" on private kindergarten 184 Елхица's
+dg-59.com, 2026-10-23) takes the URL-validation failure path, so its data leaves the site with that
 run's publish and `recover-failed-urls` looks for the real site. When search does not find it,
 `cli check-website --school-id N --url <site>` runs the same checks on a site you know (dry
-run; `--apply` stores it only if valid). A school whose accepted site is wrong (587, a
+run; `--apply` stores it only if valid, and the school starts clean: the withholding marker
+an earlier failed site left, which would hide its facts, goes with that site's pages and the
+old Stage 6 report). A school whose site spells its name otherwise (303 "Детски оазис" is
+Kinderoase) takes `--alias <name>` (repeatable): it counts in the name checks and is kept in
+`name_aliases` with the stored site. Private schools with no site are searched for by `find-websites`
+(below). A school whose accepted site is wrong (587, a
 kindergarten on its sibling school's drujba.org) takes `--replace --apply`: the old site's
 pages, site-copied addresses and extraction are dropped as in the shared-site check's
 replace, so re-run `navigate` and `extract`, then `school-facts` and `fees-agent`. A school stored
 with its group's home page (574 on novigradini.com, whose own pages are under /anika/) takes
 `--replace --section` with its section's URL. More than `SITE_CITY_MAX`
 (3) at once withholds none and opens the issue "Website town check stopped"; the pins go
-ahead either way. URL validation applies the same rule to new sites
+ahead either way. URL validation applies the same rules to new sites
 (`app/scrapers/site_city.py`).
+
+`find-websites` (free: SearXNG search, URL validation without the model) searches for the
+site of each private or international school with none and stores only one validation
+accepts, as `check-website` does; a school searched in the last 90 days waits. The register
+import brings private schools in without a site, so the monthly fees job runs it before its
+first read of the month (`docs/SCHEDULED_JOBS.md`). Dry run by default; `--school-id` searches
+named schools of any type.
 
 It also runs `site-grades` (free, no model): a school's grade bands come from the register's
 school type, which guesses (treaty schools default to 8-12, private "СУ" licences run higher

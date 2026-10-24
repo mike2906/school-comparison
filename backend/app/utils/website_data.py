@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime
+import re
 from collections.abc import Mapping
 from typing import Any
 
@@ -88,6 +89,24 @@ def promote_validation_report(
     return attrs
 
 
+def start_given_site_clean(attributes: Any, *, drop_site_blocks: bool) -> dict[str, Any]:
+    """Attributes for a school whose site a person gave or a search found and validation
+    accepted: no withholding marker and no old Stage 6 report.
+
+    The marker protected website-derived blocks read before it was set, and those do not
+    check which content they came from, only which site: a re-accepted URL, or a section
+    of the same site, would show them again unread. So with ``drop_site_blocks`` (set
+    when the marker was set, or the site was replaced) the facts, website name and
+    social links go too, and come back only from a fresh read."""
+    attrs = dict(attributes) if isinstance(attributes, Mapping) else {}
+    attrs.pop(WEBSITE_DATA_WITHHELD_KEY, None)
+    attrs.pop("data_validation", None)
+    if drop_site_blocks:
+        for key in (*_SCHOOL_FACTS_KEYS, "social_links"):
+            attrs.pop(key, None)
+    return attrs
+
+
 def record_validation_failure(
     attributes: Any, *, error: str, failed_at: str | None = None
 ) -> dict[str, Any]:
@@ -129,6 +148,50 @@ def website_data_withheld_reasons(attributes: Any, scrape_status: Any) -> list[s
     if status not in WEBSITE_PUBLISHABLE_STATUSES:
         reasons.append("status_not_publishable")
     return reasons
+
+
+_URL_SCHEME_RE = re.compile(r"^[a-z][a-z0-9+.-]*:", re.IGNORECASE)
+
+
+def safe_website_url(url: Any) -> str | None:
+    """A stored website address, or None when it names a scheme other than http(s).
+
+    Register addresses often come without a scheme ("www.school.bg") and stay as they are;
+    a value such as "javascript:..." must never reach a link.
+    """
+    if not isinstance(url, str) or not url.strip():
+        return None
+    url = url.strip()
+    if _URL_SCHEME_RE.match(url) and not url.lower().startswith(("http://", "https://")):
+        return None
+    return url
+
+
+def public_website_url(url: Any, attributes: Any, scrape_status: Any) -> str | None:
+    """The website address a response may show as the school's own.
+
+    Website discovery stores its pick (``attributes.website_candidate_url``) in
+    ``website_url`` before URL validation has looked at it. A pick from web search or a
+    domain guessed from an email address is withheld until validation accepts it
+    (``SITE_ACCEPTED_STATUSES``), like every other website-derived field. Addresses the
+    school's own records give (the register import, ``existing``) are shown.
+    """
+    safe = safe_website_url(url)
+    if safe is None:
+        return None
+    attrs = attributes if isinstance(attributes, Mapping) else {}
+    candidate = attrs.get("website_candidate_url")
+    method = str(attrs.get("website_candidate_method") or "")
+    unchecked_pick = method == "search" or method.startswith("email_domain:")
+    status = str(scrape_status or "").strip().lower()
+    if (
+        unchecked_pick
+        and isinstance(candidate, str)
+        and candidate.strip() == safe
+        and status not in SITE_ACCEPTED_STATUSES
+    ):
+        return None
+    return safe
 
 
 def agent_fees_publishable(attributes: Any, scrape_status: Any) -> bool:

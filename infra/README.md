@@ -2,7 +2,7 @@
 
 Terraform manages the Cloudflare side of production: the `api` and site DNS records, TLS
 mode, the API's Origin CA certificate, the Pages project and its domain, the `www`
-redirect, the API cache rule and the crawler settings. It does not manage the API host: the OVH provider can
+redirect, the API cache rule, the API rate limit and the crawler settings. It does not manage the API host: the OVH provider can
 order a VPS, but a changed image reinstalls (wipes) it and the SSH key needs an image ID
 that only exists after the first order. The host is ordered by hand and set up by
 `deploy/bootstrap.sh`. Email Routing's records are not declared here, so Terraform leaves
@@ -24,7 +24,7 @@ Monthly cost: everything here is on Cloudflare's free plan. The only paid item i
 4. **Cloudflare API token** (My Profile → API Tokens → Create Custom Token), limited to
    the `schooldecider.com` zone and your account:
    - Zone: Zone Read, DNS Write, Zone Settings Write, SSL and Certificates Write, Bot
-     Management Write, Single Redirect Write, Cache Rules Write
+     Management Write, Single Redirect Write, Cache Rules Write, Zone WAF Write
    - Account: Cloudflare Pages Write
 
    A token with the same items as Read is enough for `terraform plan`.
@@ -69,6 +69,18 @@ After the first apply, check in the dashboard:
 `terraform plan` fails if Cloudflare's published IPv4 ranges differ from
 `deploy/cloudflare-proxies.caddy`. Update that file, then on the server reinstall it and
 restart the firewall and Caddy (`deploy/README.md`).
+
+## Rate limit
+
+`cloudflare_ruleset.rate_limit` blocks an address for 10 seconds once it sends more than
+200 API requests in 10 seconds (the free plan's only rate-limit rule; the comment in
+`main.tf` gives the limits). Blocked requests get a 429 and show under Security → Events.
+Raise the number if parents start to share an address in large numbers (mobile carriers
+put many phones behind one), or if a build or scan starts tripping it. The site build
+waits out a 429 and retries; the load test from one runner cannot stay under it. A
+rate-limit rule made by hand in the dashboard makes the first apply fail (one ruleset per
+phase): delete it there first, or import it with
+`terraform import cloudflare_ruleset.rate_limit zones/<zone id>/<ruleset id>`.
 
 ## Crawler settings
 

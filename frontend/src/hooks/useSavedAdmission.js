@@ -23,7 +23,7 @@ function loadRuleSets() {
  * What the saved tabs need, loaded once: districts for kindergartens, catchments for first
  * grade. A file that fails leaves only its own tab without results.
  */
-function useVerdictData(needsDistricts, needsCatchments) {
+export function useVerdictData(needsDistricts, needsCatchments) {
   const [data, setData] = useState(null)
   useEffect(() => {
     if (!needsDistricts && !needsCatchments) return undefined

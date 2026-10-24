@@ -6,6 +6,7 @@ import { fetchSchool } from '../../api/schools'
 import { getSchoolName } from '../../utils/i18n'
 import { RULE_SETS } from '../../admission/ruleSets'
 import {
+  campaignStillRanking,
   defaultStartYear,
   ruleSetFor,
   sameRules,
@@ -83,7 +84,8 @@ function AdmissionPage() {
     return startYearChoices().includes(year) ? year : null
   }
   const [chosenYear, setChosenYear] = useState(() => savedYear(stage.id))
-  const startYear = chosenYear ?? defaultStartYear(new Date(), { ruleSets: RULE_SETS, stage, today })
+  const startYear = chosenYear ?? defaultStartYear()
+  const stillRanking = campaignStillRanking(new Date(), { ruleSets: RULE_SETS, stage, today })
 
   useEffect(() => {
     const previous = document.title
@@ -142,6 +144,9 @@ function AdmissionPage() {
         <h1 className="text-3xl font-bold text-neutral-900">{t('admissionCalc.title')}</h1>
         <p className="mt-2 max-w-3xl text-neutral-700">{t('admissionCalc.intro')}</p>
         <p className="mt-2 max-w-3xl text-sm text-neutral-600">{t('admissionCalc.privacy')}</p>
+        <p className="mt-2 max-w-3xl text-sm">
+          <Link to="/calendar" className="font-medium text-primary-700 underline">{t('admissionCalc.calendarLink')}</Link>
+        </p>
 
         <div className="mt-6 flex flex-wrap gap-2" role="tablist">
           {STAGES.map(option => (
@@ -184,6 +189,14 @@ function AdmissionPage() {
               </select>
             )}
           </Field>
+          {stillRanking != null && stillRanking !== startYear && (
+            <p className="text-sm text-neutral-700">
+              {t('admissionCalc.stillRanking', { year: stillRanking, next: stillRanking + 1 })}{' '}
+              <button type="button" onClick={() => setChosenYear(stillRanking)} className="font-medium text-primary-700 underline">
+                {t('admissionCalc.useStillRanking', { year: stillRanking, next: stillRanking + 1 })}
+              </button>
+            </p>
+          )}
           {schoolContext && (
             <div className="text-sm text-neutral-700">
               {t('admissionCalc.forSchool')}{' '}

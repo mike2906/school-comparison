@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Test network for frontend/src/routing/transit.test.js (walking at 4 km/h, ~1.11 m/s).
+     11                  north street 3 - 10 - 11 (~1.67 km)
+     |
+     10 - 31             footway 2 - 30 - 31 - 10, with a fence at 30
+     |    |
+     |    30 (fence)
+     |    |
+     1 - 2 - 3 - 4 - 5       main street, ~410 m a step
+     A motorway from 1 straight to 11 must not be walked. -->
+<osm version="0.6">
+  <node id="1" lat="42.700" lon="23.300"/>
+  <node id="2" lat="42.700" lon="23.305"/>
+  <node id="3" lat="42.700" lon="23.310"/>
+  <node id="4" lat="42.700" lon="23.315"/>
+  <node id="5" lat="42.700" lon="23.320"/>
+  <node id="10" lat="42.705" lon="23.310"/>
+  <node id="11" lat="42.715" lon="23.310"/>
+  <node id="30" lat="42.7025" lon="23.305"><tag k="barrier" v="fence"/></node>
+  <node id="31" lat="42.705" lon="23.305"/>
+  <way id="1"><nd ref="1"/><nd ref="2"/><nd ref="3"/><nd ref="4"/><nd ref="5"/><tag k="highway" v="residential"/></way>
+  <way id="2"><nd ref="3"/><nd ref="10"/><nd ref="11"/><tag k="highway" v="residential"/><tag k="oneway" v="yes"/></way>
+  <way id="3"><nd ref="2"/><nd ref="30"/><nd ref="31"/><nd ref="10"/><tag k="highway" v="footway"/></way>
+  <way id="4"><nd ref="1"/><nd ref="11"/><tag k="highway" v="motorway"/></way>
+</osm>

@@ -11,7 +11,8 @@ import { evaluateGrade1, evaluateKindergarten, KINDERGARTEN_GROUPS, kindergarten
 import { usesSofiaKindergartenSystem } from '../utils/admission.js'
 import { parseCoordinate } from '../utils/coordinates.js'
 
-// What the list assumes for answers that depend on the school.
+// What the list assumes for answers that depend on the school, except a sibling the parent
+// named on that school's own calculator page (the saved entry's `siblings`).
 export const KINDERGARTEN_ASSUMED = { siblingThere: false, wishRank: 1 }
 export const GRADE1_ASSUMED = { siblingAtSchool: false, siblingUnderAgeAtSchool: false, preparatoryGroupHere: false }
 
@@ -25,7 +26,7 @@ function schoolPoint(school) {
   return location ? [parseCoordinate(location.lat), parseCoordinate(location.lng)] : null
 }
 
-/** A kindergarten's district feature: the one kg.sofia.bg gives, else the polygon its pin is in. */
+/** A school's district feature: the one its source names (kg.sofia.bg for kindergartens), else the polygon its pin is in. */
 export function kindergartenDistrictFeature(school, districts) {
   if (!districts) return null
   const point = schoolPoint(school)
@@ -69,7 +70,7 @@ function kindergartenVerdict(school, entry, { ruleSets, districts, today }, sear
   const selected = ruleSetFor(ruleSets, stageById('kindergarten'), entry.startYear, today)
   if (!selected) return null
   const district = kindergartenDistrict(school, districts)
-  const result = evaluateKindergarten(selected.ruleSet, entry.answers, entry.startYear, { district, ...KINDERGARTEN_ASSUMED }, today)
+  const result = evaluateKindergarten(selected.ruleSet, entry.answers, entry.startYear, { district, ...KINDERGARTEN_ASSUMED, ...entry.siblings?.[school.id] }, today)
   if (!result) return null
   const rows = summaryRowsFor(summary, stageById('kindergarten'))
     .filter(row => rowFitsChild(row, ageGroup, entry.answers.birthYear, entry.startYear))
@@ -99,7 +100,7 @@ function grade1Verdict(school, entry, { ruleSets, catchments, today }) {
     selected.ruleSet,
     entry.answers,
     { inCatchment, inNeighbouring: !inCatchment && facts.some(f => f.inNeighbouring), since: address.since },
-    GRADE1_ASSUMED
+    { ...GRADE1_ASSUMED, ...entry.siblings?.[school.id] }
   )
   const rows = summaryRowsFor(school.admission_info?.cutoff_summary, stageById('grade_1'))
   return { stage: 'grade_1', yours: result, ...compareRows(rows, result, selected.ruleSet) }
@@ -121,18 +122,24 @@ export function savedVerdictsFor(school, saved, ageGroup, data) {
 }
 
 /**
+ * A "below" with no other way in: not a cut-off ranked under other rules, and no social
+ * priority or SEN places, separate ways in that the cut-off says nothing about.
+ */
+export function isClearlyBelow(verdict) {
+  return verdict.verdict === 'below' && !verdict.lines.some(line => line.otherRules) &&
+    !(verdict.stage === 'kindergarten' && verdict.socialPriority !== false) && !verdict.specialPlaces
+}
+
+/**
  * Ids of the schools where every saved result is below the last admitted child. Schools
  * without a cut-off, with a tie, mixed rounds, a cut-off ranked under other rules or a
  * possible priority path stay listed: only a clear "below" counts.
  */
 export function clearlyBelowIds(schools, saved, ageGroup, data) {
-  const below = verdict => verdict.verdict === 'below' && !verdict.lines.some(line => line.otherRules) &&
-    // Social priority and SEN places are separate ways in that the cut-off says nothing about.
-    !(verdict.stage === 'kindergarten' && verdict.socialPriority !== false) && !verdict.specialPlaces
   const ids = new Set()
   for (const school of schools) {
     const verdicts = savedVerdictsFor(school, saved, ageGroup, data)
-    if (verdicts.length > 0 && verdicts.every(below)) ids.add(school.id)
+    if (verdicts.length > 0 && verdicts.every(isClearlyBelow)) ids.add(school.id)
   }
   return ids
 }

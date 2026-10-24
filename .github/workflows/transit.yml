@@ -1,0 +1,133 @@
+name: Public transport data
+
+# Builds the walking graph and one school day of Sofia's public transport timetable that the
+# site routes on in the browser (docs/TRANSIT_TIMES.md), checks a sample of trips against the
+# official journey planner, and publishes them to the transit release, which the Deploy
+# workflow copies into the site. Monthly (after the 5th's map pin refresh), by hand, and on pull
+# requests that change the builders or the router (checks only, nothing published).
+on:
+  schedule:
+    - cron: "20 4 6 * *"
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - tools/transit/**
+      - frontend/src/routing/footGraph.js
+      - frontend/src/routing/transit.js
+      - frontend/src/routing/roadGraph.js
+      - .github/workflows/transit.yml
+
+concurrency:
+  group: transit-${{ github.event_name == 'pull_request' && github.ref || 'publish' }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  # Stolichna municipality plus ~5 km, as the road graph.
+  BBOX: "22.98,42.47,23.70,42.90"
+  GTFS_URL: https://gtfs.sofiatraffic.bg/api/v1/static
+  SCHOOLS_URL: https://api.schooldecider.com/schools?country_code=bg&city=sofia
+  PY_DEPS: --with osmium==4.3.1 --with numpy==2.5.4 --with scipy==1.18.1
+  # Both files together; a phone downloads them once. October 2026: ~1.4 MB.
+  MAX_GZ_BYTES: 3000000
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v8.3.2
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+
+      - name: Test fixture is up to date
+        run: |
+          uv run --no-project $PY_DEPS python tools/transit/build_foot_graph.py tools/transit/tiny.osm frontend/src/routing/testdata/tiny.foot
+          git diff --exit-code -- frontend/src/routing/testdata/tiny.foot || {
+            echo "::error::Rebuild frontend/src/routing/testdata/tiny.foot with build_foot_graph.py and commit it"; exit 1; }
+
+      - name: Download and clip OpenStreetMap
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq osmium-tool
+          curl -fsSL --retry 3 -o bg.osm.pbf https://download.geofabrik.de/europe/bulgaria-latest.osm.pbf
+          osmium extract -b "$BBOX" --strategy complete_ways bg.osm.pbf -o sofia.osm.pbf
+          osmium fileinfo -e -g data.timestamp.last sofia.osm.pbf | tee osm-timestamp.txt
+
+      - name: Download the timetable and the school buildings
+        run: |
+          curl -fsSL --retry 3 -o gtfs.zip "$GTFS_URL"
+          mkdir gtfs && unzip -q gtfs.zip -d gtfs
+          curl -fsSL --retry 3 -o schools.json "$SCHOOLS_URL"
+
+      - name: Build
+        run: |
+          uv run --no-project $PY_DEPS python tools/transit/build_foot_graph.py sofia.osm.pbf sofia-foot.bin 2>&1 | tee build.log
+          node tools/transit/build_timetable.mjs gtfs sofia-foot.bin sofia-timetable.bin --schools schools.json 2>&1 | tee -a build.log
+          gzip -9 -n -c sofia-foot.bin > sofia-foot.bin.gz
+          gzip -9 -n -c sofia-timetable.bin > sofia-timetable.bin.gz
+          size=$(( $(stat -c %s sofia-foot.bin.gz) + $(stat -c %s sofia-timetable.bin.gz) ))
+          { echo '```'; cat build.log; echo "$size bytes gzipped"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          [ "$size" -le "$MAX_GZ_BYTES" ] || { echo "::error::Transit files are $size bytes gzipped, over $MAX_GZ_BYTES"; exit 1; }
+
+      - name: Check against the official journey planner
+        run: |
+          set +e
+          node tools/transit/check_planner.mjs sofia-foot.bin sofia-timetable.bin schools.json report.json | tee check.txt
+          code=${PIPESTATUS[0]}
+          { echo '```'; tail -3 check.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          # The planner is someone else's site: if it cannot be asked, publish anyway and say so.
+          if [ "$code" = 2 ]; then echo "::warning::The official planner could not be asked; the timetable was not checked"; exit 0; fi
+          exit "$code"
+
+      - name: Keep the outputs
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: transit
+          path: |
+            sofia-foot.bin.gz
+            sofia-timetable.bin.gz
+            report.json
+            build.log
+            osm-timestamp.txt
+          if-no-files-found: ignore
+
+  publish:
+    needs: build
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      actions: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: transit
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v5
+        with:
+          name: transit
+
+      - name: Publish to the transit release
+        run: |
+          notes="Sofia walking graph and one school day of public transport timetable for in-browser trip times (docs/TRANSIT_TIMES.md). Timetable: Център за градска мобилност ЕАД / Столична община, CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/), modified (one day, packed). Walking graph built from OpenStreetMap data, last edit $(tr -d '\n' < osm-timestamp.txt). © OpenStreetMap contributors; a derived database available under the ODbL 1.0 (https://opendatacommons.org/licenses/odbl/)."
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release edit "$TAG" --notes "$notes"
+          else
+            gh release create "$TAG" --title "Public transport data" --notes "$notes" --latest=false
+          fi
+          gh release upload "$TAG" sofia-foot.bin.gz sofia-timetable.bin.gz report.json --clobber
+
+      - name: Rebuild the site with the new data
+        run: gh workflow run deploy.yml --ref main -f frontend_only=true

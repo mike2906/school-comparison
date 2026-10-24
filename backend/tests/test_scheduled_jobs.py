@@ -1,5 +1,6 @@
 """Exercise the scheduled refresh scripts (backend/scripts/refresh_*.sh) with uv, docker, gh
 and the publish stubbed: when they run, what they spend, how they carry on after a stop."""
+import fcntl
 import json
 import os
 import shutil
@@ -19,6 +20,13 @@ import json, os, sys
 args = sys.argv[1:]
 with open(os.environ["CALLS"], "a") as f:
     f.write(json.dumps({"uv": args, "force": os.environ.get("PINS_FORCE")}) + "\n")
+if args[1:3] == ["playwright", "install"]:
+    sys.exit(int(os.environ.get("BROWSER_FAIL", "0")))
+if "find-websites" in args:
+    if os.environ.get("FIND_FAIL"):
+        sys.exit(1)
+    json.dump({"found": int(os.environ.get("FIND_FOUND", "0")), "searched": 3}, open(args[args.index("--out") + 1], "w"))
+    sys.exit(0)
 if "--out" not in args or "--max-usd" not in args:
     print(os.environ.get("UV_STDOUT", ""))
     sys.exit(int(os.environ.get("UV_FAIL", "0")))
@@ -42,6 +50,7 @@ GH_STUB = """#!/bin/sh
 echo "gh $*" >> "$CALLS.gh"
 """
 PUBLISH_STUB = """#!/bin/sh
+if [ "$1" = "--lock-path" ]; then echo "$SCHEDULED_STATE_DIR/publish.lock"; exit 0; fi
 echo '{"publish": true}' >> "$CALLS"
 """
 PINS_STUB = """#!/bin/sh
@@ -71,7 +80,11 @@ def pc(tmp_path):
     subprocess.run([*git, "init", "-q", "-b", "main"], check=True)
     subprocess.run([*git, "add", "."], check=True)
     subprocess.run([*git, "commit", "-qm", "scripts"], check=True)
-    subprocess.run([*git, "update-ref", "refs/remotes/origin/main", "HEAD"], check=True)
+    origin = tmp_path / "origin.git"
+    subprocess.run(["git", "init", "-q", "--bare", "-b", "main", str(origin)], check=True)
+    subprocess.run([*git, "remote", "add", "origin", str(origin)], check=True)
+    subprocess.run([*git, "push", "-q", "origin", "main"], check=True)
+    subprocess.run([*git, "fetch", "-q", "origin"], check=True)
     binaries = tmp_path / "bin"
     _exe(binaries / "uv", UV_STUB)
     _exe(binaries / "docker", DOCKER_STUB)
@@ -84,6 +97,7 @@ def pc(tmp_path):
         PATH=f"{binaries}:{os.environ['PATH']}",
         SCHEDULED_STATE_DIR=str(state),
         PINS_STATE_DIR=str(state),
+        OPEN_DAYS_STATE_DIR=str(state),
         SCHEDULED_BACKUPS=str(tmp_path / "backups"),
         CALLS=str(calls),
         UV_PLAN=str(plan),
@@ -92,6 +106,24 @@ def pc(tmp_path):
     class PC:
         def __init__(self):
             self.state, self.checkout = state, checkout
+
+        def merge_to_main(self, path, text):
+            """A PR merged on GitHub: a commit on origin's main that the checkout lacks."""
+            clone = tmp_path / "clone"
+            if not clone.exists():
+                subprocess.run(["git", "clone", "-q", str(origin), str(clone)], check=True)
+            other = ["git", "-C", str(clone), "-c", "user.name=t", "-c", "user.email=t@t"]
+            subprocess.run([*other, "pull", "-q", "origin", "main"], check=True)
+            (clone / path).parent.mkdir(parents=True, exist_ok=True)
+            (clone / path).write_text(text)
+            subprocess.run([*other, "add", "."], check=True)
+            subprocess.run([*other, "commit", "-qm", f"change {path}"], check=True)
+            subprocess.run([*other, "push", "-q", "origin", "main"], check=True)
+
+        def head(self):
+            return subprocess.run(
+                ["git", "-C", str(checkout), "rev-parse", "HEAD"], capture_output=True, text=True, check=True
+            ).stdout.strip()
 
         def run(self, script, day, runs=(), **extra):
             plan.write_text(json.dumps(list(runs)))
@@ -130,6 +162,41 @@ def test_installing_starts_nothing_and_the_next_month_runs_once(pc):
     assert pc.option("--workers") == "4" and pc.published
     assert (pc.state / "fees_cycle").read_text().strip() == "2026-11"
     assert pc.run("refresh_fees.sh", "2026-11-02T02:20").calls == []
+
+
+def _find_websites_calls(pc):
+    return [c["uv"] for c in pc.calls if "uv" in c and "find-websites" in c["uv"]]
+
+
+def test_the_months_first_fee_run_first_searches_for_missing_websites(pc):
+    pc.run("refresh_fees.sh", "2026-10-20T12:20")
+    pc.run("refresh_fees.sh", "2026-11-01T02:20", [{"schools": [5, 8], "spent": 0.8, "stopped": "stopped before school 9: cap"}], FIND_FOUND="2")
+    uv = [c["uv"] for c in pc.calls if "uv" in c]
+    assert "find-websites" in uv[0] and "--apply" in uv[0] and "--max-usd" in uv[1]  # searched before the read
+    assert "find-websites: 2 of 3 schools without a site found one" in pc.log("fees")
+    # A carried-on run does not search again: the schools before it were read already.
+    pc.run("refresh_fees.sh", "2026-11-02T02:20", [{"schools": [9], "spent": 0.3}])
+    assert _find_websites_calls(pc) == [] and pc.option("--after-id") == "8"
+
+
+def test_nothing_found_publishes_only_what_the_read_wrote(pc):
+    pc.run("refresh_fees.sh", "2026-10-20T12:20")
+    (pc.state / "fees-2026-11.schools.jsonl").unlink(missing_ok=True)
+    pc.run("refresh_fees.sh", "2026-11-01T02:20", [{"schools": [], "spent": 0.0}], FIND_FOUND="0")
+    assert pc.code == 0 and len(_find_websites_calls(pc)) == 1 and not pc.published
+
+
+def test_sites_found_are_published_even_when_no_fee_was_written(pc):
+    pc.run("refresh_fees.sh", "2026-10-20T12:20")
+    pc.run("refresh_fees.sh", "2026-11-01T02:20", [{"schools": [], "spent": 0.0}], FIND_FOUND="1")
+    assert pc.code == 0 and pc.published
+
+
+def test_a_failed_search_does_not_hold_up_the_fee_read(pc):
+    pc.run("refresh_fees.sh", "2026-10-20T12:20")
+    pc.run("refresh_fees.sh", "2026-11-01T02:20", [{"schools": [3], "spent": 0.2}], FIND_FAIL="1")
+    assert pc.code == 0 and pc.option("--max-usd") == "1.50"
+    assert "find-websites failed; the fee read goes on without it" in pc.log("fees")
 
 
 def test_a_run_the_cap_stopped_carries_on_tomorrow_with_what_is_left(pc):
@@ -209,7 +276,7 @@ def test_the_register_chain_runs_from_the_fifth_and_ends_with_a_forced_pin_run(p
 
     pc.run("refresh_register.sh", "2026-11-05T12:50", UV_FAIL="0")
     commands = [c["uv"][4] if c["uv"][1] == "python" and c["uv"][2] == "-m" else c["uv"][2] for c in pc.calls if "uv" in c]
-    assert commands == ["run", "scripts/import_sofia_municipal_points.py", "register-pins", "site-address", "confirm-pins"]
+    assert commands == ["install", "run", "scripts/import_sofia_municipal_points.py", "register-pins", "site-address", "confirm-pins"]
     assert pc.calls[-1] == {"pins": "1 0.05"} and pc.code == 0
     assert (pc.state / "register_cycle").read_text().strip() == "2026-11"
 
@@ -217,7 +284,7 @@ def test_the_register_chain_runs_from_the_fifth_and_ends_with_a_forced_pin_run(p
 def test_a_failed_register_import_stops_before_the_pins_and_tries_three_times_a_month(pc):
     pc.run("refresh_register.sh", "2026-10-20T12:50")
     pc.run("refresh_register.sh", "2026-11-05T12:50", UV_FAIL="1")
-    assert pc.code == 1 and len(pc.calls) == 1 and "Scheduled register refresh stopped" in pc.issues
+    assert pc.code == 1 and len(pc.calls) == 2 and "Scheduled register refresh stopped" in pc.issues
     for day in ("06", "07"):
         assert pc.run("refresh_register.sh", f"2026-11-{day}T12:50", UV_FAIL="1").calls != []
     pc.run("refresh_register.sh", "2026-11-08T12:50", UV_FAIL="1")
@@ -237,8 +304,65 @@ def test_a_blocked_register_names_the_cause_in_its_issue(pc):
     assert "Cloudflare challenge" in pc.log("register")
 
 
+def test_a_register_browser_that_will_not_install_still_runs_the_import(pc):
+    pc.run("refresh_register.sh", "2026-10-20T12:50")
+    pc.run("refresh_register.sh", "2026-11-05T12:50", BROWSER_FAIL="1")
+    assert pc.code == 0 and "installing the register's headless browser failed" in pc.log("register")
+    assert pc.calls[-1] == {"pins": "1 0.05"}
+
+
 def test_an_untracked_file_under_backend_runs_nothing(pc):
     pc.run("refresh_fees.sh", "2026-10-20T12:20")
     (pc.checkout / "backend/sitecustomize.py").write_text("print('not merged')\n")
     pc.run("refresh_fees.sh", "2026-11-01T02:20", [{"schools": [1], "spent": 0.5}])
     assert pc.code == 1 and pc.calls == [] and "untracked files" in pc.log("fees")
+
+
+def test_a_run_first_brings_the_checkout_up_to_main(pc):
+    pc.run("refresh_fees.sh", "2026-10-20T12:20")
+    pc.merge_to_main("backend/app/fix.py", "FIXED = True\n")
+    pc.run("refresh_fees.sh", "2026-11-01T02:20", [{"schools": [1], "spent": 0.5}])
+    assert pc.code == 0 and pc.option("--max-usd") is not None
+    assert (pc.checkout / "backend/app/fix.py").exists() and "checkout at" in pc.log("fees")
+
+
+def test_a_change_to_a_scheduled_job_on_main_runs_the_old_code_and_says_so(pc):
+    pc.run("refresh_fees.sh", "2026-10-20T12:20")
+    before = pc.head()
+    pc.merge_to_main("backend/scripts/refresh_fees.sh", "#!/usr/bin/env bash\n# a higher cap\n")
+    pc.run("refresh_fees.sh", "2026-11-01T02:20", [{"schools": [1], "spent": 0.5}])
+    assert pc.code == 0 and pc.option("--max-usd") is not None and pc.head() == before
+    assert "backend/scripts/refresh_fees.sh" in pc.log("fees") and "checkout not updated" in pc.issues
+
+
+def test_a_new_migration_on_main_is_not_pulled(pc):
+    pc.run("refresh_fees.sh", "2026-10-20T12:20")
+    before = pc.head()
+    pc.merge_to_main("backend/alembic/versions/abc_new.py", "revision = 'abc'\n")
+    pc.run("refresh_fees.sh", "2026-11-01T02:20", [{"schools": [1], "spent": 0.5}])
+    assert pc.head() == before and "backend/alembic/versions/abc_new.py" in pc.log("fees")
+
+
+def test_a_failed_fetch_runs_the_code_it_has_and_says_so(pc):
+    pc.run("refresh_fees.sh", "2026-10-20T12:20")
+    subprocess.run(["git", "-C", str(pc.checkout), "remote", "set-url", "origin", "/nowhere"], check=True)
+    pc.run("refresh_fees.sh", "2026-11-01T02:20", [{"schools": [1], "spent": 0.5}])
+    assert pc.code == 0 and "git fetch origin main failed" in pc.log("fees") and "checkout not updated" in pc.issues
+
+
+def test_a_detached_checkout_moves_to_main(pc):
+    pc.run("refresh_fees.sh", "2026-10-20T12:20")
+    subprocess.run(["git", "-C", str(pc.checkout), "checkout", "-q", "--detach"], check=True)
+    pc.merge_to_main("backend/app/fix.py", "FIXED = True\n")
+    pc.run("refresh_fees.sh", "2026-11-01T02:20", [{"schools": [1], "spent": 0.5}])
+    assert pc.code == 0 and (pc.checkout / "backend/app/fix.py").exists()
+
+
+def test_no_update_while_a_publish_runs(pc):
+    pc.run("refresh_fees.sh", "2026-10-20T12:20")
+    pc.merge_to_main("backend/app/fix.py", "FIXED = True\n")
+    with open(pc.state / "publish.lock", "a") as held:
+        fcntl.flock(held, fcntl.LOCK_EX)
+        pc.run("refresh_fees.sh", "2026-11-01T02:20", [{"schools": [1], "spent": 0.5}])
+    assert pc.code == 0 and not (pc.checkout / "backend/app/fix.py").exists()
+    assert "a publish is running" in pc.log("fees")

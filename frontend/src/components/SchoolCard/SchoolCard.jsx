@@ -8,6 +8,7 @@ import { useCompare } from '../../context/CompareContext'
 import { getSchoolName, getAddress } from '../../utils/i18n'
 import { formatAmount, formatDistance, intlLocale } from '../../utils/format'
 import { rushHourMinutes } from '../../routing/driveTimes'
+import { clock, linesText, tripMinutes } from '../../routing/transitTimes'
 import { getStatusInfo } from '../../utils/schoolAttributes'
 import {
   curatedRequirement,
@@ -64,6 +65,8 @@ const SchoolCard = memo(function SchoolCard({
   onOpenDetails,
   examAverages = null,
   samePlace = [],
+  freePlaces = null,
+  verdicts = null,
 }) {
   const { t, i18n } = useTranslation()
   const { config: countryConfig } = useCountry()
@@ -225,7 +228,9 @@ const SchoolCard = memo(function SchoolCard({
   }, [school, pricing, attributes, i18n.language, t, primaryLocation, activeAgeGroup])
 
   // Answers saved in the admission calculator, against this school's last admitted child.
-  const savedVerdicts = useSavedVerdicts(school, activeAgeGroup)
+  // A page that decides which saved answers apply (the options page) passes its own.
+  const ownVerdicts = useSavedVerdicts(school, activeAgeGroup)
+  const savedVerdicts = verdicts ?? ownVerdicts
 
   const nvoDetail = useMemo(() => {
     // Sorted by NVO: only the exam the list is ranked by, so no card shows a score from a
@@ -318,6 +323,11 @@ const SchoolCard = memo(function SchoolCard({
     ? { backgroundColor: 'rgba(245,158,11,0.1)', color: '#d97706' }
     : { backgroundColor: 'rgba(239,68,68,0.1)', color: '#dc2626' }
   const driveMinutes = rushHourMinutes(school.driveSeconds)
+  // By public transport (the options page): the trip, and when to leave to be there in time.
+  const transit = school.transit
+  const transitLabel = transit && t(transit.lines.length ? 'transitTime.aria' : 'transitTime.ariaWalk', {
+    minutes: tripMinutes(transit), leave: clock(transit.leave), deadline: clock(transit.deadline), lines: linesText(transit.lines, t),
+  }) + (school.startKnown === false ? ` (${t('transitTime.startUnknown')})` : '')
   const statusStyle = statusInfo ? {
     backgroundColor: statusInfo.color,
     boxShadow: `0 0 8px ${hexToRgba(statusInfo.color, 0.4)}`,
@@ -406,7 +416,7 @@ const SchoolCard = memo(function SchoolCard({
             {schoolName}
           </h3>
         </div>
-        {(distanceLabel || driveMinutes != null) && (
+        {(distanceLabel || driveMinutes != null || transit) && (
           <div className="flex flex-shrink-0 flex-col items-end gap-1">
             {distanceLabel && (
               <span
@@ -424,6 +434,27 @@ const SchoolCard = memo(function SchoolCard({
                 title={t('driveTime.aria', { minutes: driveMinutes })}
               >
                 🚗 {t('driveTime.minutes', { minutes: driveMinutes })}
+              </span>
+            )}
+            {transit && (
+              <span
+                className="flex flex-col items-end"
+                aria-label={transitLabel}
+                title={transitLabel}
+                data-transit-leave={clock(transit.leave)}
+                data-transit-deadline={clock(transit.deadline)}
+              >
+                <span className="inline-flex flex-shrink-0 items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-neutral-100 text-neutral-700">
+                  {transit.lines.length ? '🚌' : '🚶'} {t('driveTime.minutes', { minutes: tripMinutes(transit) })}
+                </span>
+                <span className="mt-0.5 px-2 text-[11px] text-neutral-500">{t('transitTime.leave', { leave: clock(transit.leave), deadline: clock(transit.deadline) })}</span>
+                {/* Which lines, in view: a phone shows no title. */}
+                {transit.lines.length > 0 && (
+                  <span className="max-w-[11rem] px-2 text-right text-[11px] leading-tight text-neutral-500" aria-hidden="true">{linesText(transit.lines, t)}</span>
+                )}
+                {school.startKnown === false && (
+                  <span className="max-w-[11rem] px-2 text-right text-[11px] leading-tight text-amber-700" aria-hidden="true" data-start-unknown>{t('transitTime.startUnknown')}</span>
+                )}
               </span>
             )}
           </div>
@@ -500,6 +531,17 @@ const SchoolCard = memo(function SchoolCard({
               <SavedVerdictLine verdict={verdict} />
             </div>
           ))}
+          {freePlaces && (
+            <div className="flex items-start gap-2 text-sm" data-testid="free-places-line">
+              <span className={`mt-1.5 h-2 w-2 flex-shrink-0 rounded-full ${freePlaces.free > 0 ? 'bg-teal-600' : 'bg-neutral-400'}`} aria-hidden="true" />
+              <span className={freePlaces.free > 0 ? 'font-medium text-teal-800' : 'text-neutral-600'}>
+                {freePlaces.free > 0
+                  ? t('freePlaces.child', { count: freePlaces.free, year: freePlaces.birthYear }) +
+                    (freePlaces.buildings > 1 ? ` ${t('freePlaces.inBuildings', { count: freePlaces.buildingsWithFree, total: freePlaces.buildings })}` : '')
+                  : t('freePlaces.childFull', { year: freePlaces.birthYear })}
+              </span>
+            </div>
+          )}
           {admissionsInfo && !savedVerdicts.some(verdict => verdict.lines.length > 0) && (
             <div className="space-y-1">
               <div className="flex items-start gap-2">

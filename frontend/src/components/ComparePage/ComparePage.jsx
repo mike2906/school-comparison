@@ -13,6 +13,7 @@ import { hasDisplayEvidence, normalizeSchoolList } from '../../utils/schoolAttri
 import { comparisonExamType, examGradeLabel, getAvailableExamTypes } from '../../utils/nvo'
 import { statedTuition, tuitionSortValue } from '../../utils/pricing'
 import { hasDisplayableAdmissionInfo } from '../../utils/admission'
+import { readSavedLocation } from '../../utils/keyFacts'
 
 import { buildCompareSections } from './compareSections'
 import {
@@ -59,16 +60,7 @@ function ComparePage() {
   const selectedAgeGroup = searchParams.get('age_group')
 
   useEffect(() => {
-    const saved = localStorage.getItem('userLocation')
-    if (!saved) return
-    try {
-      const parsed = JSON.parse(saved)
-      if (typeof parsed?.lat === 'number' && typeof parsed?.lng === 'number') {
-        setUserLocation(parsed)
-      }
-    } catch {
-      // ignore
-    }
+    setUserLocation(readSavedLocation())
   }, [])
 
   useEffect(() => {

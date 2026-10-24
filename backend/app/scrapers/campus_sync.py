@@ -53,6 +53,9 @@ AGE_GROUP_TAG_PREFIX = "age_group_source=website:"
 # The site-grades stage's own marks: a band it added, and a register band it hid.
 SITE_GRADES_ADDED_PREFIX = "age_group_source=site_grades:"
 SITE_GRADES_HIDDEN_PREFIX = "age_group_hidden=site_grades:"
+# A preschool band the stage added from the municipality's admission rounds: not the
+# website's claim, so withholding the website keeps it.
+MUNICIPAL_ADDED_PREFIX = "age_group_source=municipal:"
 
 
 def site_hidden_tag(link) -> str:

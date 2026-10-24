@@ -33,4 +33,5 @@ else
 fi
 cycle_due
 claim_day
+update_checkout
 agent_run "$cycle_usd" "$night_usd" 0.30 school-facts --city "$city" --limit "$limit"

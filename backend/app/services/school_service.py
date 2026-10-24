@@ -239,7 +239,8 @@ class SchoolService:
             # facilities/programs/languages only exist nested inside `attributes.extracted`.
             attributes = build_filterable_attributes(
                 publication_attributes(
-                    school.attributes, school.scrape_status, school.website_url, school.education_level
+                    school.attributes, school.scrape_status, school.website_url, school.education_level,
+                    school.admission_info,
                 ),
                 school.school_type,
             )
@@ -287,7 +288,12 @@ class SchoolService:
     ) -> dict[str, list[str]]:
         query = (
             select(
-                School.attributes, School.scrape_status, School.school_type, School.website_url, School.education_level
+                School.attributes,
+                School.scrape_status,
+                School.school_type,
+                School.website_url,
+                School.education_level,
+                School.admission_info,
             )
             .where(School.country_code == country_code)
             .where(self._has_listable_location(city))
@@ -315,11 +321,12 @@ class SchoolService:
         # against, so emitted options can never diverge from what actually matches.
         # facilities/special_programs/teaching_approach are already mapped onto the
         # controlled vocabulary there (P1.9), so only canonical tags are surfaced.
-        for attrs, scrape_status, school_type, website_url, education_level in rows:
-            if not attrs:
+        for attrs, scrape_status, school_type, website_url, education_level, admission_info in rows:
+            if not attrs and not admission_info:
                 continue
             filterable = build_filterable_attributes(
-                publication_attributes(attrs, scrape_status, website_url, education_level), school_type
+                publication_attributes(attrs, scrape_status, website_url, education_level, admission_info),
+                school_type,
             )
 
             for value in filterable.get("language_focus") or []:

@@ -22,6 +22,12 @@ you picked, and go to Mike only for the short list in "Still goes to Mike".
    your deploy is green. A change to a result a parent gets (a calculator answer, a fee
    or cut-off for an age, a filter) also adds its parent to
    `frontend/e2e/live/coverage.test.js`, which CI runs on every PR against live data.
+   **Before calling such a feature done, use it as a parent would** (Mike, 2026-10-23):
+   once it is live, go through the parent's tasks on the live site at phone width, in
+   Bulgarian and English, and check the numbers it shows against the source (the school's
+   own site, kg.sofia.bg, the ministry) for a sample of schools, including awkward ones
+   (several buildings, a school as well as a kindergarten). Report what you checked and
+   what you found; a wrong value is a bug in the feature, not in the data.
 4. Run the checks for what you touched (`CONTRIBUTING.md` lists them). Quiet output:
    `uv run pytest -q 2>&1 | tail -3`.
 5. Read your own complete diff against the requirement and the invariants. For every check
@@ -47,6 +53,11 @@ you picked, and go to Mike only for the short list in "Still goes to Mike".
   would. Flag an answer option that makes no sense for the question ("Not sure" on
   twins), a result that is empty or odd for an ordinary family, and wording only an
   insider understands.
+- **Parent test on the preview.** A PR that changes the site gets a Pages preview on the
+  live API (commit status "Preview", built by `preview-deploy.yml`) and the live flows run
+  on it ("Preview flows"). Do the parent test on that link before merge, not on the live
+  site after it. Data changes are still checked on the live site after a publish until
+  the staging slot exists (`docs/TECH_DEBT_PLAN.md`, E2).
 - **After a substantial round of fixes** (several fixes, or any that change logic rather
   than wording), run the built-in review once more on the whole PR.
 - **Then stop.** Don't request another round when the last one only found more page
@@ -112,8 +123,11 @@ While the site has no users, agents may change the launch DB and publish without
 ### Jobs on Mike's PC
 
 Routine refreshes (fees monthly, facts twice a year, the register import and pins monthly,
-open days, cut-offs) run from cron on the PC and need no go: `docs/SCHEDULED_JOBS.md`. To get a
-fix into them, update the PC checkout to main (one go). Other launch-DB runs and publishes
+open days, cut-offs) run from cron on the PC and need no go: `docs/SCHEDULED_JOBS.md`. The
+fees, facts and register jobs pull main before each run, so a merged fix reaches them by
+itself. They don't pull a change to the job scripts, the spend guard or a migration, and run
+on the old code with an issue until the PC checkout is updated with one go. Cost logic
+elsewhere is not guarded: a PR that raises running cost still waits for Mike. Other launch-DB runs and publishes
 happen in a Remote Control session on Mike's PC. A thread can only start one from a message Mike typed in that thread (a platform rule). So a job
 needs one message from him, and that message should cover the whole job:
 

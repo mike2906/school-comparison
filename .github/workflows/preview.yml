@@ -1,0 +1,80 @@
+name: Preview build
+
+# Builds a PR's site the way Deploy does (live API, production origin for links) and keeps
+# the files as an artifact. preview-deploy.yml, which runs from main, uploads them as a
+# Pages preview and walks the live flows on it. This job holds no secrets: PR code runs
+# here, and the Pages token can also replace the live site. Plan: docs/TECH_DEBT_PLAN.md, E1.
+on:
+  pull_request:
+    paths:
+      - frontend/**
+      - .github/workflows/preview.yml
+      - .github/workflows/preview-deploy.yml
+
+concurrency:
+  group: preview-build-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build preview
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Fetch the road graph
+        run: |
+          mkdir -p public/routing
+          curl -fsSL --retry 3 -o public/routing/sofia-roads.bin.gz \
+            "https://github.com/$GITHUB_REPOSITORY/releases/download/road-graph/sofia-roads.bin.gz" \
+            || { rm -f public/routing/sofia-roads.bin.gz; echo "::warning::No road graph release yet: drive times are unavailable"; }
+
+      # Built monthly by transit.yml. Without them public transport times say they could not be
+      # loaded.
+      - name: Fetch the public transport data
+        run: |
+          for f in sofia-foot.bin.gz sofia-timetable.bin.gz; do
+            curl -fsSL --retry 3 -o "public/routing/$f" \
+              "https://github.com/$GITHUB_REPOSITORY/releases/download/transit/$f" \
+              || { rm -f "public/routing/$f"; echo "::warning::No transit release yet: public transport times are unavailable"; }
+          done
+
+      - name: Build
+        env:
+          # Links and canonical tags keep pointing at the live site; the preview is noindex.
+          VITE_SITE_ORIGIN: https://schooldecider.com
+          VITE_API_BASE: https://api.schooldecider.com
+          PRERENDER_API_URL: https://api.schooldecider.com
+          VITE_CARTO_API_KEY: ${{ vars.VITE_CARTO_API_KEY }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        # A release restarts the API for about a minute (HTTP 502 while it comes back); the
+        # build reads every school from it, so wait that out once.
+        run: |
+          npm run build:production || { echo "Retrying once in 90 seconds."; sleep 90; npm run build:production; }
+          echo "$HEAD_SHA" > dist/version.txt
+
+      - name: Keep the site
+        uses: actions/upload-artifact@v4
+        with:
+          name: preview-site
+          path: frontend/dist/
+          retention-days: 3
+          if-no-files-found: error

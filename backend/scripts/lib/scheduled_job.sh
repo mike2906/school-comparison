@@ -41,8 +41,8 @@ take_lock() {
 
 # Cron runs whatever is checked out, so only merged code may run: no local edits to tracked
 # files, no untracked file under backend/ that git does not ignore (a sitecustomize.py would
-# run with every command), and HEAD on main as last fetched. Nothing here pulls main; a thread updates the
-# checkout with Mike's go.
+# run with every command), and HEAD on main as last fetched. update_checkout then brings it up
+# to main before a run.
 check_checkout() {
 	git -C "$repo_root" diff --quiet HEAD -- ||
 		stop "the checkout at $repo_root has local changes; scheduled jobs run merged code only"
@@ -50,6 +50,75 @@ check_checkout() {
 		stop "the checkout at $repo_root has untracked files under backend/; scheduled jobs run merged code only"
 	git -C "$repo_root" merge-base --is-ancestor HEAD origin/main 2> /dev/null ||
 		stop "the checkout at $repo_root ($(git -C "$repo_root" rev-parse --short HEAD)) is not on main"
+}
+
+# What a pull may not bring in unattended: the scheduled jobs with their caps, the spend guard
+# that enforces the caps, and DB migrations (a pull does not apply them, so the new code would
+# fail on the old schema).
+job_files=(
+	backend/alembic
+	backend/alembic.ini
+	backend/app/services/provider_costs.py
+	backend/scripts/lib/scheduled_job.sh
+	backend/scripts/refresh_fees.sh
+	backend/scripts/refresh_facts.sh
+	backend/scripts/refresh_register.sh
+	backend/scripts/refresh_pins.sh
+	backend/scripts/publish_snapshot.sh
+	backend/scripts/watch_open_days.sh
+	backend/scripts/publish_cutoffs.sh
+)
+
+# One issue (once) that a job ran without updating; the run goes on.
+warn() {
+	log "NOT UPDATED: $*"
+	local name="$title: checkout not updated"
+	if [ -z "$(gh issue list -R "$repo" --state open --search "in:title \"$name\"" --json number -q '.[0].number' 2>/dev/null)" ]; then
+		gh issue create -R "$repo" --title "$name" --body "backend/scripts/refresh_$job.sh on $(hostname) ran at $(date -u +%Y-%m-%dT%H:%M:%SZ) on $(git -C "$repo_root" rev-parse --short HEAD) without updating to origin/main: $*
+
+Log: $state/$job.log. Close this issue once the checkout is updated." > /dev/null || true
+	fi
+}
+
+# Before a run, fast-forward the checkout to origin/main, so merged fixes reach the schedule
+# without a thread's go (Mike, 2026-10-21). check_checkout has made sure HEAD is merged code,
+# so whatever stops the update (main changes job_files, the fetch fails, the checkout is on
+# another branch) only means this run uses the code it has, with an issue saying why; a new
+# job, cap or migration still reaches the PC through a thread's pull with Mike's go. No update
+# while the open-days check or a publish runs from this checkout: files would change under it.
+update_checkout() {
+	local branch changed open_days publish_lock
+	branch="$(git -C "$repo_root" symbolic-ref -q --short HEAD || true)"
+	if [ -n "$branch" ] && [ "$branch" != main ]; then
+		warn "the checkout is on branch $branch"
+		return 0
+	fi
+	open_days="${OPEN_DAYS_STATE_DIR:-$HOME/.local/state/schooldecider}"
+	publish_lock="$("$repo_root/backend/scripts/publish_snapshot.sh" --lock-path)" || true
+	if [ -z "$publish_lock" ] || ! mkdir -p "$open_days"; then
+		warn "no publish lock path from publish_snapshot.sh, or no folder for the open-days lock"
+		return 0
+	fi
+	exec 6>>"$open_days/open_days.lock" 7>>"$publish_lock"
+	if ! flock -n 6 || ! flock -n 7; then
+		exec 6>&- 7>&-
+		log "not updated: the open-days check or a publish is running"
+		return 0
+	fi
+	if ! GIT_TERMINAL_PROMPT=0 timeout 5m git -C "$repo_root" fetch -q origin +refs/heads/main:refs/remotes/origin/main; then
+		warn "git fetch origin main failed"
+	else
+		changed="$(git -C "$repo_root" diff --name-only HEAD origin/main -- "${job_files[@]}" | tr '\n' ' ')"
+		if [ -n "$changed" ]; then
+			warn "main changes the scheduled jobs, their spend guard or migrations (${changed% }); update the checkout with Mike's go"
+		elif [ -n "$branch" ]; then
+			git -C "$repo_root" merge -q --ff-only origin/main || warn "the checkout cannot fast-forward to origin/main"
+		else
+			git -C "$repo_root" checkout -q --detach origin/main || warn "the checkout cannot move to origin/main"
+		fi
+	fi
+	exec 6>&- 7>&-
+	log "checkout at $(git -C "$repo_root" rev-parse --short HEAD)"
 }
 
 # The first run after install only records the current cycle, so installing starts nothing:

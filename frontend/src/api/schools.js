@@ -109,3 +109,9 @@ export function reportSearchMiss(query) {
     keepalive: true,
   }).catch(() => {})
 }
+
+/** Today's free municipal kindergarten and ПГУ places, per school id (docs/FREE_PLACES.md). */
+export function fetchFreePlaces({ countryCode = 'bg', city = 'sofia' } = {}) {
+  const params = new URLSearchParams({ country_code: countryCode, city })
+  return cachedJson(`${API_BASE}/schools/free-places?${params.toString()}`, 'Failed to fetch free places')
+}

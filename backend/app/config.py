@@ -28,8 +28,14 @@ class Settings(BaseSettings):
     model_tier_vision: str = ""  # Default: openai/gpt-6.1-sol (fee tables published as pictures)
     model_tier_fee_check: str = ""  # Default: anthropic/claude-sonnet-5-5 (checks a fee read against its pages)
     model_tier_translation: str = ""  # Default: anthropic/claude-haiku-5-5 (translate-texts)
+    model_tier_facts: str = ""  # Default: anthropic/claude-haiku-5-5 (school-facts, open-days)
     # Each takes "openrouter/<vendor>/<model>" or "anthropic/<model>" (direct API, e.g.
     # MODEL_TIER_PRICING=anthropic/claude-haiku-5-5); set it per run to switch one job.
+    # Per-run trial settings for Anthropic tiers: "adaptive" turns Haiku 5.5's thinking on
+    # (Sonnet and Opus always think); an effort (low/medium/high/xhigh/max) for thinking calls
+    # whose stage sets none. Empty keeps the defaults.
+    anthropic_thinking: str = ""
+    anthropic_effort: str = ""
 
     # Spot-check validation settings
     spot_check_sample_size: int = 10  # Number of schools to spot-check per run (-1 = all, for calibration)
@@ -106,6 +112,8 @@ class Settings(BaseSettings):
     # API settings
     max_schools_to_compare: int = 5
     max_search_query_length: int = 100
+    # Free kindergarten places snapshot (docs/FREE_PLACES.md), written by the capture workflow.
+    free_places_url: str = "https://raw.githubusercontent.com/mike2906/school-comparison/free-places-data/bg/sofia/free-places.json"
 
     # Launch-scope publication flags (sparse/fail-closed by default)
     publish_summaries: bool = False

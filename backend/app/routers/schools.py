@@ -1,5 +1,6 @@
 import asyncio
 import gzip
+import json
 import logging
 import time
 from functools import partial
@@ -22,6 +23,7 @@ from app.schemas.school import (
     SchoolListResponse,
 )
 from app.scrapers.shared_site_check import level_family
+from app.services import free_places
 from app.services.country_service import get_valid_keys
 from app.services.school_relations import continued_from, continues_to, same_place_by_school
 from app.services.school_service import SchoolService
@@ -47,11 +49,29 @@ _filters_cache: dict[tuple, tuple[float, dict[str, list[str]]]] = {}
 # schools sharing a building), so those are kept the same way, per country and city.
 _search_index_cache: dict[tuple, tuple[float, dict]] = {}
 _same_place_cache: dict[tuple, tuple[float, dict[int, list[dict]]]] = {}
+# Free kindergarten places come from a snapshot outside the DB (free_places): re-read every
+# TTL, so the capture's new numbers arrive within minutes without a publish.
+_free_places_cache: dict[tuple, tuple[float, bytes]] = {}
+# School pages, one gzipped body each (about 6 KB), so a visit costs no query or projection.
+# A publish restarts the API, which empties this cache.
+# Cold builds share a few locks by id: a burst on one page waits for a single build, while
+# different pages still build side by side and never behind a list build. None marks an id
+# with no school, so a removed school drops out at its next refresh.
+DETAIL_CACHE_MAX_ENTRIES = 2000
+_detail_cache: dict[tuple, tuple[float, bytes | None]] = {}
+_detail_build_locks = [asyncio.Lock() for _ in range(16)]
 _build_lock = asyncio.Lock()
 # The search index and same-place map are quick to build (a query and well under a second
 # of projection): their cold builds take their own lock, so a search or school page never
 # waits behind a list build.
 _city_build_lock = asyncio.Lock()
+# Requests with the advanced filters are built for that one request and not cached (the
+# site applies those filters client-side). They take their own lock, so a run of them is
+# built one at a time and never holds up a visitor's list, search or school page.
+_uncached_build_lock = asyncio.Lock()
+# Entries `warm_cache` keeps (the views the site asks for). A run of one-off requests with
+# made-up filter values must not push them out of the cache.
+_warm_keys: set[tuple] = set()
 _refreshing: set[tuple] = set()
 _background_tasks: set[asyncio.Task] = set()
 _session_factory = async_session_maker
@@ -61,13 +81,18 @@ _list_response_adapter = TypeAdapter(list[SchoolListResponse])
 def _store(cache: dict, key: tuple, value) -> None:
     # Hits move an entry to the end (`_cached_or_build`), so the first one is the least
     # recently used: a run of one-off requests cannot push out what visitors keep asking for.
-    if key not in cache and len(cache) >= LIST_CACHE_MAX_ENTRIES:
-        del cache[next(iter(cache))]
+    limit = DETAIL_CACHE_MAX_ENTRIES if cache is _detail_cache else LIST_CACHE_MAX_ENTRIES
+    if key not in cache and len(cache) >= limit:
+        victim = next((k for k in cache if (id(cache), k) not in _warm_keys), None)
+        if victim is not None:
+            del cache[victim]
     cache[key] = (time.monotonic(), value)
 
 
-async def _refresh(cache: dict, key: tuple, build) -> None:
+async def _refresh(cache: dict, key: tuple, build, *, warm: bool = False) -> None:
     """Rebuild one entry with its own session; the old entry stays if this fails."""
+    if warm:
+        _warm_keys.add((id(cache), key))
     try:
         async with _build_lock:
             async with _session_factory() as db:
@@ -79,15 +104,23 @@ async def _refresh(cache: dict, key: tuple, build) -> None:
         _refreshing.discard((id(cache), key))
 
 
-async def _cached_or_build(cache: dict, key: tuple, build, db: AsyncSession, lock: asyncio.Lock = _build_lock):
-    """The cached value for `key`, building it with `build(db)` only when there is none."""
+async def _cached_or_build(
+    cache: dict, key: tuple, build, db: AsyncSession, lock: asyncio.Lock = _build_lock, max_age: float | None = None
+):
+    """The cached value for `key`, building it with `build(db)` only when there is none, or
+    when it is older than `max_age` seconds (otherwise a stale entry is served while it
+    refreshes, which also keeps it served when the database is down)."""
+
+    def usable(entry) -> bool:
+        return entry is not None and (max_age is None or time.monotonic() - entry[0] < max_age)
+
     entry = cache.get(key)
-    if entry is None:
+    if not usable(entry):
         # One build at a time, so a burst of visitors on a cold entry waits for a single
         # build instead of each running its own.
         async with lock:
             entry = cache.get(key)
-            if entry is None:
+            if not usable(entry):
                 value = await build(db)
                 _store(cache, key, value)
                 return value
@@ -153,6 +186,18 @@ def _accepts_gzip(request: Request) -> bool:
     return "gzip" in request.headers.get("accept-encoding", "")
 
 
+def _gzipped_json_response(request: Request, gzipped: bytes) -> Response:
+    # GZipMiddleware passes a response that already has a Content-Encoding.
+    if _accepts_gzip(request):
+        return Response(
+            content=gzipped,
+            media_type="application/json",
+            headers={"Content-Encoding": "gzip", "Vary": "Accept-Encoding"},
+        )
+    # Rare: the edge always asks for gzip. GZipMiddleware adds the Vary.
+    return Response(content=gzip.decompress(gzipped), media_type="application/json")
+
+
 def _preschool_location_ids(school) -> set[int]:
     return {
         location.id for location in school.locations
@@ -191,9 +236,13 @@ async def warm_cache(country_code: str = "bg", city: str = "sofia") -> None:
             country = await db.get(Country, country_code)
         age_groups = get_valid_keys(country.education_config, "age_groups") if country else []
         place_key = _filters_key(country_code, city)
-        await _refresh(_filters_cache, place_key, partial(_build_filters, country_code=country_code, city=city))
-        await _refresh(_search_index_cache, place_key, partial(_build_search_index, country_code=country_code, city=city))
-        await _refresh(_same_place_cache, place_key, partial(_build_same_place, country_code=country_code, city=city))
+        await _refresh(_filters_cache, place_key, partial(_build_filters, country_code=country_code, city=city), warm=True)
+        await _refresh(
+            _search_index_cache, place_key, partial(_build_search_index, country_code=country_code, city=city), warm=True
+        )
+        await _refresh(
+            _same_place_cache, place_key, partial(_build_same_place, country_code=country_code, city=city), warm=True
+        )
         variants = [{"age_group": age_group} for age_group in [None, *age_groups]]
         if "preschool" in age_groups:
             # The preschool view also asks "where": kindergarten, school, or both.
@@ -212,7 +261,7 @@ async def warm_cache(country_code: str = "bg", city: str = "sofia") -> None:
                 "include_crossover": False,
                 **variant,
             }
-            await _refresh(_list_cache, _list_key(**filters), partial(_build_list_entry, **filters))
+            await _refresh(_list_cache, _list_key(**filters), partial(_build_list_entry, **filters), warm=True)
     except Exception:
         logger.exception("Warming the schools cache failed")
 
@@ -264,16 +313,17 @@ async def list_schools(
             include_crossover=include_crossover,
         )
         # The advanced filters are free-form lists (the site applies them client-side),
-        # so those requests are not cached.
+        # so those requests are not cached; they are built one at a time on their own lock.
         if any([language_focus, special_programs, facilities, teaching_approach]):
-            body = await _build_list_body(
-                db,
-                **filters,
-                language_focus=language_focus,
-                special_programs=special_programs,
-                facilities=facilities,
-                teaching_approach=teaching_approach,
-            )
+            async with _uncached_build_lock:
+                body = await _build_list_body(
+                    db,
+                    **filters,
+                    language_focus=language_focus,
+                    special_programs=special_programs,
+                    facilities=facilities,
+                    teaching_approach=teaching_approach,
+                )
         else:
             gzipped = await _cached_or_build(
                 _list_cache,
@@ -281,15 +331,7 @@ async def list_schools(
                 partial(_build_list_entry, **filters),
                 db,
             )
-            # GZipMiddleware passes a response that already has a Content-Encoding.
-            if _accepts_gzip(request):
-                return Response(
-                    content=gzipped,
-                    media_type="application/json",
-                    headers={"Content-Encoding": "gzip", "Vary": "Accept-Encoding"},
-                )
-            # Rare: the edge always asks for gzip. GZipMiddleware adds the Vary.
-            body = gzip.decompress(gzipped)
+            return _gzipped_json_response(request, gzipped)
         return Response(content=body, media_type="application/json")
     except Exception as e:
         logger.error(f"Error listing schools: {e}", exc_info=True)
@@ -351,6 +393,51 @@ async def get_available_filters(
         raise HTTPException(
             status_code=500,
             detail="An error occurred while fetching available filters. Please try again later."
+        ) from e
+
+
+async def _build_free_places(db: AsyncSession, *, country_code, city) -> bytes:
+    payload: dict = {"as_of": None, "schools": {}}
+    if (country_code, city) == ("bg", "sofia"):
+        snapshot = await free_places.fetch_snapshot(settings.free_places_url)
+        meta = snapshot.get("meta") or {}
+        payload.update({key: meta.get(key) for key in ("as_of", "retrieved_at", "source_url")})
+        if free_places.snapshot_is_fresh(snapshot):
+            schools = await free_places.matchable_schools(db)
+            by_school, unmatched = free_places.places_by_school(snapshot, schools)
+            if unmatched:
+                logger.info("Free places: %d ИСОДЗ buildings match no school", unmatched)
+            payload["schools"] = {str(school_id): entries for school_id, entries in by_school.items()}
+        else:
+            logger.warning("Free places snapshot from %s is too old to show", meta.get("retrieved_at"))
+    return await asyncio.to_thread(gzip.compress, json.dumps(payload, ensure_ascii=False).encode())
+
+
+@router.get("/free-places")
+async def get_free_places(
+    request: Request,
+    country_code: str = Query("bg", description="Country code (ISO 3166-1 alpha-2)"),
+    city: Optional[str] = Query("sofia", description="City"),
+    db: AsyncSession = Depends(get_db),
+):
+    """Today's free places in municipal kindergartens and ПГУ, per school id (aggregates
+    from ИСОДЗ; empty when the latest snapshot is too old)."""
+    try:
+        gzipped = await _cached_or_build(
+            _free_places_cache,
+            (country_code, city),
+            partial(_build_free_places, country_code=country_code, city=city),
+            db,
+            _city_build_lock,
+            # If GitHub stays unreachable, stop serving the last answer after a few hours.
+            max_age=6 * 3600,
+        )
+        return _gzipped_json_response(request, gzipped)
+    except Exception as e:
+        logger.error(f"Error getting free places: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail="An error occurred while fetching free places. Please try again later."
         ) from e
 
 
@@ -475,44 +562,79 @@ async def get_exam_averages(
         ) from e
 
 
+class _PartialDetail(Exception):
+    """A school page built without one of its optional links: shown, but never cached, so a
+    passing failure does not stick (and a refresh keeps the complete page it had)."""
+
+    def __init__(self, body: bytes):
+        super().__init__("a school page link failed")
+        self.body = body
+
+
+async def _build_detail_body(db: AsyncSession, *, school_id: int) -> bytes | None:
+    school = await SchoolService(db).get_school_with_details(school_id)
+    if not school:
+        return None
+
+    response = SchoolDetailResponse.model_validate(school)
+    complete = True
+    try:
+        link = await continues_to(db, school)
+    except Exception:
+        # The link is optional; fail closed without failing the detail page.
+        logger.warning("continues_to failed for school %s", school_id, exc_info=True)
+        link = None
+        complete = False
+    if link is not None:
+        response.continues_to = RelatedSchoolResponse.model_validate(link)
+    try:
+        response.continued_from = [RelatedSchoolResponse.model_validate(row) for row in await continued_from(db, school)]
+    except Exception:
+        logger.warning("continued_from failed for school %s", school_id, exc_info=True)
+        complete = False
+    try:
+        same_place = await _cached_or_build(
+            _same_place_cache,
+            _filters_key(school.country_code, school.city),
+            partial(_build_same_place, country_code=school.country_code, city=school.city),
+            db,
+            _city_build_lock,
+        )
+        response.same_place = [SamePlaceSchoolResponse.model_validate(row) for row in same_place.get(school.id, [])]
+    except Exception:
+        logger.warning("same_place failed for school %s", school_id, exc_info=True)
+        complete = False
+    # As FastAPI would serialize it through response_model (the publish boundary).
+    body = gzip.compress(response.model_dump_json(by_alias=True).encode())
+    if not complete:
+        raise _PartialDetail(body)
+    return body
+
+
 @router.get("/{school_id}", response_model=SchoolDetailResponse)
 async def get_school(
+    request: Request,
     school_id: Annotated[int, Path(gt=0, description="School ID (must be positive)")],
     db: AsyncSession = Depends(get_db),
 ):
     """Get detailed information about a specific school."""
     try:
-        service = SchoolService(db)
-        school = await service.get_school_with_details(school_id)
-
-        if not school:
-            raise HTTPException(status_code=404, detail="School not found")
-
-        response = SchoolDetailResponse.model_validate(school)
         try:
-            link = await continues_to(db, school)
-        except Exception:
-            # The link is optional; fail closed without failing the detail page.
-            logger.warning("continues_to failed for school %s", school_id, exc_info=True)
-            link = None
-        if link is not None:
-            response.continues_to = RelatedSchoolResponse.model_validate(link)
-        try:
-            response.continued_from = [RelatedSchoolResponse.model_validate(row) for row in await continued_from(db, school)]
-        except Exception:
-            logger.warning("continued_from failed for school %s", school_id, exc_info=True)
-        try:
-            same_place = await _cached_or_build(
-                _same_place_cache,
-                _filters_key(school.country_code, school.city),
-                partial(_build_same_place, country_code=school.country_code, city=school.city),
+            gzipped = await _cached_or_build(
+                _detail_cache,
+                (school_id,),
+                partial(_build_detail_body, school_id=school_id),
                 db,
-                _city_build_lock,
+                _detail_build_locks[school_id % len(_detail_build_locks)],
+                # Not warmed like the list: a page nobody opened for a while is rebuilt, so
+                # it never shows last week's fees or an offer that has ended.
+                max_age=2 * LIST_CACHE_TTL_SECONDS,
             )
-            response.same_place = [SamePlaceSchoolResponse.model_validate(row) for row in same_place.get(school.id, [])]
-        except Exception:
-            logger.warning("same_place failed for school %s", school_id, exc_info=True)
-        return response
+        except _PartialDetail as partial_page:
+            gzipped = partial_page.body
+        if gzipped is None:
+            raise HTTPException(status_code=404, detail="School not found")
+        return _gzipped_json_response(request, gzipped)
     except HTTPException:
         # Re-raise HTTP exceptions (like 404)
         raise

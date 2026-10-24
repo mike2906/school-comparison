@@ -58,7 +58,8 @@ of those changed, raise it with him rather than overriding it.
 
 Live: the admission points calculator (kindergarten, first grade, and the eighth-grade
 score from NVO results) with the catchment map (`docs/ADMISSION_POINTS.md`), and admission
-cut-offs (`docs/ADMISSION_CUTOFFS.md`).
+cut-offs (`docs/ADMISSION_CUTOFFS.md`), and today's free places in municipal kindergartens
+(`docs/FREE_PLACES.md`).
 
 ---
 
@@ -101,6 +102,7 @@ use `pip install` or `requirements.txt`.
 ├── skills/               # Task procedures (index below)
 ├── docs/                 # Plans and design notes (GO_LIVE_PLAN.md)
 ├── tools/road-graph/     # OSM → car road graph for in-browser drive times (docs/DRIVE_TIMES.md)
+├── tools/transit/        # OSM walking graph + GTFS timetable for public transport times (docs/TRANSIT_TIMES.md)
 └── docker-compose.yml    # PostgreSQL + SearXNG
 ```
 
