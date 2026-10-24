@@ -15,6 +15,7 @@ import {
   buildRobots,
   buildSitemap,
   createTranslator,
+  districtPages,
   fixedPages,
   indexReasons,
   outputFile,
@@ -137,8 +138,10 @@ async function main() {
     const feeds = calendarFeeds(ruleSets, { t, language, origin, today: sofiaToday(now), now })
     for (const feed of feeds) await write(feed.file, feed.content)
     console.log(`prerender: ${feeds.length} admission calendar feeds (${language})`)
+    const listed = schools.filter((school) => listedIds.has(school.id))
     const pages = [
-      ...fixedPages(t, language, schools.filter((school) => listedIds.has(school.id))),
+      ...fixedPages(t, language, listed),
+      ...districtPages(t, language, listed, districts),
       ...schools.map((school) => schoolPage(school, t, language, { listed: listedIds.has(school.id), districts, origin })),
     ]
     for (const page of pages) {

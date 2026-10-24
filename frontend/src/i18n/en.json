@@ -773,6 +773,16 @@
     "reportError": "Report a data error",
     "reportSubject": "Data error report"
   },
+  "districtPages": {
+    "title": "Kindergartens and schools by district",
+    "intro": "The kindergartens and schools in each Sofia district, with their latest NVO results, fees and admission results.",
+    "pageTitle": "Kindergartens and schools in {{district}} district",
+    "pageIntro": "The kindergartens and schools in {{district}} district, Sofia, with their latest NVO results, fees and admission results. Open one for details.",
+    "count_one": "{{count}} kindergarten or school",
+    "count_other": "{{count}} kindergartens and schools",
+    "footer": "By district",
+    "allDistricts": "All districts"
+  },
   "directory": {
     "title": "All schools and kindergartens in Sofia",
     "intro": "Every school and kindergarten on the site, by name. Open one to see its details, exam results and fees.",
