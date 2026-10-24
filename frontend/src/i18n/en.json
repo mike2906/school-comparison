@@ -726,6 +726,8 @@
       "contact": "If you email us, we use your address only to reply. Questions about privacy: {{email}}.",
       "calculator": "The admission calculator works entirely in your browser: your answers are never sent to us. If you press \"Save on this device\", they are kept in your browser (with the address you checked) so the school list can compare every school; you can forget them at any time."
     },
+    "sourceCodeTitle": "Source code",
+    "sourceCodeBody": "The code behind this site is public on GitHub under the MIT licence, so anyone can see how the data is gathered and check what the site does with your information.",
     "cta": "Browse schools"
   },
   "levels": {
