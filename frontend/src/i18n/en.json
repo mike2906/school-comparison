@@ -1313,7 +1313,9 @@
     "childRanked_one": "{{count}} ranked, not yet enrolled",
     "childRanked_other": "{{count}} ranked, not yet enrolled",
     "inBuildings_one": "(in {{count}} of its {{total}} buildings)",
-    "inBuildings_other": "(in {{count}} of its {{total}} buildings)"
+    "inBuildings_other": "(in {{count}} of its {{total}} buildings)",
+    "filter_one": "Only with a free place today ({{count}})",
+    "filter_other": "Only with a free place today ({{count}})"
   },
   "myChild": {
     "title": "My child's options",
