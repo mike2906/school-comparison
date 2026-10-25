@@ -295,7 +295,7 @@ export function isStatedTotal(row) {
 // chosen age group when there is one. A special-needs or returning-pupil rate stays listed.
 // Where the school prints a total of its fees for an age group, the total is what that group
 // pays: tuition alone would show one line of it (633's 3,140 of 7,850 €).
-function tuitionRows(rows, ageGroup = null) {
+export function tuitionRows(rows, ageGroup = null) {
   const whole = rows.filter(row => row.category === 'tuition' && !isInstallmentPlan(row) && !isClosedGroupFee(row))
   // A regular price naming the chosen group is that group's; one naming no group gives way
   // to it, as it may be another group's fee read without its group: 271's undated
@@ -533,7 +533,7 @@ export function statedTuition(pricing = [], { ageGroup = null, intake = true, to
 const OPTIONAL_RE = /препоръч|по желание|доброволн|незадължит|дарени|optional|recommended|voluntary|donation/iu
 
 // True for a row whose own name says paying it is optional.
-function isOptionalFee(row) {
+export function isOptionalFee(row) {
   return [row?.plan_name, row?.pricing_context?.plan_name_en].some(text => text && OPTIONAL_RE.test(text))
 }
 

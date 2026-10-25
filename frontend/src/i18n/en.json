@@ -1450,5 +1450,46 @@
         "enrol_1": "Enrol a pupil ranked in stage I, or apply for stage II"
       }
     }
+  },
+  "yearCost": {
+    "title": "Cost per year",
+    "for": "For",
+    "lines": {
+      "tuition": "Tuition",
+      "materials": "Books & materials",
+      "required": "Other required fees",
+      "food": "Food",
+      "extended_day": "After-school care",
+      "transport": "School bus",
+      "requiredTotal": "Required each year",
+      "withNeeds": "With what you ticked",
+      "firstYear": "First year only",
+      "optional": "Optional extras"
+    },
+    "addToTotal": "add to total",
+    "included": "Included in tuition",
+    "excluded": "Not in tuition; price not stated",
+    "notStated": "Not stated",
+    "notForStage": "Not for this age",
+    "free": "No tuition (state school)",
+    "required": "required",
+    "optional": "optional",
+    "periodAssumed": "period not stated, counted once a year",
+    "billedMonthsNotPublished": "billed months not published",
+    "noYearlyTotal": "No yearly total: billed months not published",
+    "noTotal": "No yearly total",
+    "assumedNote": "* includes a fee with no stated period, counted once a year",
+    "statedTotal": "The school's own total; it may already hold the lines above",
+    "notAdded": "Not added: {{items}}",
+    "reasons": {
+      "severalOptions": "{{line}} (several options)",
+      "notStated": "{{line}} (not stated)",
+      "excluded": "{{line}} (price not stated)",
+      "periodNotYearly": "{{line}} (not a yearly price)",
+      "noPrice": "{{line}} (no price)",
+      "inStatedTotal": "{{line}} (may be in the school's total)"
+    },
+    "deposit": "Deposit {{price}}, returned or credited later (not counted)",
+    "uniformItems": "Uniform items: {{price}} each"
   }
 }

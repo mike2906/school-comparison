@@ -147,7 +147,7 @@ const ORDINAL_TOKEN_RE = new RegExp(`(?<![\\p{L}\\p{N}])(${ORDINAL})(?![\\p{L}\\
 const NURSERY_RE = /яслен|nursery|cr[eè]che|(?<![\p{L}])ясл(?:а|и|ата)(?![\p{L}])/u
 const BOTH_RE = /ясл(?:а|и)\s*(?:и|\/|,)\s*(?:детск[аи] )?(?:градин|дг(?![\p{L}]))|(?:градин[аи]|(?<![\p{L}])дг)\s*(?:и|\/|,)\s*(?:детска )?ясл|яслена и градинска/u
 // 555's English "PREPARATORY GROUP | YEAR 2" too.
-const PRESCHOOL_NAME_RE = /подготвителн[аи] груп|предучилищн[аи] груп|подготвителен клас|(?<![\p{L}])п[гк]у?(?![\p{L}])|pre-?school|preparatory (?:group|class|year)/u
+const PRESCHOOL_NAME_RE = /подготвителн[аи] груп|предучилищн[аи] груп|предучилищен клас|подготвителен клас|(?<![\p{L}])п[гк]у?(?![\p{L}])|pre-?school|preparatory (?:group|class|year)/u
 
 const AGE_GROUP_KEYS = new Set([
   'nursery', 'first', 'second', 'third', 'preschool', 'grade_1_4', 'grade_5_7', 'grade_8_12',
