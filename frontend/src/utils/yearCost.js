@@ -322,7 +322,8 @@ function requiredTotal(tuition, lines) {
   // Every child eats: food counts as required, whether the tuition holds it or the school bills
   // it apart, so a fee without food is not the cheaper one by leaving it out. Unknown or not one
   // yearly price, it is named as not added.
-  const food = lineValue(lines.food)
+  // A food fee the school calls compulsory is in already, and a snack beside it stays optional.
+  const food = lines.food.options.some(item => item.required) ? {} : lineValue(lines.food)
   if (food.value) parts.push(food.value)
   else if (food.missing) missing.push({ line: 'food', reason: food.missing === 'notStated' ? 'unknownIfIncluded' : food.missing })
   return { value: sum(parts), missing }
@@ -331,20 +332,23 @@ function requiredTotal(tuition, lines) {
 /**
  * What a headline fee leaves out, for a school card: `{ food, materials }`, where food is
  * included | extra | unknown and materials is true when required books or materials are billed
- * apart. Null without a tuition. Without an age group, the first stage the school offers and prices.
+ * apart. Null without a tuition, or for a printed total. Without an age group the headline may be
+ * any stage's fee, so only what every priced stage the school offers agrees on.
  */
 export function feeOnTop(school, ageGroup = null, { today = new Date() } = {}) {
   const stages = ageGroup ? [stageForAgeGroup(ageGroup)].filter(Boolean) : COST_STAGES.filter(stage => offersStage(school, stage))
-  for (const stage of stages) {
+  const found = stages.flatMap((stage) => {
     const cost = yearCost(school.pricing || [], stage, { today })
-    if (!cost || cost.tuition.options.length === 0) continue
+    if (!cost || cost.tuition.options.length === 0 || cost.tuition.statedTotal) return []
     const { food, materials } = cost.lines
-    return {
+    return [{
       food: food.state === 'included' ? 'included' : (food.state === 'none' ? 'unknown' : 'extra'),
       materials: materials.options.some(item => item.required),
-    }
-  }
-  return null
+    }]
+  })
+  if (found.length === 0) return null
+  const [first] = found
+  return found.every(item => item.food === first.food && item.materials === first.materials) ? first : null
 }
 
 /**

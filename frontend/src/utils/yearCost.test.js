@@ -154,4 +154,16 @@ test('a card names what its fee leaves out', () => {
   assert.deepEqual(feeOnTop(school(172), 'grade_5_7', { today }), { food: 'included', materials: false })
   assert.equal(feeOnTop(school(172), 'grade_1_4', { today }).food, 'unknown')
   assert.equal(feeOnTop({ pricing: [], locations: [] }, null, { today }), null)
+  // With no age chosen, St. Sofia's bands disagree on food: no marker rather than another band's.
+  assert.equal(feeOnTop({ pricing: SCHOOLS[172], locations: [{ age_groups: ['grade_1_4', 'grade_5_7'] }] }, null, { today }), null)
+})
+
+test('a compulsory food fee is counted once, and an optional snack beside it is not', () => {
+  const rows = [
+    { id: 1, category: 'tuition', amount: 5000, currency: 'EUR', period: 'yearly', year_status: 'not_stated' },
+    { id: 2, category: 'food', amount: 1000, currency: 'EUR', period: 'yearly', year_status: 'not_stated', plan_name: 'Задължителен обяд' },
+    { id: 3, category: 'food', amount: 200, currency: 'EUR', period: 'yearly', year_status: 'not_stated', plan_name: 'Закуска по желание' },
+  ]
+  assert.deepEqual(yearCost(rows, 'grade_1', { today }).lines.food.options.map(item => item.required), [true, false])
+  assert.deepEqual(yearCost(rows, 'grade_1', { today }).required.value, { min: 6000, max: 6000, assumed: false })
 })
