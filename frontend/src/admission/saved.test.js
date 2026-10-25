@@ -4,7 +4,7 @@ import assert from 'node:assert/strict'
 import { parseSaved } from './saved.js'
 
 test('anything unreadable or from another version counts as nothing saved', () => {
-  const empty = { version: 1, child: null, home: null, homePoint: null, preferences: null, kindergarten: null, grade_1: null }
+  const empty = { version: 1, child: null, home: null, homePoint: null, preferences: null, costNeeds: null, kindergarten: null, grade_1: null }
   for (const text of [null, '', 'not json', '{"version":2,"kindergarten":{"startYear":2026,"answers":{}}}', '[]']) {
     assert.deepEqual(parseSaved(text), empty, String(text))
   }
@@ -154,4 +154,10 @@ test('preferences keep only languages, a positive budget and a known way to trav
   assert.deepEqual(parseSaved(JSON.stringify({ version: 1, preferences: { languages: ['english', 3], monthlyBudget: 600 } })).preferences, { languages: ['english'], monthlyBudget: 600, travel: 'car' })
   assert.equal(parseSaved(JSON.stringify({ version: 1, preferences: { languages: [], monthlyBudget: -1, travel: 'boat' } })).preferences, null)
   assert.deepEqual(parseSaved(JSON.stringify({ version: 1, preferences: { travel: 'transit' } })).preferences, { languages: [], monthlyBudget: null, travel: 'transit' })
+})
+
+test('cost needs keep only the known extras', () => {
+  assert.deepEqual(parseSaved(JSON.stringify({ version: 1, costNeeds: ['transport', 'pony', 'food'] })).costNeeds, ['food', 'transport'])
+  assert.equal(parseSaved(JSON.stringify({ version: 1, costNeeds: 'food' })).costNeeds, null)
+  assert.equal(parseSaved(JSON.stringify({ version: 1, costNeeds: [] })).costNeeds, null)
 })

@@ -137,7 +137,7 @@ export function FragmentSection({ section, schools, highlightDiffs }) {
       <SectionRow label={section.title} colSpan={schools.length + 1} />
       {section.rows.map((row) => (
         <CompareRow
-          key={`${section.key}-${row.label}`}
+          key={`${section.key}-${row.key ?? row.label}`}
           label={row.label}
           highlightDiffs={highlightDiffs}
           cells={schools.map((school) => ({

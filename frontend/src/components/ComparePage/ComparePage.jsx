@@ -14,8 +14,13 @@ import { comparisonExamType, examGradeLabel, getAvailableExamTypes } from '../..
 import { statedTuition, tuitionSortValue } from '../../utils/pricing'
 import { hasDisplayableAdmissionInfo } from '../../utils/admission'
 import { readSavedLocation } from '../../utils/keyFacts'
+import { stageForAgeGroup, stageForChild, yearCost } from '../../utils/yearCost'
+import { planningYear } from '../../utils/ageSelection'
+import { saveCostNeeds } from '../../admission/saved'
+import { useSavedAdmission } from '../../hooks/useSavedAdmission'
 
 import { buildCompareSections } from './compareSections'
+import { buildYearCostSection } from './yearCostSection'
 import {
   getNvoDetail,
   nvoNotApplicable,
@@ -58,6 +63,14 @@ function ComparePage() {
   const queryIds = useMemo(() => parseIds(queryKey ? searchParams.get(queryKey) : ''), [queryKey, searchParams])
   const ids = useMemo(() => (queryIds.length > 0 ? queryIds : compareList.map(s => s.id)), [queryIds, compareList])
   const selectedAgeGroup = searchParams.get('age_group')
+  const saved = useSavedAdmission()
+  // The cost table's stage: the saved child's, else the search's age group, else grade 1.
+  const defaultCostStage = stageForChild(saved.child?.birthYear, saved.child?.startYear ?? planningYear()) ||
+    stageForAgeGroup(selectedAgeGroup) || 'grade_1'
+  const [chosenCostStage, setCostStage] = useState(null)
+  const costStage = chosenCostStage || defaultCostStage
+  const costNeeds = useMemo(() => saved.costNeeds || [], [saved.costNeeds])
+  const toggleCostNeed = need => saveCostNeeds(costNeeds.includes(need) ? costNeeds.filter(item => item !== need) : [...costNeeds, need])
 
   useEffect(() => {
     setUserLocation(readSavedLocation())
@@ -287,14 +300,36 @@ function ComparePage() {
     countryConfig,
   }), [t, i18n.language, metricsById, userLocation, schools, selectedAgeGroup, examAverages, nvoGrade, countryConfig])
 
-  const visibleSections = useMemo(() => sections
+  const costById = useMemo(
+    () => new Map(schools.map(school => [school.id, yearCost(school.pricing, costStage)])),
+    [schools, costStage]
+  )
+
+  // The yearly cost table goes before the fee list, when some school publishes fees.
+  const allSections = useMemo(() => {
+    if (!schools.some(school => school.school_type !== 'state' && (school.pricing || []).length > 0)) return sections
+    const costSection = buildYearCostSection({
+      t,
+      language: i18n.language,
+      schools,
+      costById,
+      stage: costStage,
+      needs: costNeeds,
+      onStageChange: setCostStage,
+      onToggleNeed: toggleCostNeed,
+    })
+    const at = sections.findIndex(section => section.key === 'pricing')
+    return at < 0 ? [...sections, costSection] : [...sections.slice(0, at), costSection, ...sections.slice(at)]
+  }, [sections, schools, costById, costStage, costNeeds, t, i18n.language])
+
+  const visibleSections = useMemo(() => allSections
     .map(section => ({
       ...section,
       rows: section.rows.filter(row => sortedSchools.some(school => (
         hasDisplayEvidence(row.getCompare?.(school))
       ))),
     }))
-    .filter(section => section.rows.length > 0), [sections, sortedSchools])
+    .filter(section => section.rows.length > 0), [allSections, sortedSchools])
 
   const completenessById = useMemo(() => {
     const map = new Map()
@@ -567,7 +602,7 @@ function ComparePage() {
                   </h2>
                   {section.rows.map(row => (
                     <MobileCompareRow
-                      key={`${section.key}-${row.label}`}
+                      key={`${section.key}-${row.key ?? row.label}`}
                       label={row.label}
                       highlightDiffs={highlightDiffs}
                       labelStyle={mobileLabelStyle}

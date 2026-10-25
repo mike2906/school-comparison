@@ -7,6 +7,7 @@
  * Shape: { version, child: { birthYear, startYear? } | null, home: { streetId, number } | null,
  *          homePoint: { lat, lng, label, fromHome? } | null,
  *          preferences: { languages: [key], monthlyBudget: number | null, travel: 'car' | 'transit' } | null,
+ *          costNeeds: ['food' | 'extended_day' | 'transport'] | null,
  *          kindergarten: { startYear, answers, siblings?, savedOn } | null,
  *          grade_1: { startYear, addresses, answers, siblings?, savedOn } | null }
  * `siblings` maps a school id to that school's sibling answers (see siblingsWith).
@@ -14,7 +15,9 @@
  * year (read it with childBirthYear), so a parent gives it once. `homePoint` is the home on
  * the map, for distances and travel times; `home` is the same home in the official address
  * table, for catchments. Either can exist without the other; a point found from `home` names
- * it in `fromHome` and goes when that address changes or is forgotten.
+ * it in `fromHome` and goes when that address changes or is forgotten. `costNeeds` are the
+ * paid extras the parent ticked on the compare page's yearly cost table (food, late pickup,
+ * the school bus), so every table adds them without asking again.
  */
 
 const STORAGE_KEY = 'admissionAnswers'
@@ -23,7 +26,7 @@ export const LOCATION_KEY = 'userLocation'
 const VERSION = 1
 export const SAVED_STAGES = ['kindergarten', 'grade_1']
 
-const EMPTY = Object.freeze({ version: VERSION, child: null, home: null, homePoint: null, preferences: null, kindergarten: null, grade_1: null })
+const EMPTY = Object.freeze({ version: VERSION, child: null, home: null, homePoint: null, preferences: null, costNeeds: null, kindergarten: null, grade_1: null })
 
 function storage() {
   try {
@@ -44,6 +47,7 @@ export function parseSaved(text) {
       home: isHome(value.home) ? value.home : null,
       homePoint: isPoint(value.homePoint) ? value.homePoint : null,
       preferences: preferencesFrom(value.preferences),
+      costNeeds: costNeedsFrom(value.costNeeds),
       kindergarten: isEntry(value.kindergarten) ? value.kindergarten : null,
       grade_1: isEntry(value.grade_1) && Array.isArray(value.grade_1.addresses) ? value.grade_1 : null,
     }
@@ -68,6 +72,13 @@ function preferencesFrom(value) {
   const monthlyBudget = Number.isFinite(value.monthlyBudget) && value.monthlyBudget > 0 ? value.monthlyBudget : null
   const travel = value.travel === 'transit' ? 'transit' : 'car'
   return languages.length > 0 || monthlyBudget || travel !== 'car' ? { languages, monthlyBudget, travel } : null
+}
+
+const COST_NEEDS = ['food', 'extended_day', 'transport']
+
+function costNeedsFrom(value) {
+  const needs = Array.isArray(value) ? COST_NEEDS.filter(need => value.includes(need)) : []
+  return needs.length > 0 ? needs : null
 }
 
 function isPoint(point) {
@@ -110,7 +121,7 @@ function read() {
 
 /** Whether the parent has saved anything on this device (their opt-in to keeping more). */
 export function hasSaved(saved) {
-  return Boolean(saved.child || saved.home || saved.homePoint || saved.preferences || SAVED_STAGES.some(stage => saved[stage]))
+  return Boolean(saved.child || saved.home || saved.homePoint || saved.preferences || saved.costNeeds || SAVED_STAGES.some(stage => saved[stage]))
 }
 
 function write(next) {
@@ -171,6 +182,11 @@ export function saveChild({ birthYear, startYear }) {
   const saved = read()
   const keep = startYear === undefined && saved.child?.birthYear === birthYear ? saved.child.startYear : startYear
   write({ ...saved, child: childFrom({ birthYear, startYear: keep }) })
+}
+
+/** Saves the paid extras ticked on the yearly cost table (see costNeedsFrom), or forgets them. */
+export function saveCostNeeds(needs) {
+  write({ ...read(), costNeeds: costNeedsFrom(needs) })
 }
 
 /** Saves the options page's languages, budget and travel (see preferencesFrom), or forgets them. */
