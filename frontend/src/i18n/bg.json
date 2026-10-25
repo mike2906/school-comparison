@@ -1487,9 +1487,21 @@
       "excluded": "{{line}} (цената не е посочена)",
       "periodNotYearly": "{{line}} (не е годишна цена)",
       "noPrice": "{{line}} (без цена)",
-      "inStatedTotal": "{{line}} (може да е в общата сума)"
+      "inStatedTotal": "{{line}} (може да е в общата сума)",
+      "unknownIfIncluded": "{{line}} (не е посочено дали е в таксата)"
     },
     "deposit": "Депозит {{price}}, връща се или се приспада по-късно (не е броен)",
-    "uniformItems": "Униформа: {{price}} на брой"
+    "uniformItems": "Униформа: {{price}} на брой",
+    "foodUnknown": "Не е посочено дали е в таксата",
+    "foodCounted": "броено в сумата",
+    "card": {
+      "foodIncluded": "с включена храна",
+      "foodUnknown": "цената на храната не е посочена",
+      "onTop": "+ {{items}}",
+      "items": {
+        "food": "храна",
+        "materials": "материали"
+      }
+    }
   }
 }

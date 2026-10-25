@@ -157,7 +157,7 @@ test('preferences keep only languages, a positive budget and a known way to trav
 })
 
 test('cost needs keep only the known extras', () => {
-  assert.deepEqual(parseSaved(JSON.stringify({ version: 1, costNeeds: ['transport', 'pony', 'food'] })).costNeeds, ['food', 'transport'])
-  assert.equal(parseSaved(JSON.stringify({ version: 1, costNeeds: 'food' })).costNeeds, null)
+  assert.deepEqual(parseSaved(JSON.stringify({ version: 1, costNeeds: ['transport', 'pony', 'food', 'extended_day'] })).costNeeds, ['extended_day', 'transport'])
+  assert.equal(parseSaved(JSON.stringify({ version: 1, costNeeds: 'transport' })).costNeeds, null)
   assert.equal(parseSaved(JSON.stringify({ version: 1, costNeeds: [] })).costNeeds, null)
 })

@@ -77,8 +77,13 @@ export function buildYearCostSection({ t, language, schools, costById, stage, ne
     if (state(school) !== 'cost') return fallback(school)
     const entry = cost.lines[line]
     if (entry.state === 'included') return <span className="text-sm font-medium text-emerald-700">{t('yearCost.included')}</span>
-    if (entry.options.length === 0) return muted(t(entry.state === 'excluded' ? 'yearCost.excluded' : 'yearCost.notStated'))
-    return <ul className="space-y-1.5">{entry.options.map(item => optionLine(item, { tag: t(item.required ? 'yearCost.required' : 'yearCost.optional') }))}</ul>
+    if (entry.options.length === 0) {
+      if (entry.state === 'excluded') return muted(t('yearCost.excluded'))
+      return muted(t(line === 'food' ? 'yearCost.foodUnknown' : 'yearCost.notStated'))
+    }
+    // Food is counted whatever the school calls it, so it carries no required/optional tag.
+    const tag = item => (line === 'food' ? null : t(item.required ? 'yearCost.required' : 'yearCost.optional'))
+    return <ul className="space-y-1.5">{entry.options.map(item => optionLine(item, { tag: tag(item) }))}</ul>
   }
   const lineCompare = line => school => {
     if (state(school) !== 'cost') return state(school)
@@ -197,6 +202,12 @@ export function buildYearCostSection({ t, language, schools, costById, stage, ne
     row('tuition', lineName('tuition'), tuitionCell, school => (state(school) === 'cost' ? costById.get(school.id).tuition.options.map(item => `${item.value.min}-${item.value.max}/${item.period}`).join(',') || 'none' : state(school))),
     row('materials', lineName('materials'), school => lineCell('materials', school), lineCompare('materials')),
     ...(anyOptions('required') ? [row('required', lineName('required'), school => lineCell('required', school), lineCompare('required'))] : []),
+    row('food', (
+      <span>
+        <span className="font-semibold">{lineName('food')}</span>
+        <span className="block text-xs font-normal text-neutral-500">{t('yearCost.foodCounted')}</span>
+      </span>
+    ), school => lineCell('food', school), lineCompare('food')),
     ...COST_NEEDS.map(line => row(line, needLabel(line), school => lineCell(line, school), lineCompare(line))),
     row('requiredTotal', lineName('requiredTotal'), school => totalCell(cost => cost.required, school), totalCompare(cost => cost.required)),
     ...(needs.length > 0

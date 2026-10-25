@@ -7,7 +7,7 @@
  * Shape: { version, child: { birthYear, startYear? } | null, home: { streetId, number } | null,
  *          homePoint: { lat, lng, label, fromHome? } | null,
  *          preferences: { languages: [key], monthlyBudget: number | null, travel: 'car' | 'transit' } | null,
- *          costNeeds: ['food' | 'extended_day' | 'transport'] | null,
+ *          costNeeds: ['extended_day' | 'transport'] | null,
  *          kindergarten: { startYear, answers, siblings?, savedOn } | null,
  *          grade_1: { startYear, addresses, answers, siblings?, savedOn } | null }
  * `siblings` maps a school id to that school's sibling answers (see siblingsWith).
@@ -16,8 +16,8 @@
  * the map, for distances and travel times; `home` is the same home in the official address
  * table, for catchments. Either can exist without the other; a point found from `home` names
  * it in `fromHome` and goes when that address changes or is forgotten. `costNeeds` are the
- * paid extras the parent ticked on the compare page's yearly cost table (food, late pickup,
- * the school bus), so every table adds them without asking again.
+ * paid extras the parent ticked on the compare page's yearly cost table (late pickup, the
+ * school bus; food is always counted), so every table adds them without asking again.
  */
 
 const STORAGE_KEY = 'admissionAnswers'
@@ -75,7 +75,7 @@ function preferencesFrom(value) {
 }
 
 // The paid extras the yearly cost table can add to its total (src/utils/yearCost.js).
-export const COST_NEEDS = ['food', 'extended_day', 'transport']
+export const COST_NEEDS = ['extended_day', 'transport']
 
 function costNeedsFrom(value) {
   const needs = Array.isArray(value) ? COST_NEEDS.filter(need => value.includes(need)) : []

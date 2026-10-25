@@ -25,6 +25,7 @@ import {
   getTrendTooltip,
 } from '../../utils/nvoDisplay'
 import { selectPricingCohort, statedTuition, YEAR_STATUS } from '../../utils/pricing'
+import { feeOnTop } from '../../utils/yearCost'
 import { schoolPath } from '../../utils/schoolPath'
 
 import {
@@ -178,6 +179,17 @@ const SchoolCard = memo(function SchoolCard({
         : tuition.period
           ? t('pricing.pricePerPeriod', { price, currency: tuition.currency, period: t(`pricing.per.${tuition.period}`) })
           : t('schoolCard.admissions.priceUnstatedPeriod', { price, currency: tuition.currency })
+      // What the fee leaves out, so a cheaper fee without food is not read as cheaper.
+      const onTop = priceLabel && !tuition.total ? feeOnTop(school, activeAgeGroup) : null
+      const extras = onTop && [onTop.food === 'extra' && 'food', onTop.materials && 'materials'].filter(Boolean)
+      const onTopLabel = !onTop
+        ? null
+        : [
+            onTop.food === 'included' ? t('yearCost.card.foodIncluded') : null,
+            extras.length > 0 ? t('yearCost.card.onTop', { items: extras.map(item => t(`yearCost.card.items.${item}`)).join(', ') }) : null,
+            onTop.food === 'unknown' ? t('yearCost.card.foodUnknown') : null,
+          ].filter(Boolean).join(' · ')
+      const fullPriceLabel = onTopLabel ? `${priceLabel} · ${onTopLabel}` : priceLabel
 
       const requirement = getAdmissionRequirement(
         curatedRequirement(admissionInfo, i18n.language) || attributes?.entry_requirements,
@@ -185,9 +197,9 @@ const SchoolCard = memo(function SchoolCard({
       )
 
       if (priceLabel && requirement) {
-        return { icon: '💰', text: `${priceLabel} • ${requirement.icon} ${requirement.text}` }
+        return { icon: '💰', text: `${fullPriceLabel} • ${requirement.icon} ${requirement.text}` }
       }
-      if (priceLabel) return { icon: '💰', text: priceLabel }
+      if (priceLabel) return { icon: '💰', text: fullPriceLabel }
       if (requirement) return { icon: requirement.icon, text: requirement.text }
       return null
     }

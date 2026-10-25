@@ -1487,9 +1487,21 @@
       "excluded": "{{line}} (price not stated)",
       "periodNotYearly": "{{line}} (not a yearly price)",
       "noPrice": "{{line}} (no price)",
-      "inStatedTotal": "{{line}} (may be in the school's total)"
+      "inStatedTotal": "{{line}} (may be in the school's total)",
+      "unknownIfIncluded": "{{line}} (not stated whether tuition includes it)"
     },
     "deposit": "Deposit {{price}}, returned or credited later (not counted)",
-    "uniformItems": "Uniform items: {{price}} each"
+    "uniformItems": "Uniform items: {{price}} each",
+    "foodUnknown": "Not stated whether tuition includes it",
+    "foodCounted": "counted in the total",
+    "card": {
+      "foodIncluded": "food included",
+      "foodUnknown": "food cost not stated",
+      "onTop": "+ {{items}}",
+      "items": {
+        "food": "food",
+        "materials": "materials"
+      }
+    }
   }
 }
