@@ -9,10 +9,10 @@ import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { describe, test } from 'node:test'
 
-import { catchmentSchoolFor, catchmentUrl, displayPlaceName, indexAddresses, schoolCatchmentIds, streetDisplayName } from '../../src/admission/catchments.js'
+import { catchmentSchoolFor, catchmentUrl, displayPlaceName, indexAddresses, mapSearchQuery, schoolCatchmentIds, streetDisplayName } from '../../src/admission/catchments.js'
 import { CATCHMENT_CAMPAIGNS } from '../../src/admission/loadCatchments.js'
 import { usesSofiaKindergartenSystem } from '../../src/utils/admission.js'
-import { DESKTOP, findSchool, number, open, page, schoolName, t, liveBrowser } from './live.js'
+import { DESKTOP, allSchools, findSchool, number, open, page, schoolName, t, liveBrowser } from './live.js'
 import { planningYear } from '../../src/utils/ageSelection.js'
 
 liveBrowser(DESKTOP)
@@ -38,21 +38,35 @@ const addressTable = async file =>
  * other street has, so the suggestion to pick is clear. Read from the table the site
  * itself loads (public/ is served at the site root).
  */
-async function addressIn(ids) {
+async function addressIn(ids, accept = async () => true, maxTries = 8) {
   const streets = indexAddresses(await addressTable('addresses.json'))
   const districtNames = new Map((await addressTable('districts.json')).features.map(f => [f.properties.code, f.properties.name]))
   const sameName = new Map()
   for (const street of streets) sameName.set(street.key, (sameName.get(street.key) || 0) + 1)
+  let tried = 0
   for (const street of streets) {
     // An ordinary street (УЛ.), typed without its prefix as a parent would.
     if (street.settlement !== 'ГР.СОФИЯ' || !/^УЛ\./.test(street.street) || street.key.length <= 4 || sameName.get(street.key) > 1) continue
     const number = [...street.numbers.entries()].find(([n, id]) => ids.includes(id) && /^\d+$/.test(n))?.[0]
-    if (number) {
-      assert.ok(ids.includes(catchmentSchoolFor(street, number)))
-      return { street, number, district: districtNames.get(street.district) }
-    }
+    if (!number) continue
+    assert.ok(ids.includes(catchmentSchoolFor(street, number)))
+    if (tried++ >= maxTries) break
+    if (await accept(street, number)) return { street, number, district: districtNames.get(street.district) }
   }
   assert.fail(`an address in catchment ${ids.join(', ')}`)
+}
+
+// Whether OpenStreetMap finds the street the way the search page looks a saved address up
+// (useUserLocation: the house, then the street): a street it lacks (ул. Звънче) gives the
+// parent "address not found", which is right, but leaves this flow nothing to check.
+async function osmFindsStreet(street) {
+  await new Promise(resolve => setTimeout(resolve, 1100)) // Nominatim's one request a second.
+  const query = mapSearchQuery(street, '').replace(/\s+,/, ',')
+  const response = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=jsonv2&limit=1&countrycodes=bg`, {
+    headers: { 'User-Agent': 'schooldecider-live-flows', Accept: 'application/json' },
+    signal: AbortSignal.timeout(15_000),
+  })
+  return response.ok && (await response.json()).length > 0
 }
 
 /** Types "street number" into the one address field and picks the suggestion. */
@@ -292,9 +306,19 @@ describe('admission from a school page', () => {
   })
 
   test('saved first-grade answers compare every school in the list, and can be forgotten', async () => {
-    const school = await findSchool('with a first-grade catchment and cut-offs', () => true, s =>
+    // The first listed school with cut-offs whose catchment has a street OpenStreetMap knows.
+    let school = null
+    let address = null
+    const withCutoffs = (await allSchools()).filter(s =>
       schoolCatchmentIds(s).length > 0 && (s.admission_info?.cutoff_summary || []).some(row => row.stage === 'grade_1'))
-    const address = await addressIn(schoolCatchmentIds(school))
+    for (const candidate of withCutoffs.slice(0, 6)) {
+      address = await addressIn(schoolCatchmentIds(candidate), osmFindsStreet, 3).catch(() => null)
+      if (address) {
+        school = candidate
+        break
+      }
+    }
+    assert.ok(school, 'no school with first-grade cut-offs has a catchment street OpenStreetMap finds')
     await open('bg', '/admission?stage=grade_1')
     const g1 = key => t('bg', `admissionCalc.g1.${key}`)
     await typeAddress(page.locator('main'), address, 'bg')
