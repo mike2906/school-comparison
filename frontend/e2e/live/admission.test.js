@@ -38,7 +38,9 @@ const addressTable = async file =>
  * other street has, so the suggestion to pick is clear. Read from the table the site
  * itself loads (public/ is served at the site root).
  */
-async function addressIn(ids, accept = async () => true, maxTries = 8) {
+// An ordinary street in catchment `ids` with a plain house number there. With `accept`, the
+// first of up to `maxTries` such addresses it accepts, or null when it accepts none.
+async function addressIn(ids, accept = null, maxTries = 8) {
   const streets = indexAddresses(await addressTable('addresses.json'))
   const districtNames = new Map((await addressTable('districts.json')).features.map(f => [f.properties.code, f.properties.name]))
   const sameName = new Map()
@@ -50,23 +52,29 @@ async function addressIn(ids, accept = async () => true, maxTries = 8) {
     const number = [...street.numbers.entries()].find(([n, id]) => ids.includes(id) && /^\d+$/.test(n))?.[0]
     if (!number) continue
     assert.ok(ids.includes(catchmentSchoolFor(street, number)))
-    if (tried++ >= maxTries) break
-    if (await accept(street, number)) return { street, number, district: districtNames.get(street.district) }
+    if (!accept || await accept(street, number)) return { street, number, district: districtNames.get(street.district) }
+    if (++tried >= maxTries) return null
   }
+  if (accept) return null
   assert.fail(`an address in catchment ${ids.join(', ')}`)
 }
 
 // Whether OpenStreetMap finds the street the way the search page looks a saved address up
 // (useUserLocation: the house, then the street): a street it lacks (ул. Звънче) gives the
-// parent "address not found", which is right, but leaves this flow nothing to check.
+// parent "address not found", which is right, but leaves this flow nothing to check. A
+// refused request fails the flow as such, not as a missing street.
+let lastOsmRequest = 0
 async function osmFindsStreet(street) {
-  await new Promise(resolve => setTimeout(resolve, 1100)) // Nominatim's one request a second.
+  const wait = lastOsmRequest + 1100 - Date.now() // Nominatim's one request a second.
+  if (wait > 0) await new Promise(resolve => setTimeout(resolve, wait))
+  lastOsmRequest = Date.now()
   const query = mapSearchQuery(street, '').replace(/\s+,/, ',')
   const response = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=jsonv2&limit=1&countrycodes=bg`, {
-    headers: { 'User-Agent': 'schooldecider-live-flows', Accept: 'application/json' },
-    signal: AbortSignal.timeout(15_000),
+    headers: { 'User-Agent': 'SchoolFinder live flows (contact: contact@schooldecider.com)', Accept: 'application/json' },
+    signal: AbortSignal.timeout(10_000),
   })
-  return response.ok && (await response.json()).length > 0
+  if (!response.ok) throw new Error(`OpenStreetMap refused the street check (HTTP ${response.status}), not a site bug`)
+  return (await response.json()).length > 0
 }
 
 /** Types "street number" into the one address field and picks the suggestion. */
@@ -312,7 +320,7 @@ describe('admission from a school page', () => {
     const withCutoffs = (await allSchools()).filter(s =>
       schoolCatchmentIds(s).length > 0 && (s.admission_info?.cutoff_summary || []).some(row => row.stage === 'grade_1'))
     for (const candidate of withCutoffs.slice(0, 6)) {
-      address = await addressIn(schoolCatchmentIds(candidate), osmFindsStreet, 3).catch(() => null)
+      address = await addressIn(schoolCatchmentIds(candidate), osmFindsStreet, 3)
       if (address) {
         school = candidate
         break
