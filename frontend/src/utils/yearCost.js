@@ -319,11 +319,40 @@ function requiredTotal(tuition, lines) {
       else missing.push({ line, reason: item.value ? 'periodNotYearly' : 'noPrice' })
     })
   })
+  // Every child eats: food counts as required, whether the tuition holds it or the school bills
+  // it apart, so a fee without food is not the cheaper one by leaving it out. Unknown or not one
+  // yearly price, it is named as not added.
+  // A food fee the school calls compulsory is in already, and a snack beside it stays optional.
+  const food = lines.food.options.some(item => item.required) ? {} : lineValue(lines.food)
+  if (food.value) parts.push(food.value)
+  else if (food.missing) missing.push({ line: 'food', reason: food.missing === 'notStated' ? 'unknownIfIncluded' : food.missing })
   return { value: sum(parts), missing }
 }
 
 /**
- * The required total plus the lines the parent needs (`needs`, COST_NEEDS keys) that are not
+ * What a headline fee leaves out, for a school card: `{ food, materials }`, where food is
+ * included | extra | unknown and materials is true when required books or materials are billed
+ * apart. Null without a tuition, or for a printed total. Without an age group the headline may be
+ * any stage's fee, so only what every priced stage the school offers agrees on.
+ */
+export function feeOnTop(school, ageGroup = null, { today = new Date() } = {}) {
+  const stages = ageGroup ? [stageForAgeGroup(ageGroup)].filter(Boolean) : COST_STAGES.filter(stage => offersStage(school, stage))
+  const found = stages.flatMap((stage) => {
+    const cost = yearCost(school.pricing || [], stage, { today })
+    if (!cost || cost.tuition.options.length === 0 || cost.tuition.statedTotal) return []
+    const { food, materials } = cost.lines
+    return [{
+      food: food.state === 'included' ? 'included' : (food.state === 'none' ? 'unknown' : 'extra'),
+      materials: materials.options.some(item => item.required),
+    }]
+  })
+  if (found.length === 0) return null
+  const [first] = found
+  return found.every(item => item.food === first.food && item.materials === first.materials) ? first : null
+}
+
+/**
+ * The required total plus the lines the parent ticked (`needs`, COST_NEEDS keys) that are not
  * already in it. Null without a required total. `missing` names what could not be added.
  */
 export function totalWithNeeds(cost, needs = []) {

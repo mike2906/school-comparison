@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
 
-import { defaultStage, offersStage, rowsForStage, stageForAgeGroup, stageForChild, totalWithNeeds, yearCost } from './yearCost.js'
+import { defaultStage, feeOnTop, offersStage, rowsForStage, stageForAgeGroup, stageForChild, totalWithNeeds, yearCost } from './yearCost.js'
 
 // The live fee rows of 596 Maple Bear, 172 St. Sofia and 635 Uwekind on 25 Oct 2026, checked by
 // hand against their fee pages (2026/27, grade 1).
@@ -11,13 +11,16 @@ const today = new Date('2026-10-25T12:00:00Z')
 const cost = (id, stage = 'grade_1') => yearCost(SCHOOLS[id], stage, { today })
 const ids = options => options.map(item => item.row.id)
 
-test('grade 1 requires tuition plus the fees every pupil pays', () => {
-  // Maple Bear: 9,050 tuition (plan 1) + 550 materials.
-  assert.deepEqual(cost(596).required, { value: { min: 9600, max: 9600, assumed: false }, missing: [] })
-  // St. Sofia: the ПУК–III band's 8,900, not grades 4–7's 9,400.
-  assert.deepEqual(cost(172).required, { value: { min: 8900, max: 8900, assumed: false }, missing: [] })
-  // Uwekind: 7,880 + 600 resources + 450 for the compulsory club, whose period is not stated.
-  assert.deepEqual(cost(635).required, { value: { min: 8930, max: 8930, assumed: true }, missing: [] })
+test('grade 1 requires tuition, the fees every pupil pays, and food', () => {
+  // Maple Bear: 9,050 tuition (plan 1) + 550 materials + 1,290–1,340 food billed apart.
+  assert.deepEqual(cost(596).required, { value: { min: 10890, max: 10940, assumed: false }, missing: [] })
+  // St. Sofia: the ПУК–III band's 8,900, not grades 4–7's 9,400; our rows do not say whether it holds food.
+  assert.deepEqual(cost(172).required, { value: { min: 8900, max: 8900, assumed: false }, missing: [{ line: 'food', reason: 'unknownIfIncluded' }] })
+  // Uwekind: 7,880 + 600 resources + 450 for the compulsory club, whose period is not stated;
+  // lunch at one campus or the other, so food is not added.
+  assert.deepEqual(cost(635).required, { value: { min: 8930, max: 8930, assumed: true }, missing: [{ line: 'food', reason: 'severalOptions' }] })
+  // Grades 4–7 at St. Sofia include food: nothing to add or name.
+  assert.deepEqual(cost(172, 'grade_5').required.missing, [])
 })
 
 test('tuition is the stage’s own price, not a payment plan or another grade’s', () => {
@@ -41,10 +44,9 @@ test('a bus with a one-way price beside it is the two-way one', () => {
 })
 
 test('ticked needs are added only when they come to one yearly price', () => {
-  const all = ['food', 'extended_day', 'transport']
-  // Maple Bear states each one per year; its food is a range.
+  const all = ['extended_day', 'transport']
+  // Maple Bear states each one per year.
   assert.deepEqual(totalWithNeeds(cost(596), all), { value: { min: 14140, max: 14190, assumed: false }, missing: [] })
-  // Uwekind has lunch at two campuses and snacks: the parent's choice, so not added.
   assert.deepEqual(totalWithNeeds(cost(635), all).missing, [
     { line: 'food', reason: 'severalOptions' },
     { line: 'extended_day', reason: 'notStated' },
@@ -143,4 +145,25 @@ test('a school with no kindergarten does not offer a kindergarten group', () => 
   assert.equal(offersStage(school, 'grade_9'), true)
   assert.equal(offersStage({ locations: [{ age_groups: ['first', 'second'] }] }, 'grade_1'), false)
   assert.equal(offersStage({ locations: [] }, 'first'), true)
+})
+
+test('a card names what its fee leaves out', () => {
+  const school = id => ({ pricing: SCHOOLS[id], locations: [] })
+  // Maple Bear bills food and materials apart; St. Sofia's grades 4–7 fee holds food.
+  assert.deepEqual(feeOnTop(school(596), 'grade_1_4', { today }), { food: 'extra', materials: true })
+  assert.deepEqual(feeOnTop(school(172), 'grade_5_7', { today }), { food: 'included', materials: false })
+  assert.equal(feeOnTop(school(172), 'grade_1_4', { today }).food, 'unknown')
+  assert.equal(feeOnTop({ pricing: [], locations: [] }, null, { today }), null)
+  // With no age chosen, St. Sofia's bands disagree on food: no marker rather than another band's.
+  assert.equal(feeOnTop({ pricing: SCHOOLS[172], locations: [{ age_groups: ['grade_1_4', 'grade_5_7'] }] }, null, { today }), null)
+})
+
+test('a compulsory food fee is counted once, and an optional snack beside it is not', () => {
+  const rows = [
+    { id: 1, category: 'tuition', amount: 5000, currency: 'EUR', period: 'yearly', year_status: 'not_stated' },
+    { id: 2, category: 'food', amount: 1000, currency: 'EUR', period: 'yearly', year_status: 'not_stated', plan_name: 'Задължителен обяд' },
+    { id: 3, category: 'food', amount: 200, currency: 'EUR', period: 'yearly', year_status: 'not_stated', plan_name: 'Закуска по желание' },
+  ]
+  assert.deepEqual(yearCost(rows, 'grade_1', { today }).lines.food.options.map(item => item.required), [true, false])
+  assert.deepEqual(yearCost(rows, 'grade_1', { today }).required.value, { min: 6000, max: 6000, assumed: false })
 })

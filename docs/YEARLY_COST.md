@@ -15,14 +15,23 @@ comes from the saved child when it fits the searched age group, else that group'
 | Tuition | the stage's whole, regular tuition (`tuitionRows`), yearly rows first | yes, only when stated per year |
 | Books & materials | `materials` rows | yes, unless the fee says it is optional |
 | Other required fees | rows the school calls compulsory (`requiredExtras`): 635's club | yes |
-| Food, after-school care, school bus | `food`, `extended_day`, `transport` rows | only when ticked, and only when they come to one yearly price |
+| Food | `food` rows, or "included" from the tuition's words | always (every child eats), when included or one yearly price; else named as not added |
+| After-school care, school bus | `extended_day`, `transport` rows | only when ticked, and only when they come to one yearly price |
 | First year only | admission fees, each listed (two may be one or the other, so no sum); deposits and uniform item prices apart | no |
 | Optional extras | clubs, activities, camps the school prices | never |
 
 Each price links to its source page. A line is "Included in tuition" only when every tuition
 row for the stage says so (includes list or notes), "Not in tuition" when a row says it is
-left out, else "Not stated". The ticks are saved on the device (`costNeeds` in
+left out, else "Not stated" (for food, "Not stated whether tuition includes it"). Food is
+counted so a fee that leaves it out does not look cheaper than one that holds it. The ticks are saved on the device (`costNeeds` in
 `src/admission/saved.js`), so every comparison adds them without asking again.
+
+## On the school list
+
+A private school's card adds what its headline fee leaves out (`feeOnTop`): "food included",
+"+ food, materials" or "food cost not stated". A printed total gets no marker. The list still
+sorts by tuition: on 25 Oct 2026 only 2 of the 26 schools with a yearly grade 1 fee had food
+known as one yearly price, so a sort by yearly cost would rank partial totals as cheaper.
 
 ## Rules (from the design review, `/mnt/project-files/yearly-cost/design.md` Revision)
 
@@ -43,7 +52,12 @@ left out, else "Not stated". The ticks are saved on the device (`costNeeds` in
 - Billed months for monthly fees (about 30 kindergartens) and paid hours for after-school care.
 - "Included" is read for only a few schools: 172's grade 1 tuition includes food on its site,
   but our row does not say so.
-- Many food, bus and club rows have no period (`period: null`).
+- Many food, bus and club rows have no period (`period: null`), and many food prices are per
+  day or month (no billed days).
+- Whether the tuition includes food: the fee reader has no field for it, so it is known only
+  where a note says so. Hand check of 16 grade 1 fee pages (25 Oct 2026): 172, 593 and 568
+  include food; 271 and 171 bill it apart with no price; 350, 381 and 630 price it per day or
+  month (350 and 381 also allow food from home).
 
 These wait for the pilot re-read in the design doc. Sorting the list by yearly cost waits for
 an audited accuracy check.
