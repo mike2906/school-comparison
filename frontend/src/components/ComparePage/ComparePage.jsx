@@ -14,7 +14,7 @@ import { comparisonExamType, examGradeLabel, getAvailableExamTypes } from '../..
 import { statedTuition, tuitionSortValue } from '../../utils/pricing'
 import { hasDisplayableAdmissionInfo } from '../../utils/admission'
 import { readSavedLocation } from '../../utils/keyFacts'
-import { stageForAgeGroup, stageForChild, yearCost } from '../../utils/yearCost'
+import { defaultStage, yearCost } from '../../utils/yearCost'
 import { planningYear } from '../../utils/ageSelection'
 import { saveCostNeeds } from '../../admission/saved'
 import { useSavedAdmission } from '../../hooks/useSavedAdmission'
@@ -64,9 +64,12 @@ function ComparePage() {
   const ids = useMemo(() => (queryIds.length > 0 ? queryIds : compareList.map(s => s.id)), [queryIds, compareList])
   const selectedAgeGroup = searchParams.get('age_group')
   const saved = useSavedAdmission()
-  // The cost table's stage: the saved child's, else the search's age group, else grade 1.
-  const defaultCostStage = stageForChild(saved.child?.birthYear, saved.child?.startYear ?? planningYear()) ||
-    stageForAgeGroup(selectedAgeGroup) || 'grade_1'
+  const defaultCostStage = defaultStage({
+    birthYear: saved.child?.birthYear,
+    startYear: saved.child?.startYear,
+    ageGroup: selectedAgeGroup,
+    planningYear: planningYear(),
+  })
   const [chosenCostStage, setCostStage] = useState(null)
   const costStage = chosenCostStage || defaultCostStage
   const costNeeds = useMemo(() => saved.costNeeds || [], [saved.costNeeds])

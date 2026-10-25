@@ -39,6 +39,18 @@ export function stageForAgeGroup(ageGroup) {
   return COST_STAGES.includes(ageGroup) ? ageGroup : null
 }
 
+/**
+ * The stage a cost table starts at: the saved child's when it fits the searched age group (or
+ * there is none), else the searched group's first year, else grade 1. A start year already
+ * past plans for the coming year.
+ */
+export function defaultStage({ birthYear, startYear, ageGroup, planningYear }) {
+  const child = stageForChild(birthYear, Math.max(startYear ?? planningYear, planningYear))
+  const searched = stageForAgeGroup(ageGroup)
+  if (child && (!searched || stageAgeGroup(child) === stageAgeGroup(searched))) return child
+  return searched || child || 'grade_1'
+}
+
 const GRADE_GROUPS = new Set(['grade_1_4', 'grade_5_7', 'grade_8_12'])
 
 /**
@@ -70,7 +82,8 @@ function stageAgeGroup(stage) {
 }
 
 const KINDERGARTEN_STAGES = new Set(['nursery', 'first', 'second', 'third'])
-const SCHOOL_GROUP_RE = /училищ|ученици|school|pupils|students/iu
+// At a word's start: "предучилищна" and "preschool" are a kindergarten's words.
+const SCHOOL_GROUP_RE = /(?<![\p{L}])(?:училищ|ученици|учениците|school|pupils|students)/iu
 
 // 'named' for a row that names the stage, 'any' for one naming no group we can read (it may
 // well apply), false for one naming only other groups.
@@ -108,6 +121,8 @@ export function rowsForStage(rows = [], stage) {
 // A fee with no stated period counts once a year only on a page whose tuition is per year,
 // and is marked so (`assumed`), unless its notes say per school year (635's bus).
 const PER_YEAR_NOTE_RE = /учебна година|за година|годишн|per (?:school )?year|a year|annual|school year/iu
+// "150 € per month during the school year" is not a yearly price.
+const OTHER_PERIOD_NOTE_RE = /месе[цч]|седмиц|на ден|дневн|month|week|per day|daily|twice|два пъти/iu
 
 function amounts(row) {
   const low = toEur(row.amount_min ?? row.amount ?? row.amount_max, row.currency)
@@ -121,7 +136,7 @@ function option(row, { yearlyPage, required = false }) {
   const value = amounts(row)
   const notes = [row.pricing_context?.notes, row.plan_name, row.pricing_context?.plan_name_en].filter(Boolean).join(' / ')
   let perYear = null
-  if (value && (period === 'yearly' || (period == null && PER_YEAR_NOTE_RE.test(notes)))) {
+  if (value && (period === 'yearly' || (period == null && PER_YEAR_NOTE_RE.test(notes) && !OTHER_PERIOD_NOTE_RE.test(notes)))) {
     perYear = { ...value, assumed: false }
   } else if (value && period == null && yearlyPage) {
     perYear = { ...value, assumed: true }
@@ -130,14 +145,16 @@ function option(row, { yearlyPage, required = false }) {
 }
 
 // The same fee read twice (596's food from both of its fee PDFs): a row whose amount lies inside
-// another row's stated range, or repeats another row's amount and name, gives way to it.
+// another row's stated range, or repeats another row's amount, with the same name and period,
+// gives way to it.
 function withoutRepeats(options) {
   const name = item => (item.row.plan_name || '').trim().toLocaleLowerCase()
   return options.filter((item, index) => !options.some((other, otherIndex) => {
     if (otherIndex === index || !item.value || !other.value) return false
+    if (name(other) !== name(item) || other.period !== item.period) return false
     const inside = other.value.min < other.value.max && item.value.min === item.value.max &&
       other.value.min <= item.value.min && item.value.max <= other.value.max
-    const same = otherIndex < index && other.value.min === item.value.min && other.value.max === item.value.max && name(other) === name(item)
+    const same = otherIndex < index && other.value.min === item.value.min && other.value.max === item.value.max
     return inside || same
   }))
 }
@@ -153,11 +170,12 @@ function preferTwoWay(options) {
 
 // What the tuition's own words say about a line: 635's "В таксата не е включена храна", 172's
 // "The annual tuition fee includes food". Read from the tuition rows' includes, excludes and notes.
+// At a word's start, so "syllabus" is not a bus.
 const LINE_WORDS = {
-  food: /храна|хранене|обяд|закуск|food|meals?|lunch|snack/iu,
-  materials: /учебни(?:к|ци)|учебни помагала|помагал|материал|тетрадк|textbooks?|books|materials/iu,
-  transport: /транспорт|автобус|transport|bus/iu,
-  extended_day: /занимал|удължен|extended day|after[- ]school/iu,
+  food: /(?<![\p{L}])(?:храна|хранене|обяд|закуск|food|meals?|lunch|snacks?)/iu,
+  materials: /(?<![\p{L}])(?:учебни(?:к|ци)|учебни материали|помагал|тетрадк|textbooks?|books|(?:learning |teaching |educational |school )?materials)/iu,
+  transport: /(?<![\p{L}])(?:транспорт|автобус|transport|bus)(?![\p{L}])/iu,
+  extended_day: /(?<![\p{L}])(?:занимал|удължен|extended day|after[- ]school)/iu,
 }
 const NOT_INCLUDED_RE = /не (?:е|са|се) включен|не включва|без (?:храна|транспорт)|not included|excluded|excludes|does not include|doesn't include/iu
 const INCLUDED_RE = /включ|includ|covers|покрива/iu
@@ -167,7 +185,8 @@ function rowInclusion(row, line) {
   const context = row.pricing_context || {}
   let state = null
   if ((context.excludes || []).some(text => words.test(text))) state = 'excluded'
-  String(context.notes || '').split(/(?<=[.;!?])\s+/).forEach((sentence) => {
+  // By clause: "включва учебни материали, но не включва храна" includes one and not the other.
+  String(context.notes || '').split(/(?<=[.;!?])\s+|,\s*|\s(?:но|а|but|while)\s/u).forEach((sentence) => {
     if (!words.test(sentence)) return
     if (NOT_INCLUDED_RE.test(sentence)) state = state || 'excluded'
     else if (INCLUDED_RE.test(sentence)) state = 'included'

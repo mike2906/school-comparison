@@ -81,6 +81,7 @@ export function buildYearCostSection({ t, language, schools, costById, stage, ne
     return <ul className="space-y-1.5">{entry.options.map(item => optionLine(item, { tag: t(item.required ? 'yearCost.required' : 'yearCost.optional') }))}</ul>
   }
   const lineCompare = line => school => {
+    if (state(school) !== 'cost') return state(school)
     const entry = costById.get(school.id)?.lines[line]
     return entry ? [entry.state, ...entry.options.map(item => `${item.value.min}-${item.value.max}`)].join('|') : state(school)
   }
@@ -109,6 +110,7 @@ export function buildYearCostSection({ t, language, schools, costById, stage, ne
     )
   }
   const totalCompare = pick => school => {
+    if (state(school) !== 'cost') return state(school)
     const cost = costById.get(school.id)
     const total = cost?.required ? pick(cost) : null
     return total ? `${total.value.min}-${total.value.max}` : state(school)
@@ -144,8 +146,8 @@ export function buildYearCostSection({ t, language, schools, costById, stage, ne
     }
     return (
       <div className="space-y-1.5">
-        {options.length > 1 && <div className="text-sm font-medium text-neutral-900">{`+ ${money(cost.firstYear.value)}`}</div>}
-        {options.length > 0 && optionList(options, { sign: options.length > 1 ? '' : '+ ', named: true })}
+        {/* Listed, not summed: two admission fees may be one or the other (round I or II). */}
+        {options.length > 0 && optionList(options, { named: true })}
         {deposits.map(item => (
           <p key={item.row.id} className="text-xs text-neutral-600">
             {t('yearCost.deposit', { price: money(item.value) })} {source(item.row)}
@@ -192,7 +194,7 @@ export function buildYearCostSection({ t, language, schools, costById, stage, ne
   const row = (key, label, getValue, getCompare) => ({ key, label, getValue, getCompare })
 
   const rows = [
-    row('tuition', lineName('tuition'), tuitionCell, school => costById.get(school.id)?.tuition.options.map(item => item.row.id).join(',') || state(school)),
+    row('tuition', lineName('tuition'), tuitionCell, school => (state(school) === 'cost' ? costById.get(school.id).tuition.options.map(item => item.row.id).join(',') || 'none' : state(school))),
     row('materials', lineName('materials'), school => lineCell('materials', school), lineCompare('materials')),
     ...(anyOptions('required') ? [row('required', lineName('required'), school => lineCell('required', school), lineCompare('required'))] : []),
     ...COST_NEEDS.map(line => row(line, needLabel(line), school => lineCell(line, school), lineCompare(line))),
@@ -200,8 +202,8 @@ export function buildYearCostSection({ t, language, schools, costById, stage, ne
     ...(needs.length > 0
       ? [row('withNeeds', lineName('withNeeds'), school => totalCell(cost => totalWithNeeds(cost, needs), school), totalCompare(cost => totalWithNeeds(cost, needs)))]
       : []),
-    row('firstYear', lineName('firstYear'), firstYearCell, school => costById.get(school.id)?.firstYear.value?.min ?? state(school)),
-    row('optional', lineName('optional'), optionalCell, school => costById.get(school.id)?.optional.map(item => item.row.id).join(',') || state(school)),
+    row('firstYear', lineName('firstYear'), firstYearCell, school => (state(school) === 'cost' ? costById.get(school.id).firstYear.options.map(item => item.row.id).join(',') || 'none' : state(school))),
+    row('optional', lineName('optional'), optionalCell, school => (state(school) === 'cost' ? costById.get(school.id).optional.map(item => item.row.id).join(',') || 'none' : state(school))),
   ]
 
   const stageName = key => (key.startsWith('grade_')

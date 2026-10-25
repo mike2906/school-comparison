@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
 
-import { offersStage, rowsForStage, stageForAgeGroup, stageForChild, totalWithNeeds, yearCost } from './yearCost.js'
+import { defaultStage, offersStage, rowsForStage, stageForAgeGroup, stageForChild, totalWithNeeds, yearCost } from './yearCost.js'
 
 // The live fee rows of 596 Maple Bear, 172 St. Sofia and 635 Uwekind on 25 Oct 2026, checked by
 // hand against their fee pages (2026/27, grade 1).
@@ -105,6 +105,31 @@ test('the stage comes from the saved child or the search', () => {
   assert.equal(stageForAgeGroup('grade_5_7'), 'grade_5')
   assert.equal(stageForAgeGroup('third'), 'third')
   assert.equal(stageForAgeGroup(null), null)
+  // The child wins when it fits the search; a search for other grades starts at their first.
+  assert.equal(defaultStage({ birthYear: 2020, startYear: 2027, ageGroup: 'grade_1_4', planningYear: 2027 }), 'grade_1')
+  assert.equal(defaultStage({ birthYear: 2023, startYear: 2027, ageGroup: 'grade_5_7', planningYear: 2027 }), 'grade_5')
+  // A start year already past plans for the coming one.
+  assert.equal(defaultStage({ birthYear: 2019, startYear: 2025, planningYear: 2027 }), 'grade_2')
+  assert.equal(defaultStage({ planningYear: 2027 }), 'grade_1')
+})
+
+test('the tuition’s words decide a line by clause and by whole word', () => {
+  const tuition = notes => [{ id: 1, category: 'tuition', amount: 5000, currency: 'EUR', period: 'yearly', year_status: 'not_stated', pricing_context: { notes } }]
+  const lines = notes => yearCost(tuition(notes), 'grade_1', { today }).lines
+  const mixed = lines('Таксата включва учебни материали, но не включва храна.')
+  assert.equal(mixed.materials.state, 'included')
+  assert.equal(mixed.food.state, 'excluded')
+  assert.equal(lines('The fee includes the full syllabus.').transport.state, 'none')
+  assert.equal(lines('Включва ползване на материалната база.').materials.state, 'none')
+})
+
+test('a fee read as yearly from its notes only when they name no other period', () => {
+  const rows = notes => [
+    { id: 1, category: 'tuition', amount: 650, currency: 'EUR', period: 'monthly', year_status: 'not_stated' },
+    { id: 2, category: 'food', amount: 150, currency: 'EUR', period: null, year_status: 'not_stated', pricing_context: { notes } },
+  ]
+  assert.equal(yearCost(rows('Изчислена за една учебна година.'), 'first', { today }).lines.food.options[0].perYear.assumed, false)
+  assert.equal(yearCost(rows('150 € per month during the school year'), 'first', { today }).lines.food.options[0].perYear, null)
 })
 
 test('a school with no kindergarten does not offer a kindergarten group', () => {

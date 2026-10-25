@@ -20,6 +20,8 @@
  * the school bus), so every table adds them without asking again.
  */
 
+import { COST_NEEDS } from '../utils/yearCost.js'
+
 const STORAGE_KEY = 'admissionAnswers'
 // The search page's current location (useUserLocation): not part of the saved answers.
 export const LOCATION_KEY = 'userLocation'
@@ -74,8 +76,6 @@ function preferencesFrom(value) {
   return languages.length > 0 || monthlyBudget || travel !== 'car' ? { languages, monthlyBudget, travel } : null
 }
 
-const COST_NEEDS = ['food', 'extended_day', 'transport']
-
 function costNeedsFrom(value) {
   const needs = Array.isArray(value) ? COST_NEEDS.filter(need => value.includes(need)) : []
   return needs.length > 0 ? needs : null
@@ -119,14 +119,17 @@ function read() {
   return current
 }
 
-/** Whether the parent has saved anything on this device (their opt-in to keeping more). */
+/**
+ * Whether the parent has saved anything on this device (their opt-in to keeping more). The
+ * cost table's ticks are kept, but ticking one is not an opt-in to keeping anything else.
+ */
 export function hasSaved(saved) {
-  return Boolean(saved.child || saved.home || saved.homePoint || saved.preferences || saved.costNeeds || SAVED_STAGES.some(stage => saved[stage]))
+  return Boolean(saved.child || saved.home || saved.homePoint || saved.preferences || SAVED_STAGES.some(stage => saved[stage]))
 }
 
 function write(next) {
   current = next
-  const empty = !hasSaved(next)
+  const empty = !hasSaved(next) && !next.costNeeds
   try {
     if (empty) storage()?.removeItem(STORAGE_KEY)
     else storage()?.setItem(STORAGE_KEY, JSON.stringify(next))

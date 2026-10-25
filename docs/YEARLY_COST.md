@@ -8,7 +8,7 @@ of the yearly cost pilot; nothing here reads websites or calls a model.
 ## What a parent sees
 
 For the stage they pick (a kindergarten group, the preschool year or grades 1–12; the default
-comes from the saved child, else the search's age group, else grade 1):
+comes from the saved child when it fits the searched age group, else that group's first year, else grade 1):
 
 | Line | From | In "Required each year" |
 |---|---|---|
@@ -16,7 +16,7 @@ comes from the saved child, else the search's age group, else grade 1):
 | Books & materials | `materials` rows | yes, unless the fee says it is optional |
 | Other required fees | rows the school calls compulsory (`requiredExtras`): 635's club | yes |
 | Food, after-school care, school bus | `food`, `extended_day`, `transport` rows | only when ticked, and only when they come to one yearly price |
-| First year only | admission fees; deposits and uniform item prices listed apart, not summed | no |
+| First year only | admission fees, each listed (two may be one or the other, so no sum); deposits and uniform item prices apart | no |
 | Optional extras | clubs, activities, camps the school prices | never |
 
 Each price links to its source page. A line is "Included in tuition" only when every tuition
