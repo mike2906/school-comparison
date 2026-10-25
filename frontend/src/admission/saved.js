@@ -20,8 +20,6 @@
  * the school bus), so every table adds them without asking again.
  */
 
-import { COST_NEEDS } from '../utils/yearCost.js'
-
 const STORAGE_KEY = 'admissionAnswers'
 // The search page's current location (useUserLocation): not part of the saved answers.
 export const LOCATION_KEY = 'userLocation'
@@ -75,6 +73,9 @@ function preferencesFrom(value) {
   const travel = value.travel === 'transit' ? 'transit' : 'car'
   return languages.length > 0 || monthlyBudget || travel !== 'car' ? { languages, monthlyBudget, travel } : null
 }
+
+// The paid extras the yearly cost table can add to its total (src/utils/yearCost.js).
+export const COST_NEEDS = ['food', 'extended_day', 'transport']
 
 function costNeedsFrom(value) {
   const needs = Array.isArray(value) ? COST_NEEDS.filter(need => value.includes(need)) : []

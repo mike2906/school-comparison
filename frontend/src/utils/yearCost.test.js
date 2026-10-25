@@ -121,6 +121,9 @@ test('the tuition’s words decide a line by clause and by whole word', () => {
   assert.equal(mixed.food.state, 'excluded')
   assert.equal(lines('The fee includes the full syllabus.').transport.state, 'none')
   assert.equal(lines('Включва ползване на материалната база.').materials.state, 'none')
+  assert.equal(lines('Price not including lunch.').food.state, 'excluded')
+  const list = lines('Tuition includes meals, transport and textbooks.')
+  assert.deepEqual([list.food.state, list.transport.state, list.materials.state], ['included', 'included', 'included'])
 })
 
 test('a fee read as yearly from its notes only when they name no other period', () => {
@@ -130,6 +133,8 @@ test('a fee read as yearly from its notes only when they name no other period', 
   ]
   assert.equal(yearCost(rows('Изчислена за една учебна година.'), 'first', { today }).lines.food.options[0].perYear.assumed, false)
   assert.equal(yearCost(rows('150 € per month during the school year'), 'first', { today }).lines.food.options[0].perYear, null)
+  assert.equal(yearCost(rows('за 4-годишни деца'), 'first', { today }).lines.food.options[0].perYear, null)
+  assert.equal(yearCost(rows('paid per term, three terms a year'), 'first', { today }).lines.food.options[0].perYear, null)
 })
 
 test('a school with no kindergarten does not offer a kindergarten group', () => {

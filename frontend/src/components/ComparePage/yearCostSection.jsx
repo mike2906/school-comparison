@@ -153,7 +153,7 @@ export function buildYearCostSection({ t, language, schools, costById, stage, ne
             {t('yearCost.deposit', { price: money(item.value) })} {source(item.row)}
           </p>
         ))}
-        {uniformRange && <p className="text-xs text-neutral-600">{t('yearCost.uniformItems', { price: money(uniformRange) })}</p>}
+        {uniformRange && <p className="text-xs text-neutral-600">{t('yearCost.uniformItems', { price: money(uniformRange) })} {source(uniforms[0].row)}</p>}
       </div>
     )
   }
@@ -194,7 +194,7 @@ export function buildYearCostSection({ t, language, schools, costById, stage, ne
   const row = (key, label, getValue, getCompare) => ({ key, label, getValue, getCompare })
 
   const rows = [
-    row('tuition', lineName('tuition'), tuitionCell, school => (state(school) === 'cost' ? costById.get(school.id).tuition.options.map(item => item.row.id).join(',') || 'none' : state(school))),
+    row('tuition', lineName('tuition'), tuitionCell, school => (state(school) === 'cost' ? costById.get(school.id).tuition.options.map(item => `${item.value.min}-${item.value.max}/${item.period}`).join(',') || 'none' : state(school))),
     row('materials', lineName('materials'), school => lineCell('materials', school), lineCompare('materials')),
     ...(anyOptions('required') ? [row('required', lineName('required'), school => lineCell('required', school), lineCompare('required'))] : []),
     ...COST_NEEDS.map(line => row(line, needLabel(line), school => lineCell(line, school), lineCompare(line))),
@@ -202,8 +202,8 @@ export function buildYearCostSection({ t, language, schools, costById, stage, ne
     ...(needs.length > 0
       ? [row('withNeeds', lineName('withNeeds'), school => totalCell(cost => totalWithNeeds(cost, needs), school), totalCompare(cost => totalWithNeeds(cost, needs)))]
       : []),
-    row('firstYear', lineName('firstYear'), firstYearCell, school => (state(school) === 'cost' ? costById.get(school.id).firstYear.options.map(item => item.row.id).join(',') || 'none' : state(school))),
-    row('optional', lineName('optional'), optionalCell, school => (state(school) === 'cost' ? costById.get(school.id).optional.map(item => item.row.id).join(',') || 'none' : state(school))),
+    row('firstYear', lineName('firstYear'), firstYearCell, school => (state(school) === 'cost' ? costById.get(school.id).firstYear.options.map(item => `${item.value.min}-${item.value.max}`).join(',') || 'none' : state(school))),
+    row('optional', lineName('optional'), optionalCell, school => (state(school) === 'cost' ? costById.get(school.id).optional.map(item => `${priceCategory(item.row)}:${item.value.min}-${item.value.max}`).join(',') || 'none' : state(school))),
   ]
 
   const stageName = key => (key.startsWith('grade_')

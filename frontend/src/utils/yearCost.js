@@ -1,5 +1,6 @@
 import { gradesNamedIn, rowGradeBand } from './gradeBand.js'
 import { priceCategory, pricePeriod, rowAgeGroupKeys } from './priceRows.js'
+import { COST_NEEDS } from '../admission/saved.js'
 import { isOptionalFee, requiredExtras, selectPricingCohort, toEur, tuitionRows, isStatedTotal } from './pricing.js'
 
 /**
@@ -17,8 +18,8 @@ export const COST_STAGES = [
   ...Array.from({ length: 12 }, (_, index) => `grade_${index + 1}`),
 ]
 
-// The needs a parent can add to the total; the rest of the table is always shown.
-export const COST_NEEDS = ['food', 'extended_day', 'transport']
+// The needs a parent can add to the total (kept with the saved answers); the rest is always shown.
+export { COST_NEEDS }
 
 const KINDERGARTEN_AGES = { 3: 'first', 4: 'second', 5: 'third', 6: 'preschool' }
 
@@ -83,7 +84,7 @@ function stageAgeGroup(stage) {
 
 const KINDERGARTEN_STAGES = new Set(['nursery', 'first', 'second', 'third'])
 // At a word's start: "предучилищна" and "preschool" are a kindergarten's words.
-const SCHOOL_GROUP_RE = /(?<![\p{L}])(?:училищ|ученици|учениците|school|pupils|students)/iu
+const SCHOOL_GROUP_RE = /(?<![\p{L}-])(?:училищ|ученици|учениците|school|pupils|students)/iu
 
 // 'named' for a row that names the stage, 'any' for one naming no group we can read (it may
 // well apply), false for one naming only other groups.
@@ -120,9 +121,10 @@ export function rowsForStage(rows = [], stage) {
 
 // A fee with no stated period counts once a year only on a page whose tuition is per year,
 // and is marked so (`assumed`), unless its notes say per school year (635's bus).
-const PER_YEAR_NOTE_RE = /учебна година|за година|годишн|per (?:school )?year|a year|annual|school year/iu
+// Not "4-годишни деца" (four-year-olds) nor "prices for the 2026/27 school year".
+const PER_YEAR_NOTE_RE = /за (?:една |цялата )?учебна(?:та)? година|за година|(?<![\p{L}\p{N}-])годишн|per (?:school |academic )?year|a year|annual|for the (?:whole |entire )?(?:school |academic )?year/iu
 // "150 € per month during the school year" is not a yearly price.
-const OTHER_PERIOD_NOTE_RE = /месе[цч]|седмиц|на ден|дневн|month|week|per day|daily|twice|два пъти/iu
+const OTHER_PERIOD_NOTE_RE = /месе[цч]|седмиц|на ден|дневн|срок|семест|тримес|на час|урок|month|week|per day|daily|term|semester|quarter|hour|lesson|twice|два пъти/iu
 
 function amounts(row) {
   const low = toEur(row.amount_min ?? row.amount ?? row.amount_max, row.currency)
@@ -177,7 +179,7 @@ const LINE_WORDS = {
   transport: /(?<![\p{L}])(?:транспорт|автобус|transport|bus)(?![\p{L}])/iu,
   extended_day: /(?<![\p{L}])(?:занимал|удължен|extended day|after[- ]school)/iu,
 }
-const NOT_INCLUDED_RE = /не (?:е|са|се) включен|не включва|без (?:храна|транспорт)|not included|excluded|excludes|does not include|doesn't include/iu
+const NOT_INCLUDED_RE = /не (?:е|са|се) включен|не включва|без (?:храна|транспорт)|not included|not including|excluded|excludes|exclusive of|does not include|doesn't include|no .{0,30}included/iu
 const INCLUDED_RE = /включ|includ|covers|покрива/iu
 
 function rowInclusion(row, line) {
@@ -186,7 +188,7 @@ function rowInclusion(row, line) {
   let state = null
   if ((context.excludes || []).some(text => words.test(text))) state = 'excluded'
   // By clause: "включва учебни материали, но не включва храна" includes one and not the other.
-  String(context.notes || '').split(/(?<=[.;!?])\s+|,\s*|\s(?:но|а|but|while)\s/u).forEach((sentence) => {
+  String(context.notes || '').split(/(?<=[.;!?])\s+|,?\s(?:но|а|but|while|whereas)\s/u).forEach((sentence) => {
     if (!words.test(sentence)) return
     if (NOT_INCLUDED_RE.test(sentence)) state = state || 'excluded'
     else if (INCLUDED_RE.test(sentence)) state = 'included'
@@ -273,10 +275,12 @@ export function yearCost(pricing = [], stage, { today = new Date() } = {}) {
     }
   })
   // Other fees every child pays: 635's compulsory club.
-  const otherRequired = extras.filter(row => !RECURRING_LINES.includes(row.category) && isRequired(row))
+  const otherRequired = withoutRepeats(extras
+    .filter(row => !RECURRING_LINES.includes(row.category) && isRequired(row))
+    .map(row => option(row, { yearlyPage, required: true })))
   lines.required = {
     state: otherRequired.length > 0 ? 'priced' : 'none',
-    options: otherRequired.map(row => option(row, { yearlyPage, required: true })),
+    options: otherRequired,
     required: true,
   }
   const optional = extras
