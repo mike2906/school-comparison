@@ -82,6 +82,7 @@ Translate each item into {language}, as a parent would read it on the {language}
   ХООС Chemistry and environmental protection, ИЦ History and civilisations, ГИ Geography and
   economics, Фил Philosophy; "интензивно" intensive, "разширено" extended, "дуална" dual
   (work-based) training. ПГ, ПГУ or ПК is the preparatory group (preschool).
+- As a fee name, "обучение" ("Обучение", "Такса обучение") is tuition in English, not training.
 - Return null for an item you cannot translate with confidence.
 
 Return one entry per item, with its id."""
