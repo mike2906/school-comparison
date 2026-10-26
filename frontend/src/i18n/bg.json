@@ -289,7 +289,7 @@
     "forAgeGroup": "Показани са таксите за {{group}} и таксите без посочена възраст.",
     "forAgeGroupInYear": "Показани са таксите за {{group}} (групата на детето през {{year}}) и таксите без посочена възраст.",
     "targetYearNotPublished": "таксите за {{year}} още не са обявени",
-    "noneForAgeGroup": "Нямаме такси за {{group}}.",
+    "noneForAgeGroup": "Нямаме данни за таксите за {{group}}.",
     "otherAges": "Такси за други възрасти ({{count}})",
     "discounts": "Отстъпки",
     "payInParts": "Или на части:",

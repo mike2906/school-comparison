@@ -33,14 +33,9 @@ export function monthlyTuition(school, ageGroup) {
 }
 
 // The chosen way to travel: by public transport (`tripSeconds` set, null when no trip arrives
-// in time), how long before the start of the day the child leaves home; else the drive. In
-// the whole minutes a card shows, so two "~4 min" schools fall back to distance.
-const tripTime = school => {
-  const minutes = school.tripSeconds !== undefined
-    ? (school.tripSeconds == null ? null : Math.round(school.tripSeconds / 60))
-    : rushHourMinutes(school.driveSeconds)
-  return minutes ?? Infinity
-}
+// in time), how long before the start of the day the child leaves home; else the drive, in
+// the minutes its card shows, so two "~4 min" schools fall back to distance.
+const tripTime = school => (school.tripSeconds !== undefined ? school.tripSeconds : rushHourMinutes(school.driveSeconds)) ?? Infinity
 const tripOrder = (a, b) => (
   tripTime(a) - tripTime(b) ||
   (a.distance ?? Infinity) - (b.distance ?? Infinity)

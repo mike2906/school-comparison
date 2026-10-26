@@ -45,7 +45,7 @@ describe('drive times', () => {
     assert.deepEqual(minutes, [...minutes].sort((a, b) => a - b), `not sorted by drive time: ${minutes.join(', ')}`)
     // Cards showing the same minutes go nearest first (122 OU at 0.1 km was below 107 OU at 0.6 km).
     const cards = await page.locator('.school-card').evaluateAll(all => all.map(card => [
-      card.querySelector('span[title]')?.textContent || '',
+      [...card.querySelectorAll('span')].find(span => span.textContent.trim().startsWith('🚗'))?.textContent || '',
       [...card.querySelectorAll('span')].find(span => span.textContent.trim().startsWith('📍'))?.textContent || '',
     ]))
     const pairs = cards
