@@ -6,6 +6,7 @@
 import { CHANCE_GROUPS, chanceGroup } from '../admission/chanceGroup.js'
 import { KINDERGARTEN_GROUPS } from '../admission/inputs.js'
 import { tuitionSortValue } from './pricing.js'
+import { rushHourMinutes } from '../routing/driveTimes.js'
 
 /**
  * The calculator stage for a child's start, or null when there is none: kindergarten
@@ -32,8 +33,9 @@ export function monthlyTuition(school, ageGroup) {
 }
 
 // The chosen way to travel: by public transport (`tripSeconds` set, null when no trip arrives
-// in time), how long before the start of the day the child leaves home; else the drive.
-const tripTime = school => (school.tripSeconds !== undefined ? school.tripSeconds : school.driveSeconds) ?? Infinity
+// in time), how long before the start of the day the child leaves home; else the drive, in
+// the minutes its card shows, so two "~4 min" schools fall back to distance.
+const tripTime = school => (school.tripSeconds !== undefined ? school.tripSeconds : rushHourMinutes(school.driveSeconds)) ?? Infinity
 const tripOrder = (a, b) => (
   tripTime(a) - tripTime(b) ||
   (a.distance ?? Infinity) - (b.distance ?? Infinity)

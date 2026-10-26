@@ -76,7 +76,8 @@ the list.
   2. Groups by chance, in this order: "You're above last year's cut-off", "Close to the
      cut-off", "No cut-off published" (incl. all private schools), "Below the cut-off"
      (collapsed). The same verdicts as the list cards, never a percentage.
-  3. Inside a group, shortest trip first (car or public transport, as chosen).
+  3. Inside a group, shortest trip first (car or public transport, as chosen). Drives
+     compare in the minutes the cards show, and the same minutes go nearest first.
   Each row: name, type, trip time, yearly cost estimate, languages, verdict line, link to
   the school page and "add to compare".
 - **Map and full list** are one link away: "see these on the map" opens the search page
