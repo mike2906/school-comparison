@@ -64,6 +64,7 @@ import { pinnedLocation } from '../../utils/coordinates'
 import { locationForAgeGroup, locationsForAgeGroup } from '../../utils/schoolLocation'
 import { useDriveTimes } from '../../routing/useDriveTimes'
 import DriveTimeNote from '../../routing/DriveTimeNote'
+import { rushHourMinutes } from '../../routing/driveTimes'
 import { useFreePlaces } from '../../hooks/useFreePlaces'
 import { childFreePlacesBySchool, freePlacesFilterApplies, hasFreePlaceToday } from '../../utils/freePlaces'
 import FreePlacesToggle from './FreePlacesToggle'
@@ -722,7 +723,8 @@ function SearchPage() {
       case 'drive':
         // Until drive times arrive (or for schools without one) distance decides.
         list.sort((a, b) => (
-          (a.driveSeconds ?? Number.POSITIVE_INFINITY) - (b.driveSeconds ?? Number.POSITIVE_INFINITY) ||
+          // In the minutes the cards show, so two "~4 min" schools go nearest first.
+          (rushHourMinutes(a.driveSeconds) ?? Number.POSITIVE_INFINITY) - (rushHourMinutes(b.driveSeconds) ?? Number.POSITIVE_INFINITY) ||
           (a.distance ?? Number.POSITIVE_INFINITY) - (b.distance ?? Number.POSITIVE_INFINITY)
         ))
         break

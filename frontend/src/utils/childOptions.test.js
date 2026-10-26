@@ -48,3 +48,13 @@ test('by public transport the earliest leaving goes last, whatever the drive', (
   const { groups } = buildOptions(schools, { verdictsFor: () => [] })
   assert.deepEqual(groups.unknown.map(s => s.id), [2, 1, 3], 'no trip in time sorts after every trip')
 })
+
+test('two schools the cards show at the same drive minutes go nearest first', () => {
+  // Lozenets, 2026-10-26: 107 OU at 0.6 km was listed above 122 OU at 0.1 km, both "~4 min".
+  const schools = [
+    { id: 107, school_type: 'state', driveSeconds: 130, distance: 0.6 },
+    { id: 122, school_type: 'state', driveSeconds: 145, distance: 0.1 },
+  ]
+  const { groups } = buildOptions(schools, { verdictsFor: () => [] })
+  assert.deepEqual(groups.unknown.map(s => s.id), [122, 107])
+})

@@ -43,6 +43,18 @@ describe('drive times', () => {
     assert.ok(minutes.length >= 5, `only ${minutes.length} cards show a drive time`)
     assert.ok(minutes.every(m => m >= 1 && m < 120), `odd drive times: ${minutes.join(', ')}`)
     assert.deepEqual(minutes, [...minutes].sort((a, b) => a - b), `not sorted by drive time: ${minutes.join(', ')}`)
+    // Cards showing the same minutes go nearest first (122 OU at 0.1 km was below 107 OU at 0.6 km).
+    const cards = await page.locator('.school-card').evaluateAll(all => all.map(card => [
+      card.querySelector('span[title]')?.textContent || '',
+      [...card.querySelectorAll('span')].find(span => span.textContent.trim().startsWith('📍'))?.textContent || '',
+    ]))
+    const pairs = cards
+      .filter(([drive, distance]) => /\d/.test(drive) && /\d/.test(distance))
+      .map(([drive, distance]) => [number(drive.replace(/[^\d]/g, '')), number(distance.replace(/[^\d.,]/g, ''))])
+    pairs.slice(1).forEach(([driveMinutes, km], i) => {
+      const [previousMinutes, previousKm] = pairs[i]
+      if (driveMinutes === previousMinutes) assert.ok(previousKm <= km, `${previousKm} km listed above ${km} km at ${driveMinutes} min`)
+    })
 
     const longestTask = await page.evaluate(() => Math.round(window.__longestTask))
     testContext.diagnostic(`Drive times shown ${shownAfter} ms after opening the page; longest main-thread task ${longestTask} ms.`)
