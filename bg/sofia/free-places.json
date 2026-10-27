@@ -2,7 +2,7 @@
  "meta": {
   "source": "kg.sofia.bg",
   "source_url": "https://kg.sofia.bg/spots",
-  "retrieved_at": "2026-10-27T10:00:38+00:00",
+  "retrieved_at": "2026-10-27T18:53:01+00:00",
   "as_of": "2026-10-27",
   "school_years": [
    "2026/2027",
@@ -302,8 +302,8 @@
      "queues": {
       "general": {
        "capacity": 22,
-       "enrolled": 20,
-       "free": 2,
+       "enrolled": 19,
+       "free": 3,
        "ranked_not_enrolled": 0
       }
      }
@@ -5829,8 +5829,8 @@
      "queues": {
       "general": {
        "capacity": 49,
-       "enrolled": 49,
-       "free": 0,
+       "enrolled": 48,
+       "free": 1,
        "ranked_not_enrolled": 0
       },
       "sop": {
@@ -9421,8 +9421,8 @@
      "queues": {
       "general": {
        "capacity": 52,
-       "enrolled": 50,
-       "free": 0,
+       "enrolled": 49,
+       "free": 1,
        "ranked_not_enrolled": 2
       },
       "chronic": {
@@ -13368,9 +13368,9 @@
      "queues": {
       "general": {
        "capacity": 54,
-       "enrolled": 53,
+       "enrolled": 54,
        "free": 0,
-       "ranked_not_enrolled": 1
+       "ranked_not_enrolled": 0
       }
      }
     },
@@ -13493,9 +13493,9 @@
      "queues": {
       "general": {
        "capacity": 51,
-       "enrolled": 48,
+       "enrolled": 49,
        "free": 1,
-       "ranked_not_enrolled": 2
+       "ranked_not_enrolled": 1
       },
       "chronic": {
        "capacity": 2,
@@ -15637,8 +15637,8 @@
       "general": {
        "capacity": 53,
        "enrolled": 52,
-       "free": 0,
-       "ranked_not_enrolled": 1
+       "free": 1,
+       "ranked_not_enrolled": 0
       },
       "sop": {
        "capacity": 1,
@@ -15659,7 +15659,7 @@
      "queues": {
       "general": {
        "capacity": 52,
-       "enrolled": 53,
+       "enrolled": 52,
        "free": 0,
        "ranked_not_enrolled": 0
       },
@@ -18288,8 +18288,8 @@
       "general": {
        "capacity": 80,
        "enrolled": 78,
-       "free": 0,
-       "ranked_not_enrolled": 2
+       "free": 1,
+       "ranked_not_enrolled": 1
       },
       "sop": {
        "capacity": 1,
@@ -19572,8 +19572,8 @@
      "queues": {
       "general": {
        "capacity": 52,
-       "enrolled": 52,
-       "free": 0,
+       "enrolled": 51,
+       "free": 1,
        "ranked_not_enrolled": 0
       },
       "chronic": {
@@ -19822,8 +19822,8 @@
      "queues": {
       "general": {
        "capacity": 79,
-       "enrolled": 78,
-       "free": 1,
+       "enrolled": 77,
+       "free": 2,
        "ranked_not_enrolled": 0
       },
       "sop": {
@@ -24311,8 +24311,8 @@
      "queues": {
       "general": {
        "capacity": 50,
-       "enrolled": 45,
-       "free": 4,
+       "enrolled": 44,
+       "free": 5,
        "ranked_not_enrolled": 1
       },
       "chronic": {
@@ -24878,8 +24878,8 @@
      "queues": {
       "general": {
        "capacity": 52,
-       "enrolled": 48,
-       "free": 4,
+       "enrolled": 47,
+       "free": 5,
        "ranked_not_enrolled": 0
       },
       "chronic": {
@@ -27465,8 +27465,8 @@
       "general": {
        "capacity": 25,
        "enrolled": 24,
-       "free": 0,
-       "ranked_not_enrolled": 1
+       "free": 1,
+       "ranked_not_enrolled": 0
       },
       "chronic": {
        "capacity": 1,
@@ -28794,9 +28794,9 @@
      "queues": {
       "general": {
        "capacity": 25,
-       "enrolled": 18,
+       "enrolled": 19,
        "free": 6,
-       "ranked_not_enrolled": 1
+       "ranked_not_enrolled": 0
       },
       "chronic": {
        "capacity": 1,
@@ -29682,8 +29682,8 @@
      "queues": {
       "general": {
        "capacity": 15,
-       "enrolled": 15,
-       "free": 0,
+       "enrolled": 14,
+       "free": 1,
        "ranked_not_enrolled": 0
       }
      }
@@ -30973,9 +30973,9 @@
      "queues": {
       "general": {
        "capacity": 63,
-       "enrolled": 62,
+       "enrolled": 64,
        "free": 0,
-       "ranked_not_enrolled": 2
+       "ranked_not_enrolled": 0
       }
      }
     }
@@ -31611,9 +31611,9 @@
      "queues": {
       "general": {
        "capacity": 21,
-       "enrolled": 17,
+       "enrolled": 18,
        "free": 0,
-       "ranked_not_enrolled": 4
+       "ranked_not_enrolled": 3
       }
      }
     },
@@ -32118,9 +32118,9 @@
      "queues": {
       "general": {
        "capacity": 26,
-       "enrolled": 25,
+       "enrolled": 26,
        "free": 0,
-       "ranked_not_enrolled": 1
+       "ranked_not_enrolled": 0
       },
       "chronic": {
        "capacity": 1,
@@ -34143,8 +34143,8 @@
      "queues": {
       "general": {
        "capacity": 109,
-       "enrolled": 83,
-       "free": 23,
+       "enrolled": 82,
+       "free": 24,
        "ranked_not_enrolled": 3
       }
      }
@@ -36872,8 +36872,8 @@
       "general": {
        "capacity": 71,
        "enrolled": 69,
-       "free": 0,
-       "ranked_not_enrolled": 2
+       "free": 1,
+       "ranked_not_enrolled": 1
       }
      }
     }
@@ -37340,9 +37340,9 @@
      "queues": {
       "general": {
        "capacity": 24,
-       "enrolled": 22,
+       "enrolled": 23,
        "free": 0,
-       "ranked_not_enrolled": 2
+       "ranked_not_enrolled": 1
       },
       "chronic": {
        "capacity": 2,
@@ -38151,8 +38151,8 @@
      "queues": {
       "general": {
        "capacity": 22,
-       "enrolled": 13,
-       "free": 9,
+       "enrolled": 12,
+       "free": 10,
        "ranked_not_enrolled": 0
       },
       "sop": {
@@ -38319,9 +38319,9 @@
       },
       "chronic": {
        "capacity": 1,
-       "enrolled": 0,
+       "enrolled": 1,
        "free": 0,
-       "ranked_not_enrolled": 1
+       "ranked_not_enrolled": 0
       },
       "sop": {
        "capacity": 1,
