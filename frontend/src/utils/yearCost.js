@@ -183,17 +183,19 @@ const NOT_INCLUDED_RE = /не (?:е|са|се) включен|не включв�
 const INCLUDED_RE = /включ|includ|covers|покрива/iu
 
 function rowInclusion(row, line) {
+  // The fees agent stores the line's own key ('extended_day'); older rows, the site's words.
+  const names = text => text === line || LINE_WORDS[line].test(text)
   const words = LINE_WORDS[line]
   const context = row.pricing_context || {}
   let state = null
-  if ((context.excludes || []).some(text => words.test(text))) state = 'excluded'
+  if ((context.excludes || []).some(names)) state = 'excluded'
   // By clause: "включва учебни материали, но не включва храна" includes one and not the other.
   String(context.notes || '').split(/(?<=[.;!?])\s+|,?\s(?:но|а|but|while|whereas)\s/u).forEach((sentence) => {
     if (!words.test(sentence)) return
     if (NOT_INCLUDED_RE.test(sentence)) state = state || 'excluded'
     else if (INCLUDED_RE.test(sentence)) state = 'included'
   })
-  if ((context.includes || []).some(text => words.test(text))) state = 'included'
+  if ((context.includes || []).some(names)) state = 'included'
   return state
 }
 

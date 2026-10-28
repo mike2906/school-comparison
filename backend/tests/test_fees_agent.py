@@ -23,10 +23,12 @@ from app.models import FieldSource, Pricing, School
 from app.models.pricing import PriceCategory, PricePeriod, PriceSource
 from app.models.scrape_log import ScrapeType
 from app.models.source_page import SourcePage
+from app.schemas.pricing import PricingContextResponse
 from app.scrapers.extraction.agent_fees import (
     HELD_CONFIDENCE,
     PUBLISH_CONFIDENCE,
     AgentFee,
+    FeeService,
     PaymentOption,
     check_fee,
     names_deposit,
@@ -378,7 +380,7 @@ def test_parts_of_a_space_joined_table_row_are_numbers():
 # The stage (model and fetches stubbed)
 # ---------------------------------------------------------------------------------------
 
-PAGE_STAGE = "Месечна такса: 700 евро\nЕднократна такса за записване: 200 евро.\nХрана: 90 евро месечно"
+PAGE_STAGE = "Месечна такса: 700 евро\nЕднократна такса за записване: 200 евро.\nХрана: 90 евро месечно, заплаща се отделно"
 FEES_STAGE = [
     fee(PriceCategory.TUITION, "Месечна такса: 700 евро", amount=700, period=PricePeriod.MONTHLY, academic_year="2026/2027"),
     fee(PriceCategory.REGISTRATION, "Еднократна такса за записване: 200 евро.", amount=200, period=PricePeriod.ONE_TIME, academic_year="2026/2027"),
@@ -2263,3 +2265,104 @@ def test_a_one_day_trip_or_course_is_not_daily(line):
 def test_a_bracket_quote_does_not_join_two_page_lines():
     page = "Такса (5 клас)\n300 €\n"
     assert not check_fee(fee(PriceCategory.TUITION, "Такса(5 клас) 300 €", amount=300), page).kept
+
+
+# --- What a tuition fee includes (docs/YEARLY_COST.md) ------------------------------------
+PAGE_SERVICES = """\
+Такса обучение за 2026/2027: 8900 евро на година
+Таксата включва: учебници и учебни тетрадки, храна – плодова закуска, обяд и следобедна закуска
+В годишната такса не са включени: транспорт, екскурзии и лагери
+"""
+
+
+def test_services_kept_only_with_a_line_on_the_page_that_names_them():
+    line_in = "Таксата включва: учебници и учебни тетрадки, храна – плодова закуска, обяд и следобедна закуска"
+    line_out = "В годишната такса не са включени: транспорт, екскурзии и лагери"
+    read = fee(PriceCategory.TUITION, "Такса обучение за 2026/2027: 8900 евро на година", amount=8900).model_copy(
+        update={
+            "services": [
+                FeeService(service="food", included=True, evidence=line_in),
+                FeeService(service="materials", included=True, evidence=line_in),
+                FeeService(service="transport", included=False, evidence=line_out),
+                # Not on the page, and a line that does not name the service.
+                FeeService(service="extended_day", included=True, evidence="Таксата включва занималня до 18:00"),
+                FeeService(service="extended_day", included=False, evidence=line_in),
+            ]
+        }
+    )
+    result = check_fee(read, PAGE_SERVICES)
+    assert {(item.service, item.included) for item in result.fee.services} == {
+        ("food", True),
+        ("materials", True),
+        ("transport", False),
+    }
+    assert "service extended_day dropped: evidence line is not on the page" in result.checks
+    assert "service extended_day dropped: evidence does not say it is not included" in result.checks
+
+
+def test_a_service_needs_the_page_to_say_which_way():
+    page = PAGE_SERVICES + "ГОДИШНАТА ТАКСА НЕ ВКЛЮЧВА:\nХранителен пакет\nТаксата включва ползване на материалната база\nОбяд без допълнително заплащане\n"
+    tuition = fee(PriceCategory.TUITION, "Такса обучение за 2026/2027: 8900 евро на година", amount=8900)
+    line_out = "В годишната такса не са включени: транспорт, екскурзии и лагери"
+
+    def kept(*services):
+        return {(item.service, item.included) for item in check_fee(tuition.model_copy(update={"services": list(services)}), page).fee.services}
+
+    # The wrong way round, a word alone, the facilities for materials.
+    assert kept(FeeService(service="transport", included=True, evidence=line_out)) == set()
+    assert kept(FeeService(service="food", included=True, evidence="обяд")) == set()
+    assert kept(FeeService(service="materials", included=True, evidence="Таксата включва ползване на материалната база")) == set()
+    # A list's item under its heading; at no extra cost is included.
+    assert kept(FeeService(service="food", included=False, evidence="ГОДИШНАТА ТАКСА НЕ ВКЛЮЧВА:\nХранителен пакет")) == {("food", False)}
+    assert kept(FeeService(service="food", included=True, evidence="Обяд без допълнително заплащане")) == {("food", True)}
+    # A quote cut from a line, and a heading from another list joined to an item.
+    assert kept(FeeService(service="transport", included=True, evidence="включени: транспорт, екскурзии и лагери")) == set()
+    assert kept(FeeService(service="food", included=True, evidence="Таксата включва ползване на материалната база\nХранителен пакет")) == set()
+
+
+def test_at_no_extra_cost_speaks_for_its_own_part_of_the_line():
+    line = "Транспорт без допълнително заплащане, храната се заплаща отделно"
+    tuition = fee(PriceCategory.TUITION, "Такса обучение за 2026/2027: 8900 евро на година", amount=8900)
+    services = [FeeService(service="transport", included=True, evidence=line), FeeService(service="food", included=True, evidence=line)]
+    result = check_fee(tuition.model_copy(update={"services": services}), PAGE_SERVICES + line + "\n")
+    assert [(item.service, item.included) for item in result.fee.services] == [("transport", True)]
+
+
+def test_services_only_on_tuition_and_never_both_ways():
+    line_in = "Таксата включва: учебници и учебни тетрадки, храна – плодова закуска, обяд и следобедна закуска"
+    line_out = "В годишната такса не са включени: транспорт, екскурзии и лагери"
+    bus = fee(PriceCategory.TRANSPORT, "Такса обучение за 2026/2027: 8900 евро на година", amount=8900).model_copy(
+        update={"services": [FeeService(service="food", included=True, evidence=line_in)]}
+    )
+    assert check_fee(bus, PAGE_SERVICES).fee.services == []
+    both = fee(PriceCategory.TUITION, "Такса обучение за 2026/2027: 8900 евро на година", amount=8900).model_copy(
+        update={
+            "services": [
+                FeeService(service="transport", included=False, evidence=line_out),
+                FeeService(service="transport", included=True, evidence="Таксата включва транспорт от дома"),
+            ]
+        }
+    )
+    result = check_fee(both, PAGE_SERVICES + "Таксата включва транспорт от дома\n")
+    assert result.fee.services == []
+    assert "service transport dropped: said to be both included and not" in result.checks
+
+
+async def test_apply_stores_what_the_tuition_includes(db_session, pages, frozen_today):
+    tuition = FEES_STAGE[0].model_copy(
+        update={"services": [FeeService(service="food", included=False, evidence="Храна: 90 евро месечно, заплаща се отделно")]}
+    )
+    school = await _school(db_session)
+    await db_session.commit()
+    report = await fees_agent.run_school(
+        db_session, school, find=_find(pages), read=_read([tuition, FEES_STAGE[1]]), apply=True
+    )
+    assert report["outcome"] == "written", report
+    rows = {row.category: row for row in await _rows(db_session, school)}
+    context = rows[PriceCategory.TUITION].pricing_context
+    assert context["includes"] == [] and context["excludes"] == ["food"]
+    assert context["services_evidence"] == {"food": "Храна: 90 евро месечно, заплаща се отделно"}
+    # The lists publish; the evidence stays internal.
+    public = PricingContextResponse.model_validate(context).model_dump()
+    assert public["excludes"] == ["food"] and "services_evidence" not in public
+    assert "includes" not in rows[PriceCategory.REGISTRATION].pricing_context

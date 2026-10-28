@@ -54,8 +54,9 @@ known as one yearly price, so a sort by yearly cost would rank partial totals as
   but our row does not say so.
 - Many food, bus and club rows have no period (`period: null`), and many food prices are per
   day or month (no billed days).
-- Whether the tuition includes food: the fee reader has no field for it, so it is known only
-  where a note says so. Hand check of 16 grade 1 fee pages (25 Oct 2026): 172, 593 and 568
+- Whether the tuition includes food: until the 1 Nov 2026 fee run, known only where a note
+  says so; from it, the fees agent records it per tuition fee (`includes` / `excludes`,
+  `docs/AGENT_FEE_EXTRACTION.md`). Hand check of 16 grade 1 fee pages (25 Oct 2026): 172, 593 and 568
   include food; 271 and 171 bill it apart with no price; 350, 381 and 630 price it per day or
   month (350 and 381 also allow food from home).
 

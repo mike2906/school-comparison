@@ -167,3 +167,11 @@ test('a compulsory food fee is counted once, and an optional snack beside it is 
   assert.deepEqual(yearCost(rows, 'grade_1', { today }).lines.food.options.map(item => item.required), [true, false])
   assert.deepEqual(yearCost(rows, 'grade_1', { today }).required.value, { min: 6000, max: 6000, assumed: false })
 })
+
+test('the fees agent’s service keys say what the tuition includes', () => {
+  const rows = context => [{ id: 1, category: 'tuition', amount: 8900, currency: 'EUR', period: 'yearly', year_status: 'not_stated', pricing_context: context }]
+  const lines = yearCost(rows({ includes: ['food', 'extended_day'], excludes: ['transport'] }), 'grade_1', { today }).lines
+  assert.deepEqual([lines.food.state, lines.extended_day.state, lines.transport.state, lines.materials.state], ['included', 'included', 'excluded', 'none'])
+  // Food included: the total is complete, with nothing named as left out.
+  assert.deepEqual(yearCost(rows({ includes: ['food'] }), 'grade_1', { today }).required.missing, [])
+})
