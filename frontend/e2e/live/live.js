@@ -36,8 +36,29 @@ export const prefix = lang => (lang === 'en' ? '/en' : '')
 
 export { getAddress as address, getSchoolName as schoolName } from '../../src/utils/i18n.js'
 
+/**
+ * A live API answer, asked up to three times. A request through the edge can stall for a
+ * minute while the next one takes a second (Cloudflare's Ashburn trouble on 28 Oct 2026
+ * failed every PR's coverage check that way), so each try gets 20 s and a fresh request.
+ * An HTTP answer is returned as it is, errors included: only a stall or a dropped
+ * connection is tried again, and after the last try the error says it was the network.
+ */
+export async function fetchLive(url, tries = 3) {
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      // The body is read here too, so a stall half-way through counts as a stall.
+      const response = await fetch(url, { signal: AbortSignal.timeout(20_000) })
+      const body = await response.text()
+      return { ok: response.ok, status: response.status, json: () => JSON.parse(body) }
+    } catch (error) {
+      if (attempt >= tries) throw new Error(`The live API did not answer ${url} in ${tries} tries (${error.message}): the network, not the site`)
+      await new Promise(resolve => setTimeout(resolve, 2_000 * attempt))
+    }
+  }
+}
+
 export async function fetchJson(url) {
-  const response = await fetch(url, { signal: AbortSignal.timeout(30_000) })
+  const response = await fetchLive(url)
   if (!response.ok) throw new Error(`${url}: HTTP ${response.status}`)
   return response.json()
 }

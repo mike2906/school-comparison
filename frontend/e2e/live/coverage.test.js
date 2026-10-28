@@ -23,7 +23,7 @@ import { isClosedGroupFee, rowAgeGroupKeys } from '../../src/utils/priceRows.js'
 import { childFreePlaces, schoolFreePlaces, usableFreePlaces } from '../../src/utils/freePlaces.js'
 import { buildOptions } from '../../src/utils/childOptions.js'
 import { stageForAgeGroup, yearCost } from '../../src/utils/yearCost.js'
-import { API, allSchools } from './live.js'
+import { API, allSchools, fetchLive } from './live.js'
 
 // A parent should get an answer at no fewer than this share of the schools that publish
 // the data for their child. Today's shares are 67–100%; an empty-result bug gives ~0%.
@@ -200,11 +200,11 @@ describe('coverage for realistic parents', () => {
   })
 
   test('free places: a search for a birth year this school year shows the places at most municipal kindergartens', async t => {
-    const response = await fetch(`${API}/schools/free-places?country_code=bg&city=sofia`, { signal: AbortSignal.timeout(30_000) })
+    const response = await fetchLive(`${API}/schools/free-places?country_code=bg&city=sofia`)
     // A PR that adds the endpoint runs this before its deploy (the path then reads as a school id).
     if (response.status === 404 || response.status === 422) return t.skip('the free places endpoint is not deployed yet')
     assert.ok(response.ok, `free places: HTTP ${response.status}`)
-    const data = usableFreePlaces(await response.json())
+    const data = usableFreePlaces(response.json())
     assert.ok(data, 'a free places snapshot from the last 48 hours')
     const now = new Date()
     const startYear = now.getMonth() >= 8 ? now.getFullYear() : now.getFullYear() - 1
