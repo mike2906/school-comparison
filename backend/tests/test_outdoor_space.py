@@ -242,3 +242,20 @@ def test_a_school_mapped_as_a_building_is_not_grounds():
 def test_an_element_in_two_parts_of_the_answer_is_read_once():
     building = {"type": "way", "id": 5, "geometry": _square(*PIN, half=0.0001), "tags": {"building": "school"}}
     assert len(stage.read_plots([_plot("1"), building, building])[1]) == 1
+
+
+def test_a_kindergarten_with_no_code_with_us_takes_its_coded_plot_by_name():
+    # Municipal kindergartens carry no MoE code with us, while their OSM plot does.
+    plots = stage.read_plots([_plot("2212814", name="ДГ №73 „Маргарита“", amenity="kindergarten")])[0]
+    tokens = stage._name_tokens("ДГ №73 Маргарита")
+    assert stage.match_location(*PIN, "", tokens, plots, frozenset({"73"}))[1]
+    # A code one of our schools carries is that school's, whatever the name.
+    assert not stage.match_location(*PIN, "", tokens, plots, frozenset({"73"}), frozenset({"2212814"}))[1]
+
+
+def test_an_abbreviation_in_the_plot_name_is_not_a_distinctive_word():
+    plots = stage.read_plots([_plot(name="157. ГИЧЕ „Сесар Вайехо“")])[0]
+    tokens = stage._name_tokens("157 Гимназия с изучаване на чужд език „Сесар Вайехо“")
+    assert stage.match_location(*PIN, "", tokens, plots, frozenset({"157"}))[1]
+    # A name all in capitals keeps its words.
+    assert stage._name_tokens("ДЕТСКА ГРАДИНА РОСИЦА") == {"rositsa"}
