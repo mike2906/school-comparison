@@ -327,6 +327,27 @@ def _osm_address(tags: dict) -> Optional[str]:
     return nominatim_address({"road": street, "house_number": number}) or f'ул. "{street}"'
 
 
+async def overpass_post(client: httpx.AsyncClient, query: str, timeout: float) -> list[dict]:
+    """The query's elements from the first public Overpass server to answer in full.
+
+    Each server is tried twice, with a growing pause; a busy (429/504), down or non-JSON
+    answer, or a timed-out partial one, moves on. Raises when none answers."""
+    error: Optional[Exception] = None
+    for attempt, url in enumerate([*OVERPASS_URLS, *OVERPASS_URLS]):  # each server twice
+        if attempt:
+            await asyncio.sleep(5 * attempt)
+        try:
+            response = await client.post(url, data={"data": query}, timeout=timeout)
+            response.raise_for_status()
+            body = response.json()
+            if "runtime error" in str(body.get("remark") or ""):  # a timed-out, partial answer
+                raise ValueError(f"partial answer: {body['remark'][:120]}")
+            return body.get("elements", [])
+        except (httpx.HTTPError, ValueError) as exc:  # busy (429/504), down, or not JSON
+            error = exc
+    raise RuntimeError(f"no Overpass server answered: {error}")
+
+
 class CityOsm:
     """Every named OSM school, kindergarten and college in the city, read once per run.
 
@@ -346,20 +367,7 @@ class CityOsm:
             f"[out:json][timeout:180];nwr({b['south']},{b['west']},{b['north']},{b['east']})"
             '[amenity~"^(school|kindergarten|college)$"][name];out center tags;'
         )
-        error: Optional[Exception] = None
-        for attempt, url in enumerate([*OVERPASS_URLS, *OVERPASS_URLS]):  # each server twice
-            if attempt:
-                await asyncio.sleep(5 * attempt)
-            try:
-                response = await self.client.post(url, data={"data": query}, timeout=200)
-                response.raise_for_status()
-                body = response.json()
-                if "runtime error" in str(body.get("remark") or ""):  # a timed-out, partial answer
-                    raise ValueError(f"partial answer: {body['remark'][:120]}")
-                return body.get("elements", [])
-            except (httpx.HTTPError, ValueError) as exc:  # busy (429/504), down, or not JSON
-                error = exc
-        raise RuntimeError(f"no Overpass server answered: {error}")
+        return await overpass_post(self.client, query, timeout=200)
 
     async def __call__(self, lat: float, lng: float, radius: Optional[float] = SEARCH_RADIUS_M) -> list[dict]:
         async with self._lock:

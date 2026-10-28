@@ -91,7 +91,8 @@ changed, so the import never withholds website data it has no stage to re-check)
 `register-pins --apply`, `site-address --apply`, `confirm-pins --apply` (all free, hidden
 locations only), then `refresh_pins.sh` with `PINS_FORCE=1`: `website-pins`, `pin-agent`
 (`REGISTER_PINS_USD`, $0.05 a pass, with a $0.01 reserve per call as in the open-days
-check), `site-city`, `site-grades` with their own stops, the
+check), `site-city`, `site-grades` with their own stops, `outdoor-grounds` (OSM school plots for
+"Outdoor space", free, `docs/OUTDOOR_SPACE.md`), the
 catchment dry run (an issue "Catchment match changed" if it would change), the publish and the
 OSM check (`skills/geocoding/SKILL.md`, Weekly run). Any failure stops the chain; the next day
 runs it again from the start, which costs pennies.

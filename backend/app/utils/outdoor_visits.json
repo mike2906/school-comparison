@@ -1,0 +1,15 @@
+{
+  "_about": "Outdoor space seen on a visit, per school building. A visit beats every other source (app/utils/outdoor_space.py). One entry per building: the school id, words its register address contains, the visit date, and what was seen in both languages. Photos and notes: docs/OUTDOOR_SPACE.md.",
+  "visits": [
+    {
+      "school_id": 596,
+      "address_contains": "Витошки Камбани",
+      "checked_on": "2026-10-26",
+      "kind": "grounds",
+      "text_i18n": {
+        "bg": "Училището е в офис сграда. Ползва малка площадка с катерушки в градината на бизнес парка, малко футболно игрище с изкуствена трева и поляна до него.",
+        "en": "The school is in an office building. It uses a small play area with climbing frames in the business park's garden, and a small artificial-turf football pitch with a field next to it."
+      }
+    }
+  ]
+}

@@ -31,6 +31,7 @@ from app.utils.display_gating import (
 from app.utils.fee_discounts import publishable_fee_discounts
 from app.utils.i18n_resolver import resolve_address_i18n, resolve_name_i18n
 from app.utils.location_tags import semantic_location_tags
+from app.utils.outdoor_space import location_answers as outdoor_location_answers
 from app.utils.school_attributes import build_display_attributes, publishable_display_i18n
 from app.utils.school_facts import SITE_ACCEPTED_STATUSES, publication_attributes, shown_school_facts
 from app.utils.school_start import shown_start_times
@@ -525,6 +526,36 @@ class SocialLinks(BaseModel):
     instagram: Optional[str] = None
 
 
+class OutdoorWebsiteFact(BaseModel):
+    text_i18n: dict[str, str]
+    source_url: Optional[str] = None
+
+
+class OutdoorSpaceLocation(BaseModel):
+    """One building's outdoor space (``app.utils.outdoor_space``): ``kind`` is grounds,
+    shared, other_building, floor, none or unknown; ``source`` is visit, website, osm or
+    address (OpenStreetMap answers carry its credit on the page)."""
+
+    location_id: int
+    kind: str
+    source: Optional[str] = None
+    checked_on: Optional[str] = None
+    text_i18n: Optional[dict[str, str]] = None
+    facts: list[OutdoorWebsiteFact] = []
+    open_m2: Optional[int] = None
+    pitches: Optional[int] = None
+    playgrounds: Optional[int] = None
+    shared_with_id: Optional[int] = None
+    shared_with_i18n: Optional[dict[str, str]] = None
+
+
+class OutdoorSpace(BaseModel):
+    locations: list[OutdoorSpaceLocation]
+    # Outdoor facts from the website of a school with several buildings: the page rarely
+    # says which building they are for.
+    website: list[OutdoorWebsiteFact] = []
+
+
 class FeeDiscount(BaseModel):
     """A discount the school's own pages state beside its fees (sibling, early payment)."""
 
@@ -566,6 +597,17 @@ class SchoolResponse(SchoolBase, SchoolPricingMixin):
         )
         facts = [fact for fact in (shown or {}).get("facts", []) if fact["rank"] != "minor"]
         return SchoolFacts.model_validate(shown | {"facts": facts}) if facts else None
+
+    @computed_field(return_type=Optional[OutdoorSpace])
+    @property
+    def outdoor_space(self) -> Optional[OutdoorSpace]:
+        if not self.locations:
+            return None
+        shown = shown_school_facts(
+            self.raw_attributes, self.raw_scrape_status, self.website_url, getattr(self, "education_level", None)
+        )
+        answers = outdoor_location_answers(self.id, self.locations, self.raw_attributes, (shown or {}).get("facts"))
+        return OutdoorSpace.model_validate(answers)
 
     @computed_field(return_type=Optional[SocialLinks])
     @property

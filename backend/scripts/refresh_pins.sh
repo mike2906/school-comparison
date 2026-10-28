@@ -19,7 +19,8 @@
 # opens the issue "Website town check stopped" (the pins go ahead either way). It also sets
 # grade bands by what a school's own published site data says it teaches (site-grades,
 # free); more than SITE_GRADES_MAX (10) changes at once applies none and opens the issue
-# "Grade band check stopped". A stopped run is retried a day later, a failed publish the next hour. Log and reports:
+# "Grade band check stopped". It also stores the OpenStreetMap school plot round each pin for
+# the "Outdoor space" line (outdoor-grounds, free; a failure is logged only). A stopped run is retried a day later, a failed publish the next hour. Log and reports:
 # $state/refresh_pins.log, $state/pins-*.json (kept a month); a pg_dump before each
 # apply (the last 4 kept) in $backups.
 set -euo pipefail
@@ -52,6 +53,14 @@ stop() {
 
 New pins are not reaching the site until this is fixed; the script tries again a day later (a failed publish, next hour). Log: $state/refresh_pins.log. Close this issue once fixed."
 	exit 1
+}
+take_backup() {
+	backup="$backups/$database-pre-pins-$stamp.dump"
+	if ! docker exec "$container" pg_dump -U postgres -d "$database" --format=custom > "$backup" || ! [ -s "$backup" ]; then
+		rm -f "$backup"
+		stop "pg_dump failed"
+	fi
+	ls -1t "$backups"/"$database"-pre-pins-*.dump | tail -n +5 | xargs -r rm -f
 }
 report() { python3 -c 'import json, sys; r = json.load(open(sys.argv[1])); print(eval(sys.argv[2], {"r": r}))' "$1" "$2"; }
 placed() { report "$1" 'r["outcomes"].get("placed", 0)'; }
@@ -149,13 +158,9 @@ if [ -n "$force" ] || [ ! -f "$state/pins_unpublished" ]; then
 	[ "$website" -le "$max_placed" ] && [ "$agent" -le "$max_placed" ] ||
 		stop "the dry run would place $website (website) and $agent (agent) locations, over $max_placed; check $dry_web and $dry_agent"
 
+	backup=""
 	if [ $((website + agent + towns + grades)) -gt 0 ]; then
-		backup="$backups/$database-pre-pins-$stamp.dump"
-		if ! docker exec "$container" pg_dump -U postgres -d "$database" --format=custom > "$backup" || ! [ -s "$backup" ]; then
-			rm -f "$backup"
-			stop "pg_dump failed"
-		fi
-		ls -1t "$backups"/"$database"-pre-pins-*.dump | tail -n +5 | xargs -r rm -f
+		take_backup
 
 		# Each pin is written on its own, so pins written before a failure are published next hour.
 		touch "$state/pins_unpublished"
@@ -192,6 +197,21 @@ if [ -n "$force" ] || [ ! -f "$state/pins_unpublished" ]; then
 		if [ "$website" -gt "$max_placed" ] || [ "$agent" -gt "$max_placed" ]; then
 			rm -f "$state/pins_unpublished"
 			stop "the apply placed $website (website) and $agent (agent), over $max_placed: NOT published by this script, but the next publish by any script ships them. Check $state/pins-*-$stamp.json; restore $backup if wrong"
+		fi
+	fi
+	# OSM school plots round the pins as now placed (docs/OUTDOOR_SPACE.md): free, and a
+	# failure is logged only. The apply reads the dry run's saved OSM answer.
+	outdoor_osm="$state/pins-outdoor-osm-$stamp.json"
+	dry_outdoor="$state/pins-outdoor-dry-$stamp.json"
+	if ! cli outdoor-grounds --city "$city" --osm-json "$outdoor_osm" --out "$dry_outdoor"; then
+		log "outdoor-grounds dry run failed"
+	elif [ "$(report "$dry_outdoor" 'r["changed"]')" != 0 ]; then
+		[ -n "$backup" ] || take_backup
+		touch "$state/pins_unpublished"
+		if cli outdoor-grounds --city "$city" --osm-json "$outdoor_osm" --apply --out "$state/pins-outdoor-$stamp.json"; then
+			log "outdoor-grounds: changed the plots of $(report "$state/pins-outdoor-$stamp.json" 'r["changed"]') schools"
+		else
+			log "outdoor-grounds apply failed"
 		fi
 	fi
 	touch "$state/osm_due"

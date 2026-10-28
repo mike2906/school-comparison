@@ -73,7 +73,8 @@ a parent comparing schools would use. File each fact under one topic:
 - meals: own kitchen or catering, which meals are served and to whom
 - transport: a school bus and the areas it covers
 - activities: named sports, clubs, teams and arts on offer
-- facilities: notable rooms and grounds (pool, sports hall, labs, library)
+- facilities: notable rooms and grounds (pool, sports hall, labs, library), and the school's own outdoor space: a yard,
+  garden, playground or sports pitch, and how big it is when stated
 - support: psychologist, speech therapist, resource teacher, support for special educational needs
 - admissions: how admission works for each grade or age as the page describes it now: an entrance exam or
   test and its subjects or rounds, an interview or talk with a psychologist, trial days, year-round admission
