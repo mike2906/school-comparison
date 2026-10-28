@@ -10,6 +10,7 @@
  * A failed flow leaves a screenshot in LIVE_OUT (default live-flows-report/).
  */
 import { mkdir, readFile } from 'node:fs/promises'
+import { setTimeout as sleep } from 'node:timers/promises'
 import path from 'node:path'
 import { after, afterEach, before, beforeEach } from 'node:test'
 import { chromium } from 'playwright'
@@ -36,8 +37,32 @@ export const prefix = lang => (lang === 'en' ? '/en' : '')
 
 export { getAddress as address, getSchoolName as schoolName } from '../../src/utils/i18n.js'
 
+/**
+ * A live API answer, asked up to three times. A request through the edge can stall for a
+ * minute while the next one takes a second (Cloudflare's Ashburn trouble on 28 Oct 2026
+ * failed every PR's coverage check that way), so each try gets 30 s and a fresh request.
+ * A stall, a dropped connection or a 5xx (the edge's own 52x included) is tried again;
+ * any other answer is returned as it is.
+ */
+export async function fetchLive(url, tries = 3) {
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      // The body is read here too, so a stall half-way through counts as a stall.
+      const response = await fetch(url, { signal: AbortSignal.timeout(30_000) })
+      const body = await response.text()
+      const answer = { ok: response.ok, status: response.status, json: () => JSON.parse(body) }
+      if (response.status < 500 || attempt >= tries) return answer
+    } catch (error) {
+      if (attempt >= tries) {
+        throw new Error(`The live API did not answer ${url} in ${tries} tries of 30 s (${error.message}): a network stall or a very slow API`, { cause: error })
+      }
+    }
+    await sleep(2_000 * attempt)
+  }
+}
+
 export async function fetchJson(url) {
-  const response = await fetch(url, { signal: AbortSignal.timeout(30_000) })
+  const response = await fetchLive(url)
   if (!response.ok) throw new Error(`${url}: HTTP ${response.status}`)
   return response.json()
 }
