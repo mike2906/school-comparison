@@ -177,3 +177,36 @@ def test_address_answers(address, kind):
 def test_outdoor_facts(text, outdoor):
     facts = [{"topic": "facilities", "text_i18n": {"en": text}, "source_url": "u"}]
     assert bool(outdoor_space.outdoor_facts(facts)) is outdoor
+
+
+def test_a_hole_in_a_multipolygon_is_not_the_schools_ground():
+    outer, hole = _square(*PIN), _square(*PIN, half=0.0002)
+    relation = {
+        "type": "relation",
+        "id": 11,
+        "tags": {"amenity": "school", "type": "multipolygon", "ref:BG:neispuo": "1"},
+        "members": [
+            {"type": "way", "role": "outer", "geometry": outer},
+            {"type": "way", "role": "inner", "geometry": hole},
+        ],
+    }
+    plot = stage.read_plots([relation])[0][0]
+    whole = stage.read_plots([_plot("1")])[0][0]
+    assert abs(plot.area - whole.area * (1 - 0.16)) < 50  # the hole is 0.4 x 0.4 of the outline
+    # A pin in the hole is not inside another school's plot.
+    assert stage.match_location(*PIN, "2", set(), [plot]) == (None, False)
+
+
+def test_a_name_must_match_whole_and_numbers_must_agree():
+    plots = stage.read_plots([_plot(name="ОУ „Христо Ботев“")])[0]
+    assert stage.match_location(*PIN, "", stage._name_tokens("ОУ „Христо Смирненски“"), plots) == (None, False)
+    numbered = stage.read_plots([_plot(name="ДГ №79 Изгрев", amenity="kindergarten")])[0]
+    tokens = stage._name_tokens("ДГ №97 Изгрев")
+    assert stage.match_location(*PIN, "", tokens, numbered, frozenset({"97"})) == (None, False)
+    assert stage.match_location(*PIN, "", tokens, numbered, frozenset({"79"}))[1]
+
+
+def test_a_school_mapped_as_a_building_is_not_grounds():
+    building = _plot("1", building="school")
+    plots, buildings, _ = stage.read_plots([building])
+    assert plots == [] and len(buildings) == 1

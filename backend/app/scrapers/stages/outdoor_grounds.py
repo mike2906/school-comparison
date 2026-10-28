@@ -32,7 +32,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import School, SchoolLocation
-from app.scrapers.stages.osm_check import neispuo_codes
+from app.scrapers.stages.osm_check import name_numbers, neispuo_codes
 from app.scrapers.stages.pin_agent import OVERPASS_URLS
 from app.scrapers.stages.website_pins import needs_pin
 from app.services.geocoding.bounds import get_city_bounds
@@ -48,6 +48,8 @@ NEAR_M = 25
 # Sofia has about 600 school plots mapped; far fewer means a cut answer, which must not
 # wipe the stored plots.
 MIN_PLOTS = 100
+# Own grounds smaller than this (after the buildings) are not claimed.
+MIN_OPEN_M2 = 100
 _PLAY = ("pitch", "playground", "track")
 
 # Words every school name has: they say nothing about which school a plot is.
@@ -86,6 +88,14 @@ _GENERIC = {
     "uchilishte",
     "gimnaziya",
     "detska",
+    "chsu",
+    "chou",
+    "chnu",
+    "chdg",
+    "chpg",
+    "cheg",
+    "chesu",
+    "chezg",
     "gradina",
     "park",
     "парк",
@@ -147,15 +157,17 @@ def _join(pieces: list[list[tuple[float, float]]]) -> list[list[tuple[float, flo
     return rings
 
 
-def _rings(element: dict) -> list[list[tuple[float, float]]]:
-    """The element's outline(s) as (lat, lng) rings without the repeated last point."""
+def _rings(element: dict, inner: bool = False) -> list[list[tuple[float, float]]]:
+    """The element's outer (or a relation's inner) rings as (lat, lng) points without the
+    repeated last point."""
     if element.get("type") == "way":
         points = [(g["lat"], g["lon"]) for g in element.get("geometry") or []]
-        return [points[:-1]] if len(points) >= 4 and points[0] == points[-1] else []
+        return [points[:-1]] if not inner and len(points) >= 4 and points[0] == points[-1] else []
+    roles = ("inner",) if inner else ("outer", "")
     pieces = [
         [(g["lat"], g["lon"]) for g in member.get("geometry") or []]
         for member in element.get("members") or []
-        if member.get("type") == "way" and member.get("role") in ("outer", "")
+        if member.get("type") == "way" and member.get("role") in roles
     ]
     return _join(pieces)
 
@@ -171,21 +183,34 @@ def _name_tokens(*names: Optional[str]) -> set[str]:
 
 
 class Plot:
+    """A school plot: outer rings less a multipolygon's holes (another plot, a block of flats)."""
+
     def __init__(self, element: dict, rings: list[list[tuple[float, float]]]):
         tags = element.get("tags") or {}
+        names = [tags.get("name"), tags.get("official_name"), tags.get("name:en")]
         self.id = f"{element['type']}/{element['id']}"
         self.codes = neispuo_codes(tags)
-        self.tokens = _name_tokens(tags.get("name"), tags.get("official_name"), tags.get("name:en"))
+        self.tokens = _name_tokens(*names)
+        self.numbers = set().union(*(name_numbers(n) for n in names if n))
         self.lat0 = rings[0][0][0]
         self.rings = [[_xy(lat, lng, self.lat0) for lat, lng in ring] for ring in rings]
-        self.area = sum(_area(ring) for ring in self.rings)
+        self.holes = [[_xy(lat, lng, self.lat0) for lat, lng in ring] for ring in _rings(element, inner=True)]
+        self.area = max(sum(_area(ring) for ring in self.rings) - sum(_area(ring) for ring in self.holes), 0.0)
 
     def contains(self, xy: tuple[float, float]) -> bool:
-        return any(_inside(xy, ring) for ring in self.rings)
+        return any(_inside(xy, ring) for ring in self.rings) and not any(_inside(xy, hole) for hole in self.holes)
 
     def distance(self, lat: float, lng: float) -> float:
         xy = _xy(lat, lng, self.lat0)
-        return 0.0 if self.contains(xy) else min(_edge_distance(xy, ring) for ring in self.rings)
+        return 0.0 if self.contains(xy) else min(_edge_distance(xy, ring) for ring in self.rings + self.holes)
+
+    def named_for(self, tokens: set[str], numbers: set[str]) -> bool:
+        """A plot with no MoE code is a school's when every distinctive word of its name is
+        in the school's name and no school number differs ("Христо Ботев" is not "Христо
+        Смирненски", "ДГ №79" is not "ДГ №97")."""
+        if self.codes or not self.tokens or not self.tokens <= tokens:
+            return False
+        return not (self.numbers and numbers and not self.numbers & numbers)
 
 
 def read_plots(elements: Sequence[dict]) -> tuple[list[Plot], list[dict], list[dict]]:
@@ -193,7 +218,8 @@ def read_plots(elements: Sequence[dict]) -> tuple[list[Plot], list[dict], list[d
     plots, buildings, play = [], [], []
     for element in elements:
         tags = element.get("tags") or {}
-        if tags.get("amenity") in ("school", "kindergarten") and (rings := _rings(element)):
+        # A school mapped as a building outline is a building, not grounds round one.
+        if tags.get("amenity") in ("school", "kindergarten") and "building" not in tags and (rings := _rings(element)):
             plots.append(Plot(element, rings))
         elif tags.get("leisure") in _PLAY:
             play.append(element)
@@ -229,7 +255,7 @@ def plot_details(plot: Plot, buildings: Sequence[dict], play: Sequence[dict]) ->
 
 
 def match_location(
-    lat: float, lng: float, code: str, name_tokens: set[str], plots: Sequence[Plot]
+    lat: float, lng: float, code: str, name_tokens: set[str], plots: Sequence[Plot], numbers: frozenset = frozenset()
 ) -> tuple[Optional[Plot], bool]:
     """The plot answering for a pin, and whether it is the school's own.
 
@@ -238,9 +264,7 @@ def match_location(
     another code. A plot with no code and another name answers nothing."""
     near = [(plot, plot.distance(lat, lng)) for plot in plots]
     near = [(plot, d) for plot, d in near if d <= NEAR_M]
-    own = [
-        (plot, d) for plot, d in near if (code and code in plot.codes) or (not plot.codes and name_tokens & plot.tokens)
-    ]
+    own = [(plot, d) for plot, d in near if (code and code in plot.codes) or plot.named_for(name_tokens, set(numbers))]
     if own:
         return min(own, key=lambda pd: (pd[1], pd[0].area))[0], True
     inside = [plot for plot, d in near if d == 0 and plot.codes]
@@ -321,15 +345,19 @@ async def run_outdoor_grounds(
     for school in schools:
         code = (school.institutional_id or "").strip().lstrip("0")
         tokens = _name_tokens(*names[school.id].values())
+        numbers = frozenset().union(*(name_numbers(n) for n in names[school.id].values()))
         found: dict[str, dict[str, Any]] = {}
         for location in sorted(by_school.get(school.id, []), key=lambda loc: loc.id):
             if needs_pin(location):
                 counts["no_pin"] += 1
                 continue
-            plot, own = match_location(location.lat, location.lng, code, tokens, plots)
+            plot, own = match_location(location.lat, location.lng, code, tokens, plots, numbers)
             entry: dict[str, Any] = {"lat": location.lat, "lng": location.lng}
-            if plot is not None and own:
-                entry |= {"osm": plot.id, "own": True, **plot_details(plot, buildings, play)}
+            details = plot_details(plot, buildings, play) if plot is not None and own else {}
+            if plot is not None and own and details["open_m2"] < MIN_OPEN_M2:
+                plot = None  # buildings cover the plot: no ground to speak of
+            elif plot is not None and own:
+                entry |= {"osm": plot.id, "own": True, **details}
             elif plot is not None:
                 others = [by_code[c] for c in sorted(plot.codes) if c in by_code and by_code[c].id != school.id]
                 if not others:
