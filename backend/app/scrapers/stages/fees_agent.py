@@ -751,9 +751,7 @@ def _build_rows(
             continue
         taken.add((key, label))
         fee = result.fee
-        # What the fee includes may be said on another page that lists it (a fee page and an
-        # admissions page): the first that says it.
-        services = fee.services or next((r.fee.services for r, _, f, _, _ in built if tuple(f.values()) == key and r.fee.services), [])
+        services = fee.services
         rows.append(
             Pricing(
                 school_id=school.id,

@@ -2315,6 +2315,17 @@ def test_a_service_needs_the_page_to_say_which_way():
     # A list's item under its heading; at no extra cost is included.
     assert kept(FeeService(service="food", included=False, evidence="ГОДИШНАТА ТАКСА НЕ ВКЛЮЧВА:\nХранителен пакет")) == {("food", False)}
     assert kept(FeeService(service="food", included=True, evidence="Обяд без допълнително заплащане")) == {("food", True)}
+    # A quote cut from a line, and a heading from another list joined to an item.
+    assert kept(FeeService(service="transport", included=True, evidence="включени: транспорт, екскурзии и лагери")) == set()
+    assert kept(FeeService(service="food", included=True, evidence="Таксата включва ползване на материалната база\nХранителен пакет")) == set()
+
+
+def test_at_no_extra_cost_speaks_for_its_own_part_of_the_line():
+    line = "Транспорт без допълнително заплащане, храната се заплаща отделно"
+    tuition = fee(PriceCategory.TUITION, "Такса обучение за 2026/2027: 8900 евро на година", amount=8900)
+    services = [FeeService(service="transport", included=True, evidence=line), FeeService(service="food", included=True, evidence=line)]
+    result = check_fee(tuition.model_copy(update={"services": services}), PAGE_SERVICES + line + "\n")
+    assert [(item.service, item.included) for item in result.fee.services] == [("transport", True)]
 
 
 def test_services_only_on_tuition_and_never_both_ways():
