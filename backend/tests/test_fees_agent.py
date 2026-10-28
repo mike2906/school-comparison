@@ -23,10 +23,12 @@ from app.models import FieldSource, Pricing, School
 from app.models.pricing import PriceCategory, PricePeriod, PriceSource
 from app.models.scrape_log import ScrapeType
 from app.models.source_page import SourcePage
+from app.schemas.pricing import PricingContextResponse
 from app.scrapers.extraction.agent_fees import (
     HELD_CONFIDENCE,
     PUBLISH_CONFIDENCE,
     AgentFee,
+    FeeService,
     PaymentOption,
     check_fee,
     names_deposit,
@@ -2263,3 +2265,76 @@ def test_a_one_day_trip_or_course_is_not_daily(line):
 def test_a_bracket_quote_does_not_join_two_page_lines():
     page = "Такса (5 клас)\n300 €\n"
     assert not check_fee(fee(PriceCategory.TUITION, "Такса(5 клас) 300 €", amount=300), page).kept
+
+
+# --- What a tuition fee includes (docs/YEARLY_COST.md) ------------------------------------
+PAGE_SERVICES = """\
+Такса обучение за 2026/2027: 8900 евро на година
+Таксата включва: учебници и учебни тетрадки, храна – плодова закуска, обяд и следобедна закуска
+В годишната такса не са включени: транспорт, екскурзии и лагери
+"""
+
+
+def test_services_kept_only_with_a_line_on_the_page_that_names_them():
+    line_in = "Таксата включва: учебници и учебни тетрадки, храна – плодова закуска, обяд и следобедна закуска"
+    line_out = "В годишната такса не са включени: транспорт, екскурзии и лагери"
+    read = fee(PriceCategory.TUITION, "Такса обучение за 2026/2027: 8900 евро на година", amount=8900).model_copy(
+        update={
+            "services": [
+                FeeService(service="food", included=True, evidence=line_in),
+                FeeService(service="materials", included=True, evidence=line_in),
+                FeeService(service="transport", included=False, evidence=line_out),
+                # Not on the page, and a line that does not name the service.
+                FeeService(service="extended_day", included=True, evidence="Таксата включва занималня до 18:00"),
+                FeeService(service="extended_day", included=False, evidence=line_in),
+            ]
+        }
+    )
+    result = check_fee(read, PAGE_SERVICES)
+    assert {(item.service, item.included) for item in result.fee.services} == {
+        ("food", True),
+        ("materials", True),
+        ("transport", False),
+    }
+    assert "service extended_day dropped: evidence line is not on the page" in result.checks
+    assert "service extended_day dropped: evidence line does not name it" in result.checks
+
+
+def test_services_only_on_tuition_and_never_both_ways():
+    line_in = "Таксата включва: учебници и учебни тетрадки, храна – плодова закуска, обяд и следобедна закуска"
+    line_out = "В годишната такса не са включени: транспорт, екскурзии и лагери"
+    bus = fee(PriceCategory.TRANSPORT, "Такса обучение за 2026/2027: 8900 евро на година", amount=8900).model_copy(
+        update={"services": [FeeService(service="food", included=True, evidence=line_in)]}
+    )
+    assert check_fee(bus, PAGE_SERVICES).fee.services == []
+    both = fee(PriceCategory.TUITION, "Такса обучение за 2026/2027: 8900 евро на година", amount=8900).model_copy(
+        update={
+            "services": [
+                FeeService(service="transport", included=False, evidence=line_out),
+                FeeService(service="transport", included=True, evidence=line_out),
+            ]
+        }
+    )
+    result = check_fee(both, PAGE_SERVICES)
+    assert result.fee.services == []
+    assert "service transport dropped: said to be both included and not" in result.checks
+
+
+async def test_apply_stores_what_the_tuition_includes(db_session, pages, frozen_today):
+    tuition = FEES_STAGE[0].model_copy(
+        update={"services": [FeeService(service="food", included=False, evidence="Храна: 90 евро месечно")]}
+    )
+    school = await _school(db_session)
+    await db_session.commit()
+    report = await fees_agent.run_school(
+        db_session, school, find=_find(pages), read=_read([tuition, FEES_STAGE[1]]), apply=True
+    )
+    assert report["outcome"] == "written", report
+    rows = {row.category: row for row in await _rows(db_session, school)}
+    context = rows[PriceCategory.TUITION].pricing_context
+    assert context["includes"] == [] and context["excludes"] == ["food"]
+    assert context["services_evidence"] == {"food": "Храна: 90 евро месечно"}
+    # The lists publish; the evidence stays internal.
+    public = PricingContextResponse.model_validate(context).model_dump()
+    assert public["excludes"] == ["food"] and "services_evidence" not in public
+    assert "includes" not in rows[PriceCategory.REGISTRATION].pricing_context

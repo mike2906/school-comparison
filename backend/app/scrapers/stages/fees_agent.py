@@ -768,6 +768,17 @@ def _build_rows(
                     "installments": fee.installments,
                     "payment_options": [option.model_dump(exclude_none=True) for option in fee.payment_options],
                     "notes": fee.notes,
+                    # What the tuition includes or leaves out (food, materials, transport,
+                    # extended_day), for the yearly cost table; the lines prove it.
+                    **(
+                        {
+                            "includes": [item.service for item in fee.services if item.included],
+                            "excludes": [item.service for item in fee.services if not item.included],
+                            "services_evidence": {item.service: item.evidence for item in fee.services},
+                        }
+                        if fee.services
+                        else {}
+                    ),
                     # A deposit is listed apart from the fees: it is returned or taken off a later one.
                     **({"deposit": True} if names_deposit(fee) else {}),
                     # The site's words in English for the English page; the columns keep the site's own.
@@ -1198,6 +1209,7 @@ def _fee_report(result: CheckedFee, page: Optional[PageRead]) -> dict[str, Any]:
         "age_group": fee.age_group,
         "age_group_en": fee.age_group_en,
         "payment_options": [option.model_dump(exclude_none=True) for option in fee.payment_options],
+        "services": [item.model_dump() for item in fee.services],
         "kept": result.kept,
         "confidence": result.confidence,
         "checks": result.checks,

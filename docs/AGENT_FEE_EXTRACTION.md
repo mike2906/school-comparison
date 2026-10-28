@@ -93,6 +93,12 @@ For one school, with its `website_url`:
      still fees of their own. An amount the line gives as "1 x" ahead of "+ N x" is a first
      instalment: its period is cleared. A count of payments ("2 x", "на две вноски") states
      no period.
+   - **What tuition includes** (2026-10-28): for a tuition fee the reader also says which of
+     food, materials, transport and extended_day the page says the fee includes or leaves out,
+     each with the page line that says so. Code keeps one only on a tuition fee, with its line
+     on the page and naming the service, and drops a service said both ways. Stored as
+     `pricing_context.includes` / `excludes` (service keys, published) and
+     `services_evidence` (internal); the yearly cost table reads them (`docs/YEARLY_COST.md`).
    - **Not fees** (2026-10-19): a fine, a late-payment or reminder charge, a duplicate document,
      a transcript or official note, and replacing a lost key or badge are no cost of attending.
      The reader skips them, and code drops one whose evidence or name says so (595's
