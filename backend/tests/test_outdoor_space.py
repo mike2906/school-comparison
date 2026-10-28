@@ -114,13 +114,19 @@ async def test_run_stores_own_and_shared_plots_and_refuses_a_cut_answer(db_sessi
     assert report["changed"] == 2
     again = await stage.run_outdoor_grounds(db_session, elements)
     assert again["changed"] == 0
+    # An apply with nothing changed writes nothing: the stored read time stays.
+    await db_session.refresh(host)
+    read_at = host.attributes["outdoor_grounds"]["read_at"]
+    await stage.run_outdoor_grounds(db_session, elements, apply=True)
+    await db_session.refresh(host)
+    assert host.attributes["outdoor_grounds"]["read_at"] == read_at
     await db_session.refresh(host)
     await db_session.refresh(tenant)
     assert host.attributes["outdoor_grounds"]["locations"][str(host_loc.id)]["own"] is True
     shared = tenant.attributes["outdoor_grounds"]["locations"][str(tenant_loc.id)]
     assert shared["shared_with_id"] == host.id and shared["shared_with_i18n"]["bg"] == "47 СУ"
-    with pytest.raises(RuntimeError):
-        await stage.run_outdoor_grounds(db_session, elements[:5], apply=True)
+    with pytest.raises(RuntimeError):  # a cut answer stops the dry run too
+        await stage.run_outdoor_grounds(db_session, elements[:5])
 
 
 def test_answers_take_the_strongest_source():
@@ -172,10 +178,31 @@ def test_address_answers(address, kind):
         ("The school has a large gym and a library.", False),
         ("Частна детска градина с английски език.", False),
         ("The preschool has an indoor playground.", False),
+        ("Sports hall with a basketball court", False),
+        ("Indoor tennis courts", False),
+        ("The school has a gym, an indoor swimming pool, a tennis court and a football pitch.", True),
+        ("A playground and a sports pitch behind the building.", True),
     ],
 )
 def test_outdoor_facts(text, outdoor):
     facts = [{"topic": "facilities", "text_i18n": {"en": text}, "source_url": "u"}]
+    assert bool(outdoor_space.outdoor_facts(facts)) is outdoor
+    # A minor fact is not shown on the page, so it does not answer either.
+    assert outdoor_space.outdoor_facts([facts[0] | {"rank": "minor"}]) == []
+
+
+@pytest.mark.parametrize(
+    ("text", "outdoor"),
+    [
+        ("Физкултурен салон с баскетболно игрище", False),
+        ("Закрита спортна площадка", False),
+        ("Ученически дворец", False),
+        ("Двор с катерушки и пясъчник.", True),
+        ("Две спортни площадки в двора.", True),
+    ],
+)
+def test_outdoor_facts_bulgarian(text, outdoor):
+    facts = [{"topic": "facilities", "text_i18n": {"bg": text}, "source_url": "u"}]
     assert bool(outdoor_space.outdoor_facts(facts)) is outdoor
 
 
@@ -210,3 +237,8 @@ def test_a_school_mapped_as_a_building_is_not_grounds():
     building = _plot("1", building="school")
     plots, buildings, _ = stage.read_plots([building])
     assert plots == [] and len(buildings) == 1
+
+
+def test_an_element_in_two_parts_of_the_answer_is_read_once():
+    building = {"type": "way", "id": 5, "geometry": _square(*PIN, half=0.0001), "tags": {"building": "school"}}
+    assert len(stage.read_plots([_plot("1"), building, building])[1]) == 1

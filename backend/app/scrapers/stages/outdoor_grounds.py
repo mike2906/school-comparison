@@ -20,7 +20,6 @@ No model calls; one Overpass query.
 
 from __future__ import annotations
 
-import asyncio
 import datetime
 import logging
 import math
@@ -33,11 +32,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import School, SchoolLocation
 from app.scrapers.stages.osm_check import name_numbers, neispuo_codes
-from app.scrapers.stages.pin_agent import OVERPASS_URLS
+from app.scrapers.stages.pin_agent import overpass_post
 from app.scrapers.stages.website_pins import needs_pin
 from app.services.geocoding.bounds import get_city_bounds
 from app.utils.i18n_resolver import resolve_name_i18n
 from app.utils.outdoor_space import ATTRIBUTE_KEY
+from app.utils.school_facts import publication_attributes
 from app.utils.transliteration import transliterate_bulgarian
 
 logger = logging.getLogger(__name__)
@@ -215,8 +215,14 @@ class Plot:
 
 def read_plots(elements: Sequence[dict]) -> tuple[list[Plot], list[dict], list[dict]]:
     """Split the Overpass answer into school plots, buildings and play features."""
-    plots, buildings, play = [], [], []
+    plots, buildings, play, seen = [], [], [], set()
     for element in elements:
+        # A school outline that is also a building comes back from both of the query's
+        # building and plot parts: counted once.
+        key = (element.get("type"), element.get("id"))
+        if key in seen:
+            continue
+        seen.add(key)
         tags = element.get("tags") or {}
         # A school mapped as a building outline is a building, not grounds round one.
         if tags.get("amenity") in ("school", "kindergarten") and "building" not in tags and (rings := _rings(element)):
@@ -292,21 +298,16 @@ async def read_osm(country: str = "bg", city: str = "sofia") -> list[dict]:
         "way(area.pa)[building];out geom tags;"
         f'nwr(area.pa)[leisure~"^({"|".join(_PLAY)})$"];out center tags;'
     )
-    error: Optional[Exception] = None
     async with httpx.AsyncClient(headers={"User-Agent": CRAWLER_USER_AGENT}) as client:
-        for attempt, url in enumerate([*OVERPASS_URLS, *OVERPASS_URLS]):  # each server twice
-            if attempt:
-                await asyncio.sleep(5 * attempt)
-            try:
-                response = await client.post(url, data={"data": query}, timeout=330)
-                response.raise_for_status()
-                body = response.json()
-                if "runtime error" in str(body.get("remark") or ""):  # a timed-out, partial answer
-                    raise ValueError(f"partial answer: {body['remark'][:120]}")
-                return body.get("elements", [])
-            except (httpx.HTTPError, ValueError) as exc:  # busy (429/504), down, or not JSON
-                error = exc
-    raise RuntimeError(f"no Overpass server answered: {error}")
+        return await overpass_post(client, query, timeout=330)
+
+
+def _public_name(school: School) -> dict[str, str]:
+    """The name the school's own page shows (its website's Latin name included)."""
+    attrs = publication_attributes(
+        school.attributes, school.scrape_status, school.website_url, school.education_level, school.admission_info
+    )
+    return dict(resolve_name_i18n(school.name_i18n, attrs))
 
 
 async def run_outdoor_grounds(
@@ -319,7 +320,7 @@ async def run_outdoor_grounds(
 ) -> dict[str, Any]:
     """Find each pinned location's plot; with ``apply``, store them (replacing the last run's)."""
     plots, buildings, play = read_plots(elements)
-    if apply and len(plots) < MIN_PLOTS:
+    if len(plots) < MIN_PLOTS:
         raise RuntimeError(f"only {len(plots)} school plots in the OSM answer: not storing a cut answer")
     schools = (
         (
@@ -368,7 +369,7 @@ async def run_outdoor_grounds(
                         "osm": plot.id,
                         "own": False,
                         "shared_with_id": other.id,
-                        "shared_with_i18n": dict(names[other.id]),
+                        "shared_with_i18n": _public_name(other),
                     }
             if plot is None:
                 counts["none"] += 1
@@ -376,10 +377,10 @@ async def run_outdoor_grounds(
             counts["own" if entry["own"] else "shared"] += 1
             found[str(location.id)] = entry
         stored = (school.attributes or {}).get(ATTRIBUTE_KEY) or {}
-        if (stored.get("locations") or {}) != found:
-            changed += 1
+        differs = (stored.get("locations") or {}) != found
+        changed += differs
         results.append({"school_id": school.id, "locations": found})
-        if apply:
+        if apply and differs:
             await db.refresh(school, attribute_names=["attributes"], with_for_update=True)
             attrs = dict(school.attributes or {})
             if found:

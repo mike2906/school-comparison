@@ -26,19 +26,20 @@ ATTRIBUTE_KEY = "outdoor_grounds"
 # A stored plot answers for a pin only while the pin stays where the stage saw it.
 MOVED_PIN_M = 30
 
-# A fact about the school's own outdoor space: a yard, garden, playground or pitch. Sports
-# and clubs alone ("football", "athletics") are not, nor are indoor halls.
+# A fact about the school's own outdoor space: a yard, garden, outdoor playground or pitch.
+# Sports and clubs alone ("football", "athletics") are not, nor are indoor halls. A court,
+# "игрище" or "площадка" can be in a gym ("Физкултурен салон с баскетболно игрище"), so
+# those count only in a fact that names no indoor hall.
 _OUTDOOR_FACT_RE = re.compile(
-    r"\bдвор|площадк|игрищ|стадион|градин(?:а|ата|и) за игр|зелен[аи] площ|открит\w* (?:басейн|площ|игр|корт)|"
-    r"тенис корт|\bcourtyard|\byard\b|\byards\b|playground|\bpitch|sports? grounds?|outdoor (?:area|space|play|sports|court|pool)|"
-    r"\bgardens?\b|green (?:area|space)s?|tennis courts?|basketball courts?|running track",
+    r"\bдвор(?!ец|ц)|стадион|градин(?:а|ата|и) за игр|зелен[аи] площ|открит\w* (?:басейн|площ|игр|корт)|"
+    r"\bcourtyard|\byards?\b|\bschoolyard|sports? grounds?|outdoor|open-air|\bgardens?\b|green (?:area|space)s?|"
+    r"running track|football (?:pitch|field)s?|футболно игрище",
     re.IGNORECASE,
 )
-# Not outdoor space: "детска градина" is a kindergarten, and an indoor playground is indoors.
-_NOT_OUTDOOR_RE = re.compile(
-    r"детск\w* градин|kindergarten|(?:indoor|закрит\w*|вътрешн\w*) (?:детск\w* )?(?:play\w*|площадк\w*)",
-    re.IGNORECASE,
-)
+_PLAY_AREA_RE = re.compile(r"площадк|игрищ|playground|\bpitch|\bcourts?\b|корт", re.IGNORECASE)
+_INDOOR_RE = re.compile(r"\bindoor|\bhalls?\b|\bgym|салон|зала|закрит|вътрешн", re.IGNORECASE)
+# Not outdoor space: "детска градина" is a kindergarten.
+_NOT_OUTDOOR_RE = re.compile(r"детск\w* градин|kindergarten", re.IGNORECASE)
 
 # The register address puts the school in another school's building ("в сградата на 47 СУ")...
 _OTHER_BUILDING_RE = re.compile(r"сград(?:а|ата) на ", re.IGNORECASE)
@@ -62,11 +63,12 @@ def outdoor_facts(facts: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
     """The shown website facts that describe the school's own outdoor space."""
     found = []
     for fact in facts or []:
-        if fact.get("topic") != "facilities":
+        # "minor" facts are not shown on the page, so they do not show here either.
+        if fact.get("topic") != "facilities" or fact.get("rank") == "minor":
             continue
         texts = fact.get("text_i18n") or {}
-        words = " ".join(str(texts.get(lang) or "") for lang in ("bg", "en"))
-        if _OUTDOOR_FACT_RE.search(_NOT_OUTDOOR_RE.sub(" ", words)):
+        words = _NOT_OUTDOOR_RE.sub(" ", " ".join(str(texts.get(lang) or "") for lang in ("bg", "en")))
+        if _OUTDOOR_FACT_RE.search(words) or (_PLAY_AREA_RE.search(words) and not _INDOOR_RE.search(words)):
             found.append({"text_i18n": dict(texts), "source_url": fact.get("source_url")})
     return found
 

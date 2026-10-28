@@ -1513,8 +1513,7 @@
       "none": "No outdoor space at this building.",
       "unknown": "Not known."
     },
-    "sharedWith": "In the grounds of",
-    "sharedUseUnknown": "Whether the pupils use them is not known.",
+    "sharedSentence": "In the grounds of {{name}}. Whether the pupils use them is not known.",
     "websiteSays": "The school's website says:",
     "onTheMap": "On the map:",
     "openGround": "about {{area}} m² of open ground",
@@ -1528,6 +1527,7 @@
       "address": "From the address in the ministry register."
     },
     "osmCredit": "Map data:",
+    "osmLink": "© OpenStreetMap contributors",
     "sendPhoto": "Know this school? Send us a photo of its outdoor space.",
     "photoSubject": "Outdoor space photo: {{name}}",
     "compare": {

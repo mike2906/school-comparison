@@ -981,7 +981,13 @@ def osm_check_command(city, country, report_path, issue_path):
 @click.option("--country", default="bg", show_default=True, help="Country code")
 @click.option("--apply", "apply_changes", is_flag=True, help="Store the plots found (default writes nothing)")
 @click.option("--out", "report_path", type=click.Path(dir_okay=False, path_type=Path), help="Write the JSON report")
-def outdoor_grounds_command(city, country, apply_changes, report_path):
+@click.option(
+    "--osm-json",
+    "osm_path",
+    type=click.Path(dir_okay=False, path_type=Path),
+    help="Read the OSM answer from this file if it exists, else query Overpass and save it there",
+)
+def outdoor_grounds_command(city, country, apply_changes, report_path, osm_path):
     """Store the OpenStreetMap school plot round each pinned building (no model calls)."""
     import json
 
@@ -989,7 +995,13 @@ def outdoor_grounds_command(city, country, apply_changes, report_path):
     from app.scrapers.stages import outdoor_grounds
 
     async def _run():
-        elements = await outdoor_grounds.read_osm(country, city)
+        if osm_path is not None and osm_path.exists():
+            elements = json.loads(osm_path.read_text(encoding="utf-8"))
+        else:
+            elements = await outdoor_grounds.read_osm(country, city)
+            if osm_path is not None:
+                osm_path.parent.mkdir(parents=True, exist_ok=True)
+                osm_path.write_text(json.dumps(elements), encoding="utf-8")
         async with async_session_maker() as db:
             return await outdoor_grounds.run_outdoor_grounds(db, elements, country=country, city=city, apply=apply_changes)
 

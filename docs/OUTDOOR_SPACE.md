@@ -20,8 +20,8 @@ and compare responses):
 | Source | Answer | Where it comes from |
 | --- | --- | --- |
 | Visit | what was seen, with the date | `backend/app/utils/outdoor_visits.json`, by school id and address words; photos in the project files (`outdoor-space/visits/`) |
-| School website | "The school's website says:" and the facts, each linking its page | shown facilities facts that name a yard, garden, playground or pitch (`school-facts` stage; the reader is asked for them). Only for a school with one building: with several, the page rarely says which, so the facts are listed for the school |
-| OpenStreetMap, own plot | its own grounds, with open ground (plot less buildings, to 100 m²), pitches and playgrounds | `outdoor-grounds` stage, `attributes["outdoor_grounds"]`; the plot carries the school's MoE code, or no code and the school's name |
+| School website | "The school's website says:" and the facts, each linking its page | shown facilities facts (not "minor" ones, which the page hides) that name a yard, garden, outdoor playground or pitch; a court, "игрище" or "площадка" counts only in a fact naming no indoor hall (`school-facts` stage; the reader is asked for them). Only for a school with one building: with several, the page rarely says which, so the facts are listed for the school |
+| OpenStreetMap, own plot | its own grounds, with open ground (plot less buildings and multipolygon holes, to 100 m²; under 100 m² is not claimed), pitches and playgrounds | `outdoor-grounds` stage, `attributes["outdoor_grounds"]`; the plot carries the school's MoE code, or no code and a name whose every distinctive word is in the school's with no differing school number. A school outline tagged as a building is a building, not grounds |
 | OpenStreetMap, another school's plot | "In the grounds of X; whether the pupils use them is not known" | the pin is inside a plot carrying another school's MoE code; X is named from our own data |
 | Register address | in another school's building / on a floor of a larger building; yard not known | "сградата на", or a floor, flat, ground floor or entrance in the address ("бл." alone is not enough) |
 
@@ -33,9 +33,11 @@ plot shapes); parent photo uploads (user data, Mike's call).
 ## Refresh
 
 `outdoor-grounds` (free, one Overpass query, no model) runs in `refresh_pins.sh` after the
-monthly register import: a dry run, then `--apply` when plots changed, before the publish. A
-failure is logged and never holds the pins back. It refuses to store an answer with fewer
-than 100 school plots (a cut Overpass answer). By hand:
+monthly register import, once the week's pins are placed: a dry run saves the OSM answer
+(`--osm-json`), and when plots changed the script backs up the DB and applies from that same
+answer, before the publish. Only schools whose plots changed are written. A failure is
+logged and never holds the pins back. A run with fewer than 100 school plots (a cut Overpass
+answer) stops. By hand:
 
 ```bash
 cd backend

@@ -45,7 +45,7 @@ function OutdoorSpace({ school }) {
         <p className="mt-5 text-xs text-neutral-500">
           {t('outdoor.osmCredit')}{' '}
           <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer" className={linkClass}>
-            © OpenStreetMap
+            {t('outdoor.osmLink')}
           </a>
         </p>
       )}
@@ -85,13 +85,15 @@ function OutdoorAnswer({ entry, photoHref }) {
     )
   }
   if (entry.kind === 'shared') {
+    // The school's name sits where the translation puts {{name}}, as a link to its page.
+    const [sharedBefore, sharedAfter = ''] = t('outdoor.sharedSentence', { name: '\u0000' }).split('\u0000')
     const other = entry.sharedWithId ? (
       <Link to={`/schools/${entry.sharedWithId}`} className={linkClass}>{entry.sharedWith}</Link>
     ) : entry.sharedWith
     return (
       <>
         <p className="text-neutral-800">
-          {t('outdoor.sharedWith')} {other}. {t('outdoor.sharedUseUnknown')}
+          {sharedBefore}{other}{sharedAfter}
         </p>
         {sourceNote(t('outdoor.sources.osm'))}
       </>
