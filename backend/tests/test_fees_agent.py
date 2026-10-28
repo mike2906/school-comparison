@@ -380,7 +380,7 @@ def test_parts_of_a_space_joined_table_row_are_numbers():
 # The stage (model and fetches stubbed)
 # ---------------------------------------------------------------------------------------
 
-PAGE_STAGE = "Месечна такса: 700 евро\nЕднократна такса за записване: 200 евро.\nХрана: 90 евро месечно"
+PAGE_STAGE = "Месечна такса: 700 евро\nЕднократна такса за записване: 200 евро.\nХрана: 90 евро месечно, заплаща се отделно"
 FEES_STAGE = [
     fee(PriceCategory.TUITION, "Месечна такса: 700 евро", amount=700, period=PricePeriod.MONTHLY, academic_year="2026/2027"),
     fee(PriceCategory.REGISTRATION, "Еднократна такса за записване: 200 евро.", amount=200, period=PricePeriod.ONE_TIME, academic_year="2026/2027"),
@@ -2297,7 +2297,24 @@ def test_services_kept_only_with_a_line_on_the_page_that_names_them():
         ("transport", False),
     }
     assert "service extended_day dropped: evidence line is not on the page" in result.checks
-    assert "service extended_day dropped: evidence line does not name it" in result.checks
+    assert "service extended_day dropped: evidence does not say it is not included" in result.checks
+
+
+def test_a_service_needs_the_page_to_say_which_way():
+    page = PAGE_SERVICES + "ГОДИШНАТА ТАКСА НЕ ВКЛЮЧВА:\nХранителен пакет\nТаксата включва ползване на материалната база\nОбяд без допълнително заплащане\n"
+    tuition = fee(PriceCategory.TUITION, "Такса обучение за 2026/2027: 8900 евро на година", amount=8900)
+    line_out = "В годишната такса не са включени: транспорт, екскурзии и лагери"
+
+    def kept(*services):
+        return {(item.service, item.included) for item in check_fee(tuition.model_copy(update={"services": list(services)}), page).fee.services}
+
+    # The wrong way round, a word alone, the facilities for materials.
+    assert kept(FeeService(service="transport", included=True, evidence=line_out)) == set()
+    assert kept(FeeService(service="food", included=True, evidence="обяд")) == set()
+    assert kept(FeeService(service="materials", included=True, evidence="Таксата включва ползване на материалната база")) == set()
+    # A list's item under its heading; at no extra cost is included.
+    assert kept(FeeService(service="food", included=False, evidence="ГОДИШНАТА ТАКСА НЕ ВКЛЮЧВА:\nХранителен пакет")) == {("food", False)}
+    assert kept(FeeService(service="food", included=True, evidence="Обяд без допълнително заплащане")) == {("food", True)}
 
 
 def test_services_only_on_tuition_and_never_both_ways():
@@ -2311,18 +2328,18 @@ def test_services_only_on_tuition_and_never_both_ways():
         update={
             "services": [
                 FeeService(service="transport", included=False, evidence=line_out),
-                FeeService(service="transport", included=True, evidence=line_out),
+                FeeService(service="transport", included=True, evidence="Таксата включва транспорт от дома"),
             ]
         }
     )
-    result = check_fee(both, PAGE_SERVICES)
+    result = check_fee(both, PAGE_SERVICES + "Таксата включва транспорт от дома\n")
     assert result.fee.services == []
     assert "service transport dropped: said to be both included and not" in result.checks
 
 
 async def test_apply_stores_what_the_tuition_includes(db_session, pages, frozen_today):
     tuition = FEES_STAGE[0].model_copy(
-        update={"services": [FeeService(service="food", included=False, evidence="Храна: 90 евро месечно")]}
+        update={"services": [FeeService(service="food", included=False, evidence="Храна: 90 евро месечно, заплаща се отделно")]}
     )
     school = await _school(db_session)
     await db_session.commit()
@@ -2333,7 +2350,7 @@ async def test_apply_stores_what_the_tuition_includes(db_session, pages, frozen_
     rows = {row.category: row for row in await _rows(db_session, school)}
     context = rows[PriceCategory.TUITION].pricing_context
     assert context["includes"] == [] and context["excludes"] == ["food"]
-    assert context["services_evidence"] == {"food": "Храна: 90 евро месечно"}
+    assert context["services_evidence"] == {"food": "Храна: 90 евро месечно, заплаща се отделно"}
     # The lists publish; the evidence stays internal.
     public = PricingContextResponse.model_validate(context).model_dump()
     assert public["excludes"] == ["food"] and "services_evidence" not in public

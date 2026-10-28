@@ -53,7 +53,7 @@ class FeeService(BaseModel):
 
     service: Literal["food", "materials", "transport", "extended_day"]
     included: bool = Field(description="true when the page says the fee includes it; false when it says it does not")
-    evidence: str = Field(description="The page line that says so, copied verbatim")
+    evidence: str = Field(description="The page line that says so, copied verbatim, after a list's heading line")
 
 
 class AgentFee(BaseModel):
@@ -163,7 +163,7 @@ Rules:
 - source_url: the URL of the page the fee is on.
 - evidence: the line of the page the amount is on, copied character for character, and the lines of its payment options. For a table row, also copy the heading line that gives its period, plan or group, as a separate line. If the period is stated in a sentence above the table, copy that sentence too. A PDF's tables are repeated after its text, one row per line with cells split by " | " and a cell's lines by " / ": when the text above splits a table row over several lines, copy the row and its heading row from there instead of joining lines yourself.
 - label: the site's own wording, short. academic_year, age_group and plan_name as the site states them, or null. plan_name names what the fee buys (full day, half day, a programme such as "IB Diploma" when the page or table is for one) and any price terms, not a way of paying in parts: a payment plan's name is its option's label. It is never taken from a list of what the fee includes.
-- services, for a tuition entry only: each of food, materials (textbooks, learning materials), transport and extended_day (after-school care, занималня) the page says this fee includes (included true: "Таксата включва ... обяд и следобедна закуска", "The tuition fee covers ... food") or does not include (included false: "В таксата не са включени: транспорт", "Food is billed separately"), with the page line that says so as evidence, copied character for character. Only what the page says for this fee, or for all of the school's fees; leave out a service the page does not mention.
+- services, for a tuition entry only: each of food, materials (textbooks, learning materials), transport and extended_day (after-school care, занималня) the page says this fee includes (included true: "Таксата включва ... обяд и следобедна закуска", "The tuition fee covers ... food") or does not include (included false: "В таксата не са включени: транспорт", "Food is billed separately"), with the page line that says so as evidence, copied character for character; when that line is an item of a list, the list's heading line ("В таксата не са включени:") too, on a line of its own. Only what the page says for this fee, or for all of the school's fees; leave out a service the page does not mention.
 - plan_name_en and age_group_en: the same words in plain English, as a parent would read them on the English page ("Half day", "Paid for 6 months at once", "Ages 3 to 6"), adding nothing the Bulgarian does not say; null when the Bulgarian field is null. A fee for the teaching itself ("Обучение", "Такса обучение") is "Tuition", never "Training"."""
 
 
@@ -526,7 +526,7 @@ def check_fee(fee: AgentFee, page_text: str) -> CheckedFee:
             held.append("held: range ends are not joined by a range marker in the evidence")
 
     options, option_checks = _checked_options(fee, "\n".join(lines))
-    services, service_checks = _checked_services(fee, page, page_text)
+    services, service_checks = _checked_services(fee, page_text)
     confidence = HELD_CONFIDENCE if held else PUBLISH_CONFIDENCE
     update = {"period": period, "payment_options": options, "services": services}
     return CheckedFee(fee.model_copy(update=update), confidence, True, checks + option_checks + service_checks + held)
@@ -534,38 +534,70 @@ def check_fee(fee: AgentFee, page_text: str) -> CheckedFee:
 
 # A service's own words, so an evidence line about something else proves nothing.
 _SERVICE_WORDS = {
-    "food": re.compile(r"(?<!\w)(?:храна|хранене|обяд|закуск|кетъринг|food|meal|lunch|snack|catering)", re.IGNORECASE),
-    "materials": re.compile(r"(?<!\w)(?:учебни(?:к|ц)|учебни материали|помагал|материал|тетрадк|textbook|book|material)", re.IGNORECASE),
+    "food": re.compile(r"(?<!\w)(?:храна|хранене|хранителен|обяд|закуск|кетъринг|food|meals?(?!\w)|lunch|snacks?(?!\w)|catering)", re.IGNORECASE),
+    "materials": re.compile(
+        r"(?<!\w)(?:учебни(?:к|ц)|учебни материали|учебни помагала|помагал|тетрадк|textbooks?(?!\w)|books(?!\w)"
+        r"|(?:learning|teaching|educational|school|study) materials)",
+        re.IGNORECASE,
+    ),
     "transport": re.compile(r"(?<!\w)(?:транспорт|автобус|transport|bus)(?!\w)", re.IGNORECASE),
-    "extended_day": re.compile(r"(?<!\w)(?:занимал|удължен|целодневн|extended|after[- ]school)", re.IGNORECASE),
+    "extended_day": re.compile(r"(?<!\w)(?:занимал|удължен|extended day|after[- ]school)", re.IGNORECASE),
 }
+# Whether a clause says the fee holds the service, or leaves it out (billed apart).
+_INCLUDED_RE = re.compile(r"включ|в т\.\s?ч\.|покрива|includ|covers?(?!\w)", re.IGNORECASE)
+_NOT_INCLUDED_RE = re.compile(
+    r"не (?:е|са|се) включен|не включва|не покрива|без (?!допълнително)|отделно|допълнително|заплаща се|"
+    r"not included|not including|exclud|does not (?:include|cover)|doesn't (?:include|cover)|separately|extra(?!\w)|on top",
+    re.IGNORECASE,
+)
+# "без допълнително заплащане": at no extra cost, so in the fee.
+_FREE_RE = re.compile(
+    r"без (?:допълнително |друго )?(?:заплащане|доплащане)|at no (?:extra|additional) (?:cost|charge)|free of charge|no extra charge",
+    re.IGNORECASE,
+)
+# Clauses, as the yearly cost table reads notes: "включва учебници, но не включва храна".
+_CLAUSE_RE = re.compile(r"(?<=[.;!?])\s+|,?\s(?:но|а|but|while|whereas)\s")
 
 
-def _checked_services(fee: AgentFee, page: str, page_text: str) -> tuple[list[FeeService], list[str]]:
-    """The services kept: a tuition fee's, each with an evidence line on the page that names
-    the service. One said both ways is dropped."""
+def _says(service: str, included: bool, text: str) -> bool:
+    """A clause of the evidence names the service and says it is in the fee, or not."""
+    for clause in _CLAUSE_RE.split(text):
+        if not _SERVICE_WORDS[service].search(clause):
+            continue
+        free = bool(_FREE_RE.search(clause))
+        negative = not free and bool(_NOT_INCLUDED_RE.search(clause))
+        if negative != included and (negative or free or _INCLUDED_RE.search(clause)):
+            return True
+    return False
+
+
+def _checked_services(fee: AgentFee, page_text: str) -> tuple[list[FeeService], list[str]]:
+    """The services kept: a tuition fee's, each with evidence whose lines are each within one
+    page line, and which names the service and says whether the fee holds it. A list's item
+    and its heading ("Таксата не включва:" / "Хранителен пакет") are read as one. One said
+    both ways is dropped."""
     if not fee.services:
         return [], []
     if fee.category is not PriceCategory.TUITION:
         return [], [f"services dropped: not tuition ({fee.category.value})"]
-    page_lines = [_normalized(text) for text in page_text.splitlines() if text.strip()]
-    kept: list[FeeService] = []
+    page_lines = [_tight(_normalized(text)) for text in page_text.splitlines() if text.strip()]
+    kept: dict[str, FeeService] = {}
     checks: list[str] = []
+    said = {True: set(), False: set()}
     for item in fee.services:
-        line = _normalized(item.evidence)
-        if not line or not (line in page or _line_on_page(line, page, page_lines)):
+        lines = [_tight(_normalized(line)) for line in item.evidence.splitlines() if line.strip()]
+        if not lines or not all(any(line in text for text in page_lines) for line in lines):
             checks.append(f"service {item.service} dropped: evidence line is not on the page")
-        elif not _SERVICE_WORDS[item.service].search(line):
-            checks.append(f"service {item.service} dropped: evidence line does not name it")
+        elif not _says(item.service, item.included, " ".join(lines)):
+            state = "included" if item.included else "not included"
+            checks.append(f"service {item.service} dropped: evidence does not say it is {state}")
         else:
-            kept.append(item)
-    both = {item.service for item in kept if item.included} & {item.service for item in kept if not item.included}
+            said[item.included].add(item.service)
+            kept.setdefault(item.service, item)  # the first proof of a service quoted twice
+    both = said[True] & said[False]
     for service in sorted(both):
         checks.append(f"service {service} dropped: said to be both included and not")
-    kept = [item for item in kept if item.service not in both]
-    # One entry per service: the same line quoted twice.
-    unique = {item.service: item for item in kept}
-    return list(unique.values()), checks
+    return [item for service, item in kept.items() if service not in both], checks
 
 
 def names_deposit(fee: AgentFee) -> bool:

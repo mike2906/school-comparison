@@ -751,6 +751,9 @@ def _build_rows(
             continue
         taken.add((key, label))
         fee = result.fee
+        # What the fee includes may be said on another page that lists it (a fee page and an
+        # admissions page): the first that says it.
+        services = fee.services or next((r.fee.services for r, _, f, _, _ in built if tuple(f.values()) == key and r.fee.services), [])
         rows.append(
             Pricing(
                 school_id=school.id,
@@ -772,11 +775,11 @@ def _build_rows(
                     # extended_day), for the yearly cost table; the lines prove it.
                     **(
                         {
-                            "includes": [item.service for item in fee.services if item.included],
-                            "excludes": [item.service for item in fee.services if not item.included],
-                            "services_evidence": {item.service: item.evidence for item in fee.services},
+                            "includes": [item.service for item in services if item.included],
+                            "excludes": [item.service for item in services if not item.included],
+                            "services_evidence": {item.service: item.evidence for item in services},
                         }
-                        if fee.services
+                        if services
                         else {}
                     ),
                     # A deposit is listed apart from the fees: it is returned or taken off a later one.
