@@ -10,6 +10,7 @@
  * A failed flow leaves a screenshot in LIVE_OUT (default live-flows-report/).
  */
 import { mkdir, readFile } from 'node:fs/promises'
+import { setTimeout as sleep } from 'node:timers/promises'
 import path from 'node:path'
 import { after, afterEach, before, beforeEach } from 'node:test'
 import { chromium } from 'playwright'
@@ -39,21 +40,24 @@ export { getAddress as address, getSchoolName as schoolName } from '../../src/ut
 /**
  * A live API answer, asked up to three times. A request through the edge can stall for a
  * minute while the next one takes a second (Cloudflare's Ashburn trouble on 28 Oct 2026
- * failed every PR's coverage check that way), so each try gets 20 s and a fresh request.
- * An HTTP answer is returned as it is, errors included: only a stall or a dropped
- * connection is tried again, and after the last try the error says it was the network.
+ * failed every PR's coverage check that way), so each try gets 30 s and a fresh request.
+ * A stall, a dropped connection or a 5xx (the edge's own 52x included) is tried again;
+ * any other answer is returned as it is.
  */
 export async function fetchLive(url, tries = 3) {
   for (let attempt = 1; ; attempt += 1) {
     try {
       // The body is read here too, so a stall half-way through counts as a stall.
-      const response = await fetch(url, { signal: AbortSignal.timeout(20_000) })
+      const response = await fetch(url, { signal: AbortSignal.timeout(30_000) })
       const body = await response.text()
-      return { ok: response.ok, status: response.status, json: () => JSON.parse(body) }
+      const answer = { ok: response.ok, status: response.status, json: () => JSON.parse(body) }
+      if (response.status < 500 || attempt >= tries) return answer
     } catch (error) {
-      if (attempt >= tries) throw new Error(`The live API did not answer ${url} in ${tries} tries (${error.message}): the network, not the site`)
-      await new Promise(resolve => setTimeout(resolve, 2_000 * attempt))
+      if (attempt >= tries) {
+        throw new Error(`The live API did not answer ${url} in ${tries} tries of 30 s (${error.message}): a network stall or a very slow API`, { cause: error })
+      }
     }
+    await sleep(2_000 * attempt)
   }
 }
 
