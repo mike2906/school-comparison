@@ -1503,5 +1503,40 @@
         "materials": "materials"
       }
     }
+  },
+  "outdoor": {
+    "title": "Outdoor space",
+    "kinds": {
+      "grounds": "Its own grounds, mapped round the building.",
+      "other_building": "In another school's building (see the address). Whether there is a yard to use is not known.",
+      "floor": "On a floor of a larger building (see the address). Whether there is a yard to use is not known.",
+      "none": "No outdoor space at this building.",
+      "unknown": "Not known."
+    },
+    "sharedWith": "In the grounds of",
+    "sharedUseUnknown": "Whether the pupils use them is not known.",
+    "websiteSays": "The school's website says:",
+    "onTheMap": "On the map:",
+    "openGround": "about {{area}} m² of open ground",
+    "pitches_one": "{{count}} sports pitch",
+    "pitches_other": "{{count}} sports pitches",
+    "playgrounds_one": "{{count}} playground",
+    "playgrounds_other": "{{count}} playgrounds",
+    "sources": {
+      "visit": "Checked on a visit on {{date}}.",
+      "osm": "From the school plot on OpenStreetMap.",
+      "address": "From the address in the ministry register."
+    },
+    "osmCredit": "Map data:",
+    "sendPhoto": "Know this school? Send us a photo of its outdoor space.",
+    "photoSubject": "Outdoor space photo: {{name}}",
+    "compare": {
+      "grounds": "Outdoor space at the building",
+      "shared": "Another school's grounds",
+      "other_building": "Shared building, yard not known",
+      "floor": "Shared building, yard not known",
+      "none": "None",
+      "unknown": "Not known"
+    }
   }
 }

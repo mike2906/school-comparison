@@ -976,6 +976,34 @@ def osm_check_command(city, country, report_path, issue_path):
         console.print(f"Report: {report_path}")
 
 
+@cli.command("outdoor-grounds")
+@click.option("--city", default="sofia", show_default=True, help="City (only Sofia has bounds yet)")
+@click.option("--country", default="bg", show_default=True, help="Country code")
+@click.option("--apply", "apply_changes", is_flag=True, help="Store the plots found (default writes nothing)")
+@click.option("--out", "report_path", type=click.Path(dir_okay=False, path_type=Path), help="Write the JSON report")
+def outdoor_grounds_command(city, country, apply_changes, report_path):
+    """Store the OpenStreetMap school plot round each pinned building (no model calls)."""
+    import json
+
+    from app.database import async_session_maker
+    from app.scrapers.stages import outdoor_grounds
+
+    async def _run():
+        elements = await outdoor_grounds.read_osm(country, city)
+        async with async_session_maker() as db:
+            return await outdoor_grounds.run_outdoor_grounds(db, elements, country=country, city=city, apply=apply_changes)
+
+    report = asyncio.run(_run())
+    mode = "Applied" if apply_changes else "Dry run"
+    console.print(
+        f"{mode}: {report['plots']} OSM plots, locations {report['locations']}, {report['changed']} schools changed"
+    )
+    if report_path is not None:
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        report_path.write_text(json.dumps(report, ensure_ascii=False, indent=1, default=str), encoding="utf-8")
+        console.print(f"Report: {report_path}")
+
+
 @cli.command("check-website")
 @click.option("--school-id", type=int, required=True, help="School ID")
 @click.option("--url", required=True, help="The site to check, e.g. one search does not find")

@@ -54,6 +54,7 @@ import {
   stateAdmissionHint,
 } from './compareHelpers.js'
 import { InlineSource } from './CompareRows'
+import { outdoorEntries } from '../../utils/outdoorSpace'
 
 
 // The comparison table's rows, grouped into sections. Each row renders a cell per
@@ -453,6 +454,23 @@ export function buildCompareSections({
           return items.length > 0 ? makeTags(items) : renderPlaceholder()
         },
         getCompare: (school) => school.attributes?.facilities || [],
+      },
+      {
+        label: t('outdoor.title'),
+        getValue: (school) => {
+          const entries = outdoorEntries(school, language)
+          if (entries.length === 0) return renderPlaceholder()
+          return (
+            <div className="space-y-1">
+              {entries.map(entry => (
+                <div key={entry.locationId} className="text-sm text-neutral-700">
+                  {t(`outdoor.compare.${entry.kind}`)}
+                </div>
+              ))}
+            </div>
+          )
+        },
+        getCompare: (school) => outdoorEntries(school, language).map(entry => entry.kind).join(','),
       },
       {
         label: t('compare.labels.accessibility'),

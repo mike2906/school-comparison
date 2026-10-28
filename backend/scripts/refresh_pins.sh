@@ -19,7 +19,8 @@
 # opens the issue "Website town check stopped" (the pins go ahead either way). It also sets
 # grade bands by what a school's own published site data says it teaches (site-grades,
 # free); more than SITE_GRADES_MAX (10) changes at once applies none and opens the issue
-# "Grade band check stopped". A stopped run is retried a day later, a failed publish the next hour. Log and reports:
+# "Grade band check stopped". It also stores the OpenStreetMap school plot round each pin for
+# the "Outdoor space" line (outdoor-grounds, free; a failure is logged only). A stopped run is retried a day later, a failed publish the next hour. Log and reports:
 # $state/refresh_pins.log, $state/pins-*.json (kept a month); a pg_dump before each
 # apply (the last 4 kept) in $backups.
 set -euo pipefail
@@ -139,6 +140,14 @@ if [ -n "$force" ] || [ ! -f "$state/pins_unpublished" ]; then
 			grades=0
 		fi
 	fi
+	# OSM school plots round the pins (docs/OUTDOOR_SPACE.md): never holds the pins back.
+	dry_outdoor="$state/pins-outdoor-dry-$stamp.json"
+	outdoor=0
+	if ! cli outdoor-grounds --city "$city" --out "$dry_outdoor"; then
+		log "outdoor-grounds dry run failed"
+	else
+		outdoor="$(report "$dry_outdoor" 'r["changed"]')"
+	fi
 	# A run cut short, without OSM, or with many errors is not a good run: retry tomorrow.
 	healthy() { report "$1" '(r.get("stopped") or r.get("osm_unavailable") or "") or (r["outcomes"].get("error", 0) * 10 > max(r["locations"], 1) and "too many errors") or ""'; }
 	problem="$(healthy "$dry_web")$(healthy "$dry_agent")"
@@ -149,7 +158,7 @@ if [ -n "$force" ] || [ ! -f "$state/pins_unpublished" ]; then
 	[ "$website" -le "$max_placed" ] && [ "$agent" -le "$max_placed" ] ||
 		stop "the dry run would place $website (website) and $agent (agent) locations, over $max_placed; check $dry_web and $dry_agent"
 
-	if [ $((website + agent + towns + grades)) -gt 0 ]; then
+	if [ $((website + agent + towns + grades + outdoor)) -gt 0 ]; then
 		backup="$backups/$database-pre-pins-$stamp.dump"
 		if ! docker exec "$container" pg_dump -U postgres -d "$database" --format=custom > "$backup" || ! [ -s "$backup" ]; then
 			rm -f "$backup"
@@ -183,6 +192,14 @@ if [ -n "$force" ] || [ ! -f "$state/pins_unpublished" ]; then
 				log "site-grades: changed the grade bands of $(report "$grades_out" 'len(r["changes"])') of the $grades schools the dry run found ($dry_grades)"
 			else
 				log "site-grades apply failed"
+			fi
+		fi
+		if [ "$outdoor" != 0 ]; then
+			outdoor_out="$state/pins-outdoor-$stamp.json"
+			if cli outdoor-grounds --city "$city" --apply --out "$outdoor_out"; then
+				log "outdoor-grounds: changed the plots of $(report "$outdoor_out" 'r["changed"]') schools"
+			else
+				log "outdoor-grounds apply failed"
 			fi
 		fi
 		# The apply re-runs the model on the same schools; it must not place more than the cap.
