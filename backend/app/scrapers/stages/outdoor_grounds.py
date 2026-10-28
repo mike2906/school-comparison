@@ -173,9 +173,14 @@ def _rings(element: dict, inner: bool = False) -> list[list[tuple[float, float]]
 
 
 def _name_tokens(*names: Optional[str]) -> set[str]:
+    """Distinctive words of the names: not generic words, and not a capitalised Cyrillic
+    abbreviation ("ГИЧЕ", "НПГПТО"), which our own names spell out."""
     tokens = set()
     for name in names:
-        latin = transliterate_bulgarian(str(name or "")).casefold()
+        words = re.findall(r"\w+", str(name or ""))
+        if any(w != w.upper() for w in words):  # a name written all in capitals keeps its words
+            words = [w for w in words if not re.fullmatch(r"[А-Я]{2,}", w)]
+        latin = transliterate_bulgarian(" ".join(words)).casefold()
         for word in re.findall(r"[a-z0-9]{4,}", latin):
             if word not in _GENERIC and transliterate_bulgarian(word).casefold() not in _GENERIC:
                 tokens.add(word)
@@ -204,11 +209,12 @@ class Plot:
         xy = _xy(lat, lng, self.lat0)
         return 0.0 if self.contains(xy) else min(_edge_distance(xy, ring) for ring in self.rings + self.holes)
 
-    def named_for(self, tokens: set[str], numbers: set[str]) -> bool:
-        """A plot with no MoE code is a school's when every distinctive word of its name is
-        in the school's name and no school number differs ("Христо Ботев" is not "Христо
-        Смирненски", "ДГ №79" is not "ДГ №97")."""
-        if self.codes or not self.tokens or not self.tokens <= tokens:
+    def named_for(self, tokens: set[str], numbers: set[str], known_codes: frozenset = frozenset()) -> bool:
+        """A plot is a school's by name when every distinctive word of its name is in the
+        school's name and no school number differs ("Христо Ботев" is not "Христо
+        Смирненски", "ДГ №79" is not "ДГ №97"). Only for a plot with no MoE code, or with
+        codes none of our schools carry: municipal kindergartens have no code with us."""
+        if self.codes & known_codes or not self.tokens or not self.tokens <= tokens:
             return False
         return not (self.numbers and numbers and not self.numbers & numbers)
 
@@ -261,16 +267,27 @@ def plot_details(plot: Plot, buildings: Sequence[dict], play: Sequence[dict]) ->
 
 
 def match_location(
-    lat: float, lng: float, code: str, name_tokens: set[str], plots: Sequence[Plot], numbers: frozenset = frozenset()
+    lat: float,
+    lng: float,
+    code: str,
+    name_tokens: set[str],
+    plots: Sequence[Plot],
+    numbers: frozenset = frozenset(),
+    known_codes: frozenset = frozenset(),
 ) -> tuple[Optional[Plot], bool]:
     """The plot answering for a pin, and whether it is the school's own.
 
-    A plot with the school's code or (no code) name within ``NEAR_M`` is its own; failing
+    A plot with the school's code within ``NEAR_M`` is its own, and so is one named for it
+    whose codes (if any) are not among ``known_codes``, those of our schools; failing
     that, the smallest plot the pin is inside, which is another school's when it carries
     another code. A plot with no code and another name answers nothing."""
     near = [(plot, plot.distance(lat, lng)) for plot in plots]
     near = [(plot, d) for plot, d in near if d <= NEAR_M]
-    own = [(plot, d) for plot, d in near if (code and code in plot.codes) or plot.named_for(name_tokens, set(numbers))]
+    own = [
+        (plot, d)
+        for plot, d in near
+        if (code and code in plot.codes) or plot.named_for(name_tokens, set(numbers), known_codes)
+    ]
     if own:
         return min(own, key=lambda pd: (pd[1], pd[0].area))[0], True
     inside = [plot for plot, d in near if d == 0 and plot.codes]
@@ -293,7 +310,7 @@ async def read_osm(country: str = "bg", city: str = "sofia") -> list[dict]:
         "[out:json][timeout:300];"
         f'(way[amenity~"^(school|kindergarten)$"]{box};'
         f'relation[amenity~"^(school|kindergarten)$"][type=multipolygon]{box};)->.plots;'
-        ".plots out geom tags;"
+        ".plots out geom;"  # body verbosity: "tags" would leave out a relation's members
         ".plots map_to_area->.pa;"
         "way(area.pa)[building];out geom tags;"
         f'nwr(area.pa)[leisure~"^({"|".join(_PLAY)})$"];out center tags;'
@@ -334,6 +351,7 @@ async def run_outdoor_grounds(
         .all()
     )
     by_code = {code: school for school in schools if (code := (school.institutional_id or "").strip().lstrip("0"))}
+    known_codes = frozenset(by_code)
     names = {school.id: resolve_name_i18n(school.name_i18n, school.attributes) for school in schools}
     rows = (
         await db.execute(select(SchoolLocation).where(SchoolLocation.school_id.in_([s.id for s in schools])))
@@ -352,7 +370,7 @@ async def run_outdoor_grounds(
             if needs_pin(location):
                 counts["no_pin"] += 1
                 continue
-            plot, own = match_location(location.lat, location.lng, code, tokens, plots, numbers)
+            plot, own = match_location(location.lat, location.lng, code, tokens, plots, numbers, known_codes)
             entry: dict[str, Any] = {"lat": location.lat, "lng": location.lng}
             details = plot_details(plot, buildings, play) if plot is not None and own else {}
             if plot is not None and own and details["open_m2"] < MIN_OPEN_M2:
