@@ -2,8 +2,8 @@
  "meta": {
   "source": "kg.sofia.bg",
   "source_url": "https://kg.sofia.bg/spots",
-  "retrieved_at": "2026-10-30T18:47:17+00:00",
-  "as_of": "2026-10-30",
+  "retrieved_at": "2026-10-31T10:34:19+00:00",
+  "as_of": "2026-10-31",
   "school_years": [
    "2026/2027",
    "2027/2028"
@@ -19747,8 +19747,8 @@
      "queues": {
       "general": {
        "capacity": 106,
-       "enrolled": 98,
-       "free": 8,
+       "enrolled": 97,
+       "free": 9,
        "ranked_not_enrolled": 0
       },
       "chronic": {
