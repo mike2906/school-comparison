@@ -12,7 +12,7 @@ import { describe, test } from 'node:test'
 import { catchmentSchoolFor, catchmentUrl, displayPlaceName, indexAddresses, mapSearchQuery, schoolCatchmentIds, streetDisplayName } from '../../src/admission/catchments.js'
 import { CATCHMENT_CAMPAIGNS } from '../../src/admission/loadCatchments.js'
 import { usesSofiaKindergartenSystem } from '../../src/utils/admission.js'
-import { DESKTOP, allSchools, findSchool, number, open, page, schoolName, t, liveBrowser } from './live.js'
+import { DESKTOP, allSchools, findSchool, schoolDetail, number, open, page, schoolName, t, liveBrowser } from './live.js'
 import { planningYear } from '../../src/utils/ageSelection.js'
 
 liveBrowser(DESKTOP)
@@ -33,30 +33,67 @@ const answer = (question, option) =>
 const addressTable = async file =>
   JSON.parse(await readFile(new URL(`../../public${catchmentUrl(CATCHMENT_CAMPAIGNS[0], file)}`, import.meta.url)))
 
-/**
- * A Sofia street in one of these catchments with a plain house number, and a name no
- * other street has, so the suggestion to pick is clear. Read from the table the site
- * itself loads (public/ is served at the site root).
- */
-// An ordinary street in catchment `ids` with a plain house number there. With `accept`, the
-// first of up to `maxTries` such addresses it accepts, or null when it accepts none.
-async function addressIn(ids, accept = null, maxTries = 8) {
-  const streets = indexAddresses(await addressTable('addresses.json'))
-  const districtNames = new Map((await addressTable('districts.json')).features.map(f => [f.properties.code, f.properties.name]))
-  const sameName = new Map()
-  for (const street of streets) sameName.set(street.key, (sameName.get(street.key) || 0) + 1)
+// The published address table, read once: the same file the site itself loads (public/
+// is served at the site root).
+let addressIndex
+function addressesByStreet() {
+  addressIndex ??= (async () => {
+    const streets = indexAddresses(await addressTable('addresses.json'))
+    const districtNames = new Map((await addressTable('districts.json')).features.map(f => [f.properties.code, f.properties.name]))
+    const sameName = new Map()
+    for (const street of streets) sameName.set(street.key, (sameName.get(street.key) || 0) + 1)
+    // Each catchment's first ordinary address, and every catchment that has any address.
+    const firstByCatchment = new Map()
+    const withAddresses = new Set()
+    for (const street of streets) {
+      for (const id of street.numbers.values()) withAddresses.add(id)
+      if (!isOrdinary(street, sameName)) continue
+      for (const [number, id] of street.numbers) {
+        if (/^\d+$/.test(number) && !firstByCatchment.has(id)) firstByCatchment.set(id, { street, number, district: districtNames.get(street.district) })
+      }
+    }
+    return { streets, districtNames, sameName, firstByCatchment, withAddresses }
+  })()
+  return addressIndex
+}
+
+// An ordinary street: УЛ. in the city with a name no other street has, typed without its
+// prefix as a parent would, so the suggestion to pick is clear. A village school's catchment
+// (152 ОУ, с. Мърчаево) has none.
+const isOrdinary = (street, sameName) =>
+  street.settlement === 'ГР.СОФИЯ' && /^УЛ\./.test(street.street) && street.key.length > 4 && sameName.get(street.key) === 1
+
+// The first of up to `maxTries` ordinary addresses (plain house number) in catchment `ids`
+// that `accept` takes, or null.
+async function addressIn(ids, accept, maxTries = 8) {
+  const { streets, districtNames, sameName } = await addressesByStreet()
   let tried = 0
   for (const street of streets) {
-    // An ordinary street (УЛ.), typed without its prefix as a parent would.
-    if (street.settlement !== 'ГР.СОФИЯ' || !/^УЛ\./.test(street.street) || street.key.length <= 4 || sameName.get(street.key) > 1) continue
+    if (!isOrdinary(street, sameName)) continue
     const number = [...street.numbers.entries()].find(([n, id]) => ids.includes(id) && /^\d+$/.test(n))?.[0]
     if (!number) continue
-    assert.ok(ids.includes(catchmentSchoolFor(street, number)))
-    if (!accept || await accept(street, number)) return { street, number, district: districtNames.get(street.district) }
+    assert.ok(ids.includes(catchmentSchoolFor(street, number)), `the address lookup puts ${street.street} ${number} in catchment ${ids.join(', ')}`)
+    if (await accept(street, number)) return { street, number, district: districtNames.get(street.district) }
     if (++tried >= maxTries) return null
   }
-  if (accept) return null
-  assert.fail(`an address in catchment ${ids.join(', ')}`)
+  return null
+}
+
+// The first listed school whose first-grade catchment has an ordinary street, and that address.
+async function schoolWithAddress() {
+  const { firstByCatchment, withAddresses } = await addressesByStreet()
+  const listing = await allSchools()
+  // Every catchment a school names must have addresses, even when none is an ordinary street:
+  // otherwise a parent there could never be told they are inside it.
+  const missing = [...new Set(listing.flatMap(schoolCatchmentIds))].filter(id => !withAddresses.has(id))
+  assert.deepEqual(missing, [], 'catchments with no address in the published table')
+  const row = listing.find(s => schoolCatchmentIds(s).some(id => firstByCatchment.has(id)))
+  assert.ok(row, 'no listed school has a first-grade catchment with an ordinary city street')
+  const school = await schoolDetail(row.id)
+  const address = firstByCatchment.get(schoolCatchmentIds(school).find(id => firstByCatchment.has(id)))
+  assert.ok(address, `school ${school.id}: its catchment has an ordinary street in the list but not in its own page`)
+  assert.ok(schoolCatchmentIds(school).includes(catchmentSchoolFor(address.street, address.number)), `school ${school.id}: the address lookup puts ${address.street.street} ${address.number} in its catchment`)
+  return { school, address }
 }
 
 // Whether OpenStreetMap finds the street the way the search page looks a saved address up
@@ -279,8 +316,7 @@ describe('admission from a school page', () => {
   })
 
   test('a first-grade catchment check names the right area for a real address', async () => {
-    const school = await findSchool('with a first-grade catchment', () => true, s => schoolCatchmentIds(s).length > 0)
-    const address = await addressIn(schoolCatchmentIds(school))
+    const { school, address } = await schoolWithAddress()
     await open('bg', `/schools/${school.id}`)
     const area = page.locator('section').filter({ has: page.getByRole('heading', { name: t('bg', 'admissionArea.catchmentTitle') }) })
     await area.locator('.leaflet-container').waitFor()
@@ -291,8 +327,7 @@ describe('admission from a school page', () => {
   })
 
   test('in English the address field shows street names in Latin letters', async () => {
-    const school = await findSchool('with a first-grade catchment', () => true, s => schoolCatchmentIds(s).length > 0)
-    const address = await addressIn(schoolCatchmentIds(school))
+    const { school, address } = await schoolWithAddress()
     await open('en', `/schools/${school.id}`)
     const area = page.locator('section').filter({ has: page.getByRole('heading', { name: t('en', 'admissionArea.catchmentTitle') }) })
     await typeAddress(area, address, 'en')

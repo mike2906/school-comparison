@@ -161,14 +161,17 @@ async def _build_list_body(db: AsyncSession, **filters) -> bytes:
         kindergartens = await SchoolService(db).list_schools_filtered(**{**filters, "education_level": "kindergarten"})
         # The pin the school shares must be the one with the preschool groups, not
         # another branch of the kindergarten.
-        schools = list(schools) + [
-            kindergarten for kindergarten in kindergartens
-            if any(
-                level_family(other["education_level"]) == "school"
-                and other["location_id"] in _preschool_location_ids(kindergarten)
-                for other in same_place.get(kindergarten.id, [])
-            )
-        ]
+        schools = sorted(
+            list(schools) + [
+                kindergarten for kindergarten in kindergartens
+                if any(
+                    level_family(other["education_level"]) == "school"
+                    and other["location_id"] in _preschool_location_ids(kindergarten)
+                    for other in same_place.get(kindergarten.id, [])
+                )
+            ],
+            key=lambda school: school.id,  # the same id order as every other list
+        )
     for school in schools:
         school.same_place = same_place.get(school.id, [])
     # Seconds of CPU: run it in a thread so other requests are still answered meanwhile.
