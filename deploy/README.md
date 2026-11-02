@@ -22,9 +22,9 @@ alias dc='docker compose --env-file deploy/.env --env-file deploy/release.env -f
 ## Host setup (once)
 
 The host is an OVH VPS (Ubuntu 26.04) reached as `ubuntu@<ip>` with your SSH key.
-`bootstrap.sh` installs Docker, limits SSH to keys and the `ubuntu` user, enables
-unattended security updates for Ubuntu and Docker (rebooting at 02:30 server time when an
-update needs it), adds a weekly refresh of the Caddy and Postgres images
+`bootstrap.sh` installs Docker, limits SSH to keys and the `ubuntu` user (no X11 forwarding), enables
+unattended security updates for Ubuntu and Docker (installed at 02:00 server time, with a
+reboot at 02:30 when an update needs it), adds a weekly refresh of the Caddy and Postgres images
 (`schooldecider-image-refresh.timer`, Sunday 03:30) and installs the firewall service. It
 is safe to run again, and is how changes to these settings reach the host: CD does not
 touch them.
