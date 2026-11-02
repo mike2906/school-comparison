@@ -1,11 +1,13 @@
-"""Find-websites stage: search for the website of a private school that has none.
+"""Find-websites stage: search for the website of a school that has none.
 
 The register import brings a school in with the register's website, and for a private
 school that is usually blank. Nothing searched for one afterwards: the monthly import
 runs no website stage, and a school discovery once marked ``no_official_website`` never
 entered a batch again. On 2026-10-23, 33 of the 174 private institutions had no site,
 19 of them with one a search finds (534 Веда's wedaschule.com, 553's janbibijan.com), so
-the fee and facts readers never ran for them.
+the fee and facts readers never ran for them. State schools and municipal kindergartens
+joined on 2026-11-02: 198 of 228 kindergartens and 37 of 251 state schools showed no site,
+because the one website search for kindergartens covered only the first 32 numbers.
 
 Each school is searched (website discovery, SearXNG: free) and its best candidates go
 through URL validation without the model fallback, so a run costs nothing: an ambiguous
@@ -19,6 +21,14 @@ a search for 150 ЧПГ по програмиране и роботика "Ст�
 valid. A run with nobody watching it also needs the school's own name, a part of its
 register name in quotes ("Стив Джобс"), on the page (:func:`brand_named`); a name with
 no quoted part is not checked.
+
+A state school's or kindergarten's site is held to more (:func:`state_site_problem`):
+its candidates are tried at their home page, so a directory's page about the school
+(obrazovatelen-register.bg/dg-13-kalinka-sofiya/) or the district's list of its
+kindergartens never counts, and that home page must name the school's own number with
+its kind ("ДГ №136", not 136 СУ) and one of the words of its own name ("Славия").
+Municipal kindergartens come from kg.sofia.bg with no ministry code to check against,
+and many share a number with a school or a nursery, so a wrong site is the main risk.
 
 A stored site's fees and facts come with the next scheduled reads (monthly fees, the
 twice-yearly facts) or a thread's run for the schools found.
@@ -37,6 +47,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.models import School
+from app.scrapers.school_tokens import extract_school_name_tokens
+from app.scrapers.site_city import numbered_schools_in
 from app.utils.transliteration import transliterate_bulgarian
 
 logger = logging.getLogger(__name__)
@@ -76,6 +88,96 @@ def brand_named(name: Optional[str], page_text: str) -> bool:
     return False
 
 
+# A title's kind: a kindergarten's ("ДГ №59", "ОДЗ 29", "Детска градина 18"), a nursery's
+# ("СДЯ №69", "Детска ясла 69": Sofia numbers its nurseries apart, so СДЯ №69 is not
+# ДГ №69 Жар птица) or a school's ("74 Средно Училище", "119 СУ", "Шесто Основно Училище").
+_KIND_RES = {
+    "kindergarten": re.compile(r"(?<![^\W\d_])(?:ц?дг|одз)(?![^\W\d_])|градин|(?<![a-z])(?:dg|cdg|odz)(?![a-z])", re.IGNORECASE),
+    "nursery": re.compile(r"(?<![^\W\d_])с?дя(?![^\W\d_])|ясла|(?<![a-z])s?dya(?![a-z])", re.IGNORECASE),
+    "school": re.compile(
+        r"училищ|гимназ|лицей|(?<![^\W\d_])(?:оу|су|ну|соу|ег|пг|обу|ссу)(?![^\W\d_])|school|gymnas|lyce|(?<![a-z])(?:ou|su|sou|nu)(?![a-z])",
+        re.IGNORECASE,
+    ),
+}
+
+
+def state_kind(name: str, kindergarten: bool) -> str:
+    """"nursery" for a separate nursery (СДЯ), else "kindergarten" or "school"."""
+    if kindergarten and _KIND_RES["nursery"].search(name) and not _KIND_RES["kindergarten"].search(name):
+        return "nursery"
+    return "kindergarten" if kindergarten else "school"
+
+
+# What kg.sofia.bg adds after a name: "(с яслени групи)".
+_BRACKETS_RE = re.compile(r"\([^)]*\)")
+_NAME_FILLER = {"яслени", "групи", "сдя", "цдг", "одз", "ясла"}
+
+
+def _own_words(name: str) -> list[str]:
+    """The words of a state name besides its kind and number: "Славия" in ДГ №136 Славия."""
+    words = extract_school_name_tokens(_BRACKETS_RE.sub(" ", name), limit=12)
+    return [word for word in words if not word.isdigit() and word not in _NAME_FILLER and len(word) >= 3]
+
+
+def _whole_word(word: str, text: str) -> bool:
+    return bool(re.search(rf"(?<![^\W\d_]){re.escape(word)}(?![^\W\d_])", text))
+
+
+def _numbers_own_kind(text: str, own_numbers: set[str], kind: str) -> bool:
+    """True when the text has one of the numbers (as a number or an ordinal word) and a word
+    of the school's kind. A school's title may not name a kindergarten or nursery, nor a
+    kindergarten's a school; a kindergarten's may say "с яслени групи", a nursery's not
+    "детска градина"."""
+    from app.scrapers.site_city import _own_numbers
+
+    if not own_numbers & _own_numbers(text):
+        return False
+    has = {other: bool(pattern.search(text)) for other, pattern in _KIND_RES.items()}
+    if not has[kind]:
+        return False
+    if kind == "school":
+        return not (has["kindergarten"] or has["nursery"])
+    if kind == "nursery":
+        return not (has["kindergarten"] or has["school"])
+    return not has["school"]
+
+
+def state_site_problem(name: Optional[str], kindergarten: bool, html: str) -> Optional[str]:
+    """Why a state school's or kindergarten's home page is not its own, or None.
+
+    A numbered name needs the page's title, one of its first headings or its site name to
+    give that number with a word of the same kind ("Детска градина №136" for ДГ №136
+    Славия; "59 СУ" is no kindergarten's title, "СДЯ 69" no school's). The page must also
+    have one of the name's own words in either script ("Славия"). A name with no number
+    ("Национална финансово-стопанска гимназия") is left to URL validation's name checks,
+    and one with no own words ("ДГ №202") to its number."""
+    from bs4 import BeautifulSoup
+
+    from app.scrapers.site_city import _own_numbers, identity_texts
+
+    name = " ".join(_BRACKETS_RE.sub(" ", name or "").split())
+    soup = BeautifulSoup(html or "", "html.parser")
+    own_numbers = _own_numbers(name)
+    kind = state_kind(name, kindergarten)
+    if own_numbers and not any(_numbers_own_kind(text, own_numbers, kind) for text in identity_texts(soup)):
+        return f"The home page's title does not name {kind} {' or '.join(sorted(own_numbers))}"
+    words = _own_words(name)
+    if words:
+        text = soup.get_text(" ", strip=True).casefold()
+        spellings = {variant for word in words for variant in (word, transliterate_bulgarian(word).casefold())}
+        if not any(_whole_word(word, text) for word in spellings):
+            return f"The home page does not name {' or '.join(words)}"
+    return None
+
+
+def home_page(url: str) -> str:
+    """The site's home page: a candidate's host with no path."""
+    from urllib.parse import urlsplit
+
+    parts = urlsplit(url)
+    return f"{parts.scheme or 'https'}://{parts.netloc}/" if parts.netloc else url
+
+
 async def _page_text(url: str) -> str:
     import httpx
 
@@ -97,8 +199,11 @@ def _searched_recently(attributes: Any, now: datetime, retry_days: int) -> bool:
     return now - searched_at < timedelta(days=retry_days)
 
 
-async def _candidates(discoverer, school: School) -> list[str]:
-    """The school's best search candidates, best first (no writes)."""
+async def _candidates(discoverer, school: School, *, home_pages: bool = False) -> list[str]:
+    """The school's best search candidates, best first (no writes). With ``home_pages``,
+    each candidate's home page instead, one a site, none on a directory's site."""
+    from app.scrapers.url_validator import URLValidator
+
     name = (school.name_i18n or {}).get("bg") or (school.name_i18n or {}).get("en")
     aliases = discoverer._validation_aliases_for_school(school)
     hints = discoverer._discovery_hints_for_school(school)
@@ -113,6 +218,10 @@ async def _candidates(discoverer, school: School) -> list[str]:
         if not url:
             break
         seen.add(url)
+        if home_pages:
+            url = home_page(url)
+            if url in picked or URLValidator.directory_host(url):
+                continue
         picked.append(url)
     return picked
 
@@ -128,8 +237,8 @@ async def run_find_websites(
     apply: bool = False,
     now: Optional[datetime] = None,
 ) -> dict[str, Any]:
-    """Search for the sites of the schools with none (the given ids, or the private and
-    international schools in ``city``); returns the report."""
+    """Search for the sites of the schools with none (the given ids, or every school in
+    ``city``); returns the report."""
     from app.scrapers.stages.website import store_given_site
     from app.scrapers.url_validator import URLValidator, ValidationResult, extract_validation_aliases
     from app.scrapers.website_discovery import WebsiteDiscoverer
@@ -140,8 +249,6 @@ async def run_find_websites(
     )
     if school_ids:
         query = query.where(School.id.in_(list(school_ids)))
-    else:
-        query = query.where(School.school_type.in_(["private", "international"]))
     if city:
         query = query.where(func.lower(School.city) == city.lower())
     schools = (await db.execute(query.order_by(School.id))).scalars().all()
@@ -165,7 +272,8 @@ async def run_find_websites(
         name = (school.name_i18n or {}).get("bg") or (school.name_i18n or {}).get("en")
         result: dict[str, Any] = {"school_id": school_id, "name_bg": (school.name_i18n or {}).get("bg"), "tried": []}
         try:
-            candidates = await _candidates(discoverer, school)
+            state = school.school_type == "state"
+            candidates = await _candidates(discoverer, school, home_pages=state)
             validator = URLValidator(country_code=country, school_id=school_id, school_city=school.city)
             for url in candidates:
                 verdict, final_url, reason = await validator.validate_url(
@@ -175,8 +283,16 @@ async def run_find_websites(
                     school_aliases=extract_validation_aliases(school.attributes),
                 )
                 result["tried"].append({"url": url, "result": verdict.value, "reason": reason})
-                if verdict is ValidationResult.VALID and not brand_named(name, await _page_text(final_url or url)):
-                    result["tried"][-1].update(result="invalid", reason=f"The page does not name {' or '.join(brands(name))}")
+                if verdict is not ValidationResult.VALID:
+                    continue
+                page = await _page_text(final_url or url)
+                problem = (
+                    state_site_problem(name, school.education_level == "kindergarten", page)
+                    if state
+                    else None if brand_named(name, page) else f"The page does not name {' or '.join(brands(name))}"
+                )
+                if problem:
+                    result["tried"][-1].update(result="invalid", reason=problem)
                     continue
                 if verdict is ValidationResult.VALID:
                     result["found"] = final_url or url

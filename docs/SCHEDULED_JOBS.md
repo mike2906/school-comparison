@@ -75,11 +75,13 @@ before their pins, which then show "Not on the map yet" until the chain's publis
 ### Websites for schools without one
 
 The register import brings private schools in with the register's website, usually blank,
-and no website stage runs after it (33 of 174 private institutions had none on 2026-10-23).
+and no website stage runs after it (33 of 174 private institutions had none on 2026-10-23;
+198 of 228 municipal kindergartens and 37 of 251 state schools on 2026-11-02).
 So the fees job's first run of a month, after its backup, runs `find-websites --apply`:
-SearXNG search and URL validation without the model (free) for each private school with no
-site that was not searched in the last 90 days; a site validation accepts is stored and its
-fees are read in the same run. It counts as written, so the month publishes even when no fee
+SearXNG search and URL validation without the model (free) for each school with no
+site that was not searched in the last 90 days; a site validation accepts is stored and a
+private school's fees are read in the same run. A state school or kindergarten is held to
+its home page naming its number and kind and a word of its own name (`find_websites.py`). It counts as written, so the month publishes even when no fee
 changed. A failed search is logged and the fee read goes ahead. Facts for a site found come
 with the next facts cycle, or a thread's run.
 

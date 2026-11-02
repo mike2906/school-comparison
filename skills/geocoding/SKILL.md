@@ -144,7 +144,7 @@ run; `--apply` stores it only if valid, and the school starts clean: the withhol
 an earlier failed site left, which would hide its facts, goes with that site's pages and the
 old Stage 6 report). A school whose site spells its name otherwise (303 "Детски оазис" is
 Kinderoase) takes `--alias <name>` (repeatable): it counts in the name checks and is kept in
-`name_aliases` with the stored site. Private schools with no site are searched for by `find-websites`
+`name_aliases` with the stored site. Schools with no site are searched for by `find-websites`
 (below). A school whose accepted site is wrong (587, a
 kindergarten on its sibling school's drujba.org) takes `--replace --apply`: the old site's
 pages, site-copied addresses and extraction are dropped as in the shared-site check's
@@ -156,11 +156,18 @@ ahead either way. URL validation applies the same rules to new sites
 (`app/scrapers/site_city.py`).
 
 `find-websites` (free: SearXNG search, URL validation without the model) searches for the
-site of each private or international school with none and stores only one validation
-accepts, as `check-website` does; a school searched in the last 90 days waits. The register
-import brings private schools in without a site, so the monthly fees job runs it before its
-first read of the month (`docs/SCHEDULED_JOBS.md`). Dry run by default; `--school-id` searches
-named schools of any type.
+site of each school with none and stores only one validation accepts, as `check-website`
+does; a school searched in the last 90 days waits. A state school or municipal kindergarten
+(no ministry code to check a kindergarten against, and numbers shared with schools and
+nurseries) is tried only at a site's home page, which must name its number with its kind
+("Детска градина №136", not 136 СУ or СДЯ 136) and a word of its own name ("Славия").
+Directory and district sites (`URLValidator.DIRECTORY_HOSTS`, everything under sofia.bg)
+are never a school's site: URL validation fails one already stored and clears what it gave.
+Sites behind SuperHosting's JavaScript check ("SuperJS check", about 1 in 8 of the state
+sites we know) cannot be read without a browser, so search does not find them; give them
+with `check-website`. The register import brings private schools in without a site, so the
+monthly fees job runs it before its first read of the month (`docs/SCHEDULED_JOBS.md`). Dry
+run by default; `--school-id` searches named schools.
 
 It also runs `site-grades` (free, no model): a school's grade bands come from the register's
 school type, which guesses (treaty schools default to 8-12, private "СУ" licences run higher
