@@ -2310,7 +2310,8 @@ def test_a_service_needs_the_page_to_say_which_way():
 
     # The wrong way round, a word alone, the facilities for materials.
     assert kept(FeeService(service="transport", included=True, evidence=line_out)) == set()
-    assert kept(FeeService(service="food", included=True, evidence="обяд")) == set()
+    # A word quoted alone is read in its whole page line: here the line does say lunch is in it.
+    assert kept(FeeService(service="food", included=True, evidence="обяд")) == {("food", True)}
     assert kept(FeeService(service="materials", included=True, evidence="Таксата включва ползване на материалната база")) == set()
     # A list's item under its heading; at no extra cost is included.
     assert kept(FeeService(service="food", included=False, evidence="ГОДИШНАТА ТАКСА НЕ ВКЛЮЧВА:\nХранителен пакет")) == {("food", False)}
@@ -2366,3 +2367,23 @@ async def test_apply_stores_what_the_tuition_includes(db_session, pages, frozen_
     public = PricingContextResponse.model_validate(context).model_dump()
     assert public["excludes"] == ["food"] and "services_evidence" not in public
     assert "includes" not in rows[PriceCategory.REGISTRATION].pricing_context
+
+
+def test_a_service_is_read_in_its_whole_sentence_and_list():
+    tuition = fee(PriceCategory.TUITION, "Такса обучение за 2026/2027: 8900 евро на година", amount=8900)
+
+    def kept(page, *services):
+        result = check_fee(tuition.model_copy(update={"services": list(services)}), PAGE_SERVICES + page)
+        return {(item.service, item.included) for item in result.fee.services}
+
+    # 171: a list split by semicolons under its "НЕ включва" heading.
+    roerich = "Таксата за обучение НЕ включва следните допълнителни дейности и услуги : • училищна униформа; • транспорт; • храна;\n"
+    assert kept(roerich, FeeService(service="food", included=False, evidence="• храна;")) == {("food", False)}
+    # 593: one sentence of a longer line.
+    izzi = "Tuition Fee, payable in equal monthly installments of 900 EURO The tuition fee covers all educational resources, food and water, accident insurance.\n"
+    assert kept(izzi, FeeService(service="food", included=True, evidence="The tuition fee covers all educational resources, food and water")) == {("food", True)}
+    # 568: "(вкл. плуване" does not end the sentence that says the fee includes the meals.
+    doris = "Годишната такса за целодневно обучение (I - VIІ клас) включва всички разходи, задължителна спортна дейност (вкл. плуване и хореография), ежедневно двукратно хранене, охрана и др.\n"
+    assert kept(doris, FeeService(service="food", included=True, evidence="ежедневно двукратно хранене")) == {("food", True)}
+    # A quote cut from a line that says the opposite is read with the rest of it.
+    assert kept("Таксата не включва обяд\n", FeeService(service="food", included=True, evidence="включва обяд")) == set()
