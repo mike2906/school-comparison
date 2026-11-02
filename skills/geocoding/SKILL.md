@@ -161,7 +161,7 @@ does; a school searched in the last 90 days waits. A state school or municipal k
 (no ministry code to check a kindergarten against, and numbers shared with schools and
 nurseries) is tried only at a site's home page, which must name its number with its kind
 ("Детска градина №136", not 136 СУ or СДЯ 136) and a word of its own name ("Славия").
-Directory and district sites (`URLValidator.DIRECTORY_HOSTS`, everything under sofia.bg)
+Directory and district sites (`website_discovery.directory_host`: `data/bg/directory_domains.json`, the built-in list and everything under sofia.bg)
 are never a school's site: URL validation fails one already stored and clears what it gave.
 Sites behind SuperHosting's JavaScript check ("SuperJS check", about 1 in 8 of the state
 sites we know) cannot be read without a browser, so search does not find them; give them

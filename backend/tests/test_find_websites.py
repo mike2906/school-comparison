@@ -7,7 +7,7 @@ from app.models import School
 from app.scrapers import url_validator
 from app.scrapers.stages import find_websites
 from app.scrapers.url_validator import URLValidator, ValidationResult
-from app.scrapers.website_discovery import WebsiteDiscoverer
+from app.scrapers.website_discovery import WebsiteDiscoverer, directory_host
 
 NOW = datetime(2026, 11, 1, 2, 20, tzinfo=timezone.utc)
 
@@ -165,6 +165,7 @@ async def test_a_state_kindergarten_needs_its_number_and_its_own_name_on_the_hom
         ("<title>59 СУ Васил Левски</title><p>Елхица</p>", "does not name kindergarten 59"),
         ("<title>Детска градина №58</title><p>Елхица</p>", "does not name kindergarten 59"),
         ("<title>Детска градина №59</title><p>Добре дошли</p>", "does not name елхица"),
+        ("<title>59 ДГ - подготовка за 59 СУ</title><p>Елхица</p>", "does not name kindergarten 59"),
     ):
         report, _, store = await _run(
             db_session, [(ValidationResult.VALID, "https://dg59.bg/", "match")], candidates=("https://dg59.bg/",), page=page
@@ -177,26 +178,40 @@ def test_state_site_problem_tells_kindergartens_nurseries_and_schools_apart():
     def page(title, body=""):
         return f"<title>{title}</title><body>{body}</body>"
 
-    problem = find_websites.state_site_problem
-    assert problem("ДГ №18 Детски свят (с яслени групи)", True, page("Начало - Детска градина 18 - Детски свят")) is None
-    assert problem('74 СУ "ГОЦЕ ДЕЛЧЕВ"', False, page("74 Средно Училище Гоце Делчев")) is None
-    assert problem('6 ОУ "Граф Игнатиев"', False, page('Шесто Основно Училище "Граф Н.П. Игнатиев"')) is None
-    assert problem("ДГ №202  (с яслени групи)", True, page("ДГ 202")) is None  # no own words: the number decides
-    assert problem("СДЯ №69", True, page("Детска ясла №69")) is None
+    def problem(name, level, html):
+        return find_websites.state_site_problem(name, find_websites.state_kind(name, level), html)
+
+    kg = "kindergarten"
+    assert problem("ДГ №18 Детски свят (с яслени групи)", kg, page("Начало - Детска градина 18 - Детски свят")) is None
+    assert problem('74 СУ "ГОЦЕ ДЕЛЧЕВ"', "upper_secondary", page("74 Средно Училище Гоце Делчев")) is None
+    assert problem('6 ОУ "Граф Игнатиев"', "lower_secondary", page('Шесто Основно Училище "Граф Н.П. Игнатиев"')) is None
+    assert problem('203 ПЕГ "Свети Методий"', "upper_secondary", page('Начало - 203. ПЕГ "Свети Методий"')) is None
+    assert problem("ДГ №202  (с яслени групи)", kg, page("ДГ 202")) is None  # no own words: the number decides
+    assert problem("СДЯ №69", kg, page("Детска ясла №69")) is None
+    assert problem("ДГ №59 Елхица", kg, page("ДГ 59 Елхица - подготовка за училище")) is None
     # Sofia numbers its nurseries apart: СДЯ №69 is not ДГ №69 Жар птица, nor the other way.
-    assert problem("СДЯ №69", True, page("Детска градина 69 Жар птица"))
-    assert problem("ДГ №69 Жар птица (с яслени групи)", True, page("СДЯ 69", "Жар птица"))
-    assert problem("ДГ №59 Елхица", True, page("59 СУ Васил Левски", "Елхица"))
-    assert problem('59 СУ "Васил Левски"', False, page("ДГ 59 Елхица", "Васил Левски"))
-    assert problem("ДГ №136 Славия", True, page("ДГ 136", "детска градина Slaviya")) is None  # either script
+    assert problem("СДЯ №69", kg, page("Детска градина 69 Жар птица"))
+    assert problem("СДЯ №69", "nursery", page("69 СУ"))
+    assert problem("ДГ №69 Жар птица (с яслени групи)", kg, page("СДЯ 69", "Жар птица"))
+    assert problem("ДГ №59 Елхица", kg, page("59 СУ Васил Левски", "Елхица"))
+    assert problem('59 СУ "Васил Левски"', "upper_secondary", page("ДГ 59 Елхица", "Васил Левски"))
+    assert problem("ДГ №136 Славия", kg, page("ДГ 136", "детска градина Slaviya")) is None  # either script
+    # Two own words, not one: "детски" is on every kindergarten's page.
+    assert problem("ДГ №18 Детски свят (с яслени групи)", kg, page("Детска градина 18", "Детски игри"))
 
 
 def test_directory_hosts_are_not_a_schools_site():
-    assert URLValidator.directory_host("https://www.obrazovanieto.bg/detski-gradini/12-sdq-bebelandiq/") == "obrazovanieto.bg"
-    assert URLValidator.directory_host("https://nadezhda.sofia.bg/obrazovanie") == "sofia.bg"
-    assert URLValidator.directory_host("https://kg.sofia.bg/") == "sofia.bg"
-    assert URLValidator.directory_host("https://www.ds-sofia.bg/") is None  # Deutsche Schule Sofia
-    assert URLValidator.directory_host("https://dg3sofia.com") is None
+    assert directory_host("https://www.obrazovanieto.bg/detski-gradini/12-sdq-bebelandiq/") == "obrazovanieto.bg"
+    assert directory_host("https://obrazovatelen-register.bg/dg-13-kalinka-sofiya/") == "obrazovatelen-register.bg"
+    assert directory_host("https://nadezhda.sofia.bg/obrazovanie") == "sofia.bg"
+    assert directory_host("https://kg.sofia.bg/") == "sofia.bg"
+    assert directory_host("https://www.ds-sofia.bg/") is None  # Deutsche Schule Sofia
+    assert directory_host("https://dg3sofia.com") is None
+
+
+def test_a_home_page_keeps_a_platform_tenant():
+    assert find_websites.home_page("https://dg-59.com/za-nas/ekip.html") == "https://dg-59.com/"
+    assert find_websites.home_page("https://sites.google.com/view/dg59elhitsa/home") == "https://sites.google.com/view/dg59elhitsa/"
 
 
 async def test_validation_fails_a_stored_directory_page_and_clears_what_it_gave():

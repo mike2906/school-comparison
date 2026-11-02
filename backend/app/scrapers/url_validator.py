@@ -101,18 +101,6 @@ class URLValidator:
         "linkedin.com",
         "youtube.com",
     ]
-    # Sites about many schools that pass a school's name checks on its own page there: a
-    # directory's entry (obrazovatelen-register.bg/dg-13-kalinka-sofiya/ was 116's site
-    # and its facts) or a district's list of its kindergartens (nadezhda.sofia.bg, every
-    # Sofia district and kg.sofia.bg are under sofia.bg). A host or any subdomain of it.
-    DIRECTORY_HOSTS = (
-        "obrazovatelen-register.bg",
-        "obrazovanieto.bg",
-        "registarnadetskitegradini.com",
-        "uchilishtata.bg",
-        "sofia.bg",
-        "sredec-sofia.org",
-    )
     BROWSER_MARKDOWN_NOISE_MARKERS = (
         "бисквит",
         "cookie",
@@ -333,7 +321,9 @@ class URLValidator:
         # Step 1: Check if domain is blocked
         if self._is_blocked_domain(normalized_url):
             return ValidationResult.INVALID, None, "Blocked domain (social media/forum)"
-        directory = self.directory_host(normalized_url)
+        from app.scrapers.website_discovery import directory_host
+
+        directory = directory_host(normalized_url)
         if directory:
             # Worded as a listing so the old site's data is cleared with it.
             return ValidationResult.INVALID, None, f"Directory-like listing signals: {directory} lists many schools"
@@ -701,12 +691,6 @@ class URLValidator:
                     return canonical
             return normalized_url
         return final_url or normalized_url
-
-    @classmethod
-    def directory_host(cls, url: str) -> Optional[str]:
-        """The directory host (:attr:`DIRECTORY_HOSTS`) a URL is on, or None."""
-        host = (urlparse(url).hostname or "").lower().removeprefix("www.")
-        return next((known for known in cls.DIRECTORY_HOSTS if host == known or host.endswith("." + known)), None)
 
     def _is_blocked_domain(self, url: str) -> bool:
         """
