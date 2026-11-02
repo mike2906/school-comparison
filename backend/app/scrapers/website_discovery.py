@@ -64,6 +64,23 @@ _NOISY_DIRECTORY_DOMAINS = (
     "dz-priem.plovdiv.bg",
     "wikipedia.org",
 ) + _load_country_directory_domains("bg")
+
+
+def directory_host(url: str) -> str | None:
+    """The directory or listing host a URL is on, or None: a directory's entry
+    (obrazovatelen-register.bg/dg-13-kalinka-sofiya/ was 116's site, with its facts) or a
+    district's list of its kindergartens (nadezhda.sofia.bg; every Sofia district and
+    kg.sofia.bg are under sofia.bg). Never an institution's own site. A numbered host on
+    sofia.bg (dg42.sofia.bg) would be a school's own, so it is not one."""
+    host = (urlparse(url).hostname or "").lower().removeprefix("www.")
+    if host == "sofia.bg" or (host.endswith(".sofia.bg") and not re.search(r"\d", host.removesuffix(".sofia.bg"))):
+        return "sofia.bg"
+    for domain in _NOISY_DIRECTORY_DOMAINS:
+        if host == domain or host.endswith(f".{domain}"):
+            return domain
+    return None
+
+
 _DOCUMENT_EXTENSIONS = (
     ".pdf",
     ".doc",
@@ -1589,10 +1606,7 @@ class WebsiteDiscoverer:
 
         path = (parsed.path or "").lower()
 
-        if host == "sofia.bg" or host.endswith(".sofia.bg"):
-            return True
-
-        if any(host == domain or host.endswith(f".{domain}") for domain in _NOISY_DIRECTORY_DOMAINS):
+        if directory_host(url):
             return True
 
         if any(path.endswith(ext) for ext in _DOCUMENT_EXTENSIONS):

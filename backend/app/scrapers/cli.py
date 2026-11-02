@@ -1049,7 +1049,7 @@ def check_website_command(school_id, url, country, apply_changes, replace, secti
 @click.option("--apply", "apply_changes", is_flag=True, help="Store the sites found (default is a dry run that writes nothing)")
 @click.option("--out", "report_path", type=click.Path(dir_okay=False, path_type=Path), help="Write the JSON report")
 def find_websites_command(school_ids, city, country, limit, retry_days, apply_changes, report_path):
-    """Search for the websites of private schools that have none; store only those validation accepts (free)."""
+    """Search for the websites of schools that have none; store only those validation accepts (free)."""
     import json
 
     from app.database import async_session_maker

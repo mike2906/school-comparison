@@ -7,8 +7,8 @@
 # a month, and publishes what it wrote with publish_snapshot.sh. A run the spend cap cut
 # short, or one that failed, carries on after its last school the next day, from what is
 # left of the month's budget. A stop opens one GitHub issue, "Scheduled fees re-read stopped".
-# Its first run of a month first searches for the websites of the private schools with none
-# (`find-websites --apply`, free), so a site found has its fees read in the same run.
+# Its first run of a month first searches for the websites of the schools with none
+# (`find-websites --apply`, free), so a private school's site found has its fees read in the same run.
 # Log, report and per-school lines: $state/fees.log, fees-<month>.json(.schools.jsonl).
 set -euo pipefail
 
