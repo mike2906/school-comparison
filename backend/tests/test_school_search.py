@@ -53,6 +53,9 @@ def _rank(query: str, name: str, *, addresses=()) -> int | None:
         ("1-st", "1"),
         # A saint after a number is not an ordinal ("19st").
         ("Kindergarten No. 19 St. Sofia", "kindergarten 19 st sofia"),
+        ("No.19-St. Sofia", "19 st sofia"),
+        ("No.19St.Sofia", "19 st sofia"),
+        ("2nd 11th 23rd", "2 11 23"),
         ("School No. 7", "school 7"),
         ('91.НЕМСКА ЕЗИКОВА ,,Проф."', "91 немска езикова проф"),
     ],

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { MATCH_RANK, filterByName, schoolMatchRank, schoolMatchesQuery, sortByNameMatch } from './schoolSearch.js'
+import { MATCH_RANK, filterByName, normalizeSearchText, schoolMatchRank, schoolMatchesQuery, sortByNameMatch } from './schoolSearch.js'
 
 const svetaSofia = {
   name_i18n: { bg: '"Частно основно училище Света София" ЕООД' },
@@ -22,6 +22,9 @@ test('a saint right after a number is still a saint, and "119th" is still 119', 
     assert.equal(schoolMatchesQuery(dg19, query), true, query)
   }
   assert.equal(schoolMatchesQuery({ name_i18n: { bg: '119 СУ „Академик Михаил Арнаудов“' } }, '119th'), true)
+  for (const [text, expected] of [['No.19-St. Sofia', '19 st sofia'], ['No.19St.Sofia', '19 st sofia'], ['2nd 11th 23rd', '2 11 23'], ['1-st', '1']]) {
+    assert.equal(normalizeSearchText(text), expected, text)
+  }
 })
 
 test('a saint word needs a saint in the name', () => {
