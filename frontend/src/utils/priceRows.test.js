@@ -225,7 +225,10 @@ test('priceTerms: "годишно плащане" beside a monthly fee is the ye
 
 test('rowAgeGroupKeys: English kindergarten, Pre-K and upper-school names (506, 581)', () => {
   const keys = (age_group, plan_name) => [...rowAgeGroupKeys({ age_group, plan_name })].sort()
-  assert.deepEqual(keys('Kindergarten – Grade 5', 'Total Fee for New Students'), ['grade_1_4', 'grade_5_7', 'preschool'])
+  // Kindergarten is the 5 year olds' year, so a third-group parent sees these fees too.
+  assert.deepEqual(keys('Kindergarten – Grade 5', 'Total Fee for New Students'), ['grade_1_4', 'grade_5_7', 'preschool', 'third'])
+  assert.deepEqual(keys('Kindergarten to Grade 5', null), ['grade_1_4', 'grade_5_7', 'preschool', 'third'])
+  assert.deepEqual(keys('Pre–K', null), ['first', 'second'])
   assert.deepEqual(keys('Pre-Kindergarten', 'Total Fee for New Students'), ['first', 'second'])
   assert.deepEqual(keys('Pre-K', null), ['first', 'second'])
   assert.deepEqual(keys('Grade 6 – Grade 8', null), ['grade_5_7', 'grade_8_12'])
@@ -234,6 +237,7 @@ test('rowAgeGroupKeys: English kindergarten, Pre-K and upper-school names (506, 
   // A kindergarten alone may be every group, so it names none.
   assert.deepEqual(keys('Kindergarten', null), [])
   assert.deepEqual(keys(null, 'Learning support Level 3'), [])
+  assert.deepEqual(keys(null, 'Support at a level 2 intensity'), [])
 })
 
 test('rowAgeGroupKeys: an English "preparatory group" is the preschool year (555)', () => {

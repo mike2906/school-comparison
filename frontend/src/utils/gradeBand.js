@@ -129,9 +129,10 @@ const STAGE_BANDS = [
 ]
 // "Предучилищен и от 1-ви до 7-ми клас" (630): preschool listed with grades.
 const PRESCHOOL_WITH_GRADES_RE = /(?<![\p{L}])предучилищ(?:ен|на|но)\s+и\s/u
-// An English kindergarten opening a range of grades is the year before grade 1: 506's
-// "Kindergarten – Grade 5". Not "Pre-Kindergarten", and not a kindergarten alone.
-const KINDERGARTEN_TO_GRADE_RE = /(?<![\p{L}-])(?:kindergarten|reception)\s*-\s*(?:grades?\s*)?\d/u
+// An English kindergarten opening a range of grades starts before grade 1: 506's
+// "Kindergarten – Grade 5" (priceRows.js adds the third group). Not "Pre-Kindergarten", and
+// not a kindergarten alone.
+const KINDERGARTEN_TO_GRADE_RE = /(?<![\p{L}-])kindergarten\s*(?:-|to|through)\s*(?:grades?\s*)?\d/u
 
 function stageBand(text) {
   let found = null
