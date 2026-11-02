@@ -73,18 +73,23 @@ export const LOOSE_SPELLINGS = [
 ]
 const LOOSE_RES = LOOSE_SPELLINGS.map(([pattern, repl]) => [new RegExp(pattern, 'g'), repl])
 
+const ordinalSuffix = n => ([11, 12, 13].includes(n % 100) ? 'th' : { 1: 'st', 2: 'nd', 3: 'rd' }[n % 10] || 'th')
+
 /** Lowercase, drop "№"/"No." and punctuation, split digits from letters, drop ordinals. */
 export function normalizeSearchText(text) {
   return String(text || '')
     .toLowerCase()
     .replace(/№/g, ' ')
     .replace(/(^|[^a-z])no\.(?=\s*\d)/g, '$1 ')
+    // "119th", "1-st", "2nd", before punctuation goes and only with the suffix English gives
+    // that number: "No. 19 St. Sofia" (or "19St.") keeps its saint.
+    .replace(/(\d+)-?(th|st|nd|rd)(?![\p{L}\p{N}])/gu, (whole, digits, suffix) => (suffix === ordinalSuffix(Number(digits)) ? digits : whole))
     .replace(/[^\p{L}\p{N}]+/gu, ' ')
     .replace(/(\d)(?=\p{L})/gu, '$1 ')
     .replace(/(\p{L})(?=\d)/gu, '$1 ')
     .replace(/\s+/g, ' ')
     .trim()
-    .replace(/(\d+) (?:[вртмн][аиоя]|о|th|st|nd|rd)(?= |$)/g, '$1')
+    .replace(/(\d+) (?:[вртмн][аиоя]|о)(?= |$)/g, '$1')
 }
 
 export function transliterate(text) {

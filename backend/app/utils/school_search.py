@@ -129,8 +129,17 @@ _NO_MARKER_RE = re.compile(r"(?<![a-z])no\.(?=\s*\d)")
 _NON_WORD_RE = re.compile(r"[\W_]+")
 _DIGIT_LETTER_RE = re.compile(r"(\d)(?=[^\W\d_])")
 _LETTER_DIGIT_RE = re.compile(r"([^\W\d_])(?=\d)")
-# "119-то", "1-ва", "2-ри", "100-но", "156-о", "119th" -> the bare number.
-_ORDINAL_RE = re.compile(r"(\d+) (?:[вртмн][аиоя]|о|th|st|nd|rd)(?= |$)")
+# "119-то", "1-ва", "2-ри", "100-но", "156-о" -> the bare number.
+_ORDINAL_RE = re.compile(r"(\d+) (?:[вртмн][аиоя]|о)(?= |$)")
+# "119th", "1-st", "2nd" -> the bare number, read before punctuation goes and only with the
+# suffix English gives that number: "No. 19 St. Sofia" (or "19St.") keeps its saint.
+_LATIN_ORDINAL_RE = re.compile(r"(\d+)-?(th|st|nd|rd)(?![^\W_])")
+
+
+def _latin_ordinal(match: re.Match) -> str:
+    number = int(match.group(1))
+    suffix = "th" if number % 100 in (11, 12, 13) else {1: "st", 2: "nd", 3: "rd"}.get(number % 10, "th")
+    return match.group(1) if match.group(2) == suffix else match.group(0)
 _FIRST_NUMBER_RE = re.compile(r"\d+")
 
 
@@ -138,6 +147,7 @@ def normalize(text: object) -> str:
     """Lowercase, drop "№"/"No." and punctuation, split digits from letters, drop ordinals."""
     value = str(text or "").lower().replace("№", " ")
     value = _NO_MARKER_RE.sub(" ", value)
+    value = _LATIN_ORDINAL_RE.sub(_latin_ordinal, value)
     value = _NON_WORD_RE.sub(" ", value)
     value = _DIGIT_LETTER_RE.sub(r"\1 ", value)
     value = _LETTER_DIGIT_RE.sub(r"\1 ", value)
