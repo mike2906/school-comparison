@@ -81,7 +81,7 @@ So the fees job's first run of a month, after its backup, runs `find-websites --
 SearXNG search and URL validation without the model (free) for each school with no
 site that was not searched in the last 90 days; a site validation accepts is stored and a
 private school's fees are read in the same run. A state school or kindergarten is held to
-its home page naming its number and kind and a word of its own name (`find_websites.py`). It counts as written, so the month publishes even when no fee
+its home page naming its number and kind and two words of its own name (or its only one) (`find_websites.py`). It counts as written, so the month publishes even when no fee
 changed. A failed search is logged and the fee read goes ahead. Facts for a site found come
 with the next facts cycle, or a thread's run.
 

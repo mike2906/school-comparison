@@ -218,3 +218,13 @@ async def test_validation_fails_a_stored_directory_page_and_clears_what_it_gave(
     verdict, final_url, reason = await URLValidator().validate_url("https://obrazovatelen-register.bg/dg-13-kalinka-sofiya/")
     assert verdict is ValidationResult.INVALID and final_url is None
     assert url_validator._should_clear_website_derived_data(verdict, reason)
+
+
+def test_latin_titles_and_numbered_sofia_hosts():
+    def problem(name, title):
+        return find_websites.state_site_problem(name, find_websites.state_kind(name, "kindergarten"), f"<title>{title}</title>")
+
+    assert problem("ДГ №59 Елхица", "Detska gradina 59 Elhitsa") is None
+    assert problem("ДГ №59 Елхица", "Градина 59 Елхица")  # a quarter, not a kindergarten
+    assert directory_host("https://dg42.sofia.bg/") is None
+    assert directory_host("https://mladost.sofia.bg/obrazovanie") == "sofia.bg"

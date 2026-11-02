@@ -92,8 +92,11 @@ def brand_named(name: Optional[str], page_text: str) -> bool:
 # ("СДЯ №69", "Детска ясла 69": Sofia numbers its nurseries apart, so СДЯ №69 is not
 # ДГ №69 Жар птица) or a school's ("74 Средно Училище", "119 СУ", "Шесто Основно Училище").
 _KIND_RES = {
-    "kindergarten": re.compile(r"(?<![^\W\d_])(?:ц?дг|одз)(?![^\W\d_])|градин|(?<![a-z])(?:dg|cdg|odz)(?![a-z])", re.IGNORECASE),
-    "nursery": re.compile(r"(?<![^\W\d_])с?дя(?![^\W\d_])|ясла|(?<![a-z])s?dya(?![a-z])", re.IGNORECASE),
+    "kindergarten": re.compile(
+        r"(?<![^\W\d_])(?:ц?дг|одз)(?![^\W\d_])|детск\w*\s+градин|(?<![a-z])(?:dg|cdg|odz)(?![a-z])|detsk\w*\s+gradin|kindergarten",
+        re.IGNORECASE,
+    ),
+    "nursery": re.compile(r"(?<![^\W\d_])с?дя(?![^\W\d_])|ясла|(?<![a-z])s?dya(?![a-z])|yasla|nursery", re.IGNORECASE),
     "school": re.compile(
         r"училищ|гимназ|лицей|(?<![^\W\d_])(?:оу|су|ну|соу|ег|пг|обу|ссу)(?![^\W\d_])|school|gymnas|lyce|(?<![a-z])(?:ou|su|sou|nu)(?![a-z])",
         re.IGNORECASE,
@@ -218,8 +221,7 @@ def _searched_recently(attributes: Any, now: datetime, retry_days: int) -> bool:
 
 async def _candidates(discoverer, school: School, *, home_pages: bool = False) -> list[str]:
     """The school's best search candidates, best first (no writes). With ``home_pages``,
-    each candidate's home page instead, one a site, none on a directory's site."""
-    from app.scrapers.website_discovery import directory_host
+    each candidate's home page instead, one a site."""
 
     name = (school.name_i18n or {}).get("bg") or (school.name_i18n or {}).get("en")
     aliases = discoverer._validation_aliases_for_school(school)
@@ -237,7 +239,7 @@ async def _candidates(discoverer, school: School, *, home_pages: bool = False) -
         seen.add(url)
         if home_pages:
             url = home_page(url)
-            if url in picked or directory_host(url):
+            if url in picked:  # the picker already leaves directory hosts out
                 continue
         picked.append(url)
     return picked
@@ -258,7 +260,7 @@ async def run_find_websites(
     ``city``); returns the report."""
     from app.scrapers.stages.website import store_given_site
     from app.scrapers.url_validator import URLValidator, ValidationResult, extract_validation_aliases
-    from app.scrapers.website_discovery import WebsiteDiscoverer
+    from app.scrapers.website_discovery import WebsiteDiscoverer, directory_host
 
     now = now or datetime.now(timezone.utc)
     query = select(School).options(selectinload(School.locations)).where(
@@ -301,6 +303,9 @@ async def run_find_websites(
                 )
                 result["tried"].append({"url": url, "result": verdict.value, "reason": reason})
                 if verdict is not ValidationResult.VALID:
+                    continue
+                if directory_host(final_url or url):  # a site that redirects to its directory entry
+                    result["tried"][-1].update(result="invalid", reason=f"Redirects to {directory_host(final_url)}, a directory")
                     continue
                 page = await _page_text(final_url or url)
                 problem = (

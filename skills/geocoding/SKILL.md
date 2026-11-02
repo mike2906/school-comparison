@@ -160,8 +160,9 @@ site of each school with none and stores only one validation accepts, as `check-
 does; a school searched in the last 90 days waits. A state school or municipal kindergarten
 (no ministry code to check a kindergarten against, and numbers shared with schools and
 nurseries) is tried only at a site's home page, which must name its number with its kind
-("Детска градина №136", not 136 СУ or СДЯ 136) and a word of its own name ("Славия").
-Directory and district sites (`website_discovery.directory_host`: `data/bg/directory_domains.json`, the built-in list and everything under sofia.bg)
+("Детска градина №136", not 136 СУ or СДЯ 136) and two words of its own name, or its only one ("Славия"). A site that redirects to a
+directory's entry is not stored.
+Directory and district sites (`website_discovery.directory_host`: `data/bg/directory_domains.json`, the built-in list and everything under sofia.bg but a numbered host)
 are never a school's site: URL validation fails one already stored and clears what it gave.
 Sites behind SuperHosting's JavaScript check ("SuperJS check", about 1 in 8 of the state
 sites we know) cannot be read without a browser, so search does not find them; give them
