@@ -2310,8 +2310,8 @@ def test_a_service_needs_the_page_to_say_which_way():
 
     # The wrong way round, a word alone, the facilities for materials.
     assert kept(FeeService(service="transport", included=True, evidence=line_out)) == set()
-    # A word quoted alone is read in its whole page line: here the line does say lunch is in it.
-    assert kept(FeeService(service="food", included=True, evidence="обяд")) == {("food", True)}
+    # A word quoted alone fits several lines: it proves nothing.
+    assert kept(FeeService(service="food", included=True, evidence="обяд")) == set()
     assert kept(FeeService(service="materials", included=True, evidence="Таксата включва ползване на материалната база")) == set()
     # A list's item under its heading; at no extra cost is included.
     assert kept(FeeService(service="food", included=False, evidence="ГОДИШНАТА ТАКСА НЕ ВКЛЮЧВА:\nХранителен пакет")) == {("food", False)}
@@ -2387,3 +2387,22 @@ def test_a_service_is_read_in_its_whole_sentence_and_list():
     assert kept(doris, FeeService(service="food", included=True, evidence="ежедневно двукратно хранене")) == {("food", True)}
     # A quote cut from a line that says the opposite is read with the rest of it.
     assert kept("Таксата не включва обяд\n", FeeService(service="food", included=True, evidence="включва обяд")) == set()
+
+
+def test_clauses_capitals_semicolons_and_table_cells():
+    tuition = fee(PriceCategory.TUITION, "Такса обучение за 2026/2027: 8900 евро на година", amount=8900)
+
+    def kept(page, *services):
+        result = check_fee(tuition.model_copy(update={"services": list(services)}), PAGE_SERVICES + page)
+        return {(item.service, item.included) for item in result.fee.services}
+
+    caps = "ТАКСАТА ВКЛЮЧВА УЧЕБНИЦИ, НО НЕ ВКЛЮЧВА ХРАНА\n"
+    assert kept(caps, FeeService(service="materials", included=True, evidence=caps.strip())) == {("materials", True)}
+    semi = "Таксата включва храна; транспортът се заплаща отделно.\n"
+    assert kept(
+        semi,
+        FeeService(service="food", included=True, evidence=semi.strip()),
+        FeeService(service="transport", included=False, evidence=semi.strip()),
+    ) == {("food", True), ("transport", False)}
+    row = "Храна | включена | не е включена\n"
+    assert kept(row, FeeService(service="food", included=True, evidence="Храна | включена")) == {("food", True)}

@@ -540,7 +540,7 @@ _SERVICE_WORDS = {
         r"|(?:learning|teaching|educational|school|study) materials)",
         re.IGNORECASE,
     ),
-    "transport": re.compile(r"(?<!\w)(?:транспорт|автобус|transport|bus)(?!\w)", re.IGNORECASE),
+    "transport": re.compile(r"(?<!\w)(?:транспорт|автобус|transport|bus(?!\w))", re.IGNORECASE),
     "extended_day": re.compile(r"(?<!\w)(?:занимал|удължен|extended day|after[- ]school)", re.IGNORECASE),
 }
 # Whether a clause says the fee holds the service, or leaves it out (billed apart).
@@ -557,24 +557,48 @@ _FREE_RE = re.compile(
     re.IGNORECASE,
 )
 # Clauses, as the yearly cost table reads notes: "включва учебници, но не включва храна".
-# A sentence ends before a capital, so "(вкл. плуване" and "и др., интензивното" stay in theirs;
-# a list's semicolons ("• транспорт; • храна;") never end its heading's sentence.
-_CLAUSE_RE = re.compile(r"(?<=[.!?])\s+(?=[\"„“(]?[A-ZА-ЯЀ-Џ])|,?\s(?:но|а|but|while|whereas)\s")
+# Sentences end before a capital, so "(вкл. плуване" stays in its sentence.
+_SENTENCE_RE = re.compile(r"(?<=[.!?])\s+(?=[\"„“(]?[A-ZА-ЯЀ-Џ])")
+# Within a sentence, clauses: "включва учебници, но не включва храна", "включва храна;
+# транспортът се заплаща отделно". A clause that says neither way is a list item and takes the
+# way of the clause before it: "НЕ включва: • униформа; • транспорт; • храна;".
+_CLAUSE_RE = re.compile(r";\s*|,?\s(?:но|а|but|while|whereas)\s", re.IGNORECASE)
 
 
 def _says(service: str, included: bool, text: str) -> bool:
     """A clause of the evidence names the service and says it is in the fee, or not. "At no
     extra cost" speaks only for the part of the list it is in: "Транспорт без допълнително
     заплащане, храната се заплаща отделно"."""
-    for clause in _CLAUSE_RE.split(text):
-        if not _SERVICE_WORDS[service].search(clause):
-            continue
-        own = [part for part in clause.split(",") if _SERVICE_WORDS[service].search(part)]
-        free = any(_FREE_RE.search(part) for part in own)
-        negative = not free and bool(_NOT_INCLUDED_RE.search(_FREE_RE.sub(" ", clause)))
-        if negative != included and (negative or free or _INCLUDED_RE.search(clause)):
-            return True
+    for sentence in _SENTENCE_RE.split(text):
+        way = None  # True: in the fee; False: not
+        for clause in _CLAUSE_RE.split(sentence):
+            names = bool(_SERVICE_WORDS[service].search(clause))
+            own = [part for part in clause.split(",") if _SERVICE_WORDS[service].search(part)]
+            if any(_FREE_RE.search(part) for part in own):
+                way = True
+            elif _NOT_INCLUDED_RE.search(_FREE_RE.sub(" ", clause)):
+                way = False
+            elif _INCLUDED_RE.search(clause):
+                way = True
+            if names and way is included:
+                return True
     return False
+
+
+# A quote this short must fit one place on the page.
+_PLACED_WORDS = 4
+
+
+def _cells(row: str, quote: str) -> str:
+    """The cells of a table row the quote spans ("Храна | включена" of "Храна | включена | не е
+    включена"), or the whole line when it is no table row."""
+    cells = row.split(" | ")
+    for size in range(1, len(cells) + 1):
+        for start in range(len(cells) - size + 1):
+            span = " | ".join(cells[start : start + size])
+            if quote in _tight(_normalized(span)):
+                return span
+    return row
 
 
 # A list's heading and its item: the item at most this many lines below the heading.
@@ -612,7 +636,7 @@ def _checked_services(fee: AgentFee, page_text: str) -> tuple[list[FeeService], 
     # "Таксата не включва обяд") would lose what the line says, and a sentence quoted from a
     # longer line (593) is read with the rest of it. Original case, for the sentence ends.
     raw_lines = [" ".join(text.split()) for text in page_text.splitlines() if text.strip()]
-    page_lines = [_tight(text.casefold()) for text in raw_lines]
+    page_lines = [_tight(_normalized(text)) for text in raw_lines]
     kept: dict[str, FeeService] = {}
     checks: list[str] = []
     said: dict[bool, set[str]] = {True: set(), False: set()}
@@ -621,7 +645,10 @@ def _checked_services(fee: AgentFee, page_text: str) -> tuple[list[FeeService], 
         places = _lines_in_order(lines, page_lines) if lines else []
         if not places:
             checks.append(f"service {item.service} dropped: evidence line is not on the page")
-        elif not any(_says(item.service, item.included, " ".join(raw_lines[i] for i in at)) for at in places):
+        elif len(places) > 1 and len(" ".join(lines).split()) < _PLACED_WORDS:
+            # "храна" alone fits a kindergarten's line as well as the school's.
+            checks.append(f"service {item.service} dropped: evidence too short to place on the page")
+        elif not any(_says(item.service, item.included, " ".join(_cells(raw_lines[i], line) for i, line in zip(at, lines))) for at in places):
             state = "included" if item.included else "not included"
             checks.append(f"service {item.service} dropped: evidence does not say it is {state}")
         else:
