@@ -133,10 +133,12 @@ def _numbers_own_kind(text: str, own_numbers: set[str], kind: str) -> bool:
     if not own_numbers & _own_numbers(text):
         return False
     has = {other: bool(pattern.search(text)) for other, pattern in _KIND_RES.items()}
+    if kind == "school":
+        # Schools abbreviate themselves too many ways to list ("203. ПЕГ", "138. СУЗИЕ",
+        # "122. ИОУ"): any title with the number that is not a kindergarten's will do.
+        return not (has["kindergarten"] or has["nursery"])
     if not has[kind]:
         return False
-    if kind == "school":
-        return not (has["kindergarten"] or has["nursery"])
     if kind == "nursery":
         return not (has["kindergarten"] or has["school"])
     return not has["school"]
