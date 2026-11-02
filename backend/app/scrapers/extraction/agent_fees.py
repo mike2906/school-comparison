@@ -540,7 +540,7 @@ _SERVICE_WORDS = {
         r"|(?:learning|teaching|educational|school|study) materials)",
         re.IGNORECASE,
     ),
-    "transport": re.compile(r"(?<!\w)(?:транспорт|автобус|transport|bus)(?!\w)", re.IGNORECASE),
+    "transport": re.compile(r"(?<!\w)(?:транспорт|автобус|transport|bus(?!\w))", re.IGNORECASE),
     "extended_day": re.compile(r"(?<!\w)(?:занимал|удължен|extended day|after[- ]school)", re.IGNORECASE),
 }
 # Whether a clause says the fee holds the service, or leaves it out (billed apart).
@@ -557,63 +557,98 @@ _FREE_RE = re.compile(
     re.IGNORECASE,
 )
 # Clauses, as the yearly cost table reads notes: "включва учебници, но не включва храна".
-_CLAUSE_RE = re.compile(r"(?<=[.;!?])\s+|,?\s(?:но|а|but|while|whereas)\s")
+# Sentences end before a capital, so "(вкл. плуване" stays in its sentence.
+_SENTENCE_RE = re.compile(r"(?<=[.!?])\s+(?=[\"„“(]?[A-ZА-ЯЀ-Џ])")
+# Within a sentence, clauses: "включва учебници, но не включва храна", "включва храна;
+# транспортът се заплаща отделно". A clause that says neither way is a list item and takes the
+# way of the clause before it: "НЕ включва: • униформа; • транспорт; • храна;".
+_CLAUSE_RE = re.compile(r";\s*|,?\s(?:но|а|but|while|whereas)\s", re.IGNORECASE)
 
 
 def _says(service: str, included: bool, text: str) -> bool:
     """A clause of the evidence names the service and says it is in the fee, or not. "At no
     extra cost" speaks only for the part of the list it is in: "Транспорт без допълнително
     заплащане, храната се заплаща отделно"."""
-    for clause in _CLAUSE_RE.split(text):
-        if not _SERVICE_WORDS[service].search(clause):
-            continue
-        own = [part for part in clause.split(",") if _SERVICE_WORDS[service].search(part)]
-        free = any(_FREE_RE.search(part) for part in own)
-        negative = not free and bool(_NOT_INCLUDED_RE.search(_FREE_RE.sub(" ", clause)))
-        if negative != included and (negative or free or _INCLUDED_RE.search(clause)):
-            return True
+    for sentence in _SENTENCE_RE.split(text):
+        way = None  # True: in the fee; False: not
+        for clause in _CLAUSE_RE.split(sentence):
+            names = bool(_SERVICE_WORDS[service].search(clause))
+            own = [part for part in clause.split(",") if _SERVICE_WORDS[service].search(part)]
+            if any(_FREE_RE.search(part) for part in own):
+                way = True
+            elif _NOT_INCLUDED_RE.search(_FREE_RE.sub(" ", clause)):
+                way = False
+            elif _INCLUDED_RE.search(clause):
+                way = True
+            if names and way is included:
+                return True
     return False
+
+
+# A quote this short must fit one place on the page.
+_PLACED_WORDS = 4
+
+
+def _cells(row: str, quote: str) -> str:
+    """The cells of a table row the quote spans ("Храна | включена" of "Храна | включена | не е
+    включена"), or the whole line when it is no table row."""
+    cells = row.split(" | ")
+    for size in range(1, len(cells) + 1):
+        for start in range(len(cells) - size + 1):
+            span = " | ".join(cells[start : start + size])
+            if quote in _tight(_normalized(span)):
+                return span
+    return row
 
 
 # A list's heading and its item: the item at most this many lines below the heading.
 _LIST_LINES = 15
 
 
-def _lines_in_order(lines: list[str], pieces: list[set[str]]) -> bool:
-    """Each line is a whole page line (or cell), each after the one before and close to it."""
-    starts = [index for index, found in enumerate(pieces) if lines[0] in found]
-    for start in starts:
-        at = start
+def _lines_in_order(lines: list[str], page_lines: list[str]) -> list[list[int]]:
+    """Where the quote's lines are on the page: each within one page line, each after the one
+    before and close to it. Every way they fit, as page line numbers."""
+    found = []
+    for start in (index for index, text in enumerate(page_lines) if lines[0] in text):
+        at = [start]
         for line in lines[1:]:
-            at = next((i for i in range(at + 1, min(at + 1 + _LIST_LINES, len(pieces))) if line in pieces[i]), None)
-            if at is None:
+            last = at[-1]
+            following = range(last + 1, min(last + 1 + _LIST_LINES, len(page_lines)))
+            nxt = next((i for i in following if line in page_lines[i]), None)
+            if nxt is None:
                 break
+            at.append(nxt)
         else:
-            return True
-    return False
+            found.append(at)
+    return found
 
 
 def _checked_services(fee: AgentFee, page_text: str) -> tuple[list[FeeService], list[str]]:
-    """The services kept: a tuition fee's, each with evidence whose lines are whole page lines,
-    and which names the service and says whether the fee holds it. A list's heading and an
+    """The services kept: a tuition fee's, each with evidence on the page whose page lines name
+    the service and say whether the fee holds it. A list's heading and an
     item below it ("Таксата не включва:" / "Хранителен пакет") are read as one. One said both
     ways is dropped."""
     if not fee.services:
         return [], []
     if fee.category is not PriceCategory.TUITION:
         return [], [f"services dropped: not tuition ({fee.category.value})"]
-    # Whole lines, or a table row's cells: a quote cut from a line ("включва обяд" from "Таксата
-    # не включва обяд") would lose what the line says.
-    page_lines = [_tight(_normalized(text)) for text in page_text.splitlines() if text.strip()]
-    pieces = [{text, *(cell.strip() for cell in re.split(r" \| ", text))} for text in page_lines]
+    # The page's own lines are read, not the quote: one cut from a line ("включва обяд" from
+    # "Таксата не включва обяд") would lose what the line says, and a sentence quoted from a
+    # longer line (593) is read with the rest of it. Original case, for the sentence ends.
+    raw_lines = [" ".join(text.split()) for text in page_text.splitlines() if text.strip()]
+    page_lines = [_tight(_normalized(text)) for text in raw_lines]
     kept: dict[str, FeeService] = {}
     checks: list[str] = []
     said: dict[bool, set[str]] = {True: set(), False: set()}
     for item in fee.services:
         lines = [_tight(_normalized(line)) for line in item.evidence.splitlines() if line.strip()]
-        if not lines or not _lines_in_order(lines, pieces):
+        places = _lines_in_order(lines, page_lines) if lines else []
+        if not places:
             checks.append(f"service {item.service} dropped: evidence line is not on the page")
-        elif not _says(item.service, item.included, " ".join(lines)):
+        elif len(places) > 1 and len(" ".join(lines).split()) < _PLACED_WORDS:
+            # "храна" alone fits a kindergarten's line as well as the school's.
+            checks.append(f"service {item.service} dropped: evidence too short to place on the page")
+        elif not any(_says(item.service, item.included, " ".join(_cells(raw_lines[i], line) for i, line in zip(at, lines))) for at in places):
             state = "included" if item.included else "not included"
             checks.append(f"service {item.service} dropped: evidence does not say it is {state}")
         else:
