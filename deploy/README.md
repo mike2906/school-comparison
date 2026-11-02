@@ -22,8 +22,12 @@ alias dc='docker compose --env-file deploy/.env --env-file deploy/release.env -f
 ## Host setup (once)
 
 The host is an OVH VPS (Ubuntu 26.04) reached as `ubuntu@<ip>` with your SSH key.
-`bootstrap.sh` installs Docker, turns off SSH password logins, enables unattended
-security updates and installs the firewall service. It is safe to run again.
+`bootstrap.sh` installs Docker, limits SSH to keys and the `ubuntu` user, enables
+unattended security updates for Ubuntu and Docker (rebooting at 02:30 server time when an
+update needs it), adds a weekly refresh of the Caddy and Postgres images
+(`schooldecider-image-refresh.timer`, Sunday 03:30) and installs the firewall service. It
+is safe to run again, and is how changes to these settings reach the host: CD does not
+touch them.
 
 ```bash
 scp deploy/bootstrap.sh deploy/firewall.sh deploy/cloudflare-proxies.caddy ubuntu@<ip>:
@@ -40,9 +44,12 @@ git archive --format=tar main | ssh ubuntu@<ip> 'mkdir -p ~/schooldecider && tar
 
 **Firewall.** `schooldecider-firewall.service` runs `firewall.sh` at boot (before Docker starts) and
 whenever Docker restarts: port 443 accepts only Cloudflare's IPv4 ranges
-(`cloudflare-proxies.caddy`), port 80 is closed, SSH stays open (keys only). The compose
-file publishes Caddy's ports on IPv4 only, so nothing is reachable over IPv6, which the
-firewall does not cover. Docker requires the firewall
+(`cloudflare-proxies.caddy`), port 80 is closed, SSH stays open over IPv4 (keys only).
+Over IPv6 nothing new comes in (only replies and ICMPv6), so SSH is IPv4 only; the compose
+file publishes Caddy's ports on IPv4 only as well. IPv4 TCP packets that carry IP options
+are dropped before they reach any socket: nothing legitimate sends them, and they trigger
+CVE-2026-98432 (a kernel bug reachable through any open TCP port; Ubuntu had no fixed
+kernel on 2026-11-02). Docker requires the firewall
 service: if the rules cannot be applied, Docker does not start and the API is down
 rather than exposed (`systemctl status schooldecider-firewall`). When Cloudflare's ranges change
 (`terraform plan` in `infra/` fails), update the file, then:
