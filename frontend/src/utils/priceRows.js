@@ -147,6 +147,10 @@ const ORDINAL_TOKEN_RE = new RegExp(`(?<![\\p{L}\\p{N}])(${ORDINAL})(?![\\p{L}\\
 const NURSERY_RE = /яслен|nursery|cr[eè]che|(?<![\p{L}])ясл(?:а|и|ата)(?![\p{L}])/u
 const BOTH_RE = /ясл(?:а|и)\s*(?:и|\/|,)\s*(?:детск[аи] )?(?:градин|дг(?![\p{L}]))|(?:градин[аи]|(?<![\p{L}])дг)\s*(?:и|\/|,)\s*(?:детска )?ясл|яслена и градинска/u
 // 555's English "PREPARATORY GROUP | YEAR 2" too.
+// English names: Pre-K is for 3 and 4 year olds (506's "Pre-Kindergarten"), the first and second
+// groups. IGCSE, A Level and the IB Diploma are the last school years (581).
+const PRE_K_RE = /(?<![\p{L}])pre-?k(?:indergarten)?(?![\p{L}])/u
+const UPPER_SCHOOL_RE = /(?<![\p{L}])(?:igcse|a[- ]levels?|ib diploma)(?![\p{L}])/u
 const PRESCHOOL_NAME_RE = /подготвителн[аи] груп|предучилищн[аи] груп|предучилищен клас|подготвителен клас|(?<![\p{L}])п[гк]у?(?![\p{L}])|pre-?school|preparatory (?:group|class|year)/u
 
 const AGE_GROUP_KEYS = new Set([
@@ -169,6 +173,8 @@ function groupKeys(text) {
   const normalized = String(text || '').toLocaleLowerCase('bg')
   if (NURSERY_RE.test(normalized) && !BOTH_RE.test(normalized)) keys.add('nursery')
   if (PRESCHOOL_NAME_RE.test(normalized)) keys.add('preschool')
+  if (PRE_K_RE.test(normalized)) ['first', 'second'].forEach(key => keys.add(key))
+  if (UPPER_SCHOOL_RE.test(normalized)) keys.add('grade_8_12')
   for (const match of normalized.matchAll(GROUP_LIST_RE)) {
     // "2 групи" counts groups; only a worded ordinal names them in the plural.
     const plural = match[2] !== 'група' && match[2] !== 'group'
