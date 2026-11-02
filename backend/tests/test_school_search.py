@@ -50,6 +50,9 @@ def _rank(query: str, name: str, *, addresses=()) -> int | None:
         ("156-о Обединено", "156 обединено"),
         ("100-но ОУ", "100 оу"),
         ("119th school", "119 school"),
+        ("1-st", "1"),
+        # A saint after a number is not an ordinal ("19st").
+        ("Kindergarten No. 19 St. Sofia", "kindergarten 19 st sofia"),
         ("School No. 7", "school 7"),
         ('91.НЕМСКА ЕЗИКОВА ,,Проф."', "91 немска езикова проф"),
     ],
@@ -177,6 +180,11 @@ def test_saint_and_name_in_a_row_rank_above_scattered_words():
     assert _rank("Saint Sofia", SV_SOFIA) == RANK_PHRASE
     assert _rank("Saint Sofia", seminary) == RANK_PREFIX
     assert _rank("St Sofia", SV_SOFIA_EN) == RANK_PHRASE
+
+
+@pytest.mark.parametrize("query", ["Kindergarten No. 19 Saint Sofia", "Kindergarten Saint Sofia", "19 Saint Sofia"])
+def test_saint_right_after_a_number_matches(query):
+    assert _rank(query, "Kindergarten No. 19 St. Sofia") is not None
 
 
 def test_saint_word_needs_a_saint_in_the_name():

@@ -79,12 +79,14 @@ export function normalizeSearchText(text) {
     .toLowerCase()
     .replace(/№/g, ' ')
     .replace(/(^|[^a-z])no\.(?=\s*\d)/g, '$1 ')
+    // "119th", "1-st", before punctuation goes: after it "No. 19 St. Sofia" would read as "19st".
+    .replace(/(\d)-?(?:th|st|nd|rd)(?![a-z])/g, '$1')
     .replace(/[^\p{L}\p{N}]+/gu, ' ')
     .replace(/(\d)(?=\p{L})/gu, '$1 ')
     .replace(/(\p{L})(?=\d)/gu, '$1 ')
     .replace(/\s+/g, ' ')
     .trim()
-    .replace(/(\d+) (?:[вртмн][аиоя]|о|th|st|nd|rd)(?= |$)/g, '$1')
+    .replace(/(\d+) (?:[вртмн][аиоя]|о)(?= |$)/g, '$1')
 }
 
 export function transliterate(text) {
