@@ -34,6 +34,15 @@ country config via `useCountry()` and the helpers in `src/utils/countryConfig.js
 
 ---
 
+## Words on screen
+
+Text that explains how to use a screen is a layout bug: fix the layout instead. Text that
+qualifies a number (a fee's source and date, "food not stated", an estimate, "last year's
+result is a guide, not a promise") stays, next to that number, said once. Test: would a
+parent make a worse decision without this sentence? If not, cut it.
+
+---
+
 ## Patterns
 
 **API calls** — use the wrappers in `src/api/`:

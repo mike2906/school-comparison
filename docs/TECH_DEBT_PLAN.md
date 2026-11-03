@@ -88,7 +88,7 @@ Mike's rule (2026-10-23) is that every feature gets a parent test (phone width, 
 
 **Not recommended: feature flags and gradual release.** With no traffic there is nothing to sample, and every flag is code to remove later. A preview covers the same need. Use a build-time flag (a `VITE_` setting, on in previews, off in production) only for a feature that has to merge before it is ready.
 
-### Relation to `docs/GO_LIVE_PLAN.md` Phase 4
+### Relation to `docs/archive/GO_LIVE_PLAN.md` Phase 4
 
 This plan supersedes GO_LIVE_PLAN P4.1 (split `SearchPage`, here step 6) and P4.4 (the `cli.py` repair commands, here steps 7-9; the plan's module locations win). P4.7 (TypeScript) stays optional; see "Not recommended now".
 
