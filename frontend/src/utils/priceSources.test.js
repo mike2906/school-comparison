@@ -36,26 +36,41 @@ test('formatCheckedDate: a day in the UI language, null when unusable', () => {
   assert.equal(formatCheckedDate(null, 'en'), null)
 })
 
-test('sharedPriceSource: one page and one kind of source, latest check', () => {
+test('sharedPriceSource: one page and one kind of source, earliest check', () => {
   const rows = [
-    { source: 'scraped_website', source_url: PAGE, scraped_at: '2026-09-17T19:31:08' },
     { source: 'scraped_website', source_url: PAGE, scraped_at: '2026-09-18T08:00:00' },
+    { source: 'scraped_website', source_url: PAGE, scraped_at: '2026-09-17T19:31:08' },
   ]
   assert.deepEqual(sharedPriceSource(rows), {
     url: PAGE,
+    site: 'roerich-school.org',
     source: 'scraped_website',
-    checkedAt: '2026-09-18T08:00:00',
+    checkedAt: '2026-09-17T19:31:08',
+    onePage: true,
   })
 })
 
-test('sharedPriceSource: null when rows differ, so each row shows its own', () => {
+test('sharedPriceSource: several pages of one site share the site, with no page url', () => {
   const a = { source: 'scraped_website', source_url: PAGE, scraped_at: '2026-09-17T19:31:08' }
-  assert.equal(sharedPriceSource([a, { ...a, source_url: 'https://roerich-school.org/other/' }]), null)
+  const b = { ...a, source_url: 'https://www.roerich-school.org/fees.pdf' }
+  assert.deepEqual(sharedPriceSource([a, b]), {
+    url: null,
+    site: 'roerich-school.org',
+    source: 'scraped_website',
+    checkedAt: '2026-09-17T19:31:08',
+    onePage: false,
+  })
+})
+
+test('sharedPriceSource: null when sites or kinds differ, so each row shows its own', () => {
+  const a = { source: 'scraped_website', source_url: PAGE, scraped_at: '2026-09-17T19:31:08' }
+  assert.equal(sharedPriceSource([a, { ...a, source_url: 'https://other-school.bg/fees/' }]), null)
+  assert.equal(sharedPriceSource([a, { ...a, source_url: null }]), null)
   assert.equal(sharedPriceSource([a, { ...a, source: 'official' }]), null)
   assert.equal(sharedPriceSource([]), null)
 })
 
 test('sharedPriceSource: no stored link still shares the source kind, with no url', () => {
   const rows = [{ source: 'official', source_url: null, scraped_at: null }]
-  assert.deepEqual(sharedPriceSource(rows), { url: null, source: 'official', checkedAt: null })
+  assert.deepEqual(sharedPriceSource(rows), { url: null, site: null, source: 'official', checkedAt: null, onePage: true })
 })
