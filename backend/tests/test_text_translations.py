@@ -4,6 +4,7 @@ register text a page shows as written gets the other language's words. The model
 from __future__ import annotations
 
 import pytest
+from sqlalchemy import select
 
 from app.models.pricing import PriceSource, Pricing
 from app.models.school import School, SchoolLocation
@@ -280,3 +281,62 @@ def test_latin_roman_numerals_are_in_no_language():
     assert not needs_translation("VIII - XII клас", "bg") and needs_translation("VIII - XII клас", "en")
     assert not needs_translation("XII", "en") and not needs_translation("XII", "bg")
     assert needs_translation("Grade XII", "bg") and needs_translation("ХI клас", "en")
+
+
+def test_checked_takes_a_12_hour_time_in_24_hour_form():
+    hours = "From 4:30 pm to 6:00 pm"
+    assert stage.checked(hours, "От 16:30 до 18:00 ч.", "bg") == "От 16:30 до 18:00 ч."
+    assert stage.checked(hours, "От 16:30 до 18 ч.", "bg") == "От 16:30 до 18 ч."
+    assert stage.checked("Pick-up at 12 p.m.", "Взимане в 12 ч.", "bg") == "Взимане в 12 ч."
+    assert stage.checked("Breakfast until 9am", "Закуска до 9 ч.", "bg") == "Закуска до 9 ч."
+    # A wrong hour is still refused.
+    assert stage.checked(hours, "От 16:30 до 19:00 ч.", "bg") is None
+    assert stage.checked(hours, "От 4:30 до 6:00 ч.", "bg") is None
+
+
+@pytest.mark.asyncio
+async def test_a_12_hour_time_refused_under_version_1_is_asked_once_more(db_session):
+    hours = "From 4:30 pm to 6:00 pm"
+    school = await _priced_school(db_session)
+    db_session.add(
+        Pricing(
+            school_id=school.id,
+            category="extended_day",
+            amount=700,
+            currency="EUR",
+            period="yearly",
+            plan_name=hours,
+            source=PriceSource.OFFICIAL,
+            scraped_at=PRICING_VERIFIED_AT,
+            source_url="https://test-school.bg/fees",
+            source_page_id=(await db_session.execute(select(Pricing.source_page_id).where(Pricing.school_id == school.id))).scalars().first(),
+            pricing_context=_verified_pricing_context(0.9),
+        )
+    )
+    await db_session.commit()
+    await stage.run_text_translations(db_session, school_ids=[school.id], call=_caller(), apply=True)
+    # As version 1 stored it: the 24-hour answer was refused for its digits.
+    translations = stored(school.attributes)
+    assert hours in translations["bg"] and translations["bg"][hours] is None
+    block = {**stage.translation_block(translations), "_schema_version": 1}
+    school.attributes = {**school.attributes, "text_translations": block}
+    await db_session.commit()
+
+    call = _caller({**ANSWERS, hours: "От 16:30 до 18:00 ч."})
+    await stage.run_text_translations(db_session, school_ids=[school.id], call=call, apply=True)
+    assert call.calls == [("bg", [hours])]
+    assert stored(school.attributes)["bg"][hours] == "От 16:30 до 18:00 ч."
+    assert school.attributes["text_translations"]["_schema_version"] == stage.SCHEMA_VERSION
+
+    # Refused again, it is stored at the new version and not asked on every publish.
+    translations = stored(school.attributes)
+    translations["bg"][hours] = None
+    school.attributes = {**school.attributes, "text_translations": {**stage.translation_block(translations), "_schema_version": 1}}
+    await db_session.commit()
+    refused = _caller({**ANSWERS, hours: None})
+    await stage.run_text_translations(db_session, school_ids=[school.id], call=refused, apply=True)
+    assert refused.calls == [("bg", [hours])]
+    assert school.attributes["text_translations"]["_schema_version"] == stage.SCHEMA_VERSION
+    again = _caller()
+    await stage.run_text_translations(db_session, school_ids=[school.id], call=again, apply=True)
+    assert again.calls == []
