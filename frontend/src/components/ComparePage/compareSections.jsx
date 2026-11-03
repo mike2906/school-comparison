@@ -65,7 +65,6 @@ const TOPIC_GLANCE = {
   languages: 'languages',
   support: 'support',
   admissions: 'admission',
-  transport: 'bus',
 }
 
 export function buildCompareSections({

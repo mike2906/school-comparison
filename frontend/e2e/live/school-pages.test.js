@@ -193,7 +193,7 @@ describe('a school page', () => {
     await sourceLine.first().waitFor()
     const named = await sourceLine.count()
     assert.ok(named <= groupPricingByAcademicYear(listed.pricing).length, `${listed.id}: the site is named ${named} times`)
-    const links = await section.getByRole('link', { name: t('bg', 'pricing.sourceLinkLabel', { site }) }).count()
+    const links = await section.getByRole('link', { name: t('bg', 'pricing.rowSourceLabel', { site }) }).count()
     assert.ok(links >= rows.length, `${listed.id}: ${links} page links for ${rows.length} fees`)
   })
 

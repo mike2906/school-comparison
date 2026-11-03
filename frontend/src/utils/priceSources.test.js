@@ -46,6 +46,7 @@ test('sharedPriceSource: one page and one kind of source, earliest check', () =>
     site: 'roerich-school.org',
     source: 'scraped_website',
     checkedAt: '2026-09-17T19:31:08',
+    checkedUntil: '2026-09-18T08:00:00',
     onePage: true,
   })
 })
@@ -58,6 +59,7 @@ test('sharedPriceSource: several pages of one site share the site, with no page 
     site: 'roerich-school.org',
     source: 'scraped_website',
     checkedAt: '2026-09-17T19:31:08',
+    checkedUntil: '2026-09-17T19:31:08',
     onePage: false,
   })
 })
@@ -72,5 +74,5 @@ test('sharedPriceSource: null when sites or kinds differ, so each row shows its 
 
 test('sharedPriceSource: no stored link still shares the source kind, with no url', () => {
   const rows = [{ source: 'official', source_url: null, scraped_at: null }]
-  assert.deepEqual(sharedPriceSource(rows), { url: null, site: null, source: 'official', checkedAt: null, onePage: true })
+  assert.deepEqual(sharedPriceSource(rows), { url: null, site: null, source: 'official', checkedAt: null, checkedUntil: null, onePage: true })
 })

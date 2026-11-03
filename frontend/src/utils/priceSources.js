@@ -46,10 +46,11 @@ export function formatCheckedDate(value, language) {
  * so a section can say it once instead of on every row. Null when they differ (each row
  * then shows its own).
  *
- * Returns `{ url, site, source, checkedAt, onePage }`: `url` the shared page, or null when
- * the rows come from several pages of the site (each row then links its own page) or have
- * no usable link; `checkedAt` the earliest time any of the rows was checked, so the section
- * never claims a fresher check than its oldest row had.
+ * Returns `{ url, site, source, checkedAt, checkedUntil, onePage }`: `url` the shared page,
+ * or null when the rows come from several pages of the site (each row then links its own
+ * page) or have no usable link; `checkedAt` and `checkedUntil` the earliest and latest time
+ * a row was checked, so the section shows the span and never a fresher check than its
+ * oldest row had.
  */
 export function sharedPriceSource(rows = []) {
   if (rows.length === 0) return null
@@ -57,16 +58,17 @@ export function sharedPriceSource(rows = []) {
   const sites = new Set(rows.map(row => sourceSiteName(row.source_url)))
   const kinds = new Set(rows.map(row => row.source || null))
   if (sites.size !== 1 || kinds.size !== 1) return null
-  const checkedAt = rows
+  const checks = rows
     .map(row => row.scraped_at)
     .filter(value => value && !Number.isNaN(new Date(value).getTime()))
-    .sort((a, b) => new Date(a) - new Date(b))[0] || null
+    .sort((a, b) => new Date(a) - new Date(b))
   const onePage = urls.size === 1
   return {
     url: onePage ? [...urls][0] : null,
     site: [...sites][0],
     source: [...kinds][0],
-    checkedAt,
+    checkedAt: checks[0] || null,
+    checkedUntil: checks[checks.length - 1] || null,
     onePage,
   }
 }

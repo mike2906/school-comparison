@@ -16,7 +16,6 @@ import { hasDisplayableAdmissionInfo } from '../../utils/admission'
 import { readSavedLocation } from '../../utils/keyFacts'
 import { defaultStage, offersStage, yearCost } from '../../utils/yearCost'
 import { planningYear } from '../../utils/ageSelection'
-import { schoolPath } from '../../utils/schoolPath'
 import { saveCostNeeds } from '../../admission/saved'
 import { useSavedAdmission } from '../../hooks/useSavedAdmission'
 
@@ -324,22 +323,24 @@ function ComparePage() {
     })
     const at = sections.findIndex(section => section.key === 'pricing')
     if (at < 0) return [...sections, costSection]
-    // A school with a cost table already shows this stage's fees there: its whole fee list
-    // would repeat them, so it links the school page instead. Schools without one keep the list.
+    // A school whose cost table shows a tuition already has this stage's fees there: its whole
+    // fee list would repeat them, so it links the school page instead. Schools without one
+    // (or with no tuition in it, e.g. "price on request") keep the list.
     const pricing = sections[at]
     const linkedPricing = {
       ...pricing,
       rows: pricing.rows.map(row => ({
         ...row,
-        getValue: (school) => (school.school_type !== 'state' && offersStage(school, costStage) && costById.get(school.id) ? (
-          <Link to={schoolPath(school.id, selectedAgeGroup)} className="text-sm text-primary-700 underline underline-offset-2 hover:text-primary-800">
-            {t('compare.allFeesLink', { count: (school.pricing || []).length })}
+        getValue: (school) => (school.school_type !== 'state' && offersStage(school, costStage) && costById.get(school.id)?.tuition.options.length > 0 ? (
+          // No age group: the school page then shows every fee, none folded away.
+          <Link to={`/schools/${school.id}`} className="text-sm text-primary-700 underline underline-offset-2 hover:text-primary-800">
+            {t('compare.allFeesLink')}
           </Link>
         ) : row.getValue(school)),
       })),
     }
     return [...sections.slice(0, at), costSection, linkedPricing, ...sections.slice(at + 1)]
-  }, [sections, schools, costById, costStage, costNeeds, selectedAgeGroup, t, i18n.language])
+  }, [sections, schools, costById, costStage, costNeeds, t, i18n.language])
 
   const visibleSections = useMemo(() => allSections
     .map(section => ({

@@ -315,7 +315,9 @@
     "sourceLink": "Source: {{site}}",
     "sourceLinkLabel": "See these prices on {{site}} (opens in a new window)",
     "checkedOn": "checked {{date}}",
+    "checkedRange": "checked {{from}} – {{to}}",
     "rowSource": "source",
+    "rowSourceLabel": "Source of this fee on {{site}} (opens in a new window)",
     "grades": {
       "preschool": "Preschool",
       "preschoolTo": "Preschool to grade {{to}}",
@@ -468,8 +470,7 @@
     "visibleRange": "{{from}}–{{to}} of {{total}}",
     "someNotFound": "Some schools are no longer available and were removed from the comparison.",
     "comparingCount_one": "Comparing {{count}} school",
-    "allFeesLink_one": "The fee on the school page",
-    "allFeesLink_other": "All {{count}} fees on the school page"
+    "allFeesLink": "All fees on the school page"
   },
   "advancedFilters": {
     "title": "Advanced Filters",

@@ -51,11 +51,12 @@ function PricingSection({ pricing, discounts, ageGroup = null, targetYear = null
       : t('pricing.priceOnRequest')
 
     const ageGroupLabel = showAgeGroup ? priceAgeGroupLabel(price, t, i18n.language) : null
-    const options = paymentOptionTexts(price, (value) => `${formatNumber(value)} ${currency}`, t)
     const planName = planNameBeside(price, t, bandLabel || ageGroupLabel, i18n.language)
     // A row with no name of its own is not titled again with the category heading above it
-    // ("Tuition" under TUITION).
-    const title = planName || (priceCategory(price) === heading ? null : t(`pricing.${priceCategory(price)}`))
+    // ("Tuition" under TUITION), unless nothing else would stand beside its price.
+    const options = paymentOptionTexts(price, (value) => `${formatNumber(value)} ${currency}`, t)
+    const hasDetail = Boolean(ageGroupLabel || options.length > 0 || showSource)
+    const title = planName || (priceCategory(price) === heading && hasDetail ? null : t(`pricing.${priceCategory(price)}`))
     const pageHref = showPageLink ? safeSourceUrl(price.source_url) : null
 
     return (
@@ -99,7 +100,7 @@ function PricingSection({ pricing, discounts, ageGroup = null, targetYear = null
               target="_blank"
               rel="noopener noreferrer"
               className="text-xs text-teal-700 sm:block hover:text-teal-800 underline"
-              aria-label={t('pricing.sourceLinkLabel', { site: sourceSiteName(pageHref) })}
+              aria-label={t('pricing.rowSourceLabel', { site: sourceSiteName(pageHref) })}
             >
               {t('pricing.rowSource')}
               <span aria-hidden="true"> ↗</span>
@@ -136,7 +137,7 @@ function PricingSection({ pricing, discounts, ageGroup = null, targetYear = null
                 )}
               </div>
               {shared && (
-                <PriceSource source={shared.source} url={shared.url} site={shared.site} checkedAt={shared.checkedAt} />
+                <PriceSource source={shared.source} url={shared.url} site={shared.site} checkedAt={shared.checkedAt} checkedUntil={shared.checkedUntil} />
               )}
             </div>
 

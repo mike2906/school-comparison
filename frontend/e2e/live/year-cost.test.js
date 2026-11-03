@@ -61,9 +61,7 @@ describe('yearly cost table', () => {
       // The table already holds grade 1's fees, so each school's full list is a link to its
       // page, not the same fees again under the table.
       for (const school of schools) {
-        const count = school.pricing.length
-        const name = t(lang, `compare.allFeesLink_${count === 1 ? 'one' : 'other'}`, { count })
-        await page.locator(`a[href*="/schools/${school.id}"]`, { hasText: name }).first().waitFor()
+        await page.locator(`a[href$="/schools/${school.id}"]`, { hasText: t(lang, 'compare.allFeesLink') }).first().waitFor()
       }
 
       await section.locator('label', { hasText: t(lang, 'yearCost.lines.transport') }).locator('input').check()
