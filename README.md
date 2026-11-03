@@ -118,7 +118,7 @@ what went wrong along the way and how it was fixed, is in
 
 - A few modules are still too large: `backend/app/scrapers/extractor.py` (about 1,900 lines),
   `cli.py` and `website_discovery.py` (about 1,700 each) and the main search page component
-  (about 1,600). The plan for splitting them is in `docs/TECH_DEBT_PLAN.md`.
+  (about 1,600).
 - The backend has no type checker in CI yet; both backend (ruff) and frontend (ESLint) run a linter.
 - Coverage is Sofia only, and a fee is published only where the gates can verify it, so
   many private schools show no prices.

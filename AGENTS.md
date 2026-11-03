@@ -44,8 +44,8 @@ Routine refreshes run on a schedule (`docs/SCHEDULED_JOBS.md`).
 **Status sources:** each feature's doc in `docs/`, `docs/TECH_DEBT_PLAN.md`,
 `docs/BACKLOG.md`, git history and the DBs. Agent memory and old notes can be stale, so
 check an item is still open before starting it. Update the doc in the same PR that
-finishes the item. `docs/archive/` holds finished plans: read them for history, not
-for instructions.
+finishes the item. `docs/archive/` holds finished plans: their status lines are old, but
+a backlog item's notes there are still its detail.
 
 **Plans are starting points, not instructions.** Everything in a plan or design doc (an
 approach, a tool, a number, the order of steps) was chosen with what was known when it was
