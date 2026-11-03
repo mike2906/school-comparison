@@ -112,16 +112,32 @@ def has_twelve_hour_time(text: str) -> bool:
     return bool(_TWELVE_HOUR_RE.search(text or ""))
 
 
+_CLOCK_RE = re.compile(r"(?<![\d:])(\d{1,2}):(\d{2})(?![\d:])")
+# A whole hour written the Bulgarian way ("до 18 ч."), after the clock times are taken out.
+_HOUR_RE = re.compile(r"(?<![\d:.])(\d{1,2})\s*ч\b")
+
+
 def _numbers(text: str) -> list[str]:
-    """The numbers in ``text``, with each 12-hour time as its 24-hour digits ("4:30 pm" -> 16, 30)."""
+    """The numbers in ``text``, with each time of day as one value: a 12-hour time in its
+    24-hour form ("4:30 pm" -> "16:30"), and a whole hour with or without minutes the same
+    ("6 pm", "18:00" and "18 ч." -> "18:00"), so a wrong hour or minute still differs."""
 
     def to_24(match: re.Match) -> str:
         hour = int(match.group(1)) % 12 + (12 if match.group(3).lower() == "p" else 0)
         return f"{hour}:{match.group(2) or '00'}"
 
-    numbers = _DIGITS_RE.findall(_TWELVE_HOUR_RE.sub(to_24, text))
-    # "16:00" and "16" are the same hour: a whole hour's minutes are not a number of their own.
-    return sorted(str(int(n)) for n in numbers if n != "00")
+    times: list[str] = []
+
+    def clock(match: re.Match) -> str:
+        times.append(f"{int(match.group(1))}:{match.group(2)}")
+        return " "
+
+    def hour(match: re.Match) -> str:
+        times.append(f"{int(match.group(1))}:00")
+        return " "
+
+    rest = _HOUR_RE.sub(hour, _CLOCK_RE.sub(clock, _TWELVE_HOUR_RE.sub(to_24, text)))
+    return sorted(times) + sorted(_DIGITS_RE.findall(rest))
 
 
 def checked(source: str, target: Optional[str], locale: str) -> Optional[str]:

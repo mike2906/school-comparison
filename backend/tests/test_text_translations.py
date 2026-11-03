@@ -289,9 +289,14 @@ def test_checked_takes_a_12_hour_time_in_24_hour_form():
     assert stage.checked(hours, "От 16:30 до 18 ч.", "bg") == "От 16:30 до 18 ч."
     assert stage.checked("Pick-up at 12 p.m.", "Взимане в 12 ч.", "bg") == "Взимане в 12 ч."
     assert stage.checked("Breakfast until 9am", "Закуска до 9 ч.", "bg") == "Закуска до 9 ч."
-    # A wrong hour is still refused.
+    # A wrong hour, or the hour and minutes swapped, is still refused.
     assert stage.checked(hours, "От 16:30 до 19:00 ч.", "bg") is None
     assert stage.checked(hours, "От 4:30 до 6:00 ч.", "bg") is None
+    assert stage.checked(hours, "От 16:30 до 00:18 ч.", "bg") is None
+    assert stage.checked("Pick-up at 6 pm", "Взимане в 00:18 ч.", "bg") is None
+    assert stage.checked("Pick-up at 6 pm", "Взимане в 18:00 ч.", "bg") == "Взимане в 18:00 ч."
+    # Dates are not times.
+    assert stage.checked(INSTALMENT, "Instalment II, by 15.11.26", "en") == "Instalment II, by 15.11.26"
 
 
 @pytest.mark.asyncio
