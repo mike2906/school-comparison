@@ -24,12 +24,18 @@ export function buildYearCostSection({ t, language, schools, costById, stage, ne
     if (!offersStage(school, stage)) return 'notOffered'
     return costById.get(school.id) ? 'cost' : 'none'
   }
-  // A cell for a school without a cost table: the same words on every row.
-  const fallback = (school) => {
+  // A cell for a school without a cost table: the reason once, on the tuition row; a dash
+  // on the others, so the column does not repeat it down the table.
+  const fallback = (school, { first = false } = {}) => {
     const kind = state(school)
-    if (kind === 'state') return muted(t('yearCost.free'))
-    if (kind === 'notOffered') return muted(t('yearCost.notForStage'))
-    return muted(t('yearCost.notStated'))
+    const reason = t(kind === 'state' ? 'yearCost.free' : kind === 'notOffered' ? 'yearCost.notForStage' : 'yearCost.notStated')
+    if (first) return muted(reason)
+    return (
+      <span className="text-sm text-neutral-400">
+        <span aria-hidden="true">—</span>
+        <span className="sr-only">{reason}</span>
+      </span>
+    )
   }
 
   const source = (row) => {
@@ -123,7 +129,7 @@ export function buildYearCostSection({ t, language, schools, costById, stage, ne
 
   const tuitionCell = (school) => {
     const cost = costById.get(school.id)
-    if (state(school) !== 'cost') return fallback(school)
+    if (state(school) !== 'cost') return fallback(school, { first: true })
     if (cost.tuition.options.length === 0) return muted(t('yearCost.notStated'))
     const yearLabel = cost.academicYear && [
       cost.academicYear,

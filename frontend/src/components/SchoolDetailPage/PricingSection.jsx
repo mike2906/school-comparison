@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { displayPrice, groupPricingByAcademicYear, groupRowsByAgeGroup, isSingleInstalment, priceAgeGroupLabel, YEAR_STATUS } from '../../utils/pricing'
-import { sharedPriceSource, sourceSiteName } from '../../utils/priceSources'
+import { safeSourceUrl, sharedPriceSource, sourceSiteName } from '../../utils/priceSources'
 import { groupPricingByCategory } from './helpers'
 import { formatAmount } from '../../utils/format'
 import PriceSource from './PriceSource'
@@ -13,7 +13,8 @@ import { feeDiscountLines } from '../../utils/feeDiscounts'
 /**
  * Every published price, grouped by academic year, then by category, then by the age
  * group it is for. Each year says where its prices came from: once when they share one
- * page, otherwise on each row.
+ * site, otherwise on each row; when the shared site has several pages, each row links its
+ * own page with one short link.
  * With the parent's `ageGroup` (from the search they came from), fees that name only other
  * ages fold under "Fees for other ages"; fees naming no age stay in view, since they may
  * apply. With the `targetYear` the group was worked out for, the line above the fees says
@@ -40,7 +41,7 @@ function PricingSection({ pricing, discounts, ageGroup = null, targetYear = null
 
   const formatNumber = (value) => formatAmount(value, i18n.language)
 
-  const renderRow = (price, { showAgeGroup, showSource, bandLabel }) => {
+  const renderRow = (price, { showAgeGroup, showSource, showPageLink, bandLabel, heading }) => {
     const { currency } = displayPrice(null, price.currency)
     const formatShown = (value) => formatNumber(displayPrice(value, price.currency).value)
     const amountText = price.amount_min != null || price.amount_max != null
@@ -50,17 +51,24 @@ function PricingSection({ pricing, discounts, ageGroup = null, targetYear = null
       : t('pricing.priceOnRequest')
 
     const ageGroupLabel = showAgeGroup ? priceAgeGroupLabel(price, t, i18n.language) : null
-    const options = paymentOptionTexts(price, (value) => `${formatNumber(value)} ${currency}`, t)
     const planName = planNameBeside(price, t, bandLabel || ageGroupLabel, i18n.language)
+    // A row with no name of its own is not titled again with the category heading above it
+    // ("Tuition" under TUITION), unless nothing else would stand beside its price.
+    const options = paymentOptionTexts(price, (value) => `${formatNumber(value)} ${currency}`, t)
+    const hasDetail = Boolean(ageGroupLabel || options.length > 0 || showSource)
+    const title = planName || (priceCategory(price) === heading && hasDetail ? null : t(`pricing.${priceCategory(price)}`))
+    const pageHref = showPageLink ? safeSourceUrl(price.source_url) : null
 
     return (
       // Stacked on phones: beside the price, a long fee name was squeezed into a column a
       // few letters wide and broke mid-word.
       <div key={price.id} className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3 p-4 bg-neutral-50 rounded-lg border border-neutral-200">
         <div className="flex-1 min-w-0 space-y-1">
-          <div className="font-medium text-neutral-900 break-words" lang={textLang(planName, i18n.language)}>
-            {planName || t(`pricing.${priceCategory(price)}`)}
-          </div>
+          {title && (
+            <div className="font-medium text-neutral-900 break-words" lang={textLang(planName, i18n.language)}>
+              {title}
+            </div>
+          )}
           {ageGroupLabel && (
             <div className="text-sm text-neutral-500 break-words" lang={textLang(ageGroupLabel, i18n.language)}>{ageGroupLabel}</div>
           )}
@@ -84,6 +92,19 @@ function PricingSection({ pricing, discounts, ageGroup = null, targetYear = null
             <div className="text-sm text-neutral-500">{t(`pricing.${pricePeriod(price)}`)}</div>
           ) : periodUnknown(price) && (
             <div className="text-sm text-amber-700">{t('pricing.periodNotStated')}</div>
+          )}
+          {/* Prices from several pages of one site: each links its own page. */}
+          {pageHref && (
+            <a
+              href={pageHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-teal-700 sm:block hover:text-teal-800 underline"
+              aria-label={t('pricing.rowSourceLabel', { site: sourceSiteName(pageHref) })}
+            >
+              {t('pricing.rowSource')}
+              <span aria-hidden="true"> ↗</span>
+            </a>
           )}
         </div>
       </div>
@@ -116,7 +137,7 @@ function PricingSection({ pricing, discounts, ageGroup = null, targetYear = null
                 )}
               </div>
               {shared && (
-                <PriceSource source={shared.source} url={shared.url} checkedAt={shared.checkedAt} />
+                <PriceSource source={shared.source} url={shared.url} site={shared.site} checkedAt={shared.checkedAt} checkedUntil={shared.checkedUntil} />
               )}
             </div>
 
@@ -138,6 +159,8 @@ function PricingSection({ pricing, discounts, ageGroup = null, targetYear = null
                             showAgeGroup: !band.label,
                             bandLabel: band.label,
                             showSource: !shared,
+                            showPageLink: Boolean(shared && !shared.onePage),
+                            heading: category,
                           }))}
                         </div>
                       ))}

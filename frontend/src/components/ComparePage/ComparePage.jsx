@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import Layout from '../Layout/Layout'
 import { useCompare } from '../../context/CompareContext'
 import { getLastSearchUrl } from '../../utils/searchViewState'
@@ -14,7 +14,7 @@ import { comparisonExamType, examGradeLabel, getAvailableExamTypes } from '../..
 import { statedTuition, tuitionSortValue } from '../../utils/pricing'
 import { hasDisplayableAdmissionInfo } from '../../utils/admission'
 import { readSavedLocation } from '../../utils/keyFacts'
-import { defaultStage, yearCost } from '../../utils/yearCost'
+import { defaultStage, offersStage, yearCost } from '../../utils/yearCost'
 import { planningYear } from '../../utils/ageSelection'
 import { saveCostNeeds } from '../../admission/saved'
 import { useSavedAdmission } from '../../hooks/useSavedAdmission'
@@ -322,7 +322,24 @@ function ComparePage() {
       onToggleNeed: toggleCostNeed,
     })
     const at = sections.findIndex(section => section.key === 'pricing')
-    return at < 0 ? [...sections, costSection] : [...sections.slice(0, at), costSection, ...sections.slice(at)]
+    if (at < 0) return [...sections, costSection]
+    // A school whose cost table shows a tuition already has this stage's fees there: its whole
+    // fee list would repeat them, so it links the school page instead. Schools without one
+    // (or with no tuition in it, e.g. "price on request") keep the list.
+    const pricing = sections[at]
+    const linkedPricing = {
+      ...pricing,
+      rows: pricing.rows.map(row => ({
+        ...row,
+        getValue: (school) => (school.school_type !== 'state' && offersStage(school, costStage) && costById.get(school.id)?.tuition.options.length > 0 ? (
+          // No age group: the school page then shows every fee, none folded away.
+          <Link to={`/schools/${school.id}`} className="text-sm text-primary-700 underline underline-offset-2 hover:text-primary-800">
+            {t('compare.allFeesLink')}
+          </Link>
+        ) : row.getValue(school)),
+      })),
+    }
+    return [...sections.slice(0, at), costSection, linkedPricing, ...sections.slice(at + 1)]
   }, [sections, schools, costById, costStage, costNeeds, t, i18n.language])
 
   const visibleSections = useMemo(() => allSections

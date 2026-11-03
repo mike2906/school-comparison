@@ -5,13 +5,18 @@ import { getSourceBadgeColor } from './helpers'
 /**
  * Where a price came from, so a parent can check it: the kind of source, a link to the
  * page it was taken from (left out when none is stored) and the day we checked it.
+ * With `site` and no `url` (prices from several pages of one site), the site is named
+ * without a link and each price links its own page. With `checkedUntil` on a later day than
+ * `checkedAt`, the span of checks is shown.
  */
-function PriceSource({ source, url, checkedAt }) {
+function PriceSource({ source, url, site: siteName = null, checkedAt, checkedUntil = null }) {
   const { t, i18n } = useTranslation()
   const href = safeSourceUrl(url)
-  const site = sourceSiteName(url)
+  const site = sourceSiteName(url) || siteName
   const date = formatCheckedDate(checkedAt, i18n.language)
-  if (!source && !href && !date) return null
+  const until = formatCheckedDate(checkedUntil, i18n.language)
+  const span = date && until && until !== date
+  if (!source && !site && !date) return null
 
   return (
     <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-neutral-500">
@@ -32,7 +37,8 @@ function PriceSource({ source, url, checkedAt }) {
           <span aria-hidden="true"> ↗</span>
         </a>
       )}
-      {date && <span>{t('pricing.checkedOn', { date })}</span>}
+      {!href && site && <span>{t('pricing.sourceLink', { site })}</span>}
+      {date && <span>{span ? t('pricing.checkedRange', { from: date, to: until }) : t('pricing.checkedOn', { date })}</span>}
     </div>
   )
 }

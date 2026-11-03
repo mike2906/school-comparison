@@ -2,7 +2,8 @@
  * Live flows for the compare page's yearly cost table (docs/YEARLY_COST.md) on a phone, in
  * both languages: a parent comparing private schools for grade 1 sees what each requires a
  * year (food counted), ticks the school bus to add it, and finds the tick kept on the next
- * visit; the list's fees say what they leave out.
+ * visit, and each school's full fee list is one link to its page; the list's fees say what
+ * they leave out.
  */
 import assert from 'node:assert/strict'
 import { describe, test } from 'node:test'
@@ -55,6 +56,12 @@ describe('yearly cost table', () => {
           const named = squash(t(lang, `yearCost.reasons.${food.reason}`, { line: t(lang, 'yearCost.lines.food') }))
           assert.ok(required.includes(named), `${school.id}: food not named as left out`)
         }
+      }
+
+      // The table already holds grade 1's fees, so each school's full list is a link to its
+      // page, not the same fees again under the table.
+      for (const school of schools) {
+        await page.locator(`a[href$="/schools/${school.id}"]`, { hasText: t(lang, 'compare.allFeesLink') }).first().waitFor()
       }
 
       await section.locator('label', { hasText: t(lang, 'yearCost.lines.transport') }).locator('input').check()
