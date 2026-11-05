@@ -514,6 +514,29 @@ def test_a_pdf_row_with_merged_cells_is_joined_into_one_line():
     )
 
 
+def test_a_pdf_plan_total_in_a_row_of_its_own_joins_its_grade():
+    from app.scrapers.fee_pages import table_lines
+
+    # 596's 2027-28 fees: Plan 2 and Plan 3 totals sit in rows of their own, every other
+    # cell merged down from Plan 1's row. Read alone, "Grade 0 | Plan 1 – € 9,620" gave the
+    # reader no line holding Plan 2's 9,880 beside its "2 x € 4,940".
+    table = [
+        ["Grade", "Payment Plan", "Plan 1", "Plan 2", "Plan 3"],
+        ["Grade 0", "Plan 1 – € 9,620", "1 x € 9,620", "2 x € 4,940", "1 x € 2,940 initial\n9 x € 810 monthly"],
+        [None, "Plan 2 – € 9,880", None, None, None],
+        [None, "Plan 3 – € 10,230", None, None, None],
+        ["Grade 5 – 7", "Plan 1 – € 9,320", "1 x € 9,320", "2 x € 4,760", "1 x € 2,640 initial\n9 x € 810 monthly"],
+        [None, "Plan 2 – € 9,520", None, None, None],
+    ]  # fmt: skip
+    assert table_lines(table) == [
+        "Grade | Payment Plan | Plan 1 | Plan 2 | Plan 3",
+        "Grade 0 | Plan 1 – € 9,620 / Plan 2 – € 9,880 / Plan 3 – € 10,230 | 1 x € 9,620 | 2 x € 4,940 | "
+        "1 x € 2,940 initial / 9 x € 810 monthly",
+        "Grade 5 – 7 | Plan 1 – € 9,320 / Plan 2 – € 9,520 | 1 x € 9,320 | 2 x € 4,760 | "
+        "1 x € 2,640 initial / 9 x € 810 monthly",
+    ]  # fmt: skip
+
+
 def test_a_pdf_heading_merged_over_several_rows_keeps_the_rows_apart():
     from app.scrapers.fee_pages import table_lines
 

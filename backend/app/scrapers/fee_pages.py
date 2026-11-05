@@ -223,6 +223,10 @@ def table_lines(table: list[list[str | None]]) -> list[str]:
     - A row whose first two cells are merged into the row above (None) continues that
       row: its cells are added to the same columns, so the whole row is one line, as when
       the PDF draws it as one cell (596's primary fees and its "billed separately" table).
+    - A row whose first cell is merged and whose cells after the second are all merged too
+      continues the row above (596's 2027-28 fees: "Plan 2 – € 9,880" in a row of its own
+      under "Grade 0", every other cell spanning down from Plan 1's row): it adds only
+      to the second column, so the grade's plan totals stay on one line.
     - A row whose first cell only is merged ("Tuition" spanning "Grade 1 | € 5,000" and
       "Grade 2 | € 6,000") is a row of its own under the same heading: it takes the
       heading as its first cell.
@@ -237,7 +241,7 @@ def table_lines(table: list[list[str | None]]) -> list[str]:
     rows: list[list[list[str]]] = []
     for row in table:
         cells = [[part.strip() for part in (cell or "").splitlines() if part.strip()] for cell in row]
-        if row[0] is None and (len(row) < 2 or row[1] is None):
+        if row[0] is None and (len(row) < 2 or row[1] is None or all(cell is None for cell in row[2:])):
             for column, lines in enumerate(cells[: len(rows[-1])]):
                 rows[-1][column].extend(lines)
         elif row[0] is None:
