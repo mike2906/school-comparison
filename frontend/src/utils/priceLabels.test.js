@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { planNameBeside, planNameLabel, stageLabel, textLang } from './priceLabels.js'
+import { planNameBeside, planNameLabel, stageLabel, textLang, withoutShouting } from './priceLabels.js'
 
 const STRINGS = {
   en: {
@@ -94,4 +94,17 @@ test('the Bulgarian page shows the API translation of an English-only site\'s wo
   const fullDay = { category: 'tuition', plan_name: 'Full-day Program', pricing_context: { plan_name_bg: 'Целодневна програма' } }
   assert.equal(planNameLabel(fullDay, t, 'bg'), 'Целодневна програма')
   assert.equal(planNameLabel(fullDay, t, 'en'), 'Full-day Program')
+})
+
+test('a fee name copied in capitals is shown in sentence case', () => {
+  // 596's 2027-28 PDF headings, read as plan names.
+  assert.equal(withoutShouting('REGISTRATION & APPLICATION FEE'), 'Registration & application fee')
+  assert.equal(withoutShouting('ЧЕТВЪРТИ – ШЕСТИ КЛАС'), 'Четвърти – шести клас')
+  assert.equal(withoutShouting('IB DIPLOMA PROGRAMME'), 'IB diploma programme')
+  assert.equal(withoutShouting('REGISTRATION FEE'), 'Registration fee')
+  // One word alone, or text with any lowercase letter, stays as written.
+  assert.equal(withoutShouting('FOOD'), 'FOOD')
+  assert.equal(withoutShouting('ПУК'), 'ПУК')
+  assert.equal(withoutShouting('IGCSE first year'), 'IGCSE first year')
+  assert.equal(planNameLabel({ category: 'registration', plan_name: 'REGISTRATION & APPLICATION FEE' }, t, 'en'), 'Registration & application fee')
 })
