@@ -228,3 +228,72 @@ def test_latin_titles_and_numbered_sofia_hosts():
     assert problem("ДГ №59 Елхица", "Градина 59 Елхица")  # a quarter, not a kindergarten
     assert directory_host("https://dg42.sofia.bg/") is None
     assert directory_host("https://mladost.sofia.bg/obrazovanie") == "sofia.bg"
+
+
+async def test_a_search_no_provider_answered_is_an_error_not_a_school_without_a_site(db_session):
+    """2026-11-06: every SearXNG engine was blocked, so each school came back with no
+    candidates; stamping them as searched would have hidden them for 90 days."""
+    schools = [_school() for _ in range(find_websites.MAX_UNANSWERED + 2)]
+    db_session.add_all(schools)
+    await db_session.commit()
+    with patch.object(WebsiteDiscoverer, "_query_provider", AsyncMock(return_value=[])), patch(
+        "app.scrapers.stages.website.check_shared_sites", AsyncMock()
+    ):
+        report = await find_websites.run_find_websites(db_session, now=NOW, apply=True)
+    assert report["searched"] == find_websites.MAX_UNANSWERED and report["errors"] == report["searched"]
+    assert report["stopped"] and report["found"] == 0
+    for school in schools:
+        await db_session.refresh(school)
+        assert find_websites.SEARCHED_AT_KEY not in (school.attributes or {})
+
+
+async def test_an_answered_search_with_no_site_is_stamped(db_session):
+    school = _school()
+    db_session.add(school)
+    await db_session.commit()
+
+    async def answered(self, provider, query, school_id):
+        self._last_answered = True
+        return []
+
+    with patch.object(WebsiteDiscoverer, "_query_provider", answered):
+        report = await find_websites.run_find_websites(db_session, now=NOW, apply=True)
+    assert report["errors"] == 0 and report["stopped"] is None
+    await db_session.refresh(school)
+    assert school.attributes[find_websites.SEARCHED_AT_KEY] == NOW.isoformat()
+
+
+async def test_searxng_with_every_engine_blocked_answers_nothing():
+    class Response:
+        status_code = 200
+
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"results": [], "unresponsive_engines": [["google", "access denied"], ["duckduckgo", "CAPTCHA"]]}
+
+    discoverer = WebsiteDiscoverer()
+    discoverer.searxng_base_url = "http://searxng:8080"
+    with patch("httpx.AsyncClient.get", AsyncMock(return_value=Response())):
+        assert await discoverer._search_provider("searxng", "ДГ 59 София", 1) == []
+    assert not discoverer.search_answers.get(1)
+
+
+async def test_a_short_run_search_never_answered_is_stopped(db_session):
+    school = _school()
+    db_session.add(school)
+    await db_session.commit()
+    with patch.object(WebsiteDiscoverer, "_query_provider", AsyncMock(return_value=[])):
+        report = await find_websites.run_find_websites(db_session, now=NOW, school_ids=[school.id], apply=True)
+    assert report["stopped"] and report["errors"] == 1
+
+
+async def test_a_school_with_no_query_to_search_is_still_stamped(db_session):
+    school = _school(name_i18n={})
+    db_session.add(school)
+    await db_session.commit()
+    with patch.object(WebsiteDiscoverer, "_query_provider", AsyncMock(return_value=[])) as query:
+        report = await find_websites.run_find_websites(db_session, now=NOW, apply=True)
+    query.assert_not_awaited()
+    assert report["errors"] == 0 and report["stopped"] is None

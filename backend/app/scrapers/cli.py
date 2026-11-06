@@ -1075,6 +1075,12 @@ def find_websites_command(school_ids, city, country, limit, retry_days, apply_ch
     for school in report["schools"]:
         if school.get("found"):
             console.print(f"  {school['school_id']} {school['name_bg']}: {school['found']}", markup=False)
+    if report["stopped"]:
+        console.print(f"[red]Stopped: {report['stopped']}[/red]")
+    if report["stopped"] and not report["found"]:
+        # No report and a non-zero exit: the monthly job logs "find-websites failed" rather
+        # than "0 found", and as the month's report is missing, its next run searches again.
+        raise SystemExit(1)
     if report_path is not None:
         report_path.parent.mkdir(parents=True, exist_ok=True)
         report_path.write_text(json.dumps(report, ensure_ascii=False, indent=1), encoding="utf-8")
