@@ -64,7 +64,9 @@ MAX_UNANSWERED = 5
 
 _QUOTES_RE = re.compile(r'["„“”«»]')
 _LEGAL_FORM_RE = re.compile(r"^(?:е?оод|ад|еад|кд|сд|ет|ltd|llc)?$", re.IGNORECASE)
-_TYPE_RE = re.compile(r"^(?:ч?(?:дг|оу|су|ну|пг|пгдн|сои|ег)|частн\w*\b.*)$", re.IGNORECASE)
+# A part that is only the school's kind or owner: "ЧДГ", "Частна детска градина",
+# "Държавна ДГ", "към МО" (304 Държавна ДГ "Младост" към МО).
+_TYPE_RE = re.compile(r"^(?:ч?(?:дг|оу|су|ну|пг|пгдн|сои|ег)|(?:частн|държавн|общинск)\w*\b.*|към\b.*)$", re.IGNORECASE)
 
 
 def brands(name: Optional[str]) -> list[str]:
@@ -121,7 +123,7 @@ def state_kind(name: Optional[str], education_level: Optional[str]) -> str:
 
 # What kg.sofia.bg adds after a name: "(с яслени групи)".
 _BRACKETS_RE = re.compile(r"\([^)]*\)")
-_NAME_FILLER = {"яслени", "групи", "сдя", "цдг", "одз", "ясла"}
+_NAME_FILLER = {"яслени", "групи", "сдя", "цдг", "одз", "ясла", "държавна", "към"}
 
 
 def _own_words(name: str) -> list[str]:
@@ -183,6 +185,31 @@ def state_site_problem(name: Optional[str], kind: str, html: str) -> Optional[st
         named = [word for word in words if _whole_word(word, text) or _whole_word(transliterate_bulgarian(word).casefold(), text)]
         if len(named) < min(2, len(words)):
             return f"The home page does not name {' and '.join(words[:2]) if len(words) > 1 else words[0]}"
+    return None
+
+
+def site_problem(name: Optional[str], school: School, html: str) -> Optional[str]:
+    """Why a validated page is not the school's own site, or None.
+
+    Every school's page must name its quoted name ("Младост" in Държавна ДГ "Младост" към
+    МО: a Kazanlak kindergarten's site has every other word of it). A state school's
+    must also pass :func:`state_site_problem`. A private one's must name its town:
+    montesorigradina.bg (Plovdiv, Pazardzhik) passed for 626 "Частна детска градина
+    Монтесори" on words every Montessori kindergarten uses (2026-11-06)."""
+    if not brand_named(name, html):
+        return f"The page does not name {' or '.join(brands(name))}"
+    if school.school_type == "state":
+        return state_site_problem(name, state_kind(name, school.education_level), html)
+    from bs4 import BeautifulSoup
+
+    from app.scrapers.stages.website_pins import CITY_NAMES
+
+    town = CITY_NAMES.get((school.country_code, str(school.city or "").lower()))
+    if town:
+        text = BeautifulSoup(html or "", "html.parser").get_text(" ", strip=True).casefold()
+        spellings = {town, transliterate_bulgarian(town).casefold()}
+        if not any(_whole_word(spelling, text) for spelling in spellings):
+            return f"The page does not name {town}"
     return None
 
 
@@ -326,11 +353,7 @@ async def run_find_websites(
                     result["tried"][-1].update(result="invalid", reason=f"Redirects to {directory_host(final_url)}, a directory")
                     continue
                 page = await _page_text(final_url or url)
-                problem = (
-                    state_site_problem(name, state_kind(name, school.education_level), page)
-                    if state
-                    else None if brand_named(name, page) else f"The page does not name {' or '.join(brands(name))}"
-                )
+                problem = site_problem(name, school, page)
                 if problem:
                     result["tried"][-1].update(result="invalid", reason=problem)
                     continue

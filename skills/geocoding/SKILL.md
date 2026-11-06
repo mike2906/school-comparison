@@ -161,7 +161,9 @@ does; a school searched in the last 90 days waits. A state school or municipal k
 (no ministry code to check a kindergarten against, and numbers shared with schools and
 nurseries) is tried only at a site's home page, which must name its number with its kind
 ("Детска градина №136", not 136 СУ or СДЯ 136) and two words of its own name, or its only one ("Славия"). A site that redirects to a
-directory's entry is not stored.
+directory's entry is not stored. Every school's page must name its quoted name ("Младост" in
+Държавна ДГ "Младост" към МО), and a private school's page its town (montesorigradina.bg,
+in Plovdiv, passed for 626 on generic Montessori words; 2026-11-06).
 Directory and district sites (`website_discovery.directory_host`: `data/bg/directory_domains.json`, the built-in list and everything under sofia.bg but a numbered host)
 are never a school's site: URL validation fails one already stored and clears what it gave.
 Sites behind SuperHosting's JavaScript check ("SuperJS check", about 1 in 8 of the state

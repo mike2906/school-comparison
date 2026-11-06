@@ -20,7 +20,7 @@ def _school(**extra):
     return School(**{**values, **extra})
 
 
-async def _run(db_session, verdicts, candidates=("https://janbibijan.com/",), page="<title>ДГ Ян Бибиян</title>", **options):
+async def _run(db_session, verdicts, candidates=("https://janbibijan.com/",), page="<title>ДГ Ян Бибиян</title><p>гр. София</p>", **options):
     validate = AsyncMock(side_effect=verdicts)
     store = AsyncMock()
     with patch.object(find_websites, "_page_text", AsyncMock(return_value=page)), patch.object(WebsiteDiscoverer, "_search_candidates", AsyncMock(return_value=list(candidates))), patch.object(
@@ -297,3 +297,18 @@ async def test_a_school_with_no_query_to_search_is_still_stamped(db_session):
         report = await find_websites.run_find_websites(db_session, now=NOW, apply=True)
     query.assert_not_awaited()
     assert report["errors"] == 0 and report["stopped"] is None
+
+
+def test_a_quoted_name_and_a_private_schools_town_are_needed():
+    """2026-11-06 PC check: a Kazanlak kindergarten's site passed for 304 Държавна ДГ
+    "Младост" към МО and 340 "Средец" on their other words, and montesorigradina.bg
+    (Plovdiv) for 626 "Частна детска градина Монтесори"."""
+    kazanlak = "<title>ДДГ Детелина</title><p>Държавна детска градина Детелина към Министерство на отбраната, Казанлък</p>"
+    state = _school(school_type="state", name_i18n={"bg": 'Държавна ДГ "Младост" към МО'})
+    assert find_websites.brands(state.name_i18n["bg"]) == ["Младост"]
+    assert "Младост" in find_websites.site_problem(state.name_i18n["bg"], state, kazanlak)
+    assert find_websites.site_problem(state.name_i18n["bg"], state, kazanlak.replace("Детелина", "Младост")) is None
+    private = _school(name_i18n={"bg": '"Частна детска градина Монтесори" ЕООД'})
+    plovdiv = "<title>Монтесори детска градина</title><p>Пловдив, Пазарджик</p>"
+    assert find_websites.site_problem(private.name_i18n["bg"], private, plovdiv) == "The page does not name софия"
+    assert find_websites.site_problem(private.name_i18n["bg"], private, plovdiv + "<p>Sofia, Gorna banya</p>") is None
