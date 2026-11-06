@@ -10,7 +10,8 @@ browser User-Agent and Origin/Referer (the PC's import got a 403 the same day), 
 header, rate limit or endpoint change. On a challenge the adapter sends every request again
 from a headless Chromium page opened on the API's origin (`registry_browser.py`, Playwright).
 The block is by network: cloud and GitHub runner addresses stay on the challenge even in a
-browser (tested 2026-10-21), so this runs on the PC's home connection. If the browser is
+browser (tested 2026-10-21), and so did the PC's home connection on 2026-11-05 (issue #539). The
+monthly job then carries on without the ministry import and keeps one issue open. If the browser is
 challenged too, the adapter's error says so and the scheduled register refresh puts it in its issue.
 GitHub runners can download static files under `ruo.mon.bg/.../files/` (the pages listing them
 stay blocked).

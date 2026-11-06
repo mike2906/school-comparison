@@ -45,8 +45,20 @@ timeout -k 5m 15m uv run playwright install chromium > "$browser_log" 2>&1 ||
 	log "installing the register's headless browser failed (output: $browser_log)"
 # Keep the import's output: its adapter errors (a blocked ministry API) go into the issue.
 discover_log="$state/register-discover-$stamp.log"
-COLUMNS=400 timeout -k 5m "$run_timeout" uv run python -m app.scrapers.cli run --stage discover --city sofia > "$discover_log" 2>&1 ||
-	stop "the register import (discover) failed: $(grep -o 'Error: .*' "$discover_log" | head -n 3 | paste -sd ';' -) (output: $discover_log)"
+discover_errors() { grep -o 'Error: .*' "$discover_log" | head -n 3 | paste -sd ';' -; }
+if ! COLUMNS=400 timeout -k 5m "$run_timeout" uv run python -m app.scrapers.cli run --stage discover --city sofia > "$discover_log" 2>&1; then
+	# Only the ministry adapter failed, on Cloudflare's check (every try since November 2026):
+	# the other sources were imported, so the chain goes on, with one standing issue.
+	if grep -q 'Cloudflare challenge' "$discover_log" && grep -q '1 discovery adapter(s) failed' "$discover_log"; then
+		log "MINISTRY REGISTER BLOCKED: $(discover_errors)"
+		name="$title: ministry register blocked"
+		if [ -z "$(gh issue list -R "$repo" --state open --search "in:title \"$name\"" --json number -q '.[0].number' 2>/dev/null)" ]; then
+			gh issue create -R "$repo" --title "$name" --body "backend/scripts/refresh_register.sh on $(hostname) at $(date -u +%Y-%m-%dT%H:%M:%SZ): the ministry register (ri-api.mon.bg) answered with a Cloudflare challenge, even to a plain headless browser: $(discover_errors). The other sources and the pin steps still ran. New and closed schools from the ministry are not imported until access is back; we do not try to get round the check (backend/docs/MOE_API_DOCUMENTATION.md). Close this issue when the import works again." > /dev/null || true
+		fi
+	else
+		stop "the register import (discover) failed: $(discover_errors) (output: $discover_log)"
+	fi
+fi
 timeout -k 5m "$run_timeout" uv run python scripts/import_sofia_municipal_points.py --apply > /dev/null || stop "import_sofia_municipal_points.py failed"
 cli register-pins --apply --out "$state/register-pins-$stamp.json" || stop "register-pins failed"
 cli site-address --apply --out "$state/register-site-address-$stamp.json" || stop "site-address failed"

@@ -22,6 +22,9 @@ with open(os.environ["CALLS"], "a") as f:
     f.write(json.dumps({"uv": args, "force": os.environ.get("PINS_FORCE")}) + "\n")
 if args[1:3] == ["playwright", "install"]:
     sys.exit(int(os.environ.get("BROWSER_FAIL", "0")))
+if "discover" in args and "DISCOVER_STDOUT" in os.environ:
+    print(os.environ["DISCOVER_STDOUT"])
+    sys.exit(1)
 if "find-websites" in args:
     if os.environ.get("FIND_FAIL"):
         sys.exit(1)
@@ -292,16 +295,26 @@ def test_a_failed_register_import_stops_before_the_pins_and_tries_three_times_a_
     assert (pc.state / "register_cycle").read_text().strip() == "2026-11"
 
 
-def test_a_blocked_register_names_the_cause_in_its_issue(pc):
+def test_a_failed_register_import_names_the_cause_in_its_issue(pc):
     pc.run("refresh_register.sh", "2026-10-20T12:50")
     pc.run(
         "refresh_register.sh",
         "2026-11-05T12:50",
-        UV_FAIL="1",
-        UV_STDOUT="Running moe_registry...\n✗ Error: https://ri-api.mon.bg answered with a Cloudflare challenge (HTTP 403)",
+        DISCOVER_STDOUT="Running kg_sofia...\n✗ Error: kg.sofia.bg timed out\n✗ Error: 1 discovery adapter(s) failed",
     )
-    assert pc.code == 1 and "answered with a Cloudflare challenge (HTTP 403)" in pc.issues
-    assert "Cloudflare challenge" in pc.log("register")
+    assert pc.code == 1 and "kg.sofia.bg timed out" in pc.issues and "register refresh stopped" in pc.issues
+
+
+def test_a_blocked_ministry_register_keeps_one_issue_and_the_chain_goes_on(pc):
+    pc.run("refresh_register.sh", "2026-10-20T12:50")
+    blocked = (
+        "✗ Error: https://ri-api.mon.bg kept a headless browser on the Cloudflare challenge for 60s"
+        "\n✗ Error: 1 discovery adapter(s) failed"
+    )
+    pc.run("refresh_register.sh", "2026-11-05T12:50", DISCOVER_STDOUT=blocked)
+    assert pc.code == 0 and pc.calls[-1] == {"pins": "1 0.05"}
+    assert "ministry register blocked" in pc.issues and "Cloudflare challenge" in pc.issues
+    assert "stopped" not in pc.issues and "MINISTRY REGISTER BLOCKED" in pc.log("register")
 
 
 def test_a_register_browser_that_will_not_install_still_runs_the_import(pc):
