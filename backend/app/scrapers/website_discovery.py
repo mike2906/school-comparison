@@ -331,8 +331,9 @@ class WebsiteDiscoverer:
         # Facebook pages and Instagram profiles seen in search results, by school id: never a
         # website, but kept as unconfirmed candidates (``_store_social_candidates``).
         self.social_hits: dict[int, list[tuple[str, str]]] = {}
-        # Queries a provider really answered, per school: a blocked engine, a CAPTCHA page or
-        # a disabled provider answers nothing, so "no candidates" is then not "no site".
+        # Queries a provider really answered, per school searched (0: asked, none answered):
+        # a blocked engine, a CAPTCHA page or a disabled provider answers nothing, so "no
+        # candidates" is then not "no site". Read by find-websites, which pops its entries.
         self.search_answers: dict[int, int] = {}
         self._last_answered = False
 
@@ -817,9 +818,10 @@ class WebsiteDiscoverer:
         """Execute one search query against a single provider when enabled, counting it in
         ``search_answers`` when the provider really answered."""
         self._last_answered = False
+        self.search_answers.setdefault(school_id, 0)
         links = await self._query_provider(provider, query, school_id)
         if self._last_answered:
-            self.search_answers[school_id] = self.search_answers.get(school_id, 0) + 1
+            self.search_answers[school_id] += 1
         return links
 
     async def _query_provider(self, provider: str, query: str, school_id: int) -> list[str]:

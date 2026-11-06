@@ -84,7 +84,9 @@ private school's fees are read in the same run. A state school or kindergarten i
 its home page naming its number and kind and two words of its own name (or its only one) (`find_websites.py`). A school no
 search provider answered for (every engine blocked, as on 2026-11-06) is an error, not
 "searched, nothing found", so it is not skipped for 90 days; after 5 such schools in a row
-the search stops and exits non-zero, which this job logs as "find-websites failed". It counts as written, so the month publishes even when no fee
+the search stops. A stopped search that found nothing exits non-zero without a report, so
+this job logs "find-websites failed" and its next run searches again; one that found sites
+first keeps them and publishes them. It counts as written, so the month publishes even when no fee
 changed. A failed search is logged and the fee read goes ahead. Facts for a site found come
 with the next facts cycle, or a thread's run.
 

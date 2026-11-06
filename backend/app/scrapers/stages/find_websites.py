@@ -236,7 +236,7 @@ async def _candidates(discoverer, school: School, *, home_pages: bool = False) -
     discoverer.search_answers.pop(school.id, None)
     pool = [(url, "search") for url in await discoverer._search_candidates(school)]
     discoverer.social_hits.pop(school.id, None)
-    if not pool and not discoverer.search_answers.get(school.id):
+    if not pool and discoverer.search_answers.get(school.id) == 0:
         # No provider answered (SearXNG's engines all blocked, 2026-11-06): the school was
         # not searched, so it is an error and is not stamped as searched.
         raise SearchUnavailable("no search provider answered")
@@ -339,6 +339,7 @@ async def run_find_websites(
                     await store_given_site(db, school, url, final_url, reason, method="search")
                 break
         except SearchUnavailable as exc:
+            logger.warning("find-websites: no search answer for school %s", school_id)
             result["error"] = f"search unavailable: {exc}"
             unanswered += 1
         except Exception as exc:  # one school's failure must not stop the run
@@ -355,6 +356,8 @@ async def run_find_websites(
             await db.commit()
         results.append(result)
 
+    if stopped is None and results and unanswered == len(results):
+        stopped = f"web search answered none of the {unanswered} schools searched"
     found = [result for result in results if result.get("found")]
     if apply and found:
         from app.scrapers.stages.website import check_shared_sites

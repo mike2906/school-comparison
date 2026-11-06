@@ -278,3 +278,22 @@ async def test_searxng_with_every_engine_blocked_answers_nothing():
     with patch("httpx.AsyncClient.get", AsyncMock(return_value=Response())):
         assert await discoverer._search_provider("searxng", "ДГ 59 София", 1) == []
     assert not discoverer.search_answers.get(1)
+
+
+async def test_a_short_run_search_never_answered_is_stopped(db_session):
+    school = _school()
+    db_session.add(school)
+    await db_session.commit()
+    with patch.object(WebsiteDiscoverer, "_query_provider", AsyncMock(return_value=[])):
+        report = await find_websites.run_find_websites(db_session, now=NOW, school_ids=[school.id], apply=True)
+    assert report["stopped"] and report["errors"] == 1
+
+
+async def test_a_school_with_no_query_to_search_is_still_stamped(db_session):
+    school = _school(name_i18n={})
+    db_session.add(school)
+    await db_session.commit()
+    with patch.object(WebsiteDiscoverer, "_query_provider", AsyncMock(return_value=[])) as query:
+        report = await find_websites.run_find_websites(db_session, now=NOW, apply=True)
+    query.assert_not_awaited()
+    assert report["errors"] == 0 and report["stopped"] is None
