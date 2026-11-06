@@ -310,5 +310,14 @@ def test_a_quoted_name_and_a_private_schools_town_are_needed():
     assert find_websites.site_problem(state.name_i18n["bg"], state, kazanlak.replace("Детелина", "Младост")) is None
     private = _school(name_i18n={"bg": '"Частна детска градина Монтесори" ЕООД'})
     plovdiv = "<title>Монтесори детска градина</title><p>Пловдив, Пазарджик</p>"
-    assert find_websites.site_problem(private.name_i18n["bg"], private, plovdiv) == "The page does not name софия"
+    assert find_websites.site_problem(private.name_i18n["bg"], private, plovdiv) == "The page does not name София"
     assert find_websites.site_problem(private.name_i18n["bg"], private, plovdiv + "<p>Sofia, Gorna banya</p>") is None
+
+
+def test_brands_leave_out_numbers_brackets_and_owners():
+    assert find_websites.brands('ДГ №5 "Бреза" (с яслени групи)') == ["Бреза"]
+    assert find_websites.brands('ЧДГ "Към звездите" ООД') == ["Към звездите"]
+    private = _school(name_i18n={"bg": '"ЧДГ "ЗВЕЗДИЧКА" ООД'})
+    assert find_websites.site_problem(private.name_i18n["bg"], private, "<p>Звездичка, гр. Банкя</p>") is None
+    # A link to /zvezdichka is not the page naming it.
+    assert find_websites.site_problem(private.name_i18n["bg"], private, '<a href="/zvezdichka">x</a><p>София</p>')

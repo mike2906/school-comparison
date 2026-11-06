@@ -20,7 +20,11 @@ Validation counts a school's profile words as its name ("програмиран�
 a search for 150 ЧПГ по програмиране и роботика "Стив Джобс" found SoftUni Будител's site
 valid. A run with nobody watching it also needs the school's own name, a part of its
 register name in quotes ("Стив Джобс"), on the page (:func:`brand_named`); a name with
-no quoted part is not checked.
+no quoted part is not checked. Since 2026-11-06 this holds for state schools too (a
+Kazanlak kindergarten's site had every other word of 304 Държавна ДГ "Младост" към МО),
+and a private school's page must also name its town or one of the city's own towns
+(``site_city.OWN_TOWNS``): montesorigradina.bg, in Plovdiv, passed for 626 on Montessori
+words alone.
 
 A state school's or kindergarten's site is held to more (:func:`state_site_problem`):
 its candidates are tried at their home page, so a directory's page about the school
@@ -66,7 +70,10 @@ _QUOTES_RE = re.compile(r'["„“”«»]')
 _LEGAL_FORM_RE = re.compile(r"^(?:е?оод|ад|еад|кд|сд|ет|ltd|llc)?$", re.IGNORECASE)
 # A part that is only the school's kind or owner: "ЧДГ", "Частна детска градина",
 # "Държавна ДГ", "към МО" (304 Държавна ДГ "Младост" към МО).
-_TYPE_RE = re.compile(r"^(?:ч?(?:дг|оу|су|ну|пг|пгдн|сои|ег)|(?:частн|държавн|общинск)\w*\b.*|към\b.*)$", re.IGNORECASE)
+_TYPE_RE = re.compile(
+    r"^(?:ч?(?:дг|оу|су|ну|пг|пгдн|сои|ег)|(?:частн|държавн|общинск)\w*\s.*|към\s+(?:мо|мон|министерств\w*|общин\w*)\b.*)$",
+    re.IGNORECASE,
+)
 
 
 def brands(name: Optional[str]) -> list[str]:
@@ -77,7 +84,11 @@ def brands(name: Optional[str]) -> list[str]:
     parts = [part for part in parts if part and not _LEGAL_FORM_RE.match(part)]
     if len(parts) < 2:
         return []
-    return [part for part in parts if not _TYPE_RE.match(part) and len(part.split()) <= 4]
+    # A part with a number ("ДГ №5") or in brackets ("(с яслени групи)") is no name either.
+    return [
+        part for part in parts
+        if not _TYPE_RE.match(part) and len(part.split()) <= 4 and not re.search(r"\d|^\(", part)
+    ]
 
 
 def brand_named(name: Optional[str], page_text: str) -> bool:
@@ -123,7 +134,7 @@ def state_kind(name: Optional[str], education_level: Optional[str]) -> str:
 
 # What kg.sofia.bg adds after a name: "(с яслени групи)".
 _BRACKETS_RE = re.compile(r"\([^)]*\)")
-_NAME_FILLER = {"яслени", "групи", "сдя", "цдг", "одз", "ясла", "държавна", "към"}
+_NAME_FILLER = {"яслени", "групи", "сдя", "цдг", "одз", "ясла", "държавна", "общинска", "към"}
 
 
 def _own_words(name: str) -> list[str]:
@@ -196,20 +207,21 @@ def site_problem(name: Optional[str], school: School, html: str) -> Optional[str
     must also pass :func:`state_site_problem`. A private one's must name its town:
     montesorigradina.bg (Plovdiv, Pazardzhik) passed for 626 "Частна детска градина
     Монтесори" on words every Montessori kindergarten uses (2026-11-06)."""
-    if not brand_named(name, html):
+    from bs4 import BeautifulSoup
+
+    from app.scrapers.site_city import OWN_TOWNS
+
+    text = BeautifulSoup(html or "", "html.parser").get_text(" ", strip=True)
+    if not brand_named(name, text):
         return f"The page does not name {' or '.join(brands(name))}"
     if school.school_type == "state":
         return state_site_problem(name, state_kind(name, school.education_level), html)
-    from bs4 import BeautifulSoup
-
-    from app.scrapers.stages.website_pins import CITY_NAMES
-
-    town = CITY_NAMES.get((school.country_code, str(school.city or "").lower()))
-    if town:
-        text = BeautifulSoup(html or "", "html.parser").get_text(" ", strip=True).casefold()
-        spellings = {town, transliterate_bulgarian(town).casefold()}
-        if not any(_whole_word(spelling, text) for spelling in spellings):
-            return f"The page does not name {town}"
+    towns = OWN_TOWNS.get(str(school.city or "").casefold())
+    if towns:
+        lowered = text.casefold()
+        spellings = {variant for town in towns for variant in (town.casefold(), transliterate_bulgarian(town).casefold())}
+        if not any(_whole_word(spelling, lowered) for spelling in spellings):
+            return f"The page does not name {towns[0]}"
     return None
 
 
