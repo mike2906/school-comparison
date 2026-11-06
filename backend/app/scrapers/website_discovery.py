@@ -331,6 +331,10 @@ class WebsiteDiscoverer:
         # Facebook pages and Instagram profiles seen in search results, by school id: never a
         # website, but kept as unconfirmed candidates (``_store_social_candidates``).
         self.social_hits: dict[int, list[tuple[str, str]]] = {}
+        # Queries a provider really answered, per school: a blocked engine, a CAPTCHA page or
+        # a disabled provider answers nothing, so "no candidates" is then not "no site".
+        self.search_answers: dict[int, int] = {}
+        self._last_answered = False
 
     async def discover(
         self,
@@ -810,7 +814,15 @@ class WebsiteDiscoverer:
         return []
 
     async def _search_provider(self, provider: str, query: str, school_id: int) -> list[str]:
-        """Execute one search query against a single provider when enabled."""
+        """Execute one search query against a single provider when enabled, counting it in
+        ``search_answers`` when the provider really answered."""
+        self._last_answered = False
+        links = await self._query_provider(provider, query, school_id)
+        if self._last_answered:
+            self.search_answers[school_id] = self.search_answers.get(school_id, 0) + 1
+        return links
+
+    async def _query_provider(self, provider: str, query: str, school_id: int) -> list[str]:
         if provider == "searxng":
             if self._is_provider_disabled("searxng"):
                 return []
@@ -1442,6 +1454,9 @@ class WebsiteDiscoverer:
             links.append(cleaned)
             if len(links) >= self.MAX_SEARCH_RESULTS:
                 break
+        # Every engine blocked (Google "access denied", CAPTCHAs) gives no results and lists
+        # them as unresponsive: that is no answer, not "nothing found".
+        self._last_answered = bool(links) or not payload.get("unresponsive_engines")
         return links
 
     async def _search_duckduckgo(self, query: str, school_id: int) -> list[str]:
@@ -1483,7 +1498,9 @@ class WebsiteDiscoverer:
             return []
 
         soup = BeautifulSoup(response.text, "html.parser")
-        return self._extract_duckduckgo_links(soup)
+        links = self._extract_duckduckgo_links(soup)
+        self._last_answered = bool(links)  # a CAPTCHA page is a 200 with no results
+        return links
 
     async def _search_brave(self, query: str, school_id: int) -> list[str]:
         """Query Brave HTML results page."""
@@ -1524,7 +1541,9 @@ class WebsiteDiscoverer:
             return []
 
         soup = BeautifulSoup(response.text, "html.parser")
-        return self._extract_brave_links(soup)
+        links = self._extract_brave_links(soup)
+        self._last_answered = bool(links)  # a CAPTCHA page is a 200 with no results
+        return links
 
     def _extract_duckduckgo_links(self, soup: BeautifulSoup) -> list[str]:
         """Extract candidate links from DuckDuckGo HTML results."""

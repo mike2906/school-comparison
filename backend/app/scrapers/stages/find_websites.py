@@ -57,6 +57,9 @@ RETRY_DAYS = 90
 # Candidates validated per school: search often ranks a directory or a news page first.
 MAX_CANDIDATES = 3
 SEARCHED_AT_KEY = "website_search_checked_at"
+# Schools in a row that web search gave no answer for before a run stops: search is down,
+# and every school searched now would only be an error.
+MAX_UNANSWERED = 5
 
 
 _QUOTES_RE = re.compile(r'["„“”«»]')
@@ -183,6 +186,10 @@ def state_site_problem(name: Optional[str], kind: str, html: str) -> Optional[st
     return None
 
 
+class SearchUnavailable(RuntimeError):
+    """Web search gave no answer for a school (blocked engines, a provider down)."""
+
+
 def home_page(url: str) -> str:
     """The site's home page: a candidate's host, or its tenant's root on a platform that
     hosts sites by path (sites.google.com/view/dg59elhitsa/)."""
@@ -226,8 +233,13 @@ async def _candidates(discoverer, school: School, *, home_pages: bool = False) -
     name = (school.name_i18n or {}).get("bg") or (school.name_i18n or {}).get("en")
     aliases = discoverer._validation_aliases_for_school(school)
     hints = discoverer._discovery_hints_for_school(school)
+    discoverer.search_answers.pop(school.id, None)
     pool = [(url, "search") for url in await discoverer._search_candidates(school)]
     discoverer.social_hits.pop(school.id, None)
+    if not pool and not discoverer.search_answers.get(school.id):
+        # No provider answered (SearXNG's engines all blocked, 2026-11-06): the school was
+        # not searched, so it is an error and is not stamped as searched.
+        raise SearchUnavailable("no search provider answered")
     picked: list[str] = []
     seen: set[str] = set()
     while len(picked) < MAX_CANDIDATES:
@@ -279,7 +291,13 @@ async def run_find_websites(
     due_ids = [school.id for school in due]
     discoverer = WebsiteDiscoverer(country_code=country)
     results: list[dict[str, Any]] = []
+    unanswered = 0
+    stopped = None
     for school_id in due_ids:
+        if unanswered >= MAX_UNANSWERED:
+            stopped = f"web search answered none of the last {unanswered} schools; the rest were not searched"
+            logger.warning("find-websites stopped: %s", stopped)
+            break
         school = (
             await db.execute(
                 select(School)
@@ -320,10 +338,15 @@ async def run_find_websites(
                 if apply:
                     await store_given_site(db, school, url, final_url, reason, method="search")
                 break
+        except SearchUnavailable as exc:
+            result["error"] = f"search unavailable: {exc}"
+            unanswered += 1
         except Exception as exc:  # one school's failure must not stop the run
             logger.exception("find-websites could not search for school %s", school_id)
             result["error"] = f"{type(exc).__name__}: {exc}"[:200]
             await db.rollback()
+        else:
+            unanswered = 0
         if apply and "error" not in result:
             fresh = await db.get(School, school_id)
             attrs = dict(fresh.attributes or {})
@@ -342,6 +365,7 @@ async def run_find_websites(
         "searched": len(results),
         "found": len(found),
         "errors": sum("error" in result for result in results),
+        "stopped": stopped,
         "applied": apply,
         "schools": results,
     }

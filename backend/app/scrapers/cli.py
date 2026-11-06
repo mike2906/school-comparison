@@ -1078,6 +1078,10 @@ def find_websites_command(school_ids, city, country, limit, retry_days, apply_ch
     if report_path is not None:
         report_path.parent.mkdir(parents=True, exist_ok=True)
         report_path.write_text(json.dumps(report, ensure_ascii=False, indent=1), encoding="utf-8")
+    if report["stopped"]:
+        # Exit non-zero so the monthly job logs it as failed rather than "0 found".
+        console.print(f"[red]Stopped: {report['stopped']}[/red]")
+        raise SystemExit(1)
 
 
 @cli.command("flag-deposits")
