@@ -2,7 +2,8 @@
  * Live flows for what a parent reads on a school: finding it by name (Latin saint
  * spellings and a brand in the web address too), the facts read
  * from its website (with open days), its Facebook and Instagram links, fees with their
- * payment plans, a fee source named once with a link per page, last year's fees left out once this year lists them again, fees for the
+ * payment plans, fee names written in capitals shown in sentence case, uniforms priced per
+ * item, a fee source named once with a link per page, last year's fees left out once this year lists them again, fees for the
  * searched age first with the other ages folded away, a headline fee range that says what
  * each end is, the cheapest-first kindergarten list comparing full days, a fee for an
  * earlier year than the searched one saying so, required extras named under the fee,
@@ -17,7 +18,7 @@
 import assert from 'node:assert/strict'
 import { describe, test } from 'node:test'
 
-import { planNameLabel } from '../../src/utils/priceLabels.js'
+import { planNameLabel, withoutShouting } from '../../src/utils/priceLabels.js'
 import { sharedPriceSource } from '../../src/utils/priceSources.js'
 import { rowAgeGroupKeys, splitRowsForAgeGroup } from '../../src/utils/priceRows.js'
 import { getAvailableExamTypes, prepareNvoTimelineData } from '../../src/utils/nvo.js'
@@ -229,6 +230,29 @@ describe('a school page', () => {
       assert.equal(await section.getByText(t('bg', 'pricing.registration'), { exact: true }).count(), 0,
         'no registration heading for a deposit alone')
     }
+  })
+
+  test('a fee name the website writes in capitals is shown in sentence case', async testContext => {
+    // 596's 2027-28 PDF headings: "REGISTRATION & APPLICATION FEE" showed as written.
+    const shouting = row => row.plan_name && withoutShouting(row.plan_name) !== row.plan_name
+    const listed = (await allSchools()).find(s => isPrivate(s) && (s.pricing || []).some(shouting))
+    if (!listed) {
+      testContext.diagnostic('No fee name is written in capitals; nothing to check.')
+      return
+    }
+    const row = listed.pricing.find(shouting)
+    const lang = /\p{Script=Cyrillic}/u.test(row.plan_name) ? 'bg' : 'en'
+    await open(lang, `/schools/${listed.id}`)
+    const section = card(t(lang, 'pricing.title'))
+    await section.getByText(withoutShouting(row.plan_name), { exact: true }).first().waitFor()
+    assert.equal(await section.getByText(row.plan_name, { exact: true }).count(), 0, `${listed.id}: "${row.plan_name}" is shown in capitals`)
+  })
+
+  test('a uniform is priced per item, never per day, week or hour', async () => {
+    // 596's "Dress 19 EUR per week" took food's "Weekly" from the next line of its PDF.
+    const perUnit = row => row.category === 'uniforms' && ['daily', 'weekly', 'hourly'].includes(row.period)
+    const wrong = (await allSchools()).flatMap(s => (s.pricing || []).filter(perUnit).map(row => `${s.id}: ${row.plan_name} ${row.period}`))
+    assert.deepEqual(wrong, [], 'uniforms with a period per day, week or hour')
   })
 
   test("last year's fee is left out once a later year lists it again at that price", async testContext => {
