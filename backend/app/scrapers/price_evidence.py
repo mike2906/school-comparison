@@ -105,13 +105,28 @@ def amount_spans(text: str, value: Any) -> list[tuple[int, int]]:
     return spans
 
 
+# A heading naming two fees with one noun: "REGISTRATION & APPLICATION FEE" (596).
+_JOINED_LABEL_RE = re.compile(r"^(?P<first>\S+(?: \S+)?) (?:&|and|и) (?P<second>\S+(?: \S+)?) (?P<noun>\S+)$")
+
+
 def label_spans(text: str, label: str | None) -> list[tuple[int, int]]:
-    """Where a label occurs in normalized page text (case, spacing and punctuation-tolerant)."""
-    words = _label_key(label).split()
-    if not words:
+    """Where a label occurs in normalized page text (case, spacing and punctuation-tolerant).
+
+    A heading that names two fees with one noun also counts where either fee is named on
+    its own: under "REGISTRATION & APPLICATION FEE", 596's PDF prints "application fee of
+    € 200 ... registration fee of € 800", and the 800 stands by "registration fee"."""
+    key = " ".join(_label_key(label).replace("&", " & ").split())
+    if not key:
         return []
-    pattern = r"[\s:;,.\-–—\"'„“”«»()]+".join(re.escape(word) for word in words)
-    return [m.span() for m in re.finditer(pattern, text)]
+    keys = [key]
+    joined = _JOINED_LABEL_RE.match(key)
+    if joined:
+        keys += [f"{joined['first']} {joined['noun']}", f"{joined['second']} {joined['noun']}"]
+    spans = []
+    for words in (k.split() for k in keys):
+        pattern = r"[\s:;,.\-–—\"'„“”«»()]+".join(re.escape(word) for word in words)
+        spans += [m.span() for m in re.finditer(pattern, text)]
+    return sorted(set(spans))
 
 
 def _gap(a: tuple[int, int], b: tuple[int, int]) -> int:
@@ -1140,34 +1155,37 @@ def check_price_row(
     elif not row.label and all(names_other_level(context, school_family) for context in contexts):
         hit(RULE_LEVEL, f"amount's label lines name {other_family}", contexts[0])
 
-    # Rule 3: period. Needs agreement across the occurrences considered.
-    families = [stated_period(text, span) for span in chosen]
-    single = families[0] if all(f == families[0] for f in families) and len(families[0]) == 1 else None
-    stored = _enum(row.period)
-    headed: set[Optional[str]] = set()
-    if stored is None and (
-        not any(families) or (single and not period_fits_category(row.category, next(iter(single))))
-    ):
-        # Nothing beside the amount, or only a word the fee cannot have (517's
-        # "Еднократно плащане: До 09.07.2026" under a yearly fee): the heading of its
-        # table or list may say.
-        headed = {heading_period(text, span) for span in chosen}
-        if len(headed) == 1 and None not in headed and not period_fits_category(row.category, next(iter(headed))):
-            # "ЕДНОКРАТНО ПЛАЩАНЕ" under "Годишна такса" (564): the heading above it says.
-            headed = {heading_period(text, span, skip=frozenset(headed)) for span in chosen}
-    if single and single <= PER_UNIT_PERIODS and not period_fits_category(
-        row.category, next(iter(single))
-    ):
-        hit(RULE_PERIOD_UNFIT, f"{row.category} priced {next(iter(single)).lower()}", contexts[0])
-    elif len(headed) == 1 and None not in headed and period_fits_category(row.category, next(iter(headed))):
-        stated = headed.pop()
-        hit(RULE_PERIOD_MISSING, f"null period, heading says {stated}", contexts[0], stated)
-    elif single and stored is None:
-        stated = next(iter(single))
-        hit(RULE_PERIOD_MISSING, f"null period, text says {stated}", contexts[0], stated)
-    elif single and stored and stored not in single and {stored} | single != {"ONE_TIME", "YEARLY"}:
-        stated = next(iter(single))
-        hit(RULE_PERIOD_CONFLICT, f"stored {stored}, text says {stated}", contexts[0], stated)
+    # Rule 3: period. Needs agreement across the occurrences considered. A uniform is priced
+    # per item: a period word near it is a neighbouring fee's (596's "Dress: € 19" sits
+    # beside food's "Weekly, for the period between vacations" in the PDF's text layer).
+    if _enum(row.category) != "UNIFORMS":
+        families = [stated_period(text, span) for span in chosen]
+        single = families[0] if all(f == families[0] for f in families) and len(families[0]) == 1 else None
+        stored = _enum(row.period)
+        headed: set[Optional[str]] = set()
+        if stored is None and (
+            not any(families) or (single and not period_fits_category(row.category, next(iter(single))))
+        ):
+            # Nothing beside the amount, or only a word the fee cannot have (517's
+            # "Еднократно плащане: До 09.07.2026" under a yearly fee): the heading of its
+            # table or list may say.
+            headed = {heading_period(text, span) for span in chosen}
+            if len(headed) == 1 and None not in headed and not period_fits_category(row.category, next(iter(headed))):
+                # "ЕДНОКРАТНО ПЛАЩАНЕ" under "Годишна такса" (564): the heading above it says.
+                headed = {heading_period(text, span, skip=frozenset(headed)) for span in chosen}
+        if single and single <= PER_UNIT_PERIODS and not period_fits_category(
+            row.category, next(iter(single))
+        ):
+            hit(RULE_PERIOD_UNFIT, f"{row.category} priced {next(iter(single)).lower()}", contexts[0])
+        elif len(headed) == 1 and None not in headed and period_fits_category(row.category, next(iter(headed))):
+            stated = headed.pop()
+            hit(RULE_PERIOD_MISSING, f"null period, heading says {stated}", contexts[0], stated)
+        elif single and stored is None:
+            stated = next(iter(single))
+            hit(RULE_PERIOD_MISSING, f"null period, text says {stated}", contexts[0], stated)
+        elif single and stored and stored not in single and {stored} | single != {"ONE_TIME", "YEARLY"}:
+            stated = next(iter(single))
+            hit(RULE_PERIOD_CONFLICT, f"stored {stored}, text says {stated}", contexts[0], stated)
 
     # Rule 4: a deposit filed as tuition.
     if _enum(row.category) == "TUITION":

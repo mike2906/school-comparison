@@ -850,3 +850,37 @@ def test_only_age_ranges_past_kindergarten_clear_a_kindergarten_label():
     assert kindergartens("Група 3-4 години, 10 годишни вноски")
     assert kindergartens("Детска градина 3-6 години и лятна школа 6-12 години")
     assert kindergartens("Програми за деца от 2 до 12 години\n3-4 години: 500 евро")
+
+
+# 596's 2027-28 PDF, text layer as pdf_text reads it.
+MAPLE_BEAR_2027 = """REGISTRATION & APPLICATION FEE: A one-time application fee of € 200 is payable upon submission of application
+documents, followed by a one-time registration fee of € 800 payable upon enrollment. Both fees are applicable to new
+and external applicants only and are non-refundable.
+Grade Payment Plan Plan 1 Plan 2 Plan 3
+Plan 1 – € 10,070
+through the Maple Bear CEE Polo T-shirt: € 14
+UNIFORMS the Maple Bear CEE /
+Online Store: Trousers: € 30
+Online Store
+https://mbceeshop.com/ Dress: € 19
+Weekly, for the period
+€ 1,450 annual fee between vacations or
+FOOD Licensed catering company /
+"""
+
+
+def test_596_fee_named_in_a_joined_heading_stands_by_its_own_name():
+    # "REGISTRATION & APPLICATION FEE" heads both fees; the 200 between the heading and the
+    # 800 is the application fee's, and the 800 stands by "registration fee".
+    for amount in (Decimal("800"), Decimal("200")):
+        fee = row(amount, category="REGISTRATION", period="ONE_TIME", plan_name="REGISTRATION & APPLICATION FEE")
+        assert "1_amount_near_label" not in rules(fee, MAPLE_BEAR_2027, "school")
+    # A label naming one fee still has to stand by its amount.
+    other = row(Decimal("800"), category="REGISTRATION", period="ONE_TIME", plan_name="Polo T-shirt")
+    assert "1_amount_near_label" in rules(other, MAPLE_BEAR_2027, "school")
+
+
+def test_596_uniform_takes_no_period_from_a_neighbouring_line():
+    # "Dress: € 19" sits above food's "Weekly, for the period": a uniform is priced per item.
+    dress = row(Decimal("19"), category="UNIFORMS", plan_name="Dress")
+    assert not {rule for rule in rules(dress, MAPLE_BEAR_2027, "school") if rule.startswith("3_")}

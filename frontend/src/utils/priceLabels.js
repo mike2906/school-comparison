@@ -48,7 +48,19 @@ export function websiteWords(price, field, language) {
   const raw = price?.[field]?.trim()
   if (!raw) return null
   const lang = String(language || '').startsWith('en') ? 'en' : 'bg'
-  return price?.pricing_context?.[`${field}_${lang}`]?.trim() || raw
+  return withoutShouting(price?.pricing_context?.[`${field}_${lang}`]?.trim() || raw)
+}
+
+/**
+ * A heading copied in capitals ("REGISTRATION & APPLICATION FEE", 596's PDF) in sentence
+ * case, so it reads like the other fee names. Only text with no lowercase letter and at
+ * least two words of three letters or more: "ПУК" or "FOOD" alone stay as written, and
+ * so do words of one or two letters ("IB DIPLOMA PROGRAMME" → "IB diploma programme").
+ */
+export function withoutShouting(text) {
+  if (!text || /\p{Ll}/u.test(text) || (text.match(/\p{Lu}{3,}/gu) || []).length < 2) return text
+  const calm = text.replace(/\p{L}+/gu, word => (word.length <= 2 ? word : word.toLocaleLowerCase('bg')))
+  return calm.replace(/\p{L}/u, letter => letter.toLocaleUpperCase('bg'))
 }
 
 /**
