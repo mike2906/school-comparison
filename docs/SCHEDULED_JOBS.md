@@ -88,7 +88,7 @@ with the next facts cycle, or a thread's run.
 ### The register chain
 
 After the backup: `playwright install chromium` (a no-op once installed), then `run --stage discover --city sofia` (the ministry register and kg.sofia.bg; a
-crashed source now exits non-zero, and the issue quotes its error; the ministry API has answered scripts with a Cloudflare challenge since October 2026, so the import retries it through headless Chromium, which a home connection gets through; its output is kept in `$state/register-discover-<stamp>.log`; a school keeps its scrape status unless its website
+crashed source now exits non-zero, and the issue quotes its error; the ministry API has answered scripts with a Cloudflare challenge since October 2026, so the import retries it through a plain headless Chromium; that was blocked on the PC too (5 Nov 2026), so when only the ministry adapter fails on the challenge the chain goes on and keeps one open issue "Scheduled register refresh: ministry register blocked"; its output is kept in `$state/register-discover-<stamp>.log`; a school keeps its scrape status unless its website
 changed, so the import never withholds website data it has no stage to re-check), `scripts/import_sofia_municipal_points.py --apply`,
 `register-pins --apply`, `site-address --apply`, `confirm-pins --apply` (all free, hidden
 locations only), then `refresh_pins.sh` with `PINS_FORCE=1`: `website-pins`, `pin-agent`
