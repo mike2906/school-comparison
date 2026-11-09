@@ -20,6 +20,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from app.models import FieldSource, Pricing, School
+from app.models.country import Country
 from app.models.pricing import PriceCategory, PricePeriod, PriceSource
 from app.models.scrape_log import ScrapeType
 from app.models.source_page import SourcePage
@@ -410,6 +411,18 @@ def pages():
 
 
 async def _school(db) -> School:
+    if await db.get(Country, "bg") is None:  # PostgreSQL holds the school's country key
+        db.add(
+            Country(
+                code="bg",
+                name_i18n={"bg": "България", "en": "Bulgaria"},
+                education_config={},
+                map_config={},
+                supported_languages=["bg", "en"],
+                default_language="bg",
+                default_currency="EUR",
+            )
+        )
     school = School(
         name_i18n={"bg": "Частно училище"},
         country_code="bg",
@@ -852,7 +865,10 @@ async def test_page_gone_reads_only_the_status(status, gone):
         assert await fees_agent.page_gone(client, OLD_URL) is gone
 
 
-async def test_a_gone_page_is_saved_invalid_when_no_page_shows_prices(db_session, frozen_today):
+@pytest.mark.postgres  # a revival, then a rollback
+async def test_a_gone_page_keeps_its_rows_when_no_page_shows_prices(db_session, frozen_today):
+    # 505 rebuilt its site: every fee page answered 404, the finder did not reach the new PDF,
+    # and the school lost all its fees. With nothing read in their place, the old rows stay.
     school = await _school(db_session)
     await _old_rows(db_session, school, None, [580], page_url=OLD_URL)
     await db_session.commit()
@@ -861,10 +877,39 @@ async def test_a_gone_page_is_saved_invalid_when_no_page_shows_prices(db_session
         db_session, school, find=_find(no_prices), read=_read([]), apply=True, gone=_gone(OLD_URL)
     )
     assert report["outcome"] == "kept_old_rows" and report["pages_gone"] == [OLD_URL]
+    assert report["pages_gone_kept"] == [OLD_URL]
     await db_session.rollback()  # what a later school's failure would do
+    published = [float(r.amount) for r in await _rows(db_session, school) if pricing_row_is_publishable(r)]
+    assert published == [580.0]
+
+
+async def test_a_gone_page_keeps_its_rows_when_the_read_finds_nothing_publishable(db_session, pages, frozen_today):
+    school = await _school(db_session)
+    await _old_rows(db_session, school, None, [580], page_url=OLD_URL)
+    await db_session.commit()
+    report = await fees_agent.run_school(
+        db_session, school, find=_find(pages), read=_read([]), apply=True, gone=_gone(OLD_URL)
+    )
+    assert report["outcome"] == "kept_old_rows" and report["pages_gone_kept"] == [OLD_URL], report
+    published = [float(r.amount) for r in await _rows(db_session, school) if pricing_row_is_publishable(r)]
+    assert published == [580.0]
+
+
+@pytest.mark.postgres  # a rollback, then a write
+async def test_a_gone_page_is_valid_again_when_the_read_fails(db_session, pages, frozen_today):
+    school = await _school(db_session)
+    await _old_rows(db_session, school, None, [580], page_url=OLD_URL)
+    await db_session.commit()
+
+    async def broken(*_):
+        await db_session.execute(select(SourcePage))  # fails inside an open transaction
+        raise RuntimeError("reader down")
+
+    with pytest.raises(RuntimeError, match="reader down"):
+        await fees_agent.run_school(db_session, school, find=_find(pages), read=broken, apply=True, gone=_gone(OLD_URL))
     old = (await db_session.execute(select(SourcePage).where(SourcePage.source_url == OLD_URL))).scalar_one()
     await db_session.refresh(old)
-    assert old.is_valid is False
+    assert old.is_valid is True
 
 
 async def test_a_fee_the_read_missed_is_read_again_by_name(db_session, pages, frozen_today):
