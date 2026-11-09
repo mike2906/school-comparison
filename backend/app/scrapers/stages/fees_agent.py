@@ -1254,20 +1254,21 @@ async def run_school(
     reach the new fee PDF, and the school lost all 63 of its correct fees.
     """
     marked: list[str] = []  # the pages this read marked invalid
+    school_id = school.id  # a rollback expires ``school``; its id is read before one
     try:
         report = await _run_school(db, school, find=find, read=read, apply=apply, gone=gone, check=check, marked=marked)
     except BaseException:
         if marked:
-            await _revive_gone_pages(db, school, marked, discard=True)
+            await _revive_gone_pages(db, school_id, marked, discard=True)
         raise
     replaced = report["outcome"] == "written" or report.get("reason") in _GONE_PAGES_REPLACED
     if marked and not replaced:
-        report["pages_gone_kept"] = await _revive_gone_pages(db, school, marked)
+        report["pages_gone_kept"] = await _revive_gone_pages(db, school_id, marked)
     return report
 
 
 async def _revive_gone_pages(
-    db: AsyncSession, school: School, urls: Sequence[str], *, discard: bool = False
+    db: AsyncSession, school_id: int, urls: Sequence[str], *, discard: bool = False
 ) -> list[str]:
     """Marks the school's pages at ``urls`` valid again; returns their addresses. ``discard``
     (after a failed read) first drops what the read left unsaved."""
@@ -1278,19 +1279,20 @@ async def _revive_gone_pages(
         pages = (
             (
                 await db.execute(
-                    select(SourcePage).where(SourcePage.school_id == school.id, SourcePage.is_valid.is_(False))
+                    select(SourcePage).where(SourcePage.school_id == school_id, SourcePage.is_valid.is_(False))
                 )
             )
             .scalars()
             .all()
         )
         revived = [page for page in pages if page_key(page.source_url) in wanted]
+        addresses = [page.source_url for page in revived]
         for page in revived:
             page.is_valid = True
         await db.commit()
-        return [page.source_url for page in revived]
+        return addresses
     except Exception:  # the run's own error is the one to report
-        logger.exception("fees-agent could not mark the gone pages of school %s valid again", school.id)
+        logger.exception("fees-agent could not mark the gone pages of school %s valid again", school_id)
         return []
 
 

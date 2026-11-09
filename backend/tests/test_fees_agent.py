@@ -887,9 +887,10 @@ async def test_a_gone_page_is_valid_again_when_the_read_fails(db_session, pages,
     await db_session.commit()
 
     async def broken(*_):
+        await db_session.execute(select(SourcePage))  # fails inside an open transaction
         raise RuntimeError("reader down")
 
-    with pytest.raises(RuntimeError):
+    with pytest.raises(RuntimeError, match="reader down"):
         await fees_agent.run_school(db_session, school, find=_find(pages), read=broken, apply=True, gone=_gone(OLD_URL))
     old = (await db_session.execute(select(SourcePage).where(SourcePage.source_url == OLD_URL))).scalar_one()
     await db_session.refresh(old)
