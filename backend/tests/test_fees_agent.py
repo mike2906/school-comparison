@@ -604,6 +604,23 @@ async def test_fewer_than_half_the_published_rows_keeps_the_old_rows(db_session,
     ] == "written"
 
 
+async def test_rows_rule_6_keeps_do_not_count_against_a_read(db_session, frozen_today):
+    # 300: the read gave each fee once and left out the instalment rows the page still shows.
+    # Those stay; set against every published row, the read was held, new fee and all.
+    school = await _school(db_session)
+    instalments = [2090, 2170, 2280, 2335, 4100, 4260]
+    page_text = PAGE_STAGE + "\n" + "\n".join(f"вноска: {a} евро" for a in instalments)
+    await _old_rows(db_session, school, "2026/2027", instalments)
+    page = (await db_session.execute(select(SourcePage))).scalar_one()
+    page.raw_markdown = page_text
+    await db_session.commit()
+    found = [PageRead(HOME, "Начало", False), PageRead(URL, page_text, True)]
+    report = await fees_agent.run_school(db_session, school, find=_find(found), read=_read(FEES_STAGE), apply=True)
+    assert report["outcome"] == "written", report
+    assert (report["rows_new_publishable"], report["rows_old_published"], report["rows_old_removed"]) == (2, 6, 0)
+    assert sorted(float(r.amount) for r in await _rows(db_session, school)) == [200.0, 700.0, *map(float, instalments)]
+
+
 async def test_a_read_with_nothing_publishable_keeps_the_old_rows(db_session, pages, frozen_today):
     school = await _school(db_session)
     await _old_rows(db_session, school, "2026/2027", [700])
@@ -2451,3 +2468,48 @@ def test_clauses_capitals_semicolons_and_table_cells():
     ) == {("food", True), ("transport", False)}
     row = "Храна | включена | не е включена\n"
     assert kept(row, FeeService(service="food", included=True, evidence="Храна | включена")) == {("food", True)}
+
+
+# --- 300: unnamed activity fees, each with its own group, take the site's labels ---
+
+
+def _unnamed(category, label, age_group=None, period=PricePeriod.TERM, plan_name=None):
+    from app.models import Pricing
+
+    return Pricing(
+        school_id=1, category=category, amount=330, currency="EUR", period=period, age_group=age_group,
+        plan_name=plan_name, academic_year="2026/2027", pricing_context={"label": label},
+    )
+
+
+def test_unnamed_activity_fees_take_their_labels_across_groups():
+    rows = [
+        _unnamed(PriceCategory.EXTRACURRICULAR, "Тенис на корт", "1-7 клас"),
+        _unnamed(PriceCategory.EXTRACURRICULAR, "Плуване", "подготвителна група"),
+        _unnamed(PriceCategory.EXTRACURRICULAR, "Пиано"),
+        _unnamed(PriceCategory.EXTRACURRICULAR, "Отбори", plan_name="Отбори по математика"),
+        # Tuition rows are told apart by group: they keep no label as a name.
+        _unnamed(PriceCategory.TUITION, "Обучение", "Първи клас", PricePeriod.YEARLY),
+        _unnamed(PriceCategory.TUITION, "Обучение 2", "2-7 клас", PricePeriod.YEARLY),
+    ]
+    fees_agent._name_unnamed_alike(rows)
+    assert [row.plan_name for row in rows] == ["Тенис на корт", "Плуване", "Пиано", "Отбори по математика", None, None]
+
+
+def test_one_activity_for_two_groups_still_names_every_fee():
+    rows = [
+        _unnamed(PriceCategory.EXTRACURRICULAR, "Плуване", "подготвителна група"),
+        _unnamed(PriceCategory.EXTRACURRICULAR, "Плуване", "1-7 клас"),
+        _unnamed(PriceCategory.EXTRACURRICULAR, "Пиано"),
+    ]
+    fees_agent._name_unnamed_alike(rows)
+    assert [row.plan_name for row in rows] == ["Плуване", "Плуване", "Пиано"]
+
+
+def test_unnamed_activity_fees_with_the_same_label_stay_unnamed():
+    rows = [
+        _unnamed(PriceCategory.EXTRACURRICULAR, "Занимания", "1-4 клас"),
+        _unnamed(PriceCategory.EXTRACURRICULAR, "занимания", "5-7 клас"),
+    ]
+    fees_agent._name_unnamed_alike(rows)
+    assert [row.plan_name for row in rows] == [None, None]

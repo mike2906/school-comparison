@@ -80,6 +80,10 @@ For one school, with its `website_url`:
      (625's "половин ден" showed as is). Two fees of one category, group and period always
      get the plan name that tells them apart, so a prepaid or promotional price no longer
      shows as a second bare "Tuition" (2026-10-15).
+     An extracurricular, activities, camp or transport fee is named for what it is ("Тенис на
+     корт", "Пиано"); unnamed ones of one category take the site's own labels when the labels
+     with their group and period tell them apart (300 showed fifteen bare "Extracurricular"
+     fees, 2026-11-09).
    - **Discounts.** A percentage or amount off (siblings, paying early, paying the whole year
      at once) is no fee: the reader lists it in `discounts` with a bg and an en sentence. Code
      keeps one only when its evidence line is on the page, holds its one number (percent or
@@ -152,8 +156,11 @@ no new column, table or migration.
 **Replacing rows.** This reuses today's supersede rule (`price_step._find_superseded_rows`):
 a run replaces only the academic years it read, so earlier years stay as history. Because
 the agent's reads vary from run to run, a school whose new read has, for the academic years
-it replaces, fewer than half as many publishable fees as its current published rows keeps
-its old rows, and the run summary lists it. A school where the agent reads nothing also
+it replaces, fewer than half as many publishable fees as the published rows the write would
+remove keeps its old rows, and the run summary lists it. Rows the old-row rule keeps (the
+page still shows them) are not counted, nor are new fees that give way to a kept row: 300's
+read was held against all 62 rows, its instalments included, and with it its new €8,800
+(2026-11-09). A school where the agent reads nothing also
 keeps its rows. A failed or partial crawl must not wipe good prices or make them flicker.
 
 **Freshness.** Fees change about once a year, for the new school year. Run monthly, and
