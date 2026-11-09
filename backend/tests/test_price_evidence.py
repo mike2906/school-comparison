@@ -884,3 +884,11 @@ def test_596_uniform_takes_no_period_from_a_neighbouring_line():
     # "Dress: € 19" sits above food's "Weekly, for the period": a uniform is priced per item.
     dress = row(Decimal("19"), category="UNIFORMS", plan_name="Dress")
     assert not {rule for rule in rules(dress, MAPLE_BEAR_2027, "school") if rule.startswith("3_")}
+
+
+def test_596_uniform_period_the_checks_no_longer_give_is_not_kept():
+    # The Dress row got "weekly" from food's line before rule 3 skipped uniforms; a re-read
+    # without it must replace it, not keep it as a lost period.
+    published = [(row(Decimal("19"), category="UNIFORMS", period="WEEKLY", plan_name="Dress"), MAPLE_BEAR_2027)]
+    proposed = [(row(Decimal("19"), category="UNIFORMS", plan_name="Dress"), MAPLE_BEAR_2027)]
+    assert replacement_regressions(published, proposed, "school") == []

@@ -1286,6 +1286,13 @@ def states_another_unit(page_text: Optional[str], value: Any) -> bool:
     return False
 
 
+def _period_can_hold(row: PriceRow) -> bool:
+    """False for a stored period the checks would not give this fee today: any period on
+    a uniform (priced per item, rule 3 skips it) or one its category cannot have."""
+    category = str(_enum(row.category) or "").upper()
+    return category != "UNIFORMS" and period_fits_category(category, _enum(row.period))
+
+
 def replacement_regressions(
     published: Iterable[tuple[PriceRow, Optional[str]]],
     proposed: Iterable[tuple[PriceRow, Optional[str]]],
@@ -1382,6 +1389,10 @@ def replacement_regressions(
             continue
         for old, old_text in olds:
             if states_another_unit(old_text, old.amounts[0]):
+                continue
+            if old.period and not _period_can_hold(old):
+                # A period the checks no longer allow is no evidence to keep: 596's Dress
+                # got "weekly" from food's line below it before rule 3 skipped uniforms.
                 continue
             if old.period and all(new.period is None for new, _ in matches):
                 filled = any(
