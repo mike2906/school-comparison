@@ -20,6 +20,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from app.models import FieldSource, Pricing, School
+from app.models.country import Country
 from app.models.pricing import PriceCategory, PricePeriod, PriceSource
 from app.models.scrape_log import ScrapeType
 from app.models.source_page import SourcePage
@@ -410,6 +411,18 @@ def pages():
 
 
 async def _school(db) -> School:
+    if await db.get(Country, "bg") is None:  # PostgreSQL holds the school's country key
+        db.add(
+            Country(
+                code="bg",
+                name_i18n={"bg": "България", "en": "Bulgaria"},
+                education_config={},
+                map_config={},
+                supported_languages=["bg", "en"],
+                default_language="bg",
+                default_currency="EUR",
+            )
+        )
     school = School(
         name_i18n={"bg": "Частно училище"},
         country_code="bg",
@@ -852,6 +865,7 @@ async def test_page_gone_reads_only_the_status(status, gone):
         assert await fees_agent.page_gone(client, OLD_URL) is gone
 
 
+@pytest.mark.postgres  # a revival, then a rollback
 async def test_a_gone_page_keeps_its_rows_when_no_page_shows_prices(db_session, frozen_today):
     # 505 rebuilt its site: every fee page answered 404, the finder did not reach the new PDF,
     # and the school lost all its fees. With nothing read in their place, the old rows stay.
@@ -883,19 +897,6 @@ async def test_a_gone_page_keeps_its_rows_when_the_read_finds_nothing_publishabl
 
 @pytest.mark.postgres  # a rollback, then a write
 async def test_a_gone_page_is_valid_again_when_the_read_fails(db_session, pages, frozen_today):
-    from app.models.country import Country
-
-    db_session.add(  # PostgreSQL holds the school's country key
-        Country(
-            code="bg",
-            name_i18n={"bg": "България", "en": "Bulgaria"},
-            education_config={},
-            map_config={},
-            supported_languages=["bg", "en"],
-            default_language="bg",
-            default_currency="EUR",
-        )
-    )
     school = await _school(db_session)
     await _old_rows(db_session, school, None, [580], page_url=OLD_URL)
     await db_session.commit()
