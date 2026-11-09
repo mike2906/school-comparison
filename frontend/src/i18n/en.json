@@ -1484,6 +1484,7 @@
     "noTotal": "No yearly total",
     "assumedNote": "* includes a fee with no stated period, counted once a year",
     "statedTotal": "The school's own total; it may already hold the lines above",
+    "firstYearInTotal": "Admission fees are in the school's total for new pupils",
     "notAdded": "Not added: {{items}}",
     "reasons": {
       "severalOptions": "{{line}} (several options)",

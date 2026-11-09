@@ -89,6 +89,34 @@ test('deposits and uniforms are listed apart from the first-year sum', () => {
   assert.deepEqual(firstYear.value, { min: 500, max: 500, assumed: false })
 })
 
+test('admission fees are not added on top of a total for new pupils (506)', () => {
+  const rows = [
+    { id: 1, category: 'tuition', amount: 28511, currency: 'EUR', period: null, age_group: 'Kindergarten – Grade 5', plan_name: 'Total Fee for New Students', year_status: 'not_stated' },
+    { id: 2, category: 'tuition', amount: 25702, currency: 'EUR', period: null, age_group: 'Kindergarten – Grade 5', plan_name: 'Total Fee for Returning Students', year_status: 'not_stated' },
+    { id: 3, category: 'registration', amount: 1707, currency: 'EUR', period: 'one_time', plan_name: 'Entrance Capital Fee (New students only)', year_status: 'not_stated' },
+    { id: 4, category: 'registration', amount: 1102, currency: 'EUR', period: 'one_time', plan_name: 'Registration Fee (New students only)', year_status: 'not_stated' },
+  ]
+  const { firstYear } = yearCost(rows, 'grade_1', { today })
+  assert.equal(firstYear.inTotal, true)
+  assert.deepEqual(firstYear.options, [])
+  assert.equal(firstYear.value, null)
+  // The entrance exam and a total without a price are not in it, nor is a total that leaves them out.
+  const exam = { id: 5, category: 'registration', amount: 200, currency: 'EUR', period: 'one_time', plan_name: 'Entrance exam', year_status: 'not_stated' }
+  assert.deepEqual(ids(yearCost([...rows, exam], 'grade_1', { today }).firstYear.options), [5])
+  const unpriced = yearCost(rows.map(row => (row.id === 1 ? { ...row, amount: null } : row)).filter(row => row.id !== 2), 'grade_1', { today })
+  assert.deepEqual(ids(unpriced.firstYear.options), [3, 4])
+  const leftOut = yearCost(rows.map(row => (row.id === 1 ? { ...row, plan_name: 'Total (excluding fees for new students)' } : row)), 'grade_1', { today })
+  assert.equal(leftOut.firstYear.inTotal, false)
+  const noBus = yearCost(rows.map(row => (row.id === 1 ? { ...row, plan_name: 'Total Fee for New Students (without bus)' } : row)), 'grade_1', { today })
+  assert.equal(noBus.firstYear.inTotal, true)
+  // No admission fee: nothing to say is in the total.
+  assert.equal(yearCost(rows.slice(0, 2), 'grade_1', { today }).firstYear.inTotal, false)
+  // Any other total is not known to hold them.
+  const other = yearCost(rows.map(row => (row.id === 1 ? { ...row, plan_name: 'Total' } : row)).filter(row => row.id !== 2), 'grade_1', { today })
+  assert.equal(other.firstYear.inTotal, false)
+  assert.deepEqual(ids(other.firstYear.options), [3, 4])
+})
+
 test('a kindergarten group never gets a school’s fee', () => {
   // Uwekind's "Училище" tuition and the pupils' food at Lozen are not a kindergarten's.
   assert.equal(cost(635, 'first').tuition.options.length, 0)

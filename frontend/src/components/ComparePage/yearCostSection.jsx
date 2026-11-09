@@ -149,8 +149,8 @@ export function buildYearCostSection({ t, language, schools, costById, stage, ne
   const firstYearCell = (school) => {
     const cost = costById.get(school.id)
     if (state(school) !== 'cost') return fallback(school)
-    const { options, deposits, uniforms } = cost.firstYear
-    if (options.length + deposits.length + uniforms.length === 0) return muted(t('yearCost.notStated'))
+    const { options, deposits, uniforms, inTotal } = cost.firstYear
+    if (options.length + deposits.length + uniforms.length === 0) return muted(t(inTotal ? 'yearCost.firstYearInTotal' : 'yearCost.notStated'))
     const uniformRange = uniforms.length > 0 && {
       min: Math.min(...uniforms.map(item => item.value.min)),
       max: Math.max(...uniforms.map(item => item.value.max)),
@@ -158,6 +158,7 @@ export function buildYearCostSection({ t, language, schools, costById, stage, ne
     return (
       <div className="space-y-1.5">
         {/* Listed, not summed: two admission fees may be one or the other (round I or II). */}
+        {inTotal && <p className="text-xs text-neutral-600">{t('yearCost.firstYearInTotal')}</p>}
         {options.length > 0 && optionList(options, { named: true })}
         {deposits.map(item => (
           <p key={item.row.id} className="text-xs text-neutral-600">
@@ -219,7 +220,7 @@ export function buildYearCostSection({ t, language, schools, costById, stage, ne
     ...(needs.length > 0
       ? [row('withNeeds', lineName('withNeeds'), school => totalCell(cost => totalWithNeeds(cost, needs), school), totalCompare(cost => totalWithNeeds(cost, needs)))]
       : []),
-    row('firstYear', lineName('firstYear'), firstYearCell, school => (state(school) === 'cost' ? costById.get(school.id).firstYear.options.map(item => `${item.value.min}-${item.value.max}`).join(',') || 'none' : state(school))),
+    row('firstYear', lineName('firstYear'), firstYearCell, school => (state(school) === 'cost' ? [...costById.get(school.id).firstYear.options.map(item => `${item.value.min}-${item.value.max}`), costById.get(school.id).firstYear.inTotal ? 'inTotal' : ''].join(',') || 'none' : state(school))),
     row('optional', lineName('optional'), optionalCell, school => (state(school) === 'cost' ? costById.get(school.id).optional.map(item => `${priceCategory(item.row)}:${item.value.min}-${item.value.max}`).join(',') || 'none' : state(school))),
   ]
 

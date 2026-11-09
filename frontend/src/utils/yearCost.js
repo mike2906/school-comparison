@@ -228,12 +228,21 @@ function lineValue(line) {
 
 const RECURRING_LINES = ['materials', 'food', 'extended_day', 'transport']
 const ONE_OFF_CATEGORIES = new Set(['registration', 'deposit', 'uniforms'])
+// A school's total for a new pupil holds the entrance and registration fees: 506's "Total Fee for
+// New Students" is tuition + entrance + capital + registration fee.
+const NEW_PUPILS_RE = /new (?:students?|pupils?)|нови ученици|новоприет|новопостъп/iu
+// Leaves out the admission fees themselves: "without bus" does not.
+const LEAVES_OUT_RE = /(?:exclud\w*|not includ\w*|without|без|не включва)\s+(?:the\s+)?(?:[\p{L}-]+\s+){0,2}?(?:fees?\b|admission|registration|entrance|такс|прием|записване)/iu
+// Not part of such a total: 506 bills its entrance exam apart, and an application fee comes first.
+const NOT_IN_TOTAL_RE = /exam|test|assessment|application|изпит|тест|кандидат/iu
+const names = row => [row.plan_name, row.pricing_context?.plan_name_en].filter(Boolean)
+const newPupilTotal = row => names(row).some(text => NEW_PUPILS_RE.test(text) && !LEAVES_OUT_RE.test(text))
 
 /**
  * One year at a school for `stage` (a COST_STAGES key). Returns null without fees. Shape:
  * `{ academicYear, yearStatus, tuition: { options, perYear, statedTotal },
  *    lines: { materials, required, food, extended_day, transport }: { state, options, required },
- *    firstYear: { options, deposits, uniforms, value }, optional: [option],
+ *    firstYear: { options, deposits, uniforms, value, inTotal }, optional: [option],
  *    required: { value, missing: [{ line, reason }] } }`
  * where `state` is included | excluded | priced | none and each option is
  * `{ row, period, value: {min, max}, perYear: {min, max, assumed} | null, required }`.
@@ -290,8 +299,15 @@ export function yearCost(pricing = [], stage, { today = new Date() } = {}) {
     .map(row => option(row, { yearlyPage }))
 
   const oneOffs = rows.filter(row => ONE_OFF_CATEGORIES.has(priceCategory(row)) && amounts(row))
-  const firstYearOptions = withoutRepeats(oneOffs.filter(row => priceCategory(row) === 'registration').map(row => option(row, { yearlyPage })))
+  // Admission fees inside the school's own new-pupil total (one shown with a price) are not
+  // added on top of it; an exam or application fee still is.
+  const admission = oneOffs.filter(row => priceCategory(row) === 'registration')
+  const heldInTotal = tuition.statedTotal && tuition.options.some(item => newPupilTotal(item.row))
+    ? admission.filter(row => !names(row).some(text => NOT_IN_TOTAL_RE.test(text)))
+    : []
+  const firstYearOptions = withoutRepeats(admission.filter(row => !heldInTotal.includes(row)).map(row => option(row, { yearlyPage })))
   const firstYear = {
+    inTotal: heldInTotal.length > 0,
     options: firstYearOptions,
     deposits: oneOffs.filter(row => priceCategory(row) === 'deposit').map(row => option(row, { yearlyPage })),
     uniforms: oneOffs.filter(row => priceCategory(row) === 'uniforms').map(row => option(row, { yearlyPage })),
