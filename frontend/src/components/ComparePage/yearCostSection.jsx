@@ -220,7 +220,7 @@ export function buildYearCostSection({ t, language, schools, costById, stage, ne
     ...(needs.length > 0
       ? [row('withNeeds', lineName('withNeeds'), school => totalCell(cost => totalWithNeeds(cost, needs), school), totalCompare(cost => totalWithNeeds(cost, needs)))]
       : []),
-    row('firstYear', lineName('firstYear'), firstYearCell, school => (state(school) === 'cost' ? costById.get(school.id).firstYear.options.map(item => `${item.value.min}-${item.value.max}`).join(',') || 'none' : state(school))),
+    row('firstYear', lineName('firstYear'), firstYearCell, school => (state(school) === 'cost' ? [...costById.get(school.id).firstYear.options.map(item => `${item.value.min}-${item.value.max}`), costById.get(school.id).firstYear.inTotal ? 'inTotal' : ''].join(',') || 'none' : state(school))),
     row('optional', lineName('optional'), optionalCell, school => (state(school) === 'cost' ? costById.get(school.id).optional.map(item => `${priceCategory(item.row)}:${item.value.min}-${item.value.max}`).join(',') || 'none' : state(school))),
   ]
 

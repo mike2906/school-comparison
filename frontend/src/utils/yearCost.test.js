@@ -100,6 +100,15 @@ test('admission fees are not added on top of a total for new pupils (506)', () =
   assert.equal(firstYear.inTotal, true)
   assert.deepEqual(firstYear.options, [])
   assert.equal(firstYear.value, null)
+  // The entrance exam and a total without a price are not in it, nor is a total that leaves them out.
+  const exam = { id: 5, category: 'registration', amount: 200, currency: 'EUR', period: 'one_time', plan_name: 'Entrance exam', year_status: 'not_stated' }
+  assert.deepEqual(ids(yearCost([...rows, exam], 'grade_1', { today }).firstYear.options), [5])
+  const unpriced = yearCost(rows.map(row => (row.id === 1 ? { ...row, amount: null } : row)).filter(row => row.id !== 2), 'grade_1', { today })
+  assert.deepEqual(ids(unpriced.firstYear.options), [3, 4])
+  const leftOut = yearCost(rows.map(row => (row.id === 1 ? { ...row, plan_name: 'Total (excluding fees for new students)' } : row)), 'grade_1', { today })
+  assert.equal(leftOut.firstYear.inTotal, false)
+  // No admission fee: nothing to say is in the total.
+  assert.equal(yearCost(rows.slice(0, 2), 'grade_1', { today }).firstYear.inTotal, false)
   // Any other total is not known to hold them.
   const other = yearCost(rows.map(row => (row.id === 1 ? { ...row, plan_name: 'Total' } : row)).filter(row => row.id !== 2), 'grade_1', { today })
   assert.equal(other.firstYear.inTotal, false)

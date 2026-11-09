@@ -17,7 +17,7 @@ comes from the saved child when it fits the searched age group, else that group'
 | Other required fees | rows the school calls compulsory (`requiredExtras`): 635's club | yes |
 | Food | `food` rows, or "included" from the tuition's words | always (every child eats), when included or one yearly price; else named as not added |
 | After-school care, school bus | `extended_day`, `transport` rows | only when ticked, and only when they come to one yearly price |
-| First year only | admission fees, each listed (two may be one or the other, so no sum); deposits and uniform item prices apart | no |
+| First year only | admission fees, each listed (two may be one or the other, so no sum); deposits and uniform item prices apart. Under the school's own priced total for new pupils (506) the admission fees are in it and not listed, except an exam or application fee | no |
 | Optional extras | clubs, activities, camps the school prices | never |
 
 Each price links to its source page. A line is "Included in tuition" only when every tuition
