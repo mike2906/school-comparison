@@ -317,7 +317,10 @@ const SchoolCard = memo(function SchoolCard({
     pricing,
     t,
     locale: intlLocale(i18n.language),
-  }), [school, attributes, locations, pricing, t, i18n.language])
+    language: i18n.language,
+    ageGroup: activeAgeGroup,
+    cohort: pricingCohort,
+  }), [school, attributes, locations, pricing, t, i18n.language, activeAgeGroup, pricingCohort])
 
   const hasExpandedContent = expandedSections.length > 0 || Boolean(nvoDetail)
   const expandedId = `school-details-${school.id}`

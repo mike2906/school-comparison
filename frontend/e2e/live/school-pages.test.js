@@ -2,7 +2,8 @@
  * Live flows for what a parent reads on a school: finding it by name (Latin saint
  * spellings and a brand in the web address too), the facts read
  * from its website (with open days), its Facebook and Instagram links, fees with their
- * payment plans, fee names written in capitals shown in sentence case, uniforms priced per
+ * payment plans, a search card naming each group's main fee and the other kinds (not
+ * every fee line), fee names written in capitals shown in sentence case, uniforms priced per
  * item, a fee source named once with a link per page, last year's fees left out once this year lists them again, fees for the
  * searched age first with the other ages folded away, a headline fee range that says what
  * each end is, the cheapest-first kindergarten list comparing full days, a fee for an
@@ -163,6 +164,22 @@ describe('a school page', () => {
       assert.equal(sameUrl(await link.getAttribute('href')), sameUrl(url))
       assert.equal(await link.getAttribute('target'), '_blank')
     }
+  })
+
+  test("a search card names each group's main fee and the other kinds, not every fee line", async () => {
+    // 300 (ESPA) listed 62 fee lines on its card, the price buried among fifteen bare
+    // "Extracurricular" lines and every instalment.
+    const school = (await allSchools()).find(s => isPrivate(s) && (s.pricing || []).length >= 20 && statedTuition(s.pricing))
+    assert.ok(school, 'a private school with many fees')
+    await open('en', `/search?q=${encodeURIComponent(schoolName(school, 'bg'))}`)
+    const toggle = page.locator(`[aria-controls="school-details-${school.id}"]`).filter({ visible: true }).first()
+    await toggle.click()
+    const details = page.locator(`#school-details-${school.id}`)
+    const fees = details.getByText(t('en', 'schoolCard.sections.tuitionFees'), { exact: true }).locator('xpath=..')
+    await fees.waitFor()
+    const lines = await fees.locator('li').allInnerTexts()
+    assert.ok(lines.length < 12, `a short fee section, not ${school.pricing.length} lines: ${lines.join(' | ')}`)
+    await fees.getByText(t('en', 'schoolCard.otherFees', { fees: '' }).trim()).waitFor()
   })
 
   test('a fee with a payment plan shows the plan under it, in euro', async () => {

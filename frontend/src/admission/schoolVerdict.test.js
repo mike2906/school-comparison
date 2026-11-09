@@ -8,7 +8,7 @@ import { catchmentUrl, indexAddresses, indexCatchments } from './catchments.js'
 import { evaluateKindergarten, GRADE1_INITIAL, KINDERGARTEN_INITIAL } from './inputs.js'
 import { ruleSetFor, stageById } from './calculator.js'
 import { siblingsWith } from './saved.js'
-import { clearlyBelowIds, compareRows, kindergartenDistrict, KINDERGARTEN_ASSUMED, savedVerdictsFor } from './schoolVerdict.js'
+import { clearlyBelowIds, compareRows, kindergartenDistrict, KINDERGARTEN_ASSUMED, savedVerdictsFor, stagesShown } from './schoolVerdict.js'
 
 const savedVerdictFor = (...args) => savedVerdictsFor(...args)[0] ?? null
 
@@ -183,4 +183,13 @@ test('only schools clearly below the last admitted child are hidden', () => {
   assert.deepEqual([...hidden], [1])
   const withSen = { kindergarten: { startYear: 2026, answers: { ...kgAnswers, additional: 'sen' } } }
   assert.equal(clearlyBelowIds(schools, withSen, null, data).size, 0, 'SEN places are another way in')
+})
+
+test('the list banner names only the saved tabs a listed school shows a result for', () => {
+  const saved = { kindergarten: { startYear: 2026, answers: kgAnswers } }
+  const privateSchool = { id: 6, school_type: 'private', education_level: 'primary', admission_info: {} }
+  // 300 (ESPA) alone under "Preschool · schools": a private school's own admission shows no points.
+  assert.equal(stagesShown([privateSchool], saved, null, data).size, 0)
+  const withKindergarten = [privateSchool, { ...kindergarten(home, [kgRow(10)]), id: 1 }]
+  assert.deepEqual([...stagesShown(withKindergarten, saved, null, data).get('kindergarten')], ['kindergarten'])
 })

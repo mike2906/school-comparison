@@ -1,7 +1,7 @@
 import { languageLabel } from '../../utils/languages.js'
 import { getNvoDetail as getSharedNvoDetail } from '../../utils/nvo.js'
 import { getCanonicalAmenityFlags, getOptionLabel, normalizeLanguageFocus } from '../../utils/schoolAttributes.js'
-import { formatPriceLabel } from '../../utils/pricing.js'
+import { formatPriceLabel, priceAgeGroupLabel, selectPricingCohort, sortByCategory, tuitionRows } from '../../utils/pricing.js'
 import { planNameLabel } from '../../utils/priceLabels.js'
 import { priceCategory, pricePeriod } from '../../utils/priceRows.js'
 import { parsePhones } from '../../utils/phone.js'
@@ -212,6 +212,9 @@ export function buildExpandedSections({
   pricing,
   t,
   locale,
+  language = 'bg',
+  ageGroup = null,
+  cohort = undefined, // the card's selectPricingCohort result, so its badge and fees agree
 }) {
   const sections = []
 
@@ -308,22 +311,27 @@ export function buildExpandedSections({
   }
 
   if (pricing.length > 0 && school.school_type !== 'state') {
-    const pricingLines = pricing.map(item => {
-      const category = t(`pricing.${priceCategory(item)}`)
+    // The main price of each group, then the other kinds of fee by name: the school page
+    // lists every fee. Listing them all here buried the price (300 had 62 lines, among them
+    // fifteen bare "Extracurricular" ones and every instalment).
+    const rows = (cohort === undefined ? selectPricingCohort(pricing, { ageGroup }) : cohort)?.rows || pricing
+    const tuition = tuitionRows(rows, ageGroup)
+    const pricingLines = tuition.map(item => {
+      const group = priceAgeGroupLabel(item, t, language)
+      const plan = planNameLabel(item, t, language)
+      const name = [group, plan].filter(Boolean).join(' · ') || t('pricing.tuition')
       const period = pricePeriod(item)
-      const periodKey = period ? t(`pricing.${period}`) : t('pricing.periodNotStated')
-      const planName = planNameLabel(item, t, locale)
-      const plan = planName ? `${t('pricing.plan')}: ${planName}` : ''
-      const year = item.academic_year ? `${t('pricing.academicYear')}: ${item.academic_year}` : ''
-      const meta = [plan, year].filter(Boolean).join(' • ')
-      const source = item.source ? t(`priceSource.${item.source}`) : ''
-      // BGN rows are converted to euro, as on the detail and compare pages.
-      const priceLabel = formatPriceLabel(item, locale, t)
-      const periodLabel = periodKey ? ` (${periodKey})` : ''
-      const metaLabel = meta ? ` • ${meta}` : ''
-      const sourceLabel = source ? ` • ${source}` : ''
-      return `${category}${periodLabel}${metaLabel}: ${priceLabel}${sourceLabel}`
-    }).filter(Boolean)
+      const periodLabel = period ? t(`pricing.${period}`) : t('pricing.periodNotStated')
+      // Next to each price, the year the school gave it for and where it comes from.
+      const meta = [item.academic_year, item.source && t(`priceSource.${item.source}`)].filter(Boolean)
+      return [`${name}: ${formatPriceLabel(item, locale, t)} (${periodLabel})`, ...meta].join(' · ')
+    })
+    // Every kind of fee the school lists, whatever its year; tuition too when no main price is shown.
+    const others = [...new Set(sortByCategory(pricing).map(priceCategory))]
+      .filter(category => category !== 'tuition' || tuition.length === 0)
+    if (others.length > 0) {
+      pricingLines.push(t('schoolCard.otherFees', { fees: others.map(category => t(`pricing.${category}`)).join(', ') }))
+    }
 
     if (pricingLines.length > 0) {
       sections.push({

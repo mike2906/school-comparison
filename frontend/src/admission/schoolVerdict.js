@@ -145,6 +145,24 @@ export function clearlyBelowIds(schools, saved, ageGroup, data) {
 }
 
 /**
+ * The saved tabs these schools show a result for, each with the kinds of place that show
+ * it ('kindergarten', 'school': a state school's preparatory group is ranked under the
+ * kindergarten rules too). The list's banner explains only what the cards show, in their
+ * words: a list of private schools, which admit by their own procedure, shows none.
+ * Returns `Map<stage, Set<kind>>`.
+ */
+export function stagesShown(schools, saved, ageGroup, data) {
+  const shown = new Map()
+  for (const school of schools) {
+    for (const verdict of savedVerdictsFor(school, saved, ageGroup, data)) {
+      if (!shown.has(verdict.stage)) shown.set(verdict.stage, new Set())
+      shown.get(verdict.stage).add(usesSofiaKindergartenSystem(school) ? 'kindergarten' : 'school')
+    }
+  }
+  return shown
+}
+
+/**
  * The search filters that show a saved tab's schools: state schools, its intake year and
  * age group (and the child's birth year for kindergartens). Null when the answers do not
  * give an age group.

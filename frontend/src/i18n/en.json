@@ -606,6 +606,7 @@
       "scheduleDetails": "Schedule Details",
       "tuitionFees": "Tuition & Fees"
     },
+    "otherFees": "Other fees: {{fees}}",
     "showMore": "Show more",
     "showLess": "Show less",
     "labels": {
@@ -1261,10 +1262,14 @@
     "panelTitle": "Your saved answers at this school",
     "assumed": {
       "kindergarten": "Assumes it's your 1st wish, and a sibling only where you said so in that kindergarten's own calculator.",
+      "kindergarten_school": "Assumes it's your 1st wish, and a sibling only where you said so in that school's own calculator.",
+      "kindergarten_both": "Assumes it's your 1st wish, and a sibling only where you said so in that kindergarten's or school's own calculator.",
       "grade_1": "Uses your first address, assumes no preparatory group at the school, and a sibling only where you said so in that school's own calculator."
     },
     "banner": {
       "kindergarten": "Each kindergarten shows your saved points (child born {{year}}) against the last child admitted.",
+      "kindergarten_school": "Each school's preschool group shows your saved points (child born {{year}}) against the last child admitted.",
+      "kindergarten_both": "Each kindergarten and school preschool group shows your saved points (child born {{year}}) against the last child admitted.",
       "grade_1": "Each school shows your saved 1st grade group and points against the last child admitted."
     },
     "edit": "Change answers",

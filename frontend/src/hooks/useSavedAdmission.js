@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import { getSaved, subscribeSaved } from '../admission/saved'
-import { clearlyBelowIds, savedVerdictsFor } from '../admission/schoolVerdict'
+import { clearlyBelowIds, savedVerdictsFor, stagesShown } from '../admission/schoolVerdict'
 import { sofiaToday } from '../admission/calculator'
 import { loadCatchments, loadDistricts } from '../admission/loadCatchments'
 
@@ -104,4 +104,16 @@ export function useHiddenBelow(schools, ageGroup = null) {
     if (!hideBelow || !data || !(saved.kindergarten || saved.grade_1)) return new Set()
     return clearlyBelowIds(schools, saved, ageGroup, { ...data, today: sofiaToday() })
   }, [hideBelow, data, saved, schools, ageGroup])
+}
+
+/** The saved tabs some of these schools show a result for (stagesShown); null while loading. */
+export function useStagesShown(schools, ageGroup = null) {
+  const saved = useSavedAdmission()
+  const hasSaved = Boolean(saved.kindergarten || saved.grade_1)
+  const data = useVerdictData(Boolean(saved.kindergarten), Boolean(saved.grade_1))
+  return useMemo(() => {
+    if (!hasSaved) return new Map()
+    if (!data) return null
+    return stagesShown(schools, saved, ageGroup, { ...data, today: sofiaToday() })
+  }, [hasSaved, data, saved, schools, ageGroup])
 }
