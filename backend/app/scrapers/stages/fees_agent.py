@@ -806,6 +806,9 @@ def _build_rows(
     return rows, sources
 
 
+_NAMED_BY_WHAT = {PriceCategory.EXTRACURRICULAR, PriceCategory.ACTIVITIES, PriceCategory.CAMP, PriceCategory.TRANSPORT}
+
+
 def _name_unnamed_alike(rows: list[Pricing]) -> None:
     """Fees of one kind, group, year and period that the reader left unnamed read as the
     same fee twice (596's uniforms: "Uniforms" 25, 14, 28, 18). Each takes the site's own
@@ -816,10 +819,28 @@ def _name_unnamed_alike(rows: list[Pricing]) -> None:
             key = (row.category, row.age_group, row.period, row.academic_year)
             alike.setdefault(key, []).append(row)
     for group in alike.values():
-        labels = [" ".join(str(row.pricing_context.get("label") or "").split()) for row in group]
+        labels = [_label(row) for row in group]
         if len(group) > 1 and all(labels) and len({label.casefold() for label in labels}) == len(labels):
             for row, label in zip(group, labels):
                 row.plan_name = label[:100]
+    # An activity, camp or route is told apart by what it is, whatever its group or period:
+    # 300's fifteen unnamed "Extracurricular" fees (tennis, piano, swimming for the preschool
+    # and for grades 1-7...) each had their own group, so no two were alike above. Named when
+    # the labels with the group and period tell every fee apart.
+    by_kind: dict[tuple, list[Pricing]] = {}
+    for row in rows:
+        if not row.plan_name and row.category in _NAMED_BY_WHAT:
+            by_kind.setdefault((row.category, row.academic_year), []).append(row)
+    for group in by_kind.values():
+        labels = [_label(row) for row in group]
+        keys = {(label.casefold(), row.age_group, row.period) for row, label in zip(group, labels)}
+        if len(group) > 1 and all(labels) and len(keys) == len(group) and len({label.casefold() for label in labels}) > 1:
+            for row, label in zip(group, labels):
+                row.plan_name = label[:100]
+
+
+def _label(row: Pricing) -> str:
+    return " ".join(str((row.pricing_context or {}).get("label") or "").split())
 
 
 async def _upsert_pages(db: AsyncSession, pages: dict[str, SourcePage], stored: dict[tuple, SourcePage]) -> None:
@@ -1454,14 +1475,9 @@ async def _run_school(
         "rows_old_published": len(published_before),
     }
 
-    # A thin or failed read must not wipe good prices or make them flicker.
-    if not publishable or 2 * len(publishable) < len(published_before):
+    if not publishable:
         report["outcome"] = "kept_old_rows"
-        report["reason"] = (
-            "nothing publishable read"
-            if not publishable
-            else f"{len(publishable)} publishable rows against {len(published_before)} published"
-        )
+        report["reason"] = "nothing publishable read"
         return report
 
     # Old rows the read would lose (a fee it missed, a period it dropped) stay, instead of
@@ -1473,6 +1489,18 @@ async def _run_school(
         publishable,
         [(category, amount) for category, _, amount in listed],
     )
+    # A thin or failed read must not wipe good prices or make them flicker. Counted against
+    # the published rows the write would remove: rows rule 6 keeps stay published. 300's read
+    # gave each fee once and left out its instalment rows, which the page still shows and so
+    # stay; set against all 62 published rows, the read was held, and with it the new 8 800.
+    # A new row that gives way to a kept one (same amount) replaces nothing, so it doesn't count.
+    removed = [row for row in published_before if row not in kept]
+    replacing = [row for row in publishable if not kept or _amount_group(row) not in kept_amounts]
+    report["rows_old_removed"] = len(removed)
+    if 2 * len(replacing) < len(removed):
+        report["outcome"] = "kept_old_rows"
+        report["reason"] = f"{len(replacing)} publishable rows against {len(removed)} published rows it would remove"
+        return report
     if kept:  # by amount alone: a refiled category or currency is still the same fee
         superseded = [row for row in superseded if row not in kept]
         pairs = [(row, source) for row, source in zip(rows, sources) if _amount_group(row) not in kept_amounts]
