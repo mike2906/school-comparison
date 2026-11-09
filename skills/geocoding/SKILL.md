@@ -84,6 +84,11 @@ only that address ("relabelled").
 `cli hand-pin --location-id N --lat --lng [--address] --note "..." [--apply]` pins one hidden
 location by hand (manual_fix, old address and point kept in `manual_fix.previous`) when the
 evidence is the school's own but no stage can read it. Run it as a named command, never as raw SQL.
+With `--move-shown` and `--address` it also moves a shown pin, for a register address the
+school's own site never gives when no site campus row exists to move to (300 ESPA: the
+register's ул. Градина 23 is on no page of espa.bg, whose footer names its own buildings with
+no city, so the campus check skips them). `manual_fix.previous` keeps the register's address
+it first replaced, so a re-import still finds the row.
 
 `cli move-to-site-campus --location-id N --campus-id M --note "..." [--apply]` moves a shown
 register location to the address and point of the school's own site campus location (M,

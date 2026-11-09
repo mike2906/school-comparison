@@ -115,3 +115,24 @@ async def test_a_register_location_moves_to_the_sites_campus(db_session):
     assert sorted(moved.age_groups) == ["grade_1_4", "grade_8_12"]
     assert moved.geocode_meta["manual_fix"]["previous"]["address_i18n"] == {"bg": 'ул. "Горски пътник" № 44'}
     assert has_pinned_point(moved)
+
+
+@pytest.mark.asyncio
+async def test_a_shown_pin_moves_only_when_asked_and_to_the_sites_address(db_session):
+    # 300 ESPA: the register's address is on no page of espa.bg, which gives its own buildings.
+    location_id = await _location(db_session)
+    first = (42.703233, 23.135833)
+    await set_hand_pin(db_session, location_id, first, note="site map", address="ул. Тенев баир 2", apply=True)
+    point = (42.6510561, 23.3378609)
+    assert (await set_hand_pin(db_session, location_id, point, note="espa.bg footer", apply=True))["outcome"] == "already_shown"
+    no_address = await set_hand_pin(db_session, location_id, point, note="espa.bg", move_shown=True, apply=True)
+    assert no_address["outcome"] == "move_needs_address"
+    moved = await set_hand_pin(
+        db_session, location_id, point, note="espa.bg footer", address='ул. „Проф. Кирил Попов“ № 13', move_shown=True, apply=True
+    )
+    assert moved["outcome"] == "placed"
+    row = await db_session.get(SchoolLocation, location_id)
+    await db_session.refresh(row)
+    assert (row.lat, row.lng) == point and row.address_i18n == {"bg": 'ул. „Проф. Кирил Попов“ № 13'}
+    # The register's address stays the one kept, so a re-import still finds the row.
+    assert row.geocode_meta["manual_fix"]["previous"]["address_i18n"] == {"bg": 'ул. "Майор Коста Паница"'}

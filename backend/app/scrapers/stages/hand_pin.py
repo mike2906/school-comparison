@@ -20,6 +20,12 @@ from app.services.geocoding.bounds import get_city_bounds, point_in_bounds
 from app.services.geocoding.write_gate import MANUAL_FIX_METHOD, OFFICIAL_COORDS_TAG, location_holding_point
 
 
+def _first_previous(previous: dict) -> Optional[dict]:
+    meta = previous.get("geocode_meta")
+    fix = meta.get("manual_fix") if isinstance(meta, dict) else None
+    return fix.get("previous") if isinstance(fix, dict) else None
+
+
 async def set_hand_pin(
     db: AsyncSession,
     location_id: int,
@@ -27,9 +33,14 @@ async def set_hand_pin(
     *,
     note: str,
     address: Optional[str] = None,
+    move_shown: bool = False,
     apply: bool = False,
 ) -> dict[str, Any]:
-    """Pin the location at ``point`` (and give it ``address``); returns what was (or would be) done."""
+    """Pin the location at ``point`` (and give it ``address``); returns what was (or would be) done.
+
+    A shown pin moves only with ``move_shown`` and a new ``address``: a register address the
+    school's own site never gives (300 ESPA: the register's ул. Градина 23 in Киноцентър; espa.bg
+    names three other buildings). Mike's rule (2026-10-15): the school's own site wins."""
     if not note.strip():
         raise ValueError("a hand pin needs a note saying what the point was checked against")
     address = (address or "").strip() or None
@@ -57,8 +68,10 @@ async def set_hand_pin(
     if address:
         location.address_i18n = {"bg": address}
         location.district = None  # the old address's
-    if not needs_pin(location):
+    if not needs_pin(location) and not move_shown:
         outcome = "already_shown"
+    elif not needs_pin(location) and not address:
+        outcome = "move_needs_address"  # a shown pin moves to the address the site gives
     elif bounds is None:
         outcome = "no_city_bounds"  # the point cannot be checked
     elif not point_in_bounds(point[0], point[1], bounds):
@@ -78,7 +91,9 @@ async def set_hand_pin(
         "provider": "manual",
         "precision": "exact",
         "formatted_address": (location.address_i18n or {}).get("bg"),
-        "manual_fix": {"previous": previous, "note": note},
+        # A pin moved twice keeps the register's address it first replaced, so a re-import
+        # still finds the row.
+        "manual_fix": {"previous": _first_previous(previous) or previous, "note": note},
     }
     location.location_tags = [
         tag
