@@ -214,6 +214,7 @@ export function buildExpandedSections({
   locale,
   language = 'bg',
   ageGroup = null,
+  cohort = undefined, // the card's selectPricingCohort result, so its badge and fees agree
 }) {
   const sections = []
 
@@ -313,8 +314,7 @@ export function buildExpandedSections({
     // The main price of each group, then the other kinds of fee by name: the school page
     // lists every fee. Listing them all here buried the price (300 had 62 lines, among them
     // fifteen bare "Extracurricular" ones and every instalment).
-    const cohort = selectPricingCohort(pricing, { ageGroup })
-    const rows = cohort?.rows || pricing
+    const rows = (cohort === undefined ? selectPricingCohort(pricing, { ageGroup }) : cohort)?.rows || pricing
     const tuition = tuitionRows(rows, ageGroup)
     const pricingLines = tuition.map(item => {
       const group = priceAgeGroupLabel(item, t, language)
@@ -322,11 +322,12 @@ export function buildExpandedSections({
       const name = [group, plan].filter(Boolean).join(' · ') || t('pricing.tuition')
       const period = pricePeriod(item)
       const periodLabel = period ? t(`pricing.${period}`) : t('pricing.periodNotStated')
-      const source = item.source ? ` · ${t(`priceSource.${item.source}`)}` : ''
-      return `${name}: ${formatPriceLabel(item, locale, t)} (${periodLabel})${cohort?.academicYear ? ` · ${cohort.academicYear}` : ''}${source}`
+      // Next to each price, the year the school gave it for and where it comes from.
+      const meta = [item.academic_year, item.source && t(`priceSource.${item.source}`)].filter(Boolean)
+      return [`${name}: ${formatPriceLabel(item, locale, t)} (${periodLabel})`, ...meta].join(' · ')
     })
-    // With no main price shown, tuition is one of the other fees.
-    const others = [...new Set(sortByCategory(rows).map(priceCategory))]
+    // Every kind of fee the school lists, whatever its year; tuition too when no main price is shown.
+    const others = [...new Set(sortByCategory(pricing).map(priceCategory))]
       .filter(category => category !== 'tuition' || tuition.length === 0)
     if (others.length > 0) {
       pricingLines.push(t('schoolCard.otherFees', { fees: others.map(category => t(`pricing.${category}`)).join(', ') }))

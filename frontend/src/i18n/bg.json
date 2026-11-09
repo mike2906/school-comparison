@@ -606,7 +606,7 @@
       "scheduleDetails": "График",
       "tuitionFees": "Такси и плащания"
     },
-    "otherFees": "Други такси, на пълната страница: {{fees}}",
+    "otherFees": "Други такси: {{fees}}",
     "showMore": "Покажи повече",
     "showLess": "Покажи по-малко",
     "labels": {

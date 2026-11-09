@@ -606,7 +606,7 @@
       "scheduleDetails": "Schedule Details",
       "tuitionFees": "Tuition & Fees"
     },
-    "otherFees": "Other fees, on the full page: {{fees}}",
+    "otherFees": "Other fees: {{fees}}",
     "showMore": "Show more",
     "showLess": "Show less",
     "labels": {
