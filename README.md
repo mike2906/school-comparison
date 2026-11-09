@@ -110,13 +110,15 @@ kept in the repository:
   infrastructure deletions, running cost and user privacy go to a human.
 - An agent must never loosen a check to get its pull request through.
 
-[`docs/GO_LIVE_PLAN.md`](docs/GO_LIVE_PLAN.md) is the working backlog, including what
-went wrong along the way and how it was fixed.
+[`docs/BACKLOG.md`](docs/BACKLOG.md) is the open backlog. The finished go-live plan, with
+what went wrong along the way and how it was fixed, is in
+[`docs/archive/GO_LIVE_PLAN.md`](docs/archive/GO_LIVE_PLAN.md).
 
 ## Known limitations
 
-- A few modules are still too large: `backend/app/scrapers/extractor.py` (about 2,400 lines),
-  `validator.py` (about 1,700) and the main search page component (about 2,000).
+- A few modules are still too large: `backend/app/scrapers/extractor.py` (about 1,900 lines),
+  `cli.py` and `website_discovery.py` (about 1,700 each) and the main search page component
+  (about 1,600).
 - The backend has no type checker in CI yet; both backend (ruff) and frontend (ESLint) run a linter.
 - Coverage is Sofia only, and a fee is published only where the gates can verify it, so
   many private schools show no prices.

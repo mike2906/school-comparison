@@ -64,6 +64,23 @@ _NOISY_DIRECTORY_DOMAINS = (
     "dz-priem.plovdiv.bg",
     "wikipedia.org",
 ) + _load_country_directory_domains("bg")
+
+
+def directory_host(url: str) -> str | None:
+    """The directory or listing host a URL is on, or None: a directory's entry
+    (obrazovatelen-register.bg/dg-13-kalinka-sofiya/ was 116's site, with its facts) or a
+    district's list of its kindergartens (nadezhda.sofia.bg; every Sofia district and
+    kg.sofia.bg are under sofia.bg). Never an institution's own site. A numbered host on
+    sofia.bg (dg42.sofia.bg) would be a school's own, so it is not one."""
+    host = (urlparse(url).hostname or "").lower().removeprefix("www.")
+    if host == "sofia.bg" or (host.endswith(".sofia.bg") and not re.search(r"\d", host.removesuffix(".sofia.bg"))):
+        return "sofia.bg"
+    for domain in _NOISY_DIRECTORY_DOMAINS:
+        if host == domain or host.endswith(f".{domain}"):
+            return domain
+    return None
+
+
 _DOCUMENT_EXTENSIONS = (
     ".pdf",
     ".doc",
@@ -314,6 +331,11 @@ class WebsiteDiscoverer:
         # Facebook pages and Instagram profiles seen in search results, by school id: never a
         # website, but kept as unconfirmed candidates (``_store_social_candidates``).
         self.social_hits: dict[int, list[tuple[str, str]]] = {}
+        # Queries a provider really answered, per school searched (0: asked, none answered):
+        # a blocked engine, a CAPTCHA page or a disabled provider answers nothing, so "no
+        # candidates" is then not "no site". Read by find-websites, which pops its entries.
+        self.search_answers: dict[int, int] = {}
+        self._last_answered = False
 
     async def discover(
         self,
@@ -793,7 +815,16 @@ class WebsiteDiscoverer:
         return []
 
     async def _search_provider(self, provider: str, query: str, school_id: int) -> list[str]:
-        """Execute one search query against a single provider when enabled."""
+        """Execute one search query against a single provider when enabled, counting it in
+        ``search_answers`` when the provider really answered."""
+        self._last_answered = False
+        self.search_answers.setdefault(school_id, 0)
+        links = await self._query_provider(provider, query, school_id)
+        if self._last_answered:
+            self.search_answers[school_id] += 1
+        return links
+
+    async def _query_provider(self, provider: str, query: str, school_id: int) -> list[str]:
         if provider == "searxng":
             if self._is_provider_disabled("searxng"):
                 return []
@@ -1425,6 +1456,9 @@ class WebsiteDiscoverer:
             links.append(cleaned)
             if len(links) >= self.MAX_SEARCH_RESULTS:
                 break
+        # Every engine blocked (Google "access denied", CAPTCHAs) gives no results and lists
+        # them as unresponsive: that is no answer, not "nothing found".
+        self._last_answered = bool(links) or not payload.get("unresponsive_engines")
         return links
 
     async def _search_duckduckgo(self, query: str, school_id: int) -> list[str]:
@@ -1466,7 +1500,9 @@ class WebsiteDiscoverer:
             return []
 
         soup = BeautifulSoup(response.text, "html.parser")
-        return self._extract_duckduckgo_links(soup)
+        links = self._extract_duckduckgo_links(soup)
+        self._last_answered = bool(links)  # a CAPTCHA page is a 200 with no results
+        return links
 
     async def _search_brave(self, query: str, school_id: int) -> list[str]:
         """Query Brave HTML results page."""
@@ -1507,7 +1543,9 @@ class WebsiteDiscoverer:
             return []
 
         soup = BeautifulSoup(response.text, "html.parser")
-        return self._extract_brave_links(soup)
+        links = self._extract_brave_links(soup)
+        self._last_answered = bool(links)  # a CAPTCHA page is a 200 with no results
+        return links
 
     def _extract_duckduckgo_links(self, soup: BeautifulSoup) -> list[str]:
         """Extract candidate links from DuckDuckGo HTML results."""
@@ -1589,10 +1627,7 @@ class WebsiteDiscoverer:
 
         path = (parsed.path or "").lower()
 
-        if host == "sofia.bg" or host.endswith(".sofia.bg"):
-            return True
-
-        if any(host == domain or host.endswith(f".{domain}") for domain in _NOISY_DIRECTORY_DOMAINS):
+        if directory_host(url):
             return True
 
         if any(path.endswith(ext) for ext in _DOCUMENT_EXTENSIONS):

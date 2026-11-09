@@ -55,3 +55,17 @@ export function childFreePlacesBySchool(data, birthYear, startYear) {
   }
   return out
 }
+
+/**
+ * Whether the "free place today" filter applies: the parent asked for it and today's
+ * snapshot has the child's group somewhere (a birth year and the school year now running).
+ * Otherwise the filter is left off rather than emptying the list.
+ */
+export function freePlacesFilterApplies(filters, bySchool) {
+  return Boolean(filters.freePlacesOnly && bySchool.size > 0)
+}
+
+/** Whether a school has a free place today in the child's group (`childFreePlacesBySchool`). */
+export function hasFreePlaceToday(bySchool, schoolId) {
+  return (bySchool.get(schoolId)?.free || 0) > 0
+}

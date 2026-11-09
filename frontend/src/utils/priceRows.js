@@ -146,8 +146,15 @@ const ORDINAL_TOKEN_RE = new RegExp(`(?<![\\p{L}\\p{N}])(${ORDINAL})(?![\\p{L}\\
 // "Ясла", "Яслена група"; but "ДГ и ясла" or "Детска ясла и градина" name both, so neither.
 const NURSERY_RE = /яслен|nursery|cr[eè]che|(?<![\p{L}])ясл(?:а|и|ата)(?![\p{L}])/u
 const BOTH_RE = /ясл(?:а|и)\s*(?:и|\/|,)\s*(?:детск[аи] )?(?:градин|дг(?![\p{L}]))|(?:градин[аи]|(?<![\p{L}])дг)\s*(?:и|\/|,)\s*(?:детска )?ясл|яслена и градинска/u
+// English names. Pre-K is for 3 and 4 year olds, the first and second groups, and Kindergarten
+// for 5 year olds, the third group (506: aas-sofia.org's age placement); a kindergarten opening a
+// range of grades ("Kindergarten – Grade 5") also covers the year before grade 1 (gradeBand.js).
+// IGCSE, A Levels and the IB Diploma are the last school years (581). Dashes are hyphens here.
+const PRE_K_RE = /(?<![\p{L}])pre[- ]?k(?:indergarten)?(?![\p{L}])/u
+const KINDERGARTEN_TO_GRADE_RE = /(?<![\p{L}-])kindergarten\s*(?:-|to|through)\s*(?:grades?\s*)?\d/u
+const UPPER_SCHOOL_RE = /(?<![\p{L}])(?:igcse|a-levels?|a levels|(?:first|second|1st|2nd) year a level|a level (?:first|second|1st|2nd) year|ib diploma)(?![\p{L}])/u
 // 555's English "PREPARATORY GROUP | YEAR 2" too.
-const PRESCHOOL_NAME_RE = /подготвителн[аи] груп|предучилищн[аи] груп|подготвителен клас|(?<![\p{L}])п[гк]у?(?![\p{L}])|pre-?school|preparatory (?:group|class|year)/u
+const PRESCHOOL_NAME_RE = /подготвителн[аи] груп|предучилищн[аи] груп|предучилищен клас|подготвителен клас|(?<![\p{L}])п[гк]у?(?![\p{L}])|pre-?school|preparatory (?:group|class|year)/u
 
 const AGE_GROUP_KEYS = new Set([
   'nursery', 'first', 'second', 'third', 'preschool', 'grade_1_4', 'grade_5_7', 'grade_8_12',
@@ -169,6 +176,10 @@ function groupKeys(text) {
   const normalized = String(text || '').toLocaleLowerCase('bg')
   if (NURSERY_RE.test(normalized) && !BOTH_RE.test(normalized)) keys.add('nursery')
   if (PRESCHOOL_NAME_RE.test(normalized)) keys.add('preschool')
+  const english = normalized.replace(/[–—]/g, '-')
+  if (PRE_K_RE.test(english)) ['first', 'second'].forEach(key => keys.add(key))
+  if (KINDERGARTEN_TO_GRADE_RE.test(english)) ['third', 'preschool'].forEach(key => keys.add(key))
+  if (UPPER_SCHOOL_RE.test(english)) keys.add('grade_8_12')
   for (const match of normalized.matchAll(GROUP_LIST_RE)) {
     // "2 групи" counts groups; only a worded ordinal names them in the plural.
     const plural = match[2] !== 'група' && match[2] !== 'group'

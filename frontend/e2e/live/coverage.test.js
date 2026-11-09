@@ -22,7 +22,8 @@ import { isInstallmentPlan, statedTuition } from '../../src/utils/pricing.js'
 import { isClosedGroupFee, rowAgeGroupKeys } from '../../src/utils/priceRows.js'
 import { childFreePlaces, schoolFreePlaces, usableFreePlaces } from '../../src/utils/freePlaces.js'
 import { buildOptions } from '../../src/utils/childOptions.js'
-import { API, allSchools } from './live.js'
+import { stageForAgeGroup, yearCost } from '../../src/utils/yearCost.js'
+import { API, allSchools, fetchLive } from './live.js'
 
 // A parent should get an answer at no fewer than this share of the schools that publish
 // the data for their child. Today's shares are 67–100%; an empty-result bug gives ~0%.
@@ -181,12 +182,29 @@ describe('coverage for realistic parents', () => {
     assert.ok(checked >= MIN_WITH_DATA, `only ${checked} school ages with a tuition`)
     assert.deepEqual(missing, [], 'ages with a listed tuition but no headline fee')
   })
+  test('yearly cost: an age with a headline fee gets its tuition in the cost table, and a yearly fee a total', async t => {
+    const schools = (await allSchools()).filter(school => school.school_type !== 'state' && (school.pricing || []).length > 0)
+    const results = []
+    for (const group of ['first', 'preschool', 'grade_1_4', 'grade_5_7', 'grade_8_12']) {
+      const stage = stageForAgeGroup(group)
+      const taking = schools.filter(school => (school.locations || []).some(l => (l.age_groups || []).includes(group)))
+      const priced = taking.filter(school => statedTuition(school.pricing, { ageGroup: group }))
+      results.push({ persona: `${stage}: tuition line`, withData: priced.length, shown: priced.filter(s => yearCost(s.pricing, stage)?.tuition.options.length > 0).length })
+      const yearly = priced.filter(school => statedTuition(school.pricing, { ageGroup: group }).period === 'yearly')
+      // Kindergartens mostly price by the month, so too few have a yearly fee to measure.
+      if (yearly.length >= MIN_WITH_DATA) {
+        results.push({ persona: `${stage}: yearly total`, withData: yearly.length, shown: yearly.filter(s => yearCost(s.pricing, stage)?.required).length })
+      }
+    }
+    assertCoverage(t, results)
+  })
+
   test('free places: a search for a birth year this school year shows the places at most municipal kindergartens', async t => {
-    const response = await fetch(`${API}/schools/free-places?country_code=bg&city=sofia`, { signal: AbortSignal.timeout(30_000) })
+    const response = await fetchLive(`${API}/schools/free-places?country_code=bg&city=sofia`)
     // A PR that adds the endpoint runs this before its deploy (the path then reads as a school id).
     if (response.status === 404 || response.status === 422) return t.skip('the free places endpoint is not deployed yet')
     assert.ok(response.ok, `free places: HTTP ${response.status}`)
-    const data = usableFreePlaces(await response.json())
+    const data = usableFreePlaces(response.json())
     assert.ok(data, 'a free places snapshot from the last 48 hours')
     const now = new Date()
     const startYear = now.getMonth() >= 8 ? now.getFullYear() : now.getFullYear() - 1

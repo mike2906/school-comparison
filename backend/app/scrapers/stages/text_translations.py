@@ -49,6 +49,7 @@ from app.utils.text_translations import (
     price_texts,
     roman_numerals,
     stored,
+    stored_version,
 )
 
 logger = logging.getLogger(__name__)
@@ -60,6 +61,8 @@ BATCH_SIZE = 60
 OUTPUT_TOKENS = 6000
 LIST_FIELDS = ("facilities", "special_programs", "activities_offered")
 _DIGITS_RE = re.compile(r"\d+")
+# A 12-hour time ("4:30 pm", "6 p.m."): Bulgarian writes it as "16:30", with other digits.
+_TWELVE_HOUR_RE = re.compile(r"\b(\d{1,2})(?:[:.](\d{2}))?\s*([ap])\.?\s?m\b\.?", re.IGNORECASE)
 _CYRILLIC_RE = re.compile(r"[Ѐ-ӿ]")
 
 LANGUAGE_NAMES = {"en": "English", "bg": "Bulgarian"}
@@ -72,7 +75,8 @@ class profiles, programmes, facilities and activities.
 Translate each item into {language}, as a parent would read it on the {language} page.
 - Say what the item says, plainly. Add nothing, explain nothing, and drop nothing.
 - Keep every number, date, amount, percentage, code and Roman numeral exactly as written
-  ("вноска II, до 15.11.26 г." -> "Instalment II, by 15.11.26").
+  ("вноска II, до 15.11.26 г." -> "Instalment II, by 15.11.26"). The one change: in Bulgarian,
+  a 12-hour time is written in 24-hour form ("4:30 pm" -> "16:30").
 - Keep names as names: a brand, programme or school name stays as written; in English a Bulgarian
   proper name is transliterated ("Слънчице" -> "Slanchitse").
 - 8th-grade class profiles use these abbreviations: АЕ English, НЕ German, ФЕ French, ИЕ Spanish,
@@ -82,6 +86,7 @@ Translate each item into {language}, as a parent would read it on the {language}
   ХООС Chemistry and environmental protection, ИЦ History and civilisations, ГИ Geography and
   economics, Фил Philosophy; "интензивно" intensive, "разширено" extended, "дуална" dual
   (work-based) training. ПГ, ПГУ or ПК is the preparatory group (preschool).
+- As a fee name, "обучение" ("Обучение", "Такса обучение") is tuition in English, not training.
 - Return null for an item you cannot translate with confidence.
 
 Return one entry per item, with its id."""
@@ -103,10 +108,43 @@ class BatchMismatch(RuntimeError):
     """The model's answer does not give each item of the batch exactly once."""
 
 
+def has_twelve_hour_time(text: str) -> bool:
+    return bool(_TWELVE_HOUR_RE.search(text or ""))
+
+
+_CLOCK_RE = re.compile(r"(?<![\d:])(\d{1,2}):(\d{2})(?![\d:])")
+# A whole hour written the Bulgarian way ("до 18 ч."), after the clock times are taken out.
+_HOUR_RE = re.compile(r"(?<![\d:.])(\d{1,2})\s*ч\b")
+
+
+def _numbers(text: str) -> list[str]:
+    """The numbers in ``text``, with each time of day as one value: a 12-hour time in its
+    24-hour form ("4:30 pm" -> "16:30"), and a whole hour with or without minutes the same
+    ("6 pm", "18:00" and "18 ч." -> "18:00"), so a wrong hour or minute still differs."""
+
+    def to_24(match: re.Match) -> str:
+        hour = int(match.group(1)) % 12 + (12 if match.group(3).lower() == "p" else 0)
+        return f"{hour}:{match.group(2) or '00'}"
+
+    times: list[str] = []
+
+    def clock(match: re.Match) -> str:
+        times.append(f"{int(match.group(1))}:{match.group(2)}")
+        return " "
+
+    def hour(match: re.Match) -> str:
+        times.append(f"{int(match.group(1))}:00")
+        return " "
+
+    rest = _HOUR_RE.sub(hour, _CLOCK_RE.sub(clock, _TWELVE_HOUR_RE.sub(to_24, text)))
+    return sorted(times) + sorted(_DIGITS_RE.findall(rest))
+
+
 def checked(source: str, target: Optional[str], locale: str) -> Optional[str]:
     """``target`` when it is a usable translation of ``source`` into ``locale``, else None:
     in the target language (no Cyrillic in English, mostly Cyrillic in Bulgarian), not
-    implausibly long, and with exactly the original's numbers."""
+    implausibly long, and with exactly the original's numbers (a 12-hour time may become
+    the same time in 24-hour form)."""
     target = key(target)
     if not target or target == key(source) or len(target) > 3 * len(source) + 30:
         return None
@@ -114,7 +152,7 @@ def checked(source: str, target: Optional[str], locale: str) -> Optional[str]:
         return None
     if locale == "bg" and needs_translation(target, "bg"):
         return None
-    if sorted(_DIGITS_RE.findall(source)) != sorted(_DIGITS_RE.findall(target)):
+    if _numbers(source) != _numbers(target):
         return None
     if sorted(roman_numerals(source)) != sorted(roman_numerals(target)):
         return None
@@ -237,12 +275,15 @@ async def run_text_translations(
 
     needed = {school.id: shown_texts(school) for school in schools}
     have = {school.id: stored(school.attributes) for school in schools}
+    versions = {school.id: stored_version(school.attributes) for school in schools}
     known: dict[str, dict[str, Optional[str]]] = {locale: {} for locale in LOCALES}
-    for translations in have.values():
+    for school_id, translations in have.items():
         for locale in LOCALES:
             for text, value in translations[locale].items():
                 if value is not None and checked(text, value, locale) is None:
                     continue  # stored before a check it now fails: asked again
+                if value is None and versions[school_id] == 1 and has_twelve_hour_time(text):
+                    continue  # refused under version 1 only for its 24-hour digits: asked once more
                 # A usable translation another school has wins over a stored failure.
                 if known[locale].get(text) is None:
                     known[locale][text] = value
@@ -263,6 +304,7 @@ async def run_text_translations(
             1
             for school in schools
             if wanted(school.id) != have[school.id]
+            or (versions[school.id] not in (None, SCHEMA_VERSION))
             or any(set(needed[school.id][locale]) & set(asked[locale]) for locale in LOCALES)
         )
         return {"plan": True, "schools": len(schools), "schools_to_change": pending,
@@ -303,7 +345,9 @@ async def run_text_translations(
     try:
         for school in schools:
             translations = wanted(school.id)
-            if translations == have[school.id]:
+            # An old block is rewritten at this version even unchanged, so a text asked once
+            # more under the new checks is not asked again on every publish.
+            if translations == have[school.id] and versions[school.id] in (None, SCHEMA_VERSION):
                 continue
             changed += 1
             if apply:

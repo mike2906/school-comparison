@@ -321,6 +321,12 @@ class URLValidator:
         # Step 1: Check if domain is blocked
         if self._is_blocked_domain(normalized_url):
             return ValidationResult.INVALID, None, "Blocked domain (social media/forum)"
+        from app.scrapers.website_discovery import directory_host
+
+        directory = directory_host(normalized_url)
+        if directory:
+            # Worded as a listing so the old site's data is cleared with it.
+            return ValidationResult.INVALID, None, f"Directory-like listing signals: {directory} lists many schools"
 
         first_result = await self._validate_with_http_timeout(
             normalized_url=normalized_url,

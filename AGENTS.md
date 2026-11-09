@@ -35,18 +35,17 @@ Bulgarian cities, then other countries.
 - Multi-country architecture with country-specific education configs
 - Bilingual interface (Bulgarian primary, English secondary for MVP)
 
-**Current status:** The site is live for Sofia with no real users yet. The scraper CLI
-runs the pipeline stages (discovery, website discovery, URL validation, navigation,
-extraction, validation/spot checks, summarization). Private-school fees now come from the
-fees agent (`docs/AGENT_FEE_EXTRACTION.md`); the old price extraction stays behind
-`EXTRACTION_PIPELINE_PRICES` until Mike is confident in the agent. School facts, an agent
-stage replacing the summaries, are in `docs/SCHOOL_FACTS.md`. Official NVO and ДЗИ imports
-are independent stages.
+**Current status:** live for Sofia, with no real users yet. Fees come from the fees agent
+(`docs/AGENT_FEE_EXTRACTION.md`); the old price extraction stays behind
+`EXTRACTION_PIPELINE_PRICES` (off) until it is deleted. Website facts come from the
+school-facts stage (`docs/SCHOOL_FACTS.md`). NVO and ДЗИ imports are separate stages.
+Routine refreshes run on a schedule (`docs/SCHEDULED_JOBS.md`).
 
-**Status sources:** the plan docs (`docs/GO_LIVE_PLAN.md`, `docs/TECH_DEBT_PLAN.md`,
-`docs/AGENT_FEE_EXTRACTION.md`, `docs/SCHOOL_FACTS.md`), git history and the DBs. Agent
-memory and old notes can be stale: verify an item is still open before starting it, and
-update the plan in the same PR that finishes it.
+**Status sources:** each feature's doc in `docs/`, `docs/TECH_DEBT_PLAN.md`,
+`docs/BACKLOG.md`, git history and the DBs. Agent memory and old notes can be stale, so
+check an item is still open before starting it. Update the doc in the same PR that
+finishes the item. `docs/archive/` holds finished plans: their status lines are old, but
+a backlog item's notes there are still its detail.
 
 **Plans are starting points, not instructions.** Everything in a plan or design doc (an
 approach, a tool, a number, the order of steps) was chosen with what was known when it was
@@ -59,7 +58,8 @@ of those changed, raise it with him rather than overriding it.
 Live: the admission points calculator (kindergarten, first grade, and the eighth-grade
 score from NVO results) with the catchment map (`docs/ADMISSION_POINTS.md`), and admission
 cut-offs (`docs/ADMISSION_CUTOFFS.md`), and today's free places in municipal kindergartens
-(`docs/FREE_PLACES.md`).
+(`docs/FREE_PLACES.md`). Each school page says what is known about its outdoor space
+(`docs/OUTDOOR_SPACE.md`).
 
 ---
 
@@ -77,34 +77,17 @@ use `pip install` or `requirements.txt`.
 
 ## File Structure
 
-```
-├── AGENTS.md             # this file
-├── backend/
-│   ├── AGENTS.md         # backend rules (read before backend work)
-│   ├── app/
-│   │   ├── models/       # SQLAlchemy ORM — schema source of truth
-│   │   ├── schemas/      # Pydantic request/response models
-│   │   ├── routers/      # FastAPI routes (schools.py, compare.py, countries.py)
-│   │   ├── services/     # Business logic (incl. geocoding/)
-│   │   ├── scrapers/     # Scraping pipeline + CLI (cli.py; stage runners in stages/, repairs in repairs/, validation sections in validation/)
-│   │   ├── utils/        # Incl. publish-boundary gates (display_gating.py, website_data.py)
-│   │   ├── config.py     # Settings (get_settings() factory)
-│   │   ├── database.py   # DB engine, session
-│   │   └── main.py       # FastAPI app
-│   ├── tests/            # pytest
-│   ├── alembic/          # DB migrations
-│   ├── scripts/          # Seed and one-off maintenance scripts
-│   ├── .env.example      # All env vars, with defaults
-│   └── pyproject.toml    # Dependencies (uv)
-├── frontend/
-│   ├── AGENTS.md         # frontend rules (read before frontend work)
-│   └── src/              # components/, i18n/, api/, utils/
-├── skills/               # Task procedures (index below)
-├── docs/                 # Plans and design notes (GO_LIVE_PLAN.md)
-├── tools/road-graph/     # OSM → car road graph for in-browser drive times (docs/DRIVE_TIMES.md)
-├── tools/transit/        # OSM walking graph + GTFS timetable for public transport times (docs/TRANSIT_TIMES.md)
-└── docker-compose.yml    # PostgreSQL + SearXNG
-```
+Non-obvious places only; list the rest yourself.
+
+- `backend/app/models/` is the schema source of truth; `app/utils/display_gating.py` and
+  `website_data.py` hold the publish-boundary gates.
+- `backend/app/scrapers/cli.py` is the CLI (`uv run python -m app.scrapers.cli --help`);
+  stage runners live in `stages/`, repairs in `repairs/`, validation sections in `validation/`.
+- `backend/scripts/` holds the scheduled jobs and `publish_snapshot.sh`.
+- `frontend/src/admission/rules/` holds the admission rule sets (JSON, evaluated in the browser).
+- `tools/road-graph/` and `tools/transit/` build the drive and transit time data
+  (`docs/DRIVE_TIMES.md`, `docs/TRANSIT_TIMES.md`).
+- `docs/` holds feature docs and plans; `docs/archive/` holds finished ones.
 
 ---
 

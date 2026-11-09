@@ -33,6 +33,7 @@ import DziResults from './DziResults'
 import LocationMap, { directionsUrl } from './LocationMap'
 import PricingSection from './PricingSection'
 import WebsiteFacts from './WebsiteFacts'
+import OutdoorSpace from './OutdoorSpace'
 import { formatAmount } from '../../utils/format'
 import { parseCoordinate } from '../../utils/coordinates'
 import SchoolActions from './SchoolActions'
@@ -450,6 +451,8 @@ function SchoolDetailPage({ schoolId = null, embedded = false, onClose = null })
         {hasPricing && <PricingSection pricing={pricing} discounts={school.fee_discounts} ageGroup={preferredAgeGroup} targetYear={targetYear} />}
 
         <WebsiteFacts school={school} />
+
+        <OutdoorSpace school={school} />
 
         {/* At a Glance Section */}
         {hasAtAGlance && (

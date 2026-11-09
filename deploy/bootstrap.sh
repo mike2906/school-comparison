@@ -2,8 +2,11 @@
 # One-time setup of the API host (Ubuntu 26.04), safe to run again. From your machine:
 #   scp deploy/bootstrap.sh deploy/firewall.sh deploy/cloudflare-proxies.caddy ubuntu@<ip>:
 #   ssh ubuntu@<ip> sudo bash bootstrap.sh
-# Installs Docker, turns off SSH password logins, enables unattended security updates and
-# installs the firewall (deploy/firewall.sh) as a service. Runbook: deploy/README.md
+# Installs Docker, limits SSH to keys and the login user (no passwords, no root, no X11),
+# enables unattended security updates (Ubuntu's and Docker's, installed at 02:00 with a
+# reboot at 02:30 when one needs it), refreshes the Caddy
+# and Postgres images weekly and installs the firewall (deploy/firewall.sh) as a service.
+# Runbook: deploy/README.md
 set -euo pipefail
 
 if [ "$(id -u)" -ne 0 ]; then
@@ -12,6 +15,10 @@ if [ "$(id -u)" -ne 0 ]; then
 fi
 src="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 login_user="${SUDO_USER:-ubuntu}"
+if [ "$login_user" = root ]; then
+	echo "run as the login user with sudo (sudo bash bootstrap.sh), not from a root shell" >&2
+	exit 1
+fi
 if ! [ -s "$(getent passwd "$login_user" | cut -d: -f6)/.ssh/authorized_keys" ]; then
 	echo "$login_user has no SSH key installed; not disabling password logins" >&2
 	exit 1
@@ -19,7 +26,7 @@ fi
 
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -q
-apt-get install -y -q ca-certificates curl iptables unattended-upgrades
+apt-get install -y -q ca-certificates curl iptables nftables unattended-upgrades
 
 # Docker Engine and the compose plugin, from Docker's apt repository.
 install -m 0755 -d /etc/apt/keyrings
@@ -32,11 +39,39 @@ apt-get update -q
 apt-get install -y -q docker-ce docker-ce-cli containerd.io docker-compose-plugin
 usermod -aG docker "$login_user"
 
-# SSH: keys only.
-cat > /etc/ssh/sshd_config.d/00-schooldecider.conf <<'CONF'
+# Unattended upgrades: Ubuntu's security pocket (the default) plus Docker's repository,
+# which the default leaves out. Without a reboot a new kernel or libc is installed but not
+# running (the host ran a month-old kernel until 2026-11), so reboot at night when one is
+# needed. The API is down for about a minute; Cloudflare serves cached answers meanwhile.
+cat > /etc/apt/apt.conf.d/52schooldecider-upgrades <<'CONF'
+Unattended-Upgrade::Origins-Pattern {
+	"origin=Docker,label=Docker CE,codename=${distro_codename}";
+};
+Unattended-Upgrade::Automatic-Reboot "true";
+Unattended-Upgrade::Automatic-Reboot-WithUsers "true";
+Unattended-Upgrade::Automatic-Reboot-Time "02:30";
+CONF
+# Install at 02:00 too (Ubuntu's default is a random morning time), so a Docker upgrade
+# restarting the containers and the reboot both fall in the quiet hours.
+install -m 0755 -d /etc/systemd/system/apt-daily-upgrade.timer.d
+cat > /etc/systemd/system/apt-daily-upgrade.timer.d/schooldecider.conf <<'UNIT'
+[Timer]
+OnCalendar=
+OnCalendar=*-*-* 02:00
+RandomizedDelaySec=0
+UNIT
+cat > /etc/apt/apt.conf.d/20auto-upgrades <<'CONF'
+APT::Periodic::Update-Package-Lists "1";
+APT::Periodic::Unattended-Upgrade "1";
+CONF
+
+# SSH: keys only, one login user (CD uses the same one).
+cat > /etc/ssh/sshd_config.d/00-schooldecider.conf <<CONF
 PasswordAuthentication no
 KbdInteractiveAuthentication no
 PermitRootLogin no
+AllowUsers $login_user
+X11Forwarding no
 CONF
 sshd -t
 systemctl try-reload-or-restart ssh
@@ -63,8 +98,57 @@ ExecStart=/usr/local/sbin/schooldecider-firewall
 WantedBy=multi-user.target
 RequiredBy=docker.service
 UNIT
+
+# Caddy and Postgres use moving tags (caddy:2-alpine, postgres:16-alpine) that CD never
+# pulls: fetch their patch releases weekly. Same major versions, so no data migration.
+# Holds deploy.sh's lock so it never runs during a deploy or publish, and restarts the API
+# after a new Postgres so it drops its dead pooled connections.
+app_dir="$(getent passwd "$login_user" | cut -d: -f6)/schooldecider"
+cat > /usr/local/sbin/schooldecider-image-refresh <<'SCRIPT'
+#!/usr/bin/env bash
+set -euo pipefail
+cd "$1"
+env_files=(--env-file deploy/.env)
+[ -f deploy/release.env ] && env_files+=(--env-file deploy/release.env)
+dc() { docker compose "${env_files[@]}" -f docker-compose.prod.yml "$@"; }
+exec 9> deploy/.deploy.lock
+flock -w 1800 9
+before="$(dc images -q postgres)"
+dc pull -q caddy postgres
+dc up -d --no-deps caddy postgres
+if [ "$(dc images -q postgres)" != "$before" ]; then
+	dc up -d --no-deps --wait --wait-timeout 60 postgres
+	dc restart api
+fi
+docker image prune -f >/dev/null
+SCRIPT
+chmod 0755 /usr/local/sbin/schooldecider-image-refresh
+cat > /etc/systemd/system/schooldecider-image-refresh.service <<UNIT
+[Unit]
+Description=Pull patch releases of the Caddy and Postgres images
+Wants=network-online.target docker.service
+After=network-online.target docker.service
+
+[Service]
+Type=oneshot
+User=$login_user
+ExecStart=/usr/local/sbin/schooldecider-image-refresh $app_dir
+UNIT
+cat > /etc/systemd/system/schooldecider-image-refresh.timer <<'UNIT'
+[Unit]
+Description=Weekly refresh of the Caddy and Postgres images
+
+[Timer]
+OnCalendar=Sun 03:30
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+UNIT
+
 systemctl daemon-reload
 systemctl reenable schooldecider-firewall.service
 systemctl restart schooldecider-firewall.service
+systemctl enable --now schooldecider-image-refresh.timer
 
 echo "bootstrap done; log in again for the docker group to apply to $login_user"

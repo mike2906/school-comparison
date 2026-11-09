@@ -25,7 +25,10 @@ from app.utils.display_names import translate_bg_school_name
 from app.utils.list_translations import is_bulgarian
 
 ATTRIBUTE_KEY = "text_translations"
-SCHEMA_VERSION = 1
+# 2: failures stored under version 1 for texts with a 12-hour time ("From 4:30 pm to 6:00 pm")
+# were refused only because "16:30" has other digits; they are asked once more.
+SCHEMA_VERSION = 2
+ACCEPTED_VERSIONS = (1, 2)
 LOCALES = ("en", "bg")
 # A fee's own words the page shows (``PricingResponse``); the agent's English comes first.
 PRICE_FIELDS = ("plan_name", "age_group")
@@ -66,7 +69,7 @@ def roman_numerals(text: str) -> list[str]:
 def stored(attributes: Any) -> dict[str, dict[str, Optional[str]]]:
     """The stored translations by locale; empty when none or of another schema version."""
     block = attributes.get(ATTRIBUTE_KEY) if isinstance(attributes, Mapping) else None
-    if not isinstance(block, Mapping) or block.get("_schema_version") != SCHEMA_VERSION:
+    if not isinstance(block, Mapping) or block.get("_schema_version") not in ACCEPTED_VERSIONS:
         return {locale: {} for locale in LOCALES}
     return {
         locale: {
@@ -77,6 +80,13 @@ def stored(attributes: Any) -> dict[str, dict[str, Optional[str]]]:
         else {}
         for locale in LOCALES
     }
+
+
+def stored_version(attributes: Any) -> Optional[int]:
+    """The stored block's schema version, or None when there is no usable block."""
+    block = attributes.get(ATTRIBUTE_KEY) if isinstance(attributes, Mapping) else None
+    version = block.get("_schema_version") if isinstance(block, Mapping) else None
+    return version if version in ACCEPTED_VERSIONS else None
 
 
 def translation(translations: Mapping[str, Mapping[str, Optional[str]]], text: Any, locale: str) -> Optional[str]:

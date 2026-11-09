@@ -2215,3 +2215,17 @@ class TestDisplayGating:
         assert attributes_i18n["en"]["facilities"] == []
         # ...while an unaffected field still comes through.
         assert attributes_i18n["bg"]["special_programs"] == ["STEM"]
+
+
+@pytest.mark.postgres
+@pytest.mark.asyncio
+async def test_school_list_order_survives_an_update(seeded_client, seeded_db):
+    """The list keeps id order after a school is updated. Without an ORDER BY, PostgreSQL
+    returns rows as they lie on disk, and an UPDATE writes the row anew at the end, so the
+    order (and whichever school the site or a live check takes first) moved after publishes."""
+    first = (await seeded_db.execute(select(School).order_by(School.id).limit(1))).scalar_one()
+    first.name_i18n = {**first.name_i18n, "en": f"{first.name_i18n['en']} (renamed)"}
+    await seeded_db.flush()
+    ids = [school["id"] for school in (await seeded_client.get("/schools")).json()]
+    assert len(ids) == 3
+    assert ids == sorted(ids)

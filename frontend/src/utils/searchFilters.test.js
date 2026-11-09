@@ -63,3 +63,14 @@ test('planningYear is this September until the end of September, then next year'
   assert.equal(planningYear(new Date(2026, 8, 30)), 2026)
   assert.equal(planningYear(new Date(2026, 9, 1)), 2027)
 })
+
+test('the free places filter round-trips through the URL', () => {
+  const current = new URLSearchParams('age_group=first&birth_year=2023&target_year=2026')
+  const filters = readFiltersFromUrl(current)
+  assert.equal(filters.freePlacesOnly, false)
+  const on = filterSearchParams(current, { freePlacesOnly: true }, nextFilterState(filters, { freePlacesOnly: true }))
+  assert.equal(on.get('free_places'), 'true')
+  assert.equal(readFiltersFromUrl(on).freePlacesOnly, true)
+  const off = filterSearchParams(on, { freePlacesOnly: false }, nextFilterState(filters, { freePlacesOnly: false }))
+  assert.equal(off.has('free_places'), false)
+})

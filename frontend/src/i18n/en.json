@@ -255,7 +255,7 @@
     "title": "Pricing",
     "tuition": "Tuition",
     "totalFees": "Total fees",
-    "noMainFee": "The school's website does not state its main fee. The fees below are extras only.",
+    "noMainFee": "We don't have data on the main fee. The fees below are extras only.",
     "food": "Food",
     "transport": "Transport",
     "activities": "Activities",
@@ -289,7 +289,7 @@
     "forAgeGroup": "Showing the fees for {{group}}, and fees that name no age.",
     "forAgeGroupInYear": "Showing the fees for {{group}} (your child's group in {{year}}), and fees that name no age.",
     "targetYearNotPublished": "{{year}} fees not published yet",
-    "noneForAgeGroup": "The school lists no fees for {{group}}.",
+    "noneForAgeGroup": "We don't have the fees for {{group}}.",
     "otherAges": "Fees for other ages ({{count}})",
     "discounts": "Discounts",
     "payInParts": "Or in parts:",
@@ -315,6 +315,9 @@
     "sourceLink": "Source: {{site}}",
     "sourceLinkLabel": "See these prices on {{site}} (opens in a new window)",
     "checkedOn": "checked {{date}}",
+    "checkedRange": "checked {{from}} – {{to}}",
+    "rowSource": "source",
+    "rowSourceLabel": "Source of this fee on {{site}} (opens in a new window)",
     "grades": {
       "preschool": "Preschool",
       "preschoolTo": "Preschool to grade {{to}}",
@@ -466,7 +469,8 @@
     "nextSchools": "Next schools",
     "visibleRange": "{{from}}–{{to}} of {{total}}",
     "someNotFound": "Some schools are no longer available and were removed from the comparison.",
-    "comparingCount_one": "Comparing {{count}} school"
+    "comparingCount_one": "Comparing {{count}} school",
+    "allFeesLink": "All fees on the school page"
   },
   "advancedFilters": {
     "title": "Advanced Filters",
@@ -726,6 +730,8 @@
       "contact": "If you email us, we use your address only to reply. Questions about privacy: {{email}}.",
       "calculator": "The admission calculator works entirely in your browser: your answers are never sent to us. If you press \"Save on this device\", they are kept in your browser (with the address you checked) so the school list can compare every school; you can forget them at any time."
     },
+    "sourceCodeTitle": "Source code",
+    "sourceCodeBody": "The code behind this site is public on GitHub under the MIT licence, so anyone can see how the site gathers and shows the data.",
     "cta": "Browse schools"
   },
   "levels": {
@@ -1311,7 +1317,9 @@
     "childRanked_one": "{{count}} ranked, not yet enrolled",
     "childRanked_other": "{{count}} ranked, not yet enrolled",
     "inBuildings_one": "(in {{count}} of its {{total}} buildings)",
-    "inBuildings_other": "(in {{count}} of its {{total}} buildings)"
+    "inBuildings_other": "(in {{count}} of its {{total}} buildings)",
+    "filter_one": "Only with a free place today ({{count}})",
+    "filter_other": "Only with a free place today ({{count}})"
   },
   "myChild": {
     "title": "My child's options",
@@ -1445,6 +1453,95 @@
         "enrol": "Enrol a pupil ranked in stage {{stage}}",
         "enrol_1": "Enrol a pupil ranked in stage I, or apply for stage II"
       }
+    }
+  },
+  "yearCost": {
+    "title": "Cost per year",
+    "for": "For",
+    "lines": {
+      "tuition": "Tuition",
+      "materials": "Books & materials",
+      "required": "Other required fees",
+      "food": "Food",
+      "extended_day": "After-school care",
+      "transport": "School bus",
+      "requiredTotal": "Required each year",
+      "withNeeds": "With what you ticked",
+      "firstYear": "First year only",
+      "optional": "Optional extras"
+    },
+    "addToTotal": "add to total",
+    "included": "Included in tuition",
+    "excluded": "Not in tuition; price not stated",
+    "notStated": "Not stated",
+    "notForStage": "Not for this age",
+    "free": "No tuition (state school)",
+    "required": "required",
+    "optional": "optional",
+    "periodAssumed": "period not stated, counted once a year",
+    "billedMonthsNotPublished": "billed months not published",
+    "noYearlyTotal": "No yearly total: billed months not published",
+    "noTotal": "No yearly total",
+    "assumedNote": "* includes a fee with no stated period, counted once a year",
+    "statedTotal": "The school's own total; it may already hold the lines above",
+    "firstYearInTotal": "Admission fees are in the school's total for new pupils",
+    "notAdded": "Not added: {{items}}",
+    "reasons": {
+      "severalOptions": "{{line}} (several options)",
+      "notStated": "{{line}} (not stated)",
+      "excluded": "{{line}} (price not stated)",
+      "periodNotYearly": "{{line}} (not a yearly price)",
+      "noPrice": "{{line}} (no price)",
+      "inStatedTotal": "{{line}} (may be in the school's total)",
+      "unknownIfIncluded": "{{line}} (not stated whether tuition includes it)"
+    },
+    "deposit": "Deposit {{price}}, returned or credited later (not counted)",
+    "uniformItems": "Uniform items: {{price}} each",
+    "foodUnknown": "Not stated whether tuition includes it",
+    "foodCounted": "counted in the total",
+    "card": {
+      "foodIncluded": "food included",
+      "foodUnknown": "food cost not stated",
+      "onTop": "+ {{items}}",
+      "items": {
+        "food": "food",
+        "materials": "materials"
+      }
+    }
+  },
+  "outdoor": {
+    "title": "Outdoor space",
+    "kinds": {
+      "grounds": "Its own grounds, mapped round the building.",
+      "other_building": "In another school's building (see the address). Whether there is a yard to use is not known.",
+      "floor": "On a floor of a larger building (see the address). Whether there is a yard to use is not known.",
+      "none": "No outdoor space at this building.",
+      "unknown": "Not known."
+    },
+    "sharedSentence": "In the grounds of {{name}}. Whether the pupils use them is not known.",
+    "websiteSays": "The school's website says:",
+    "onTheMap": "On the map:",
+    "openGround": "about {{area}} m² of open ground",
+    "pitches_one": "{{count}} sports pitch",
+    "pitches_other": "{{count}} sports pitches",
+    "playgrounds_one": "{{count}} playground",
+    "playgrounds_other": "{{count}} playgrounds",
+    "sources": {
+      "visit": "Checked on a visit on {{date}}.",
+      "osm": "From the school plot on OpenStreetMap.",
+      "address": "From the address in the ministry register."
+    },
+    "osmCredit": "Map data:",
+    "osmLink": "© OpenStreetMap contributors",
+    "sendPhoto": "Know this school? Send us a photo of its outdoor space.",
+    "photoSubject": "Outdoor space photo: {{name}}",
+    "compare": {
+      "grounds": "Outdoor space at the building",
+      "shared": "Another school's grounds",
+      "other_building": "Shared building, yard not known",
+      "floor": "Shared building, yard not known",
+      "none": "None",
+      "unknown": "Not known"
     }
   }
 }

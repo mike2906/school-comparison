@@ -75,23 +75,31 @@ before their pins, which then show "Not on the map yet" until the chain's publis
 ### Websites for schools without one
 
 The register import brings private schools in with the register's website, usually blank,
-and no website stage runs after it (33 of 174 private institutions had none on 2026-10-23).
+and no website stage runs after it (33 of 174 private institutions had none on 2026-10-23;
+198 of 228 municipal kindergartens and 37 of 251 state schools on 2026-11-02).
 So the fees job's first run of a month, after its backup, runs `find-websites --apply`:
-SearXNG search and URL validation without the model (free) for each private school with no
-site that was not searched in the last 90 days; a site validation accepts is stored and its
-fees are read in the same run. It counts as written, so the month publishes even when no fee
+SearXNG search and URL validation without the model (free) for each school with no
+site that was not searched in the last 90 days; a site validation accepts is stored and a
+private school's fees are read in the same run. A state school or kindergarten is held to
+its home page naming its number and kind and two words of its own name (or its only one) (`find_websites.py`). A school no
+search provider answered for (every engine blocked, as on 2026-11-06) is an error, not
+"searched, nothing found", so it is not skipped for 90 days; after 5 such schools in a row
+the search stops. A stopped search that found nothing exits non-zero without a report, so
+this job logs "find-websites failed" and its next run searches again; one that found sites
+first keeps them and publishes them. It counts as written, so the month publishes even when no fee
 changed. A failed search is logged and the fee read goes ahead. Facts for a site found come
 with the next facts cycle, or a thread's run.
 
 ### The register chain
 
 After the backup: `playwright install chromium` (a no-op once installed), then `run --stage discover --city sofia` (the ministry register and kg.sofia.bg; a
-crashed source now exits non-zero, and the issue quotes its error; the ministry API has answered scripts with a Cloudflare challenge since October 2026, so the import retries it through headless Chromium, which a home connection gets through; its output is kept in `$state/register-discover-<stamp>.log`; a school keeps its scrape status unless its website
+crashed source now exits non-zero, and the issue quotes its error; the ministry API has answered scripts with a Cloudflare challenge since October 2026, so the import retries it through a plain headless Chromium; that was blocked on the PC too (5 Nov 2026), so when only the ministry adapter fails on the challenge the chain goes on and keeps one open issue "Scheduled register refresh: ministry register blocked"; its output is kept in `$state/register-discover-<stamp>.log`; a school keeps its scrape status unless its website
 changed, so the import never withholds website data it has no stage to re-check), `scripts/import_sofia_municipal_points.py --apply`,
 `register-pins --apply`, `site-address --apply`, `confirm-pins --apply` (all free, hidden
 locations only), then `refresh_pins.sh` with `PINS_FORCE=1`: `website-pins`, `pin-agent`
 (`REGISTER_PINS_USD`, $0.05 a pass, with a $0.01 reserve per call as in the open-days
-check), `site-city`, `site-grades` with their own stops, the
+check), `site-city`, `site-grades` with their own stops, `outdoor-grounds` (OSM school plots for
+"Outdoor space", free, `docs/OUTDOOR_SPACE.md`), the
 catchment dry run (an issue "Catchment match changed" if it would change), the publish and the
 OSM check (`skills/geocoding/SKILL.md`, Weekly run). Any failure stops the chain; the next day
 runs it again from the start, which costs pennies.

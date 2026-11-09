@@ -54,10 +54,19 @@ import {
   stateAdmissionHint,
 } from './compareHelpers.js'
 import { InlineSource } from './CompareRows'
+import { outdoorEntries } from '../../utils/outdoorSpace'
 
 
 // The comparison table's rows, grouped into sections. Each row renders a cell per
 // school (getValue) and a plain value used to spot differences (getCompare).
+// Fact topics shown under the at-a-glance line they explain (schoolFacts.topics → .glance).
+const TOPIC_GLANCE = {
+  curriculum: 'curricula',
+  languages: 'languages',
+  support: 'support',
+  admissions: 'admission',
+}
+
 export function buildCompareSections({
   t,
   language,
@@ -77,9 +86,16 @@ export function buildCompareSections({
     return <TagList tags={tags} chipClassName="rounded bg-neutral-100 px-2 py-0.5 text-xs text-neutral-700" />
   }
 
-  const renderPlaceholder = (labelKey = 'compare.notAvailable') => (
+  // Nothing known: a dash, so a column of unknowns stays quiet instead of repeating words
+  // down the table (and "Not available" read as "the school doesn't offer it").
+  const renderPlaceholder = (labelKey = 'compare.notAvailable') => (labelKey === 'compare.notAvailable' ? (
+    <span className="text-neutral-400 text-sm">
+      <span aria-hidden="true">—</span>
+      <span className="sr-only">{t(labelKey)}</span>
+    </span>
+  ) : (
     <span className="text-neutral-400 text-sm">{t(labelKey)}</span>
-  )
+  ))
 
     const amenityEvidenceForSchool = (school) => getCanonicalAmenityEvidence(
       school.attributes,
@@ -455,6 +471,23 @@ export function buildCompareSections({
         getCompare: (school) => school.attributes?.facilities || [],
       },
       {
+        label: t('outdoor.title'),
+        getValue: (school) => {
+          const entries = outdoorEntries(school, language)
+          if (entries.length === 0) return renderPlaceholder()
+          return (
+            <div className="space-y-1">
+              {entries.map(entry => (
+                <div key={entry.locationId} className="text-sm text-neutral-700">
+                  {t(`outdoor.compare.${entry.kind}`)}
+                </div>
+              ))}
+            </div>
+          )
+        },
+        getCompare: (school) => outdoorEntries(school, language).map(entry => entry.kind).join(','),
+      },
+      {
         label: t('compare.labels.accessibility'),
         getValue: (school) => renderBinaryEvidence(amenityEvidenceForSchool(school).accessibility),
         getCompare: (school) => amenityEvidenceForSchool(school).accessibility,
@@ -714,12 +747,31 @@ export function buildCompareSections({
     // The facts' labels summed up (admission, curriculum, bus areas ...), one row a kind.
     const glanceLine = (school, key) => atAGlanceLines(school, language, t).find(line => line.key === key)
     const glanceValue = (school, key) => glanceLine(school, key)?.value || null
-    const glanceRows = atAGlanceKeysIn(schools, language, t).map(key => ({
+    const renderFacts = (facts) => (
+      <ul className="space-y-1">
+        {facts.map((fact, index) => (
+          <li key={index} className="text-sm text-neutral-700">
+            {fact.text}{' '}
+            <a href={fact.sourceUrl} target="_blank" rel="noopener noreferrer nofollow" className="text-primary-700 underline underline-offset-2">
+              {t('schoolFacts.source')}
+            </a>
+          </li>
+        ))}
+      </ul>
+    )
+    const glanceKeys = atAGlanceKeysIn(schools, language, t)
+    // A topic's facts sit under the summed-up line of the same kind, so "Curriculum" or
+    // "Languages" is one row, not two.
+    const glanceForTopic = topic => (TOPIC_GLANCE[topic] && glanceKeys.includes(TOPIC_GLANCE[topic]) ? TOPIC_GLANCE[topic] : null)
+    const topicsIn = factTopicsIn(schools, language)
+    const topicsForGlance = key => topicsIn.filter(topic => glanceForTopic(topic) === key)
+    const glanceRows = glanceKeys.map(key => ({
       label: t(`schoolFacts.glance.${key}`),
       getValue: (school) => {
         const line = glanceLine(school, key)
-        if (!line) return renderPlaceholder()
-        return line.href ? (
+        const facts = topicsForGlance(key).flatMap(topic => topicFacts(school, topic))
+        if (!line && facts.length === 0) return renderPlaceholder()
+        const summary = !line ? null : line.href ? (
           <span>
             {line.value}{' '}
             <a href={line.href} target="_blank" rel="noopener noreferrer nofollow" className="text-primary-700 underline underline-offset-2">
@@ -727,25 +779,25 @@ export function buildCompareSections({
             </a>
           </span>
         ) : line.value
+        if (facts.length === 0) return summary
+        return (
+          <div className="space-y-2">
+            {summary && <div>{summary}</div>}
+            {renderFacts(facts)}
+          </div>
+        )
       },
-      getCompare: (school) => glanceValue(school, key),
+      getCompare: (school) => {
+        const facts = topicsForGlance(key).flatMap(topic => topicFacts(school, topic)).map(fact => fact.text)
+        const value = glanceValue(school, key)
+        return value || facts.length > 0 ? [value, ...facts].join('|') : null
+      },
     }))
-    const factRows = factTopicsIn(schools, language).map(topic => ({
+    const factRows = topicsIn.filter(topic => !glanceForTopic(topic)).map(topic => ({
       label: t(`schoolFacts.topics.${topic}`),
       getValue: (school) => {
         const facts = topicFacts(school, topic)
-        return facts.length > 0 ? (
-          <ul className="space-y-1">
-            {facts.map((fact, index) => (
-              <li key={index} className="text-sm text-neutral-700">
-                {fact.text}{' '}
-                <a href={fact.sourceUrl} target="_blank" rel="noopener noreferrer nofollow" className="text-primary-700 underline underline-offset-2">
-                  {t('schoolFacts.source')}
-                </a>
-              </li>
-            ))}
-          </ul>
-        ) : renderPlaceholder()
+        return facts.length > 0 ? renderFacts(facts) : renderPlaceholder()
       },
       getCompare: (school) => topicFacts(school, topic).map(fact => fact.text).join('|') || null,
     }))

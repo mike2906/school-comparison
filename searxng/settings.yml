@@ -13,3 +13,10 @@ search:
   formats:
     - html
     - json
+
+engines:
+  # Google, DuckDuckGo, Startpage, Brave and Qwant all refused this PC on 2026-11-06
+  # ("access denied", CAPTCHAs); Yandex answered Bulgarian school searches well
+  # (dg136.com for "ДГ 136 София"). It is off in SearXNG's defaults.
+  - name: yandex
+    disabled: false

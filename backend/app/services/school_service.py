@@ -228,7 +228,10 @@ class SchoolService:
         if school_type:
             query = query.where(School.school_type == school_type)
 
-        result = await self.db.execute(query)
+        # A fixed order: without one Postgres returns rows as they lie on disk, which moves
+        # whenever a school is updated, so ties in the site's sort and anything that takes
+        # "the first school" from the list would change after each publish.
+        result = await self.db.execute(query.order_by(School.id))
         schools = result.scalars().unique().all()
 
         if not any([language_focus, special_programs, facilities, teaching_approach]):

@@ -62,5 +62,18 @@ describe('free kindergarten places', () => {
     const line = page.getByTestId('free-places-line').first()
     await line.waitFor()
     assert.match(await line.innerText(), new RegExp(String(birthYear)))
+
+    // "Only with a free place today" leaves just the schools whose card says it has one.
+    const withPlace = (await allSchools()).filter(s =>
+      childFreePlaces(schoolFreePlaces(data, s.id), birthYear, year)?.free > 0).length
+    const toggle = page.getByTestId('free-places-filter')
+    await toggle.click()
+    await page.waitForURL(url => url.searchParams.get('free_places') === 'true')
+    assert.equal(await toggle.getAttribute('aria-pressed'), 'true')
+    const lines = page.getByTestId('free-places-line')
+    await lines.first().waitFor()
+    const none = t('bg', 'freePlaces.childFull', { year: birthYear })
+    for (const text of await lines.allInnerTexts()) assert.notEqual(text.trim(), none)
+    assert.ok(await lines.count() <= withPlace, `${await lines.count()} cards, ${withPlace} state kindergartens with a place`)
   })
 })

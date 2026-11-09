@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { MATCH_RANK, filterByName, schoolMatchRank, schoolMatchesQuery, sortByNameMatch } from './schoolSearch.js'
+import { MATCH_RANK, filterByName, normalizeSearchText, schoolMatchRank, schoolMatchesQuery, sortByNameMatch } from './schoolSearch.js'
 
 const svetaSofia = {
   name_i18n: { bg: '"Частно основно училище Света София" ЕООД' },
@@ -12,6 +12,18 @@ const smg = { name_i18n: { bg: 'Софийска математическа ги
 test('Latin saint words and the "Sofia" spelling find Света София', () => {
   for (const query of ['Sofiy', 'Saints Sofia', 'Saint Sofia', 'Sveta Sofia', 'Sveta Sofiya', 'St Sofia', 'Св. София', 'свети софия']) {
     assert.equal(schoolMatchesQuery(svetaSofia, query), true, query)
+  }
+})
+
+test('a saint right after a number is still a saint, and "119th" is still 119', () => {
+  // "No. 19 St. Sofia" once read as the ordinal "19st", so "Saint" found nothing.
+  const dg19 = { name_i18n: { bg: 'ДГ №19 Света София' }, resolved_name_i18n: { bg: 'ДГ №19 Света София', en: 'Kindergarten No. 19 St. Sofia' } }
+  for (const query of ['Kindergarten No. 19 Saint Sofia', 'Kindergarten Saint Sofia', 'Kindergarten No. 19 St. Sofia']) {
+    assert.equal(schoolMatchesQuery(dg19, query), true, query)
+  }
+  assert.equal(schoolMatchesQuery({ name_i18n: { bg: '119 СУ „Академик Михаил Арнаудов“' } }, '119th'), true)
+  for (const [text, expected] of [['No.19-St. Sofia', '19 st sofia'], ['No.19St.Sofia', '19 st sofia'], ['2nd 11th 23rd', '2 11 23'], ['1-st', '1']]) {
+    assert.equal(normalizeSearchText(text), expected, text)
   }
 })
 

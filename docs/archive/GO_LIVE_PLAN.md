@@ -2560,7 +2560,7 @@ providers; multi-country generalization of gates (hardcode Sofia); rewriting
 ## Repository publication preparation (2026-10-05)
 
 Code protections and remaining maintainer controls are tracked in
-[PUBLICATION_CHECKLIST.md](PUBLICATION_CHECKLIST.md). Local service ports, demo seeding,
+[PUBLICATION_CHECKLIST.md](../PUBLICATION_CHECKLIST.md). Local service ports, demo seeding,
 locked dependencies, clean-install migrations and deployment backup handling are prepared
 for review. Host installation, branch protection and secret scoping remain open; visibility
 and the launch database are unchanged.

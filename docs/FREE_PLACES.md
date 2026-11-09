@@ -68,7 +68,9 @@ an empty `schools`, and the site also hides an answer older than that.
   line per group and building with the free places, capacity, enrolled and ranked but not
   yet enrolled, and the СОП and chronic-illness places.
 - **Search list**: with a birth year and the current school year picked, each card says how
-  many places are free for that birth year today (or that none is).
+  many places are free for that birth year today (or that none is), and "Only with a free
+  place today (N)" keeps just the schools with one (`free_places=true` in the URL; hidden,
+  and ignored, for a school year with no snapshot yet).
 - **Kindergarten calculator**: for the chosen kindergarten and start year, the free places
   in the child's group beside the cut-off comparison.
 

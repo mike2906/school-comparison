@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { childFreePlaces, childFreePlacesBySchool, schoolFreePlaces, usableFreePlaces } from './freePlaces.js'
+import { childFreePlaces, childFreePlacesBySchool, freePlacesFilterApplies, hasFreePlaceToday, schoolFreePlaces, usableFreePlaces } from './freePlaces.js'
 
 const entry = (birthYear, free, extra = {}) => ({
   birth_year: birthYear, campaign: '2026/2027', stage: 'kindergarten', free, ranked_not_enrolled: 1, capacity: 26, enrolled: 25 - free, ...extra,
@@ -44,5 +44,17 @@ describe('free places', () => {
     assert.equal(map.get(1).birthYear, 2023)
     assert.equal(map.get(1).free, 2)
     assert.equal(childFreePlacesBySchool(null, 2023, 2026).size, 0)
+  })
+
+  it('filters to schools with a free place only when today has the child\'s group', () => {
+    const data = { schools: { 1: [entry(2023, 2)], 2: [entry(2023, 0)], 3: [entry(2022, 4)] } }
+    const bySchool = childFreePlacesBySchool(data, 2023, 2026)
+    assert.equal(hasFreePlaceToday(bySchool, 1), true)
+    assert.equal(hasFreePlaceToday(bySchool, 2), false)
+    assert.equal(hasFreePlaceToday(bySchool, 3), false, 'another birth year')
+    assert.equal(freePlacesFilterApplies({ freePlacesOnly: true }, bySchool), true)
+    assert.equal(freePlacesFilterApplies({ freePlacesOnly: false }, bySchool), false)
+    // Next year's start has no snapshot yet: the list is not emptied.
+    assert.equal(freePlacesFilterApplies({ freePlacesOnly: true }, childFreePlacesBySchool(data, 2023, 2027)), false)
   })
 })

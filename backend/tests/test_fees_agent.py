@@ -20,13 +20,16 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from app.models import FieldSource, Pricing, School
+from app.models.country import Country
 from app.models.pricing import PriceCategory, PricePeriod, PriceSource
 from app.models.scrape_log import ScrapeType
 from app.models.source_page import SourcePage
+from app.schemas.pricing import PricingContextResponse
 from app.scrapers.extraction.agent_fees import (
     HELD_CONFIDENCE,
     PUBLISH_CONFIDENCE,
     AgentFee,
+    FeeService,
     PaymentOption,
     check_fee,
     names_deposit,
@@ -408,7 +411,7 @@ def test_parts_of_a_space_joined_table_row_are_numbers():
 # The stage (model and fetches stubbed)
 # ---------------------------------------------------------------------------------------
 
-PAGE_STAGE = "Месечна такса: 700 евро\nЕднократна такса за записване: 200 евро.\nХрана: 90 евро месечно"
+PAGE_STAGE = "Месечна такса: 700 евро\nЕднократна такса за записване: 200 евро.\nХрана: 90 евро месечно, заплаща се отделно"
 FEES_STAGE = [
     fee(PriceCategory.TUITION, "Месечна такса: 700 евро", amount=700, period=PricePeriod.MONTHLY, academic_year="2026/2027"),
     fee(PriceCategory.REGISTRATION, "Еднократна такса за записване: 200 евро.", amount=200, period=PricePeriod.ONE_TIME, academic_year="2026/2027"),
@@ -438,6 +441,18 @@ def pages():
 
 
 async def _school(db) -> School:
+    if await db.get(Country, "bg") is None:  # PostgreSQL holds the school's country key
+        db.add(
+            Country(
+                code="bg",
+                name_i18n={"bg": "България", "en": "Bulgaria"},
+                education_config={},
+                map_config={},
+                supported_languages=["bg", "en"],
+                default_language="bg",
+                default_currency="EUR",
+            )
+        )
     school = School(
         name_i18n={"bg": "Частно училище"},
         country_code="bg",
@@ -998,7 +1013,10 @@ async def test_page_gone_reads_only_the_status(status, gone):
         assert await fees_agent.page_gone(client, OLD_URL) is gone
 
 
-async def test_a_gone_page_is_saved_invalid_when_no_page_shows_prices(db_session, frozen_today):
+@pytest.mark.postgres  # a revival, then a rollback
+async def test_a_gone_page_keeps_its_rows_when_no_page_shows_prices(db_session, frozen_today):
+    # 505 rebuilt its site: every fee page answered 404, the finder did not reach the new PDF,
+    # and the school lost all its fees. With nothing read in their place, the old rows stay.
     school = await _school(db_session)
     await _old_rows(db_session, school, None, [580], page_url=OLD_URL)
     await db_session.commit()
@@ -1007,10 +1025,39 @@ async def test_a_gone_page_is_saved_invalid_when_no_page_shows_prices(db_session
         db_session, school, find=_find(no_prices), read=_read([]), apply=True, gone=_gone(OLD_URL)
     )
     assert report["outcome"] == "kept_old_rows" and report["pages_gone"] == [OLD_URL]
+    assert report["pages_gone_kept"] == [OLD_URL]
     await db_session.rollback()  # what a later school's failure would do
+    published = [float(r.amount) for r in await _rows(db_session, school) if pricing_row_is_publishable(r)]
+    assert published == [580.0]
+
+
+async def test_a_gone_page_keeps_its_rows_when_the_read_finds_nothing_publishable(db_session, pages, frozen_today):
+    school = await _school(db_session)
+    await _old_rows(db_session, school, None, [580], page_url=OLD_URL)
+    await db_session.commit()
+    report = await fees_agent.run_school(
+        db_session, school, find=_find(pages), read=_read([]), apply=True, gone=_gone(OLD_URL)
+    )
+    assert report["outcome"] == "kept_old_rows" and report["pages_gone_kept"] == [OLD_URL], report
+    published = [float(r.amount) for r in await _rows(db_session, school) if pricing_row_is_publishable(r)]
+    assert published == [580.0]
+
+
+@pytest.mark.postgres  # a rollback, then a write
+async def test_a_gone_page_is_valid_again_when_the_read_fails(db_session, pages, frozen_today):
+    school = await _school(db_session)
+    await _old_rows(db_session, school, None, [580], page_url=OLD_URL)
+    await db_session.commit()
+
+    async def broken(*_):
+        await db_session.execute(select(SourcePage))  # fails inside an open transaction
+        raise RuntimeError("reader down")
+
+    with pytest.raises(RuntimeError, match="reader down"):
+        await fees_agent.run_school(db_session, school, find=_find(pages), read=broken, apply=True, gone=_gone(OLD_URL))
     old = (await db_session.execute(select(SourcePage).where(SourcePage.source_url == OLD_URL))).scalar_one()
     await db_session.refresh(old)
-    assert old.is_valid is False
+    assert old.is_valid is True
 
 
 async def test_a_fee_the_read_missed_is_read_again_by_name(db_session, pages, frozen_today):
@@ -2411,3 +2458,144 @@ def test_a_one_day_trip_or_course_is_not_daily(line):
 def test_a_bracket_quote_does_not_join_two_page_lines():
     page = "Такса (5 клас)\n300 €\n"
     assert not check_fee(fee(PriceCategory.TUITION, "Такса(5 клас) 300 €", amount=300), page).kept
+
+
+# --- What a tuition fee includes (docs/YEARLY_COST.md) ------------------------------------
+PAGE_SERVICES = """\
+Такса обучение за 2026/2027: 8900 евро на година
+Таксата включва: учебници и учебни тетрадки, храна – плодова закуска, обяд и следобедна закуска
+В годишната такса не са включени: транспорт, екскурзии и лагери
+"""
+
+
+def test_services_kept_only_with_a_line_on_the_page_that_names_them():
+    line_in = "Таксата включва: учебници и учебни тетрадки, храна – плодова закуска, обяд и следобедна закуска"
+    line_out = "В годишната такса не са включени: транспорт, екскурзии и лагери"
+    read = fee(PriceCategory.TUITION, "Такса обучение за 2026/2027: 8900 евро на година", amount=8900).model_copy(
+        update={
+            "services": [
+                FeeService(service="food", included=True, evidence=line_in),
+                FeeService(service="materials", included=True, evidence=line_in),
+                FeeService(service="transport", included=False, evidence=line_out),
+                # Not on the page, and a line that does not name the service.
+                FeeService(service="extended_day", included=True, evidence="Таксата включва занималня до 18:00"),
+                FeeService(service="extended_day", included=False, evidence=line_in),
+            ]
+        }
+    )
+    result = check_fee(read, PAGE_SERVICES)
+    assert {(item.service, item.included) for item in result.fee.services} == {
+        ("food", True),
+        ("materials", True),
+        ("transport", False),
+    }
+    assert "service extended_day dropped: evidence line is not on the page" in result.checks
+    assert "service extended_day dropped: evidence does not say it is not included" in result.checks
+
+
+def test_a_service_needs_the_page_to_say_which_way():
+    page = PAGE_SERVICES + "ГОДИШНАТА ТАКСА НЕ ВКЛЮЧВА:\nХранителен пакет\nТаксата включва ползване на материалната база\nОбяд без допълнително заплащане\n"
+    tuition = fee(PriceCategory.TUITION, "Такса обучение за 2026/2027: 8900 евро на година", amount=8900)
+    line_out = "В годишната такса не са включени: транспорт, екскурзии и лагери"
+
+    def kept(*services):
+        return {(item.service, item.included) for item in check_fee(tuition.model_copy(update={"services": list(services)}), page).fee.services}
+
+    # The wrong way round, a word alone, the facilities for materials.
+    assert kept(FeeService(service="transport", included=True, evidence=line_out)) == set()
+    # A word quoted alone fits several lines: it proves nothing.
+    assert kept(FeeService(service="food", included=True, evidence="обяд")) == set()
+    assert kept(FeeService(service="materials", included=True, evidence="Таксата включва ползване на материалната база")) == set()
+    # A list's item under its heading; at no extra cost is included.
+    assert kept(FeeService(service="food", included=False, evidence="ГОДИШНАТА ТАКСА НЕ ВКЛЮЧВА:\nХранителен пакет")) == {("food", False)}
+    assert kept(FeeService(service="food", included=True, evidence="Обяд без допълнително заплащане")) == {("food", True)}
+    # A quote cut from a line, and a heading from another list joined to an item.
+    assert kept(FeeService(service="transport", included=True, evidence="включени: транспорт, екскурзии и лагери")) == set()
+    assert kept(FeeService(service="food", included=True, evidence="Таксата включва ползване на материалната база\nХранителен пакет")) == set()
+
+
+def test_at_no_extra_cost_speaks_for_its_own_part_of_the_line():
+    line = "Транспорт без допълнително заплащане, храната се заплаща отделно"
+    tuition = fee(PriceCategory.TUITION, "Такса обучение за 2026/2027: 8900 евро на година", amount=8900)
+    services = [FeeService(service="transport", included=True, evidence=line), FeeService(service="food", included=True, evidence=line)]
+    result = check_fee(tuition.model_copy(update={"services": services}), PAGE_SERVICES + line + "\n")
+    assert [(item.service, item.included) for item in result.fee.services] == [("transport", True)]
+
+
+def test_services_only_on_tuition_and_never_both_ways():
+    line_in = "Таксата включва: учебници и учебни тетрадки, храна – плодова закуска, обяд и следобедна закуска"
+    line_out = "В годишната такса не са включени: транспорт, екскурзии и лагери"
+    bus = fee(PriceCategory.TRANSPORT, "Такса обучение за 2026/2027: 8900 евро на година", amount=8900).model_copy(
+        update={"services": [FeeService(service="food", included=True, evidence=line_in)]}
+    )
+    assert check_fee(bus, PAGE_SERVICES).fee.services == []
+    both = fee(PriceCategory.TUITION, "Такса обучение за 2026/2027: 8900 евро на година", amount=8900).model_copy(
+        update={
+            "services": [
+                FeeService(service="transport", included=False, evidence=line_out),
+                FeeService(service="transport", included=True, evidence="Таксата включва транспорт от дома"),
+            ]
+        }
+    )
+    result = check_fee(both, PAGE_SERVICES + "Таксата включва транспорт от дома\n")
+    assert result.fee.services == []
+    assert "service transport dropped: said to be both included and not" in result.checks
+
+
+async def test_apply_stores_what_the_tuition_includes(db_session, pages, frozen_today):
+    tuition = FEES_STAGE[0].model_copy(
+        update={"services": [FeeService(service="food", included=False, evidence="Храна: 90 евро месечно, заплаща се отделно")]}
+    )
+    school = await _school(db_session)
+    await db_session.commit()
+    report = await fees_agent.run_school(
+        db_session, school, find=_find(pages), read=_read([tuition, FEES_STAGE[1]]), apply=True
+    )
+    assert report["outcome"] == "written", report
+    rows = {row.category: row for row in await _rows(db_session, school)}
+    context = rows[PriceCategory.TUITION].pricing_context
+    assert context["includes"] == [] and context["excludes"] == ["food"]
+    assert context["services_evidence"] == {"food": "Храна: 90 евро месечно, заплаща се отделно"}
+    # The lists publish; the evidence stays internal.
+    public = PricingContextResponse.model_validate(context).model_dump()
+    assert public["excludes"] == ["food"] and "services_evidence" not in public
+    assert "includes" not in rows[PriceCategory.REGISTRATION].pricing_context
+
+
+def test_a_service_is_read_in_its_whole_sentence_and_list():
+    tuition = fee(PriceCategory.TUITION, "Такса обучение за 2026/2027: 8900 евро на година", amount=8900)
+
+    def kept(page, *services):
+        result = check_fee(tuition.model_copy(update={"services": list(services)}), PAGE_SERVICES + page)
+        return {(item.service, item.included) for item in result.fee.services}
+
+    # 171: a list split by semicolons under its "НЕ включва" heading.
+    roerich = "Таксата за обучение НЕ включва следните допълнителни дейности и услуги : • училищна униформа; • транспорт; • храна;\n"
+    assert kept(roerich, FeeService(service="food", included=False, evidence="• храна;")) == {("food", False)}
+    # 593: one sentence of a longer line.
+    izzi = "Tuition Fee, payable in equal monthly installments of 900 EURO The tuition fee covers all educational resources, food and water, accident insurance.\n"
+    assert kept(izzi, FeeService(service="food", included=True, evidence="The tuition fee covers all educational resources, food and water")) == {("food", True)}
+    # 568: "(вкл. плуване" does not end the sentence that says the fee includes the meals.
+    doris = "Годишната такса за целодневно обучение (I - VIІ клас) включва всички разходи, задължителна спортна дейност (вкл. плуване и хореография), ежедневно двукратно хранене, охрана и др.\n"
+    assert kept(doris, FeeService(service="food", included=True, evidence="ежедневно двукратно хранене")) == {("food", True)}
+    # A quote cut from a line that says the opposite is read with the rest of it.
+    assert kept("Таксата не включва обяд\n", FeeService(service="food", included=True, evidence="включва обяд")) == set()
+
+
+def test_clauses_capitals_semicolons_and_table_cells():
+    tuition = fee(PriceCategory.TUITION, "Такса обучение за 2026/2027: 8900 евро на година", amount=8900)
+
+    def kept(page, *services):
+        result = check_fee(tuition.model_copy(update={"services": list(services)}), PAGE_SERVICES + page)
+        return {(item.service, item.included) for item in result.fee.services}
+
+    caps = "ТАКСАТА ВКЛЮЧВА УЧЕБНИЦИ, НО НЕ ВКЛЮЧВА ХРАНА\n"
+    assert kept(caps, FeeService(service="materials", included=True, evidence=caps.strip())) == {("materials", True)}
+    semi = "Таксата включва храна; транспортът се заплаща отделно.\n"
+    assert kept(
+        semi,
+        FeeService(service="food", included=True, evidence=semi.strip()),
+        FeeService(service="transport", included=False, evidence=semi.strip()),
+    ) == {("food", True), ("transport", False)}
+    row = "Храна | включена | не е включена\n"
+    assert kept(row, FeeService(service="food", included=True, evidence="Храна | включена")) == {("food", True)}

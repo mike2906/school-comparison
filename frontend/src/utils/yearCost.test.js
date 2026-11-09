@@ -1,0 +1,205 @@
+import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import test from 'node:test'
+
+import { defaultStage, feeOnTop, offersStage, rowsForStage, stageForAgeGroup, stageForChild, totalWithNeeds, yearCost } from './yearCost.js'
+
+// The live fee rows of 596 Maple Bear, 172 St. Sofia and 635 Uwekind on 25 Oct 2026, checked by
+// hand against their fee pages (2026/27, grade 1).
+const SCHOOLS = JSON.parse(readFileSync(new URL('./testdata/yearCostSchools.json', import.meta.url)))
+const today = new Date('2026-10-25T12:00:00Z')
+const cost = (id, stage = 'grade_1') => yearCost(SCHOOLS[id], stage, { today })
+const ids = options => options.map(item => item.row.id)
+
+test('grade 1 requires tuition, the fees every pupil pays, and food', () => {
+  // Maple Bear: 9,050 tuition (plan 1) + 550 materials + 1,290–1,340 food billed apart.
+  assert.deepEqual(cost(596).required, { value: { min: 10890, max: 10940, assumed: false }, missing: [] })
+  // St. Sofia: the ПУК–III band's 8,900, not grades 4–7's 9,400; our rows do not say whether it holds food.
+  assert.deepEqual(cost(172).required, { value: { min: 8900, max: 8900, assumed: false }, missing: [{ line: 'food', reason: 'unknownIfIncluded' }] })
+  // Uwekind: 7,880 + 600 resources + 450 for the compulsory club, whose period is not stated;
+  // lunch at one campus or the other, so food is not added.
+  assert.deepEqual(cost(635).required, { value: { min: 8930, max: 8930, assumed: true }, missing: [{ line: 'food', reason: 'severalOptions' }] })
+  // Grades 4–7 at St. Sofia include food: nothing to add or name.
+  assert.deepEqual(cost(172, 'grade_5').required.missing, [])
+})
+
+test('tuition is the stage’s own price, not a payment plan or another grade’s', () => {
+  assert.deepEqual(ids(cost(596).tuition.options), [6189])
+  assert.deepEqual(ids(cost(596, 'grade_3').tuition.options), [6190])
+  assert.deepEqual(ids(cost(172, 'grade_5').tuition.options), [5782])
+  assert.equal(cost(172, 'grade_9').tuition.options.length, 0)
+})
+
+test('the same fee read from two PDFs is counted once, and a secondary-school PDF’s fees stay there', () => {
+  // 1,340 food from the secondary PDF is inside the primary PDF's 1,290–1,340.
+  assert.deepEqual(ids(cost(596).lines.food.options), [6193])
+  // The 200 application fee is on the grades 8–12 PDF only.
+  assert.deepEqual(ids(cost(596).firstYear.options), [6192])
+  assert.deepEqual(ids(cost(596, 'grade_9').firstYear.options), [6202])
+})
+
+test('a bus with a one-way price beside it is the two-way one', () => {
+  assert.deepEqual(ids(cost(596).lines.transport.options), [6194])
+  assert.deepEqual(ids(cost(635).lines.transport.options), [5678])
+})
+
+test('ticked needs are added only when they come to one yearly price', () => {
+  const all = ['extended_day', 'transport']
+  // Maple Bear states each one per year.
+  assert.deepEqual(totalWithNeeds(cost(596), all), { value: { min: 14140, max: 14190, assumed: false }, missing: [] })
+  assert.deepEqual(totalWithNeeds(cost(635), all).missing, [
+    { line: 'food', reason: 'severalOptions' },
+    { line: 'extended_day', reason: 'notStated' },
+  ])
+  // Unticked lines are never added.
+  assert.deepEqual(totalWithNeeds(cost(596), []), cost(596).required)
+})
+
+test('a line the tuition says it includes or leaves out', () => {
+  // "The annual tuition fee includes food" is on the grades 4–7 row only.
+  assert.equal(cost(172, 'grade_5').lines.food.state, 'included')
+  assert.equal(cost(172).lines.food.state, 'none')
+  const excluded = [{
+    id: 1, category: 'tuition', amount: 5000, currency: 'EUR', period: 'yearly', year_status: 'not_stated',
+    pricing_context: { notes: 'В таксата не е включена храна.' },
+  }]
+  assert.equal(yearCost(excluded, 'grade_1', { today }).lines.food.state, 'excluded')
+})
+
+test('a monthly tuition is never made into a year', () => {
+  const monthly = [
+    { id: 1, category: 'tuition', amount: 650, currency: 'EUR', period: 'monthly', year_status: 'not_stated' },
+    { id: 2, category: 'food', amount: 1200, currency: 'EUR', period: null, year_status: 'not_stated' },
+  ]
+  const result = yearCost(monthly, 'first', { today })
+  assert.equal(result.required, null)
+  // Nor is a fee without a period read as yearly on a monthly page.
+  assert.equal(result.lines.food.options[0].perYear, null)
+})
+
+test('deposits and uniforms are listed apart from the first-year sum', () => {
+  const rows = [
+    { id: 1, category: 'tuition', amount: 9000, currency: 'EUR', period: 'yearly', year_status: 'not_stated' },
+    { id: 2, category: 'registration', amount: 500, currency: 'EUR', period: 'one_time', year_status: 'not_stated' },
+    { id: 3, category: 'registration', amount: 1000, currency: 'EUR', period: 'one_time', year_status: 'not_stated', pricing_context: { deposit: true } },
+  ]
+  const { firstYear } = yearCost(rows, 'grade_1', { today })
+  assert.deepEqual(ids(firstYear.options), [2])
+  assert.deepEqual(ids(firstYear.deposits), [3])
+  assert.deepEqual(firstYear.value, { min: 500, max: 500, assumed: false })
+})
+
+test('admission fees are not added on top of a total for new pupils (506)', () => {
+  const rows = [
+    { id: 1, category: 'tuition', amount: 28511, currency: 'EUR', period: null, age_group: 'Kindergarten – Grade 5', plan_name: 'Total Fee for New Students', year_status: 'not_stated' },
+    { id: 2, category: 'tuition', amount: 25702, currency: 'EUR', period: null, age_group: 'Kindergarten – Grade 5', plan_name: 'Total Fee for Returning Students', year_status: 'not_stated' },
+    { id: 3, category: 'registration', amount: 1707, currency: 'EUR', period: 'one_time', plan_name: 'Entrance Capital Fee (New students only)', year_status: 'not_stated' },
+    { id: 4, category: 'registration', amount: 1102, currency: 'EUR', period: 'one_time', plan_name: 'Registration Fee (New students only)', year_status: 'not_stated' },
+  ]
+  const { firstYear } = yearCost(rows, 'grade_1', { today })
+  assert.equal(firstYear.inTotal, true)
+  assert.deepEqual(firstYear.options, [])
+  assert.equal(firstYear.value, null)
+  // The entrance exam and a total without a price are not in it, nor is a total that leaves them out.
+  const exam = { id: 5, category: 'registration', amount: 200, currency: 'EUR', period: 'one_time', plan_name: 'Entrance exam', year_status: 'not_stated' }
+  assert.deepEqual(ids(yearCost([...rows, exam], 'grade_1', { today }).firstYear.options), [5])
+  const unpriced = yearCost(rows.map(row => (row.id === 1 ? { ...row, amount: null } : row)).filter(row => row.id !== 2), 'grade_1', { today })
+  assert.deepEqual(ids(unpriced.firstYear.options), [3, 4])
+  const leftOut = yearCost(rows.map(row => (row.id === 1 ? { ...row, plan_name: 'Total (excluding fees for new students)' } : row)), 'grade_1', { today })
+  assert.equal(leftOut.firstYear.inTotal, false)
+  const noBus = yearCost(rows.map(row => (row.id === 1 ? { ...row, plan_name: 'Total Fee for New Students (without bus)' } : row)), 'grade_1', { today })
+  assert.equal(noBus.firstYear.inTotal, true)
+  // No admission fee: nothing to say is in the total.
+  assert.equal(yearCost(rows.slice(0, 2), 'grade_1', { today }).firstYear.inTotal, false)
+  // Any other total is not known to hold them.
+  const other = yearCost(rows.map(row => (row.id === 1 ? { ...row, plan_name: 'Total' } : row)).filter(row => row.id !== 2), 'grade_1', { today })
+  assert.equal(other.firstYear.inTotal, false)
+  assert.deepEqual(ids(other.firstYear.options), [3, 4])
+})
+
+test('a kindergarten group never gets a school’s fee', () => {
+  // Uwekind's "Училище" tuition and the pupils' food at Lozen are not a kindergarten's.
+  assert.equal(cost(635, 'first').tuition.options.length, 0)
+  assert.deepEqual(rowsForStage([{ id: 1, category: 'food', age_group: 'Ученици в Лозен' }], 'second'), [])
+  // Its preschool class fee is not grade 1's.
+  assert.deepEqual(ids(cost(635, 'preschool').tuition.options), [5682])
+  assert.ok(!ids(cost(635).lines.food.options).includes(5684))
+})
+
+test('the stage comes from the saved child or the search', () => {
+  assert.equal(stageForChild(2020, 2027), 'grade_1')
+  assert.equal(stageForChild(2021, 2027), 'preschool')
+  assert.equal(stageForChild(2023, 2027), 'second')
+  assert.equal(stageForChild(2026, 2027), 'nursery')
+  assert.equal(stageForChild(null, 2027), null)
+  assert.equal(stageForAgeGroup('grade_5_7'), 'grade_5')
+  assert.equal(stageForAgeGroup('third'), 'third')
+  assert.equal(stageForAgeGroup(null), null)
+  // The child wins when it fits the search; a search for other grades starts at their first.
+  assert.equal(defaultStage({ birthYear: 2020, startYear: 2027, ageGroup: 'grade_1_4', planningYear: 2027 }), 'grade_1')
+  assert.equal(defaultStage({ birthYear: 2023, startYear: 2027, ageGroup: 'grade_5_7', planningYear: 2027 }), 'grade_5')
+  // A start year already past plans for the coming one.
+  assert.equal(defaultStage({ birthYear: 2019, startYear: 2025, planningYear: 2027 }), 'grade_2')
+  assert.equal(defaultStage({ planningYear: 2027 }), 'grade_1')
+})
+
+test('the tuition’s words decide a line by clause and by whole word', () => {
+  const tuition = notes => [{ id: 1, category: 'tuition', amount: 5000, currency: 'EUR', period: 'yearly', year_status: 'not_stated', pricing_context: { notes } }]
+  const lines = notes => yearCost(tuition(notes), 'grade_1', { today }).lines
+  const mixed = lines('Таксата включва учебни материали, но не включва храна.')
+  assert.equal(mixed.materials.state, 'included')
+  assert.equal(mixed.food.state, 'excluded')
+  assert.equal(lines('The fee includes the full syllabus.').transport.state, 'none')
+  assert.equal(lines('Включва ползване на материалната база.').materials.state, 'none')
+  assert.equal(lines('Price not including lunch.').food.state, 'excluded')
+  const list = lines('Tuition includes meals, transport and textbooks.')
+  assert.deepEqual([list.food.state, list.transport.state, list.materials.state], ['included', 'included', 'included'])
+})
+
+test('a fee read as yearly from its notes only when they name no other period', () => {
+  const rows = notes => [
+    { id: 1, category: 'tuition', amount: 650, currency: 'EUR', period: 'monthly', year_status: 'not_stated' },
+    { id: 2, category: 'food', amount: 150, currency: 'EUR', period: null, year_status: 'not_stated', pricing_context: { notes } },
+  ]
+  assert.equal(yearCost(rows('Изчислена за една учебна година.'), 'first', { today }).lines.food.options[0].perYear.assumed, false)
+  assert.equal(yearCost(rows('150 € per month during the school year'), 'first', { today }).lines.food.options[0].perYear, null)
+  assert.equal(yearCost(rows('за 4-годишни деца'), 'first', { today }).lines.food.options[0].perYear, null)
+  assert.equal(yearCost(rows('paid per term, three terms a year'), 'first', { today }).lines.food.options[0].perYear, null)
+})
+
+test('a school with no kindergarten does not offer a kindergarten group', () => {
+  const school = { locations: [{ age_groups: ['grade_1_4', 'grade_5_7'] }] }
+  assert.equal(offersStage(school, 'first'), false)
+  assert.equal(offersStage(school, 'grade_9'), true)
+  assert.equal(offersStage({ locations: [{ age_groups: ['first', 'second'] }] }, 'grade_1'), false)
+  assert.equal(offersStage({ locations: [] }, 'first'), true)
+})
+
+test('a card names what its fee leaves out', () => {
+  const school = id => ({ pricing: SCHOOLS[id], locations: [] })
+  // Maple Bear bills food and materials apart; St. Sofia's grades 4–7 fee holds food.
+  assert.deepEqual(feeOnTop(school(596), 'grade_1_4', { today }), { food: 'extra', materials: true })
+  assert.deepEqual(feeOnTop(school(172), 'grade_5_7', { today }), { food: 'included', materials: false })
+  assert.equal(feeOnTop(school(172), 'grade_1_4', { today }).food, 'unknown')
+  assert.equal(feeOnTop({ pricing: [], locations: [] }, null, { today }), null)
+  // With no age chosen, St. Sofia's bands disagree on food: no marker rather than another band's.
+  assert.equal(feeOnTop({ pricing: SCHOOLS[172], locations: [{ age_groups: ['grade_1_4', 'grade_5_7'] }] }, null, { today }), null)
+})
+
+test('a compulsory food fee is counted once, and an optional snack beside it is not', () => {
+  const rows = [
+    { id: 1, category: 'tuition', amount: 5000, currency: 'EUR', period: 'yearly', year_status: 'not_stated' },
+    { id: 2, category: 'food', amount: 1000, currency: 'EUR', period: 'yearly', year_status: 'not_stated', plan_name: 'Задължителен обяд' },
+    { id: 3, category: 'food', amount: 200, currency: 'EUR', period: 'yearly', year_status: 'not_stated', plan_name: 'Закуска по желание' },
+  ]
+  assert.deepEqual(yearCost(rows, 'grade_1', { today }).lines.food.options.map(item => item.required), [true, false])
+  assert.deepEqual(yearCost(rows, 'grade_1', { today }).required.value, { min: 6000, max: 6000, assumed: false })
+})
+
+test('the fees agent’s service keys say what the tuition includes', () => {
+  const rows = context => [{ id: 1, category: 'tuition', amount: 8900, currency: 'EUR', period: 'yearly', year_status: 'not_stated', pricing_context: context }]
+  const lines = yearCost(rows({ includes: ['food', 'extended_day'], excludes: ['transport'] }), 'grade_1', { today }).lines
+  assert.deepEqual([lines.food.state, lines.extended_day.state, lines.transport.state, lines.materials.state], ['included', 'included', 'excluded', 'none'])
+  // Food included: the total is complete, with nothing named as left out.
+  assert.deepEqual(yearCost(rows({ includes: ['food'] }), 'grade_1', { today }).required.missing, [])
+})

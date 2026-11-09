@@ -109,7 +109,7 @@ READ_MAX_OUTPUT_TOKENS = 32_000
 PICK_MAX_OUTPUT_TOKENS = 1_000
 MAX_PICK_INPUT_CHARS = 40_000
 # When the picker returns nothing, follow links whose URL or text names fees or admissions.
-_FEE_LINK_RE = re.compile(r"такс|цени|цена|прием|fee|tuition|pric|admission", re.IGNORECASE)
+_FEE_LINK_RE = re.compile(r"такс|цени|цена|прием|fee|tuition|pric|admission|frais|tarif|inscription", re.IGNORECASE)
 _SKIPPED = (".jpg", ".jpeg", ".png", ".gif", ".svg", ".webp", ".css", ".js", ".zip", ".mp4", ".mp3", ".doc", ".docx")
 
 PICK_PROMPT = """You help find the pages of a school website that state its fees (tuition, monthly fee,
@@ -821,6 +821,7 @@ def _build_rows(
             continue
         taken.add((key, label))
         fee = result.fee
+        services = fee.services
         rows.append(
             Pricing(
                 school_id=school.id,
@@ -838,6 +839,17 @@ def _build_rows(
                     "installments": fee.installments,
                     "payment_options": [option.model_dump(exclude_none=True) for option in fee.payment_options],
                     "notes": fee.notes,
+                    # What the tuition includes or leaves out (food, materials, transport,
+                    # extended_day), for the yearly cost table; the lines prove it.
+                    **(
+                        {
+                            "includes": [item.service for item in services if item.included],
+                            "excludes": [item.service for item in services if not item.included],
+                            "services_evidence": {item.service: item.evidence for item in services},
+                        }
+                        if services
+                        else {}
+                    ),
                     # A deposit is listed apart from the fees: it is returned or taken off a later one.
                     **({"deposit": True} if names_deposit(fee) else {}),
                     # The site's words in English for the English page; the columns keep the site's own.
@@ -1271,6 +1283,7 @@ def _fee_report(result: CheckedFee, page: Optional[PageRead]) -> dict[str, Any]:
         "age_group": fee.age_group,
         "age_group_en": fee.age_group_en,
         "payment_options": [option.model_dump(exclude_none=True) for option in fee.payment_options],
+        "services": [item.model_dump() for item in fee.services],
         "kept": result.kept,
         "confidence": result.confidence,
         "checks": result.checks,
@@ -1288,6 +1301,11 @@ async def page_gone(client, url: str) -> bool:
         return False
 
 
+# The outcomes after which a gone price page stays invalid: the read stored the school's fees
+# from the pages it reached, so the gone page's rows are last year's (538).
+_GONE_PAGES_REPLACED = ("written", "every fee read is already stored")
+
+
 async def run_school(
     db: AsyncSession,
     school: School,
@@ -1302,7 +1320,66 @@ async def run_school(
 
     ``check`` (the fee check) reads the pages against the first read; the amounts it says
     were missed join the second read's.
+
+    A price page that answers 404 is marked invalid while the read runs, so its rows neither
+    hold back nor sit beside the new ones. When the read stores nothing in their place, the
+    page is valid again and its rows stay published: 505 rebuilt its site, the finder did not
+    reach the new fee PDF, and the school lost all 63 of its correct fees.
     """
+    marked: list[str] = []  # the pages this read marked invalid
+    school_id = school.id  # a rollback expires ``school``; its id is read before one
+    try:
+        report = await _run_school(db, school, find=find, read=read, apply=apply, gone=gone, check=check, marked=marked)
+    except BaseException:
+        if marked:
+            await _revive_gone_pages(db, school_id, marked, discard=True)
+        raise
+    replaced = report["outcome"] == "written" or report.get("reason") in _GONE_PAGES_REPLACED
+    if marked and not replaced:
+        report["pages_gone_kept"] = await _revive_gone_pages(db, school_id, marked)
+    return report
+
+
+async def _revive_gone_pages(
+    db: AsyncSession, school_id: int, urls: Sequence[str], *, discard: bool = False
+) -> list[str]:
+    """Marks the school's pages at ``urls`` valid again; returns their addresses. ``discard``
+    (after a failed read) first drops what the read left unsaved."""
+    try:
+        if discard and db.in_transaction():
+            await db.rollback()
+        wanted = {page_key(url) for url in urls}
+        pages = (
+            (
+                await db.execute(
+                    select(SourcePage).where(SourcePage.school_id == school_id, SourcePage.is_valid.is_(False))
+                )
+            )
+            .scalars()
+            .all()
+        )
+        revived = [page for page in pages if page_key(page.source_url) in wanted]
+        addresses = [page.source_url for page in revived]
+        for page in revived:
+            page.is_valid = True
+        await db.commit()
+        return addresses
+    except Exception:  # the run's own error is the one to report
+        logger.exception("fees-agent could not mark the gone pages of school %s valid again", school_id)
+        return []
+
+
+async def _run_school(
+    db: AsyncSession,
+    school: School,
+    *,
+    find: Finder,
+    read: Reader,
+    apply: bool = False,
+    gone: Optional[Callable[[str], Awaitable[bool]]] = None,
+    check: Optional[Checker] = None,
+    marked: Optional[list[str]] = None,
+) -> dict[str, Any]:
     report: dict[str, Any] = {"school_id": school.id, "outcome": None, "pages": [], "fees": [], "discounts": []}
     pages = await find(school)
     report["pages"] = [{"url": p.url, "chars": len(p.text), "prices": p.prices, "note": p.note} for p in pages]
@@ -1311,7 +1388,8 @@ async def run_school(
     stored = _stored_by_key(stored_pages)
     # A price page the finder did not reach may be gone: 538's old fees address answers 404 and
     # its last-year rows stayed beside the new ones. Marked invalid, its rows stop being published
-    # and the keep rule no longer holds them. A dry run only reports it.
+    # and the keep rule no longer holds them; ``run_school`` marks it valid again when the read
+    # stores nothing in their place. A dry run only reports it.
     if gone is not None:
         reached = {page_key(page.url) for page in pages}
         priced_ids = set(
@@ -1329,7 +1407,9 @@ async def run_school(
                     report.setdefault("pages_gone", []).append(page.source_url)
                     if apply:
                         page.is_valid = False
-        if apply and report.get("pages_gone"):  # saved now, whatever the read below does
+                        if marked is not None:
+                            marked.append(page.source_url)
+        if apply and report.get("pages_gone"):  # saved now: the fee check below commits too
             await db.commit()
     priced = [page for page in pages if page.prices]
     if not priced:

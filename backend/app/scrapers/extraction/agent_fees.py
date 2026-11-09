@@ -47,6 +47,15 @@ class PaymentOption(BaseModel):
     )
 
 
+class FeeService(BaseModel):
+    """Whether a tuition fee includes a service a parent pays for: the yearly cost table
+    counts food, and needs to know when a fee already holds it (docs/YEARLY_COST.md)."""
+
+    service: Literal["food", "materials", "transport", "extended_day"]
+    included: bool = Field(description="true when the page says the fee includes it; false when it says it does not")
+    evidence: str = Field(description="The page line that says so, copied verbatim, after a list's heading line")
+
+
 class AgentFee(BaseModel):
     category: PriceCategory
     amount: Optional[float] = None
@@ -71,6 +80,10 @@ class AgentFee(BaseModel):
     installments: list[str] = Field(default_factory=list)
     payment_options: list[PaymentOption] = Field(
         default_factory=list, description="Other ways the site offers to pay this same fee, in parts"
+    )
+    services: list[FeeService] = Field(
+        default_factory=list,
+        description="Tuition only: food, materials, transport or extended day the page says this fee includes or not",
     )
     source_url: str = Field(description="The URL of the page the fee was read from, copied from its PAGE line")
     evidence: str = Field(
@@ -125,7 +138,7 @@ class AgentFees(BaseModel):
 READER_PROMPT = """You read a school's own web pages and list the fees it states. Each page starts with a "=== PAGE <url>" line.
 Rules:
 - Only fees of the named institution. A shared site may also list a sibling school or kindergarten; skip their fees.
-- Only the current or upcoming school year. If several appear, list the most recent: where a page shows one fee for two years side by side, list only the later price. When the site gives a fee from different dates ("от септември 2025 г. ... 475.50 €" in one place, "от септември 2026 г. ... 590 €" in another), list only the latest, and skip any other mention of the same fee at the older amount (an FAQ or summary that was not updated), including a deposit that equals one month's fee. A fee shown once, on a page for the current or upcoming year, counts as that year's even when its column or a note names the previous year: the school still charges it. Skip a page or table that is itself for an earlier year.
+- Only the current or upcoming school year. If several appear, list the most recent: where a page shows one fee for two years side by side, list only the later price. When the site gives a fee from different dates ("от септември 2025 г. ... 475.50 €" in one place, "от септември 2026 г. ... 590 €" in another), list only the latest, and skip any other mention of the same fee at the older amount (an FAQ or summary that was not updated), including a deposit that equals one month's fee. A fee shown once, on a page for the current or upcoming year, counts as that year's even when its column or a note names the previous year: the school still charges it. So does a table of services billed separately (food, transport, extended day, clubs) on the upcoming year's fee page whose price column names the current year or says prices may change: list its fees with the page's year, and skip the same services on an older year's page. Skip a page or table that is itself for an earlier year.
 - One entry per fee and group (grade, age group, full or half day). A discounted, prepaid or promotional price the site prints as an amount is its own entry, and its plan_name says on what terms, in the site's words ("Еднократно плащане за 6 месеца", "Промоционална такса за първите 3 месеца").
 - Two entries of the same category and group never share a plan_name, even with different periods: the site's words that tell them apart (half day, full day, paid for 6 months at once, enrolment, yearly registration) are their plan_name.
 - When the site prints a total of a group's fees ("Общо", "Total"), list the total as a tuition entry of its own, with the site's word for it as plan_name ("Общо"); the fees it adds up stay their own entries.
@@ -137,7 +150,7 @@ Rules:
 - Skip a payment schedule. Never invent an amount, and never compute a total the site does not print.
 - A discount the school offers (for siblings, for paying early, for paying the whole year at once, any other stated discount) goes in discounts, never in fees, and only when the page states it with a percentage or an amount. A fee the school waives on a condition ("се освобождават от такса кандидатстване и такса регистрация" for those who sign by a date) is a discount of percent 100, applies_to naming the fees waived, and its sentences say on what condition. One entry per discount ("5% for a second child, 10% for a third" is two). text_i18n says in bg and en only what the evidence says. A discounted price the site prints as an amount stays a fee entry (see above).
 - currency as printed (EUR or BGN); if both are printed, the EUR figure.
-- category: the monthly kindergarten fee and school tuition are tuition, and so is the main fee of an institution that charges no other tuition, even when the fee is named for a subject or the classes are held in another school's building; a subject's fee charged on top of the institution's own tuition is extracurricular; an enrolment, exam, application or entry-test fee is registration; a deposit (депозит, капаро) is registration, never tuition, and its plan_name is the site's word for it ("Депозит", "Капаро"), with notes saying whether it is returned or taken off a later fee when the site says; learning support, therapy and similar services are activities; optional classes, clubs and sports charged on top are extracurricular; transport, food, uniforms and extended day (after-school care) are their own categories.
+- category: the monthly kindergarten fee and school tuition are tuition, and so is the main fee of an institution that charges no other tuition, even when the fee is named for a subject or the classes are held in another school's building; a subject's fee charged on top of the institution's own tuition is extracurricular; an enrolment, exam, application or entry-test fee is registration; a deposit (депозит, капаро) is registration, never tuition, and its plan_name is the site's word for it ("Депозит", "Капаро"), with notes saying whether it is returned or taken off a later fee when the site says; learning support, therapy and similar services are activities; optional classes, clubs and sports charged on top are extracurricular; transport, food, uniforms and extended day (after-school care) are their own categories; boarding (общежитие, пансион) is activities, and its plan_name is the site's word for it ("Общежитие"), never only its period.
 - period only when the page states it for THAT amount (per month, per year, per term...); otherwise null. Never guess.
   - "once per school year" or "еднократна такса" for the school year is yearly; a full year's tuition paid in one payment is yearly too.
   - one_time only for a fee charged once ever: enrolment, exam, application, deposit. Never for tuition or materials.
@@ -150,7 +163,8 @@ Rules:
 - source_url: the URL of the page the fee is on.
 - evidence: the line of the page the amount is on, copied character for character, and the lines of its payment options. For a table row, also copy the heading line that gives its period, plan or group, as a separate line. If the period is stated in a sentence above the table, copy that sentence too. A PDF's tables are repeated after its text, one row per line with cells split by " | " and a cell's lines by " / ": when the text above splits a table row over several lines, copy the row and its heading row from there instead of joining lines yourself.
 - label: the site's own wording, short. academic_year, age_group and plan_name as the site states them, or null. plan_name names what the fee buys (full day, half day, a programme such as "IB Diploma" when the page or table is for one) and any price terms, not a way of paying in parts: a payment plan's name is its option's label. It is never taken from a list of what the fee includes.
-- plan_name_en and age_group_en: the same words in plain English, as a parent would read them on the English page ("Half day", "Paid for 6 months at once", "Ages 3 to 6"), adding nothing the Bulgarian does not say; null when the Bulgarian field is null."""
+- services, for a tuition entry only: each of food, materials (textbooks, learning materials), transport and extended_day (after-school care, занималня) the page says this fee includes (included true: "Таксата включва ... обяд и следобедна закуска", "The tuition fee covers ... food") or does not include (included false: "В таксата не са включени: транспорт", "Food is billed separately"), with the page line that says so as evidence, copied character for character; when that line is an item of a list, the list's heading line ("В таксата не са включени:") too, on a line of its own. Only what the page says for this fee, or for all of the school's fees; leave out a service the page does not mention.
+- plan_name_en and age_group_en: the same words in plain English, as a parent would read them on the English page ("Half day", "Paid for 6 months at once", "Ages 3 to 6"), adding nothing the Bulgarian does not say; null when the Bulgarian field is null. A fee for the teaching itself ("Обучение", "Такса обучение") is "Tuition", never "Training"."""
 
 
 # ---------------------------------------------------------------------------
@@ -543,9 +557,138 @@ def check_fee(fee: AgentFee, page_text: str) -> CheckedFee:
             held.append("held: range ends are not joined by a range marker in the evidence")
 
     options, option_checks = _checked_options(fee, "\n".join(lines))
+    services, service_checks = _checked_services(fee, page_text)
     confidence = HELD_CONFIDENCE if held else PUBLISH_CONFIDENCE
-    update = {"period": period, "payment_options": options}
-    return CheckedFee(fee.model_copy(update=update), confidence, True, checks + option_checks + held)
+    update = {"period": period, "payment_options": options, "services": services}
+    return CheckedFee(fee.model_copy(update=update), confidence, True, checks + option_checks + service_checks + held)
+
+
+# A service's own words, so an evidence line about something else proves nothing.
+_SERVICE_WORDS = {
+    "food": re.compile(r"(?<!\w)(?:храна|хранене|хранителен|обяд|закуск|кетъринг|food|meals?(?!\w)|lunch|snacks?(?!\w)|catering)", re.IGNORECASE),
+    "materials": re.compile(
+        r"(?<!\w)(?:учебни(?:к|ц)|учебни материали|учебни помагала|помагал|тетрадк|textbooks?(?!\w)|books(?!\w)"
+        r"|(?:learning|teaching|educational|school|study) materials)",
+        re.IGNORECASE,
+    ),
+    "transport": re.compile(r"(?<!\w)(?:транспорт|автобус|transport|bus(?!\w))", re.IGNORECASE),
+    "extended_day": re.compile(r"(?<!\w)(?:занимал|удължен|extended day|after[- ]school)", re.IGNORECASE),
+}
+# Whether a clause says the fee holds the service, or leaves it out (billed apart).
+_INCLUDED_RE = re.compile(r"включ|в т\.\s?ч\.|покрива|includ|covers?(?!\w)", re.IGNORECASE)
+_NOT_INCLUDED_RE = re.compile(
+    r"не (?:е|са|се) включен|не включва|не покрива|отделно|допълнително|заплаща се|"
+    r"not included|not including|exclud|does not (?:include|cover)|doesn't (?:include|cover)|separately|"
+    r"extra (?:charge|cost|fee)|on top",
+    re.IGNORECASE,
+)
+# "без допълнително заплащане": at no extra cost, so in the fee.
+_FREE_RE = re.compile(
+    r"без (?:допълнително |друго )?(?:заплащане|доплащане)|at no (?:extra|additional) (?:cost|charge)|free of charge|no extra charge",
+    re.IGNORECASE,
+)
+# Clauses, as the yearly cost table reads notes: "включва учебници, но не включва храна".
+# Sentences end before a capital, so "(вкл. плуване" stays in its sentence.
+_SENTENCE_RE = re.compile(r"(?<=[.!?])\s+(?=[\"„“(]?[A-ZА-ЯЀ-Џ])")
+# Within a sentence, clauses: "включва учебници, но не включва храна", "включва храна;
+# транспортът се заплаща отделно". A clause that says neither way is a list item and takes the
+# way of the clause before it: "НЕ включва: • униформа; • транспорт; • храна;".
+_CLAUSE_RE = re.compile(r";\s*|,?\s(?:но|а|but|while|whereas)\s", re.IGNORECASE)
+
+
+def _says(service: str, included: bool, text: str) -> bool:
+    """A clause of the evidence names the service and says it is in the fee, or not. "At no
+    extra cost" speaks only for the part of the list it is in: "Транспорт без допълнително
+    заплащане, храната се заплаща отделно"."""
+    for sentence in _SENTENCE_RE.split(text):
+        way = None  # True: in the fee; False: not
+        for clause in _CLAUSE_RE.split(sentence):
+            names = bool(_SERVICE_WORDS[service].search(clause))
+            own = [part for part in clause.split(",") if _SERVICE_WORDS[service].search(part)]
+            if any(_FREE_RE.search(part) for part in own):
+                way = True
+            elif _NOT_INCLUDED_RE.search(_FREE_RE.sub(" ", clause)):
+                way = False
+            elif _INCLUDED_RE.search(clause):
+                way = True
+            if names and way is included:
+                return True
+    return False
+
+
+# A quote this short must fit one place on the page.
+_PLACED_WORDS = 4
+
+
+def _cells(row: str, quote: str) -> str:
+    """The cells of a table row the quote spans ("Храна | включена" of "Храна | включена | не е
+    включена"), or the whole line when it is no table row."""
+    cells = row.split(" | ")
+    for size in range(1, len(cells) + 1):
+        for start in range(len(cells) - size + 1):
+            span = " | ".join(cells[start : start + size])
+            if quote in _tight(_normalized(span)):
+                return span
+    return row
+
+
+# A list's heading and its item: the item at most this many lines below the heading.
+_LIST_LINES = 15
+
+
+def _lines_in_order(lines: list[str], page_lines: list[str]) -> list[list[int]]:
+    """Where the quote's lines are on the page: each within one page line, each after the one
+    before and close to it. Every way they fit, as page line numbers."""
+    found = []
+    for start in (index for index, text in enumerate(page_lines) if lines[0] in text):
+        at = [start]
+        for line in lines[1:]:
+            last = at[-1]
+            following = range(last + 1, min(last + 1 + _LIST_LINES, len(page_lines)))
+            nxt = next((i for i in following if line in page_lines[i]), None)
+            if nxt is None:
+                break
+            at.append(nxt)
+        else:
+            found.append(at)
+    return found
+
+
+def _checked_services(fee: AgentFee, page_text: str) -> tuple[list[FeeService], list[str]]:
+    """The services kept: a tuition fee's, each with evidence on the page whose page lines name
+    the service and say whether the fee holds it. A list's heading and an
+    item below it ("Таксата не включва:" / "Хранителен пакет") are read as one. One said both
+    ways is dropped."""
+    if not fee.services:
+        return [], []
+    if fee.category is not PriceCategory.TUITION:
+        return [], [f"services dropped: not tuition ({fee.category.value})"]
+    # The page's own lines are read, not the quote: one cut from a line ("включва обяд" from
+    # "Таксата не включва обяд") would lose what the line says, and a sentence quoted from a
+    # longer line (593) is read with the rest of it. Original case, for the sentence ends.
+    raw_lines = [" ".join(text.split()) for text in page_text.splitlines() if text.strip()]
+    page_lines = [_tight(_normalized(text)) for text in raw_lines]
+    kept: dict[str, FeeService] = {}
+    checks: list[str] = []
+    said: dict[bool, set[str]] = {True: set(), False: set()}
+    for item in fee.services:
+        lines = [_tight(_normalized(line)) for line in item.evidence.splitlines() if line.strip()]
+        places = _lines_in_order(lines, page_lines) if lines else []
+        if not places:
+            checks.append(f"service {item.service} dropped: evidence line is not on the page")
+        elif len(places) > 1 and len(" ".join(lines).split()) < _PLACED_WORDS:
+            # "храна" alone fits a kindergarten's line as well as the school's.
+            checks.append(f"service {item.service} dropped: evidence too short to place on the page")
+        elif not any(_says(item.service, item.included, " ".join(_cells(raw_lines[i], line) for i, line in zip(at, lines))) for at in places):
+            state = "included" if item.included else "not included"
+            checks.append(f"service {item.service} dropped: evidence does not say it is {state}")
+        else:
+            said[item.included].add(item.service)
+            kept.setdefault(item.service, item)  # the first proof of a service quoted twice
+    both = said[True] & said[False]
+    for service in sorted(both):
+        checks.append(f"service {service} dropped: said to be both included and not")
+    return [item for service, item in kept.items() if service not in both], checks
 
 
 def names_deposit(fee: AgentFee) -> bool:

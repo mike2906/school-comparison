@@ -13,27 +13,32 @@ shift's start (``EARLIEST``-``LATEST``). Publication: ``app/utils/school_start.p
 
 from __future__ import annotations
 
-import re
 from collections.abc import Awaitable, Callable, Mapping, Sequence
-from typing import Any, Literal, Optional
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
+
+from app.utils.school_start import clock_times, garbled, written
 
 BANDS = ("preschool", "grade_1_4", "grade_5_7", "grade_8_12")
 EARLIEST = "07:00"
 LATEST = "14:00"  # the timetable keeps trips to 14:00 (tools/transit/build_timetable.mjs)
 
 PROMPT = """You get numbered facts about one school's day, read from its own website, each with the page line
-it comes from. For each age band, give the time the first lesson of the day starts, but only when a fact
-states it:
+it comes from. A parent choosing a school for a child who starts there asks when the child must be at
+school. For each key below, give the time the day starts for that child, but only when a fact states it:
 - preschool: the preparatory group before first grade (подготвителна група, ПГ, 5 and 6 year olds)
-- grade_1_4, grade_5_7, grade_8_12: grades I-IV, V-VII and VIII-XII
+- grade_1_4: first grade (I клас)
+- grade_5_7: fifth grade (V клас)
+- grade_8_12: eighth grade (VIII клас)
 Rules:
-- A fact about the whole school ("lessons start at 8:00", "one shift, from 7:30") holds for every band the
-  school teaches; a fact about some grades holds only for their bands.
-- A band taught in two shifts, or in other shifts by term, gets the first shift's start in the first term.
-- Only lessons. Not the building's opening hours, morning care before lessons, after-school groups
-  (занималня, целодневна организация) or a kindergarten's working hours ("from 7:00 to 19:00").
+- A fact about the whole school ("lessons start at 8:00", "one shift, from 7:30") holds for every grade the
+  school teaches; a fact about some grades ("I–II клас", "V–VII клас", "прогимназиален етап") holds only for
+  them. When first grade has its own time and grades III-IV another, give first grade's.
+- The start of the first lesson. In two shifts, or other shifts by term, the first term's shift for that
+  grade.
+- Not the building's opening hours, optional morning care, after-school groups (занималня, целодневна
+  организация, ГЦОУД) or a kindergarten's working hours ("from 7:00 to 19:00").
 - "time": the start as the fact writes it, as HH:MM. "fact": that fact's number.
 - No fact states a start: return an empty list."""
 
@@ -50,14 +55,6 @@ class Starts(BaseModel):
 
 Caller = Callable[[str, type, str, int], Awaitable[Any]]
 
-# "7:30", "07.30", "7,30 ч.", "8.00"; not part of a date ("01.09.2026") or a longer number.
-_TIME_RE = re.compile(r"(?<![\d.:,])([01]?\d|2[0-3])\s?[.:,]\s?([0-5]\d)(?![\d]|[.:,]\d)")
-
-
-def clock_times(text: Optional[str]) -> set[str]:
-    """Every clock time ``text`` writes, as HH:MM."""
-    return {f"{int(h):02d}:{m}" for h, m in _TIME_RE.findall(text or "")}
-
 
 def day_facts(facts: Sequence[Any]) -> list[Mapping[str, Any]]:
     """The stored school-day facts that write a clock time."""
@@ -66,13 +63,9 @@ def day_facts(facts: Sequence[Any]) -> list[Mapping[str, Any]]:
         for fact in facts
         if isinstance(fact, Mapping)
         and fact.get("topic") == "school_day"
-        and clock_times(_written(fact))
+        and clock_times(written(fact))
+        and not garbled(fact.get("quote"))
     ]
-
-
-def _written(fact: Mapping[str, Any]) -> str:
-    text = fact.get("text_i18n") if isinstance(fact.get("text_i18n"), Mapping) else {}
-    return "\n".join(str(part) for part in (fact.get("quote"), text.get("bg"), text.get("en")) if part)
 
 
 def message(facts: Sequence[Mapping[str, Any]]) -> str:
@@ -96,7 +89,7 @@ def checked(answer: Starts, facts: Sequence[Mapping[str, Any]]) -> dict[str, dic
         if len(times) != 1:
             continue
         time = times.pop()
-        if time in clock_times(_written(fact)) and EARLIEST <= time <= LATEST:
+        if time in clock_times(written(fact)) and EARLIEST <= time <= LATEST:
             kept[start.band] = {"time": time, "fact_bg": str((fact.get("text_i18n") or {}).get("bg") or "")}
     return kept
 
