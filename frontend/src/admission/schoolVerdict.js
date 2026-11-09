@@ -145,6 +145,20 @@ export function clearlyBelowIds(schools, saved, ageGroup, data) {
 }
 
 /**
+ * The saved tabs at least one of these schools shows a result for: the list's banner
+ * explains only what the cards show (a private school's own admission gets none).
+ */
+export function stagesShown(schools, saved, ageGroup, data) {
+  const stages = new Set()
+  for (const school of schools) {
+    for (const verdict of savedVerdictsFor(school, saved, ageGroup, data)) stages.add(verdict.stage)
+    if (stages.size === SAVED_STAGE_COUNT) break
+  }
+  return stages
+}
+const SAVED_STAGE_COUNT = 2
+
+/**
  * The search filters that show a saved tab's schools: state schools, its intake year and
  * age group (and the child's birth year for kindergartens). Null when the answers do not
  * give an age group.

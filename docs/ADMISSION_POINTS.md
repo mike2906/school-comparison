@@ -253,7 +253,9 @@ The calculator re-runs per school with that school's own facts (district for the
 kindergarten bonus, catchment group for first grade) and assumes what the parent could
 not have answered for every school: a kindergarten is their first wish with no sibling
 there; a first-grade school has no sibling or preparatory group of theirs. The list says
-so in a banner. First grade needs an address checked against the official table, since
+so in a banner, shown only for a calculator tab at least one listed school has a result
+for (a list of private schools gets none) and naming the places listed: kindergartens,
+schools' preschool groups, or both (2026-11-09). First grade needs an address checked against the official table, since
 only that says which catchment it is in. Only the newest campaign's rows are compared,
 on the reference ranking: the campaign's main (first) ranking, since later ones only fill
 places that came free; for kindergarten rows where kg.sofia.bg keeps only the free-place

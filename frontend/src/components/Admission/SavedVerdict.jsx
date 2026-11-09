@@ -3,7 +3,8 @@ import { Link } from 'react-router-dom'
 import { formatRange, rankingWhen, rowLabel } from '../../admission/calculator'
 import { forgetSaved, SAVED_STAGES } from '../../admission/saved'
 import { savedListFilters, savedStageApplies } from '../../admission/schoolVerdict'
-import { setHideBelow, useHideBelow, useSavedAdmission } from '../../hooks/useSavedAdmission'
+import { setHideBelow, useHideBelow, useSavedAdmission, useStagesShown } from '../../hooks/useSavedAdmission'
+import { preschoolWhere } from '../../utils/ageSelection'
 import { CutoffValue } from './CutoffTable'
 
 const TONE = {
@@ -141,13 +142,19 @@ export function SavedVerdictPanel({ verdict, schoolId }) {
  * Above the search list: whose answers the cards use, what they assume, a way out, and
  * the switch that hides schools where the parent is below the last admitted child.
  */
-export function SavedAdmissionBanner({ filters = {}, onFilterChange = null, hiddenCount = 0 }) {
+export function SavedAdmissionBanner({ schools = [], filters = {}, onFilterChange = null, hiddenCount = 0 }) {
   const { ageGroup } = filters
   const { t } = useTranslation()
   const saved = useSavedAdmission()
   const hideBelow = useHideBelow()
-  const stages = SAVED_STAGES.filter(stage => savedStageApplies(stage, saved[stage], ageGroup))
+  // Only the tabs a listed school shows a result for: a list of private schools, which
+  // admit by their own procedure, shows none and needs no note about the city's points.
+  const shown = useStagesShown(schools, ageGroup)
+  const stages = SAVED_STAGES.filter(stage => savedStageApplies(stage, saved[stage], ageGroup) && shown?.has(stage))
   if (stages.length === 0) return null
+  // Preschool happens at kindergartens and at schools; the note names the places listed.
+  const where = ageGroup === 'preschool' ? preschoolWhere(filters) : 'kindergarten'
+  const variant = stage => (stage === 'kindergarten' && where !== 'kindergarten' ? `kindergarten_${where}` : stage)
   return (
     <div className="mx-3 mt-3 rounded-xl border border-primary-200 bg-primary-50 p-3 text-sm text-primary-900" data-testid="saved-admission-banner">
       {stages.map(stage => {
@@ -158,8 +165,8 @@ export function SavedAdmissionBanner({ filters = {}, onFilterChange = null, hidd
         return (
           <div key={stage} className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
             <p>
-              {t(`savedAdmission.banner.${stage}`, { year: saved[stage].answers.birthYear })}{' '}
-              <span className="text-primary-900/80">{t(`savedAdmission.assumed.${stage}`)}</span>
+              {t(`savedAdmission.banner.${variant(stage)}`, { year: saved[stage].answers.birthYear })}{' '}
+              <span className="text-primary-900/80">{t(`savedAdmission.assumed.${variant(stage)}`)}</span>
             </p>
             <div className="flex flex-wrap gap-3 text-xs">
               {showFor && (
