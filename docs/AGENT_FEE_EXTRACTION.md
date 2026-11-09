@@ -82,6 +82,10 @@ For one school, with its `website_url`:
      (625's "половин ден" showed as is). Two fees of one category, group and period always
      get the plan name that tells them apart, so a prepaid or promotional price no longer
      shows as a second bare "Tuition" (2026-10-15).
+     An extracurricular, activities, camp or transport fee is named for what it is ("Тенис на
+     корт", "Пиано"); unnamed ones of one category take the site's own labels when those tell
+     them apart, whatever their group or period (300 showed fifteen bare "Extracurricular"
+     fees, 2026-11-09).
    - **Discounts.** A percentage or amount off (siblings, paying early, paying the whole year
      at once) is no fee: the reader lists it in `discounts` with a bg and an en sentence. Code
      keeps one only when its evidence line is on the page, holds its one number (percent or

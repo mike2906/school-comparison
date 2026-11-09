@@ -2599,3 +2599,38 @@ def test_clauses_capitals_semicolons_and_table_cells():
     ) == {("food", True), ("transport", False)}
     row = "Храна | включена | не е включена\n"
     assert kept(row, FeeService(service="food", included=True, evidence="Храна | включена")) == {("food", True)}
+
+
+# --- 300: unnamed activity fees, each with its own group, take the site's labels ---
+
+
+def _unnamed(category, label, age_group=None, period=PricePeriod.TERM, plan_name=None):
+    from app.models import Pricing
+
+    return Pricing(
+        school_id=1, category=category, amount=330, currency="EUR", period=period, age_group=age_group,
+        plan_name=plan_name, academic_year="2026/2027", pricing_context={"label": label},
+    )
+
+
+def test_unnamed_activity_fees_take_their_labels_across_groups():
+    rows = [
+        _unnamed(PriceCategory.EXTRACURRICULAR, "Тенис на корт", "1-7 клас"),
+        _unnamed(PriceCategory.EXTRACURRICULAR, "Плуване", "подготвителна група"),
+        _unnamed(PriceCategory.EXTRACURRICULAR, "Пиано"),
+        _unnamed(PriceCategory.EXTRACURRICULAR, "Отбори", plan_name="Отбори по математика"),
+        # Tuition rows are told apart by group: they keep no label as a name.
+        _unnamed(PriceCategory.TUITION, "Обучение", "Първи клас", PricePeriod.YEARLY),
+        _unnamed(PriceCategory.TUITION, "Обучение 2", "2-7 клас", PricePeriod.YEARLY),
+    ]
+    fees_agent._name_unnamed_alike(rows)
+    assert [row.plan_name for row in rows] == ["Тенис на корт", "Плуване", "Пиано", "Отбори по математика", None, None]
+
+
+def test_unnamed_activity_fees_with_the_same_label_stay_unnamed():
+    rows = [
+        _unnamed(PriceCategory.EXTRACURRICULAR, "Занимания", "1-4 клас"),
+        _unnamed(PriceCategory.EXTRACURRICULAR, "занимания", "5-7 клас"),
+    ]
+    fees_agent._name_unnamed_alike(rows)
+    assert [row.plan_name for row in rows] == [None, None]

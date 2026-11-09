@@ -876,6 +876,9 @@ def _build_rows(
     return rows, sources
 
 
+_NAMED_BY_WHAT = {PriceCategory.EXTRACURRICULAR, PriceCategory.ACTIVITIES, PriceCategory.CAMP, PriceCategory.TRANSPORT}
+
+
 def _name_unnamed_alike(rows: list[Pricing]) -> None:
     """Fees of one kind, group, year and period that the reader left unnamed read as the
     same fee twice (596's uniforms: "Uniforms" 25, 14, 28, 18). Each takes the site's own
@@ -885,7 +888,14 @@ def _name_unnamed_alike(rows: list[Pricing]) -> None:
         if not row.plan_name:
             key = (row.category, row.age_group, row.period, row.academic_year)
             alike.setdefault(key, []).append(row)
+    # An activity, camp or route is told apart by what it is, whatever its group or period:
+    # 300's fifteen unnamed "Extracurricular" fees (tennis, piano, swimming, maths teams)
+    # each had their own group, so the grouping above never saw two alike.
+    for row in rows:
+        if not row.plan_name and row.category in _NAMED_BY_WHAT:
+            alike.setdefault((row.category, row.academic_year), []).append(row)
     for group in alike.values():
+        group = [row for row in group if not row.plan_name]
         labels = [" ".join(str(row.pricing_context.get("label") or "").split()) for row in group]
         if len(group) > 1 and all(labels) and len({label.casefold() for label in labels}) == len(labels):
             for row, label in zip(group, labels):
