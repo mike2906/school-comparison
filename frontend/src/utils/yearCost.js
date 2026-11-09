@@ -231,7 +231,8 @@ const ONE_OFF_CATEGORIES = new Set(['registration', 'deposit', 'uniforms'])
 // A school's total for a new pupil holds the entrance and registration fees: 506's "Total Fee for
 // New Students" is tuition + entrance + capital + registration fee.
 const NEW_PUPILS_RE = /new (?:students?|pupils?)|нови ученици|новоприет|новопостъп/iu
-const LEAVES_OUT_RE = /exclud|not includ|without|без |не включва/iu
+// Leaves out the admission fees themselves: "without bus" does not.
+const LEAVES_OUT_RE = /(?:exclud\w*|not includ\w*|without|без|не включва)\s+(?:the\s+)?(?:[\p{L}-]+\s+){0,2}?(?:fees?\b|admission|registration|entrance|такс|прием|записване)/iu
 // Not part of such a total: 506 bills its entrance exam apart, and an application fee comes first.
 const NOT_IN_TOTAL_RE = /exam|test|assessment|application|изпит|тест|кандидат/iu
 const names = row => [row.plan_name, row.pricing_context?.plan_name_en].filter(Boolean)
