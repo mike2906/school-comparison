@@ -41,7 +41,9 @@ For one school, with its `website_url`:
    its same-site links, and ask the cheap model (`cheap` tier) for up to 4 links likely to
    state fees. If it picks none, follow links whose URL or text names fees or admissions
    (`такс`, `цени`, `прием`, `fee`, `tuition`, ...). Up to 3 clicks deep, 12 pages. PDFs are
-   read with pdfplumber.
+   read with pdfplumber. A link to the school's sister domain (meridian22.org's pages on
+   meridian22.bg) that comes back empty is read again at the same path on the school's own
+   host (552, whose .bg domain stopped resolving).
    Pages whose fees are only an image go to the existing `fee_image_reader.py`.
 2. **Read.** Send every page that shows a price to one `pricing`-tier call. Its output is the
    existing `ExtractedPrice` schema: category, amount or range, currency, period (null
@@ -80,6 +82,10 @@ For one school, with its `website_url`:
      (625's "половин ден" showed as is). Two fees of one category, group and period always
      get the plan name that tells them apart, so a prepaid or promotional price no longer
      shows as a second bare "Tuition" (2026-10-15).
+     An extracurricular, activities, camp or transport fee is named for what it is ("Тенис на
+     корт", "Пиано"); unnamed ones of one category take the site's own labels when those tell
+     them apart, whatever their group or period (300 showed fifteen bare "Extracurricular"
+     fees, 2026-11-09).
    - **Discounts.** A percentage or amount off (siblings, paying early, paying the whole year
      at once) is no fee: the reader lists it in `discounts` with a bg and an en sentence. Code
      keeps one only when its evidence line is on the page, holds its one number (percent or
@@ -152,9 +158,19 @@ no new column, table or migration.
 **Replacing rows.** This reuses today's supersede rule (`price_step._find_superseded_rows`):
 a run replaces only the academic years it read, so earlier years stay as history. Because
 the agent's reads vary from run to run, a school whose new read has, for the academic years
-it replaces, fewer than half as many publishable fees as its current published rows keeps
-its old rows, and the run summary lists it. A school where the agent reads nothing also
-keeps its rows. A failed or partial crawl must not wipe good prices or make them flicker.
+it replaces, fewer than half as many publishable fees as the published rows the write would remove keeps
+its old rows, and the run summary lists it (rows rule 6 keeps, because the page still shows
+them and the read left them out, stay published and are not counted: 300). A school where the
+agent reads nothing also keeps its rows. A failed or partial crawl must not wipe good prices
+or make them flicker.
+
+**Pages another stage ruled out.** A price page stored with `is_valid = False` is left out of
+the read, before it is paid for; the school's other price pages are still read, and only a
+school whose every price page is ruled out keeps its rows unread. The verdict is lifted when
+the fresh fetch outlives it: the school's site is accepted by validation with no withholding
+marker, the page is under it (under its section for a site such as `novigradini.com/anika/`),
+and today's text shows prices and is neither a bot check nor a parked domain (574). When the
+same page is stored more than once, the valid copy counts (199).
 
 **Freshness.** Fees change about once a year, for the new school year. Run monthly, and
 weekly from June to September. One run over Sofia's 175 private and international schools

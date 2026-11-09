@@ -162,7 +162,7 @@ Rules:
 - Never build a range from two different fees (a full-day and a half-day price are two entries). A range only when the site prints one.
 - source_url: the URL of the page the fee is on.
 - evidence: the line of the page the amount is on, copied character for character, and the lines of its payment options. For a table row, also copy the heading line that gives its period, plan or group, as a separate line. If the period is stated in a sentence above the table, copy that sentence too. A PDF's tables are repeated after its text, one row per line with cells split by " | " and a cell's lines by " / ": when the text above splits a table row over several lines, copy the row and its heading row from there instead of joining lines yourself.
-- label: the site's own wording, short. academic_year, age_group and plan_name as the site states them, or null. plan_name names what the fee buys (full day, half day, a programme such as "IB Diploma" when the page or table is for one) and any price terms, not a way of paying in parts: a payment plan's name is its option's label. It is never taken from a list of what the fee includes.
+- label: the site's own wording, short. academic_year, age_group and plan_name as the site states them, or null. plan_name names what the fee buys (full day, half day, a programme such as "IB Diploma" when the page or table is for one) and any price terms, not a way of paying in parts: a payment plan's name is its option's label. It is never taken from a list of what the fee includes. For an extracurricular, activities, camp or transport fee, plan_name is the activity, course, camp or route the fee is for, as the site names it ("Тенис на корт", "Пиано", "Плуване", "Летен езиков курс"): a list of such fees with no names tells a parent nothing.
 - services, for a tuition entry only: each of food, materials (textbooks, learning materials), transport and extended_day (after-school care, занималня) the page says this fee includes (included true: "Таксата включва ... обяд и следобедна закуска", "The tuition fee covers ... food") or does not include (included false: "В таксата не са включени: транспорт", "Food is billed separately"), with the page line that says so as evidence, copied character for character; when that line is an item of a list, the list's heading line ("В таксата не са включени:") too, on a line of its own. Only what the page says for this fee, or for all of the school's fees; leave out a service the page does not mention.
 - plan_name_en and age_group_en: the same words in plain English, as a parent would read them on the English page ("Half day", "Paid for 6 months at once", "Ages 3 to 6"), adding nothing the Bulgarian does not say; null when the Bulgarian field is null. A fee for the teaching itself ("Обучение", "Такса обучение") is "Tuition", never "Training"."""
 
@@ -361,6 +361,34 @@ def _names_period(period: PricePeriod, evidence: str, amounts: list[Decimal], ca
     )
 
 
+# A price for one item, not for a stretch of time: "2,30 euro per juice" (555's fresh juice,
+# in a paragraph whose food fee is "paid in one (annual) or two instalments"). Not a person:
+# "€ 500 per child per year" is yearly.
+_PER_ITEM_RE = re.compile(
+    r"^\s*(?:€|eur(?:os?)?\b|евро|лв\.?|лева|bgn)?\s*"
+    r"(?:per\s+(?:a\s+|one\s+)?(?!(?:child|children|student|pupil|person|kid|family)\b)|(?:на|за)\s+(?=брой|бр\.|порция|чаша))"
+    r"(?P<unit>[^\W\d_]+)"
+)
+_CLAUSE_END_RE = re.compile(r"[;|]|\.(?:\s|$)")
+
+
+def _priced_per_item(evidence: str, amounts: list[Decimal]) -> bool:
+    """The amount's own words price one item ("per juice", "за брой"), and the rest of
+    that clause names no period."""
+    wanted = set(amounts)
+    for line in evidence.casefold().splitlines():
+        for _, end, values in number_spans(line):
+            match = _PER_ITEM_RE.match(line[end:]) if values & wanted else None
+            if match is None:
+                continue
+            rest = line[end:]
+            stop = _CLAUSE_END_RE.search(rest, match.end())
+            clause = rest[: stop.start() if stop else len(rest)]
+            if not any(re.search(words, clause) for words in _PERIOD_WORDS.values()):
+                return True
+    return False
+
+
 # A page titled for one period of tuition: 596's PDFs open with "ANNUAL TUITION FEES 2026-2027",
 # and a read that quoted a row without that title lost the period of every tuition in them.
 _TITLE_LINES = 5
@@ -512,6 +540,9 @@ def check_fee(fee: AgentFee, page_text: str) -> CheckedFee:
         period = None
     if period is PricePeriod.ONE_TIME and fee.category is not PriceCategory.REGISTRATION:
         checks.append(f"one_time cleared: not valid for {fee.category.value}")
+        period = None
+    if period is not None and _priced_per_item(evidence, fee_amounts(fee)):
+        checks.append(f"period {period.value} cleared: the amount is priced per item")
         period = None
     if period is not None and fee.amount is not None and _is_first_instalment(evidence, fee_amounts(fee)[0]):
         checks.append(f"period {period.value} cleared: first instalment of '1 x A + N x B'")

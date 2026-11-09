@@ -448,3 +448,28 @@ async def test_first_urls_are_read_after_home_on_top_of_the_cap(monkeypatch):
     )
     assert [p.url for p in read][:2] == [HOME, arts]
     assert len(read) == fees_agent.MAX_FETCHES + 1
+
+
+async def test_a_dead_sister_domain_is_read_on_the_schools_own_host(monkeypatch):
+    # 552: meridian22.bg stopped resolving (2026-10-24); meridian22.org serves the same paths.
+    crawler = _Crawler({
+        HOME: [("Добре дошли", [("https://meridian22.bg/priem#fees", "Прием")])],
+        "https://meridian22.bg/priem": [None],
+        "https://meridian22.org/priem": [("Годишна такса: 7 960 евро " + "x" * 300, [])],
+    })  # fmt: skip
+    monkeypatch.setattr(fees_agent, "_pick", _picks(["https://meridian22.bg/priem"]))
+    read = await fees_agent.find_pages(crawler, None, _Client(), _school(), Spend(0.05))
+    assert [(p.url, p.prices) for p in read][-2:] == [("https://meridian22.bg/priem", False), ("https://meridian22.org/priem", True)]
+
+
+def test_only_a_sister_domain_link_has_a_twin_on_the_home_host():
+    assert fees_agent._on_home_host("https://meridian22.bg/priem?x=1", HOME) == "https://meridian22.org/priem?x=1"
+    assert fees_agent._on_home_host("https://www.meridian22.org/priem", HOME) is None
+
+
+async def test_the_home_page_is_read_without_its_fragment(monkeypatch):
+    home = "https://novigradini.com/anika/#dipipopup-27586290"
+    crawler = _Crawler({"https://novigradini.com/anika/": [("Цени " + "x" * 300, [])]})
+    school = School(id=1, name_i18n={}, country_code="bg", school_type="private", website_url=home)
+    read = await fees_agent.find_pages(crawler, None, _Client(), school, Spend(0.05))
+    assert crawler.calls == ["https://novigradini.com/anika/"] and read[0].url == "https://novigradini.com/anika/"
