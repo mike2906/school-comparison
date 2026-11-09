@@ -115,3 +115,52 @@ async def test_a_register_location_moves_to_the_sites_campus(db_session):
     assert sorted(moved.age_groups) == ["grade_1_4", "grade_8_12"]
     assert moved.geocode_meta["manual_fix"]["previous"]["address_i18n"] == {"bg": 'ул. "Горски пътник" № 44'}
     assert has_pinned_point(moved)
+
+
+@pytest.mark.asyncio
+async def test_a_shown_pin_moves_only_when_asked_and_to_the_sites_address(db_session):
+    # 300 ESPA: the register's address is on no page of espa.bg, which gives its own buildings.
+    location_id = await _location(db_session)
+    first = (42.703233, 23.135833)
+    await set_hand_pin(db_session, location_id, first, note="site map", address="ул. Тенев баир 2", apply=True)
+    point = (42.6510561, 23.3378609)
+    assert (await set_hand_pin(db_session, location_id, point, note="espa.bg footer", apply=True))["outcome"] == "already_shown"
+    no_address = await set_hand_pin(db_session, location_id, point, note="espa.bg", move_shown=True, apply=True)
+    assert no_address["outcome"] == "move_needs_address"
+    moved = await set_hand_pin(
+        db_session, location_id, point, note="espa.bg footer", address='ул. „Проф. Кирил Попов“ № 13', move_shown=True, apply=True
+    )
+    assert moved["outcome"] == "placed"
+    row = await db_session.get(SchoolLocation, location_id)
+    await db_session.refresh(row)
+    assert (row.lat, row.lng) == point and row.address_i18n == {"bg": 'ул. „Проф. Кирил Попов“ № 13'}
+    assert row.geocode_meta["manual_fix"]["previous"]["address_i18n"] == {"bg": "ул. Тенев баир 2"}
+    # The register's address is kept where every re-import path looks, so it finds the row.
+    from app.scrapers.sources.base_adapter import _address_keys, _is_pinned_location
+
+    assert row.geocode_meta["evidence"]["previous_address_i18n"] == {"bg": 'ул. "Майор Коста Паница"'}
+    assert _is_pinned_location(row, {"bg": 'ул. "Майор Коста Паница"'})
+    assert len(_address_keys(row)) == 2
+    for again in ("ул. Проф. Кирил Попов 13", 'ул. "Майор Коста Паница"'):
+        refused = await set_hand_pin(db_session, location_id, point, note="x", address=again, move_shown=True)
+        assert refused["outcome"] == "move_needs_address", again  # its own, or the register's
+
+
+@pytest.mark.asyncio
+async def test_an_official_register_pin_moves_and_loses_its_source_tags(db_session):
+    # 300 ESPA's case: a register location shown at the register's point.
+    from app.services.geocoding.write_gate import OFFICIAL_COORDS_TAG
+
+    location_id = await _location(db_session)
+    row = await db_session.get(SchoolLocation, location_id)
+    row.location_tags = [OFFICIAL_COORDS_TAG, "address_source=website_contact", "source=moe_registry"]
+    row.geocode_meta = {"precision": "exact", "method": "official"}
+    await db_session.commit()
+    point = (42.6510561, 23.3378609)
+    moved = await set_hand_pin(
+        db_session, location_id, point, note="espa.bg", address="ул. Проф. Кирил Попов 13", move_shown=True, apply=True
+    )
+    assert moved["outcome"] == "placed", moved
+    await db_session.refresh(row)
+    assert row.location_tags == ["source=moe_registry"]
+    assert row.geocode_meta["evidence"]["previous_address_i18n"] == {"bg": 'ул. "Майор Коста Паница"'}

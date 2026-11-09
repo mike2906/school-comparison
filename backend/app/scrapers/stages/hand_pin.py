@@ -4,8 +4,9 @@ For the few schools no stage can place, where the evidence is the school's own (
 Дидро's site maps Тенев баир 2 but writes no street). The pin is a hand correction
 (``geocode_meta.method`` = manual_fix): the write gate, the geocoder and a registry re-import
 leave it alone, and the address and point it replaced are kept in ``manual_fix.previous``
-(a re-import of that address finds this row). Only a hidden location (approximate or no
-point) inside the city's bounds; default is a dry run.
+(a re-import of that address finds this row). A hidden location (approximate or no point),
+or with ``move_shown`` a shown one moved to another address the school's site gives; inside
+the city's bounds; default is a dry run.
 """
 
 from __future__ import annotations
@@ -16,8 +17,29 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import School, SchoolLocation
 from app.scrapers.stages.website_pins import needs_pin
+from app.services.geocoding.bg.address_match import same_building
 from app.services.geocoding.bounds import get_city_bounds, point_in_bounds
 from app.services.geocoding.write_gate import MANUAL_FIX_METHOD, OFFICIAL_COORDS_TAG, location_holding_point
+
+
+def _register_address(previous: dict) -> dict:
+    """The source's address a location had before any correction: the one a stage kept
+    (site-address's ``evidence.previous_address_i18n``), else the one an earlier hand fix
+    replaced, else the location's own."""
+    meta = previous.get("geocode_meta") if isinstance(previous.get("geocode_meta"), dict) else {}
+    evidence = meta.get("evidence") if isinstance(meta.get("evidence"), dict) else {}
+    fix = meta.get("manual_fix") if isinstance(meta.get("manual_fix"), dict) else {}
+    for address in (evidence.get("previous_address_i18n"), (fix.get("previous") or {}).get("address_i18n")):
+        if isinstance(address, dict) and (address.get("bg") or address.get("en")):
+            return dict(address)
+    return dict(previous.get("address_i18n") or {})
+
+
+def _same_address(address: str, other: Optional[dict]) -> bool:
+    from app.scrapers.sources.base_adapter import _address_key
+
+    other_text = (other or {}).get("bg") or ""
+    return _address_key({"bg": address}) == _address_key(other) or same_building(address, other_text)
 
 
 async def set_hand_pin(
@@ -27,9 +49,16 @@ async def set_hand_pin(
     *,
     note: str,
     address: Optional[str] = None,
+    move_shown: bool = False,
     apply: bool = False,
 ) -> dict[str, Any]:
-    """Pin the location at ``point`` (and give it ``address``); returns what was (or would be) done."""
+    """Pin the location at ``point`` (and give it ``address``); returns what was (or would be) done.
+
+    A shown pin moves only with ``move_shown`` and a new ``address``: a register address the
+    school's own site never gives (300 ESPA: the register's ул. Градина 23 in Киноцентър; espa.bg
+    names three other buildings). Mike's rule (2026-10-15): the school's own site wins."""
+    from app.scrapers.campus_sync import CAMPUS_TAG  # campus_sync imports stage modules
+
     if not note.strip():
         raise ValueError("a hand pin needs a note saying what the point was checked against")
     address = (address or "").strip() or None
@@ -57,8 +86,17 @@ async def set_hand_pin(
     if address:
         location.address_i18n = {"bg": address}
         location.district = None  # the old address's
-    if not needs_pin(location):
+    shown = not needs_pin(location)
+    register_address = _register_address(previous)
+    if shown and not move_shown:
         outcome = "already_shown"
+    elif shown and CAMPUS_TAG in (location.location_tags or []):
+        outcome = "site_campus"  # the site's own row: campus_sync owns it
+    elif shown and (
+        not address
+        or any(_same_address(address, old) for old in (previous["address_i18n"], register_address))
+    ):
+        outcome = "move_needs_address"  # a shown pin moves to another address, the site's
     elif bounds is None:
         outcome = "no_city_bounds"  # the point cannot be checked
     elif not point_in_bounds(point[0], point[1], bounds):
@@ -80,10 +118,17 @@ async def set_hand_pin(
         "formatted_address": (location.address_i18n or {}).get("bg"),
         "manual_fix": {"previous": previous, "note": note},
     }
+    if shown:
+        # The register's address, where every re-import path looks for a replaced one
+        # (base_adapter._address_keys, as site-address keeps it), however often the pin moved.
+        location.geocode_meta["evidence"] = {"previous_address_i18n": register_address}
+    # A hidden location may keep an official tag. A moved shown pin's point and address are
+    # no source's: its coordinate and address provenance tags go.
     location.location_tags = [
         tag
         for tag in location.location_tags or []
-        if not str(tag).startswith("coords_source=") or tag == OFFICIAL_COORDS_TAG
+        if not (shown and str(tag).startswith("address_source="))
+        and (not str(tag).startswith("coords_source=") or (tag == OFFICIAL_COORDS_TAG and not shown))
     ]
     db.add(location)
     await db.commit()
