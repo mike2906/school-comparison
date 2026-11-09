@@ -46,6 +46,8 @@ jobs:
     defaults:
       run:
         working-directory: frontend
+    env:
+      LIVE_FAILED_LIST: ${{ github.workspace }}/../failed-flows.txt
     steps:
       # The flows of the commit the live site was built from (deploy.yml writes it to
       # version.txt): a docs-only push or a rolled-back deploy leaves main ahead of it.
@@ -89,7 +91,6 @@ jobs:
         env:
           LIVE_SITE_URL: ${{ inputs.site_url || 'https://schooldecider.com' }}
           LIVE_API_URL: ${{ inputs.api_url || 'https://api.schooldecider.com' }}
-          LIVE_FAILED_LIST: ${{ runner.temp }}/failed-flows.txt
         # One retry, so a single slow answer does not page anyone. Each flow that fails the
         # retry too is an annotation on the run's page.
         run: npm run test:live:ci || { echo "Retrying once in 60 seconds."; sleep 60; LIVE_LAST_TRY=1 npm run test:live:ci; }
@@ -100,7 +101,10 @@ jobs:
         if: steps.flows.outcome == 'failure'
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: node e2e/live/still-failing.js "$RUNNER_TEMP/failed-flows.txt"
+        # A live commit from before this step existed has no script: any failure is red.
+        run: |
+          [ -f e2e/live/still-failing.js ] || exit 1
+          node e2e/live/still-failing.js "$LIVE_FAILED_LIST"
 
       - name: Upload screenshots
         if: always() && steps.flows.outcome == 'failure'

@@ -8,14 +8,20 @@
  * run and manual runs always go red on any failure, so a known problem still alerts once
  * a day until it is fixed.
  *
- * Exits 1 (red) for any new failure, and whenever it cannot tell: no list of failed
- * flows, or the GitHub API not answering.
+ * Exits 1 (red) for any new failure, and whenever it cannot tell: no complete list of
+ * failed flows (a crash), or the GitHub API not answering. A flow that keeps failing for a
+ * new reason only shows up in the daily run: a deliberate trade for one alert per problem.
+ *
+ * It always writes this run's failed flows as one notice titled "Failed flows" (JSON), so
+ * the next run reads the whole list even when GitHub keeps only the first 10 errors.
  *
  * Usage: node e2e/live/still-failing.js <file listing this run's failed flows, one a line>
  * Env: GITHUB_TOKEN, GITHUB_REPOSITORY, GITHUB_RUN_ID, GITHUB_EVENT_NAME.
  */
 import fs from 'node:fs'
-import { flowName } from './annotate.js'
+import { END_OF_RUN, flowName } from './annotate.js'
+
+const LIST_TITLE = 'Failed flows'
 
 const api = async path => {
   const response = await fetch(`https://api.github.com/repos/${process.env.GITHUB_REPOSITORY}/${path}`, {
@@ -25,16 +31,19 @@ const api = async path => {
   return response.json()
 }
 
-// Flows that failed in the last finished run before this one (from its error annotations).
+// Flows that failed in the last finished deploy or daily run before this one. Manual runs
+// (a branch, a preview site) are skipped: they don't describe the live site's state.
 async function failedLastTime() {
-  const { workflow_runs: runs } = await api('actions/workflows/live-flows.yml/runs?status=completed&per_page=20')
-  const previous = runs.find(run => String(run.id) !== process.env.GITHUB_RUN_ID && ['success', 'failure'].includes(run.conclusion))
+  const { workflow_runs: runs } = await api('actions/workflows/live-flows.yml/runs?status=completed&branch=main&per_page=30')
+  const previous = runs.find(run => String(run.id) !== process.env.GITHUB_RUN_ID &&
+    ['workflow_run', 'schedule'].includes(run.event) && ['success', 'failure'].includes(run.conclusion))
   if (!previous) return { run: null, names: new Set() }
   const { jobs } = await api(`actions/runs/${previous.id}/jobs`)
   const names = new Set()
   for (const job of jobs) {
     for (const note of await api(`check-runs/${job.id}/annotations?per_page=100`)) {
-      if (note.annotation_level === 'failure' && note.title) names.add(flowName(note.title))
+      if (note.title === LIST_TITLE) JSON.parse(note.message).forEach(name => names.add(flowName(name)))
+      else if (note.annotation_level === 'failure' && note.title) names.add(flowName(note.title))
     }
   }
   return { run: previous, names }
@@ -42,11 +51,11 @@ async function failedLastTime() {
 
 async function main() {
   const file = process.argv[2]
-  const failed = fs.existsSync(file)
-    ? [...new Set(fs.readFileSync(file, 'utf8').split('\n').map(flowName).filter(Boolean))]
-    : []
-  if (failed.length === 0) {
-    console.log('The flows failed, but no failed flow was listed (a crash?). Failing the run.')
+  const lines = fs.existsSync(file) ? fs.readFileSync(file, 'utf8').split('\n').map(flowName).filter(Boolean) : []
+  const failed = [...new Set(lines.filter(line => line !== END_OF_RUN))]
+  console.log(`::notice title=${LIST_TITLE}::${JSON.stringify(failed).replace(/%/g, '%25')}`)
+  if (failed.length === 0 || !lines.includes(END_OF_RUN)) {
+    console.log('The flows failed, but the list of failed flows is empty or cut short (a crash?). Failing the run.')
     return 1
   }
   if (process.env.GITHUB_EVENT_NAME !== 'workflow_run') return 1
