@@ -22,6 +22,26 @@ from app.services.geocoding.bounds import get_city_bounds, point_in_bounds
 from app.services.geocoding.write_gate import MANUAL_FIX_METHOD, OFFICIAL_COORDS_TAG, location_holding_point
 
 
+def _register_address(previous: dict) -> dict:
+    """The source's address a location had before any correction: the one a stage kept
+    (site-address's ``evidence.previous_address_i18n``), else the one an earlier hand fix
+    replaced, else the location's own."""
+    meta = previous.get("geocode_meta") if isinstance(previous.get("geocode_meta"), dict) else {}
+    evidence = meta.get("evidence") if isinstance(meta.get("evidence"), dict) else {}
+    fix = meta.get("manual_fix") if isinstance(meta.get("manual_fix"), dict) else {}
+    for address in (evidence.get("previous_address_i18n"), (fix.get("previous") or {}).get("address_i18n")):
+        if isinstance(address, dict) and (address.get("bg") or address.get("en")):
+            return dict(address)
+    return dict(previous.get("address_i18n") or {})
+
+
+def _same_address(address: str, other: Optional[dict]) -> bool:
+    from app.scrapers.sources.base_adapter import _address_key
+
+    other_text = (other or {}).get("bg") or ""
+    return _address_key({"bg": address}) == _address_key(other) or same_building(address, other_text)
+
+
 async def set_hand_pin(
     db: AsyncSession,
     location_id: int,
@@ -67,12 +87,16 @@ async def set_hand_pin(
         location.address_i18n = {"bg": address}
         location.district = None  # the old address's
     shown = not needs_pin(location)
+    register_address = _register_address(previous)
     if shown and not move_shown:
         outcome = "already_shown"
-    elif shown and (not address or same_building(address, previous["address_i18n"].get("bg") or "")):
-        outcome = "move_needs_address"  # a shown pin moves to another address, the site's
     elif shown and CAMPUS_TAG in (location.location_tags or []):
         outcome = "site_campus"  # the site's own row: campus_sync owns it
+    elif shown and (
+        not address
+        or any(_same_address(address, old) for old in (previous["address_i18n"], register_address))
+    ):
+        outcome = "move_needs_address"  # a shown pin moves to another address, the site's
     elif bounds is None:
         outcome = "no_city_bounds"  # the point cannot be checked
     elif not point_in_bounds(point[0], point[1], bounds):
@@ -92,15 +116,19 @@ async def set_hand_pin(
         "provider": "manual",
         "precision": "exact",
         "formatted_address": (location.address_i18n or {}).get("bg"),
-        # A pin moved again keeps the one it moved, and with it the chain down to the
-        # register's address (base_adapter._replaced_addresses), so a re-import finds the row.
         "manual_fix": {"previous": previous, "note": note},
     }
-    # A hidden location may keep an official tag; a moved shown pin's point is no source's.
+    if shown:
+        # The register's address, where every re-import path looks for a replaced one
+        # (base_adapter._address_keys, as site-address keeps it), however often the pin moved.
+        location.geocode_meta["evidence"] = {"previous_address_i18n": register_address}
+    # A hidden location may keep an official tag. A moved shown pin's point and address are
+    # no source's: its coordinate and address provenance tags go.
     location.location_tags = [
         tag
         for tag in location.location_tags or []
-        if not str(tag).startswith("coords_source=") or (tag == OFFICIAL_COORDS_TAG and not shown)
+        if not (shown and str(tag).startswith("address_source="))
+        and (not str(tag).startswith("coords_source=") or (tag == OFFICIAL_COORDS_TAG and not shown))
     ]
     db.add(location)
     await db.commit()

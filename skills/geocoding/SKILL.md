@@ -87,8 +87,10 @@ evidence is the school's own but no stage can read it. Run it as a named command
 With `--move-shown` and `--address` it also moves a shown pin, for a register address the
 school's own site never gives when no site campus row exists to move to (300 ESPA: the
 register's ул. Градина 23 is on no page of espa.bg, whose footer names its own buildings with
-no city, so the campus check skips them). `manual_fix.previous` keeps the register's address
-it first replaced, so a re-import still finds the row.
+no city, so the campus check skips them). It refuses the address the pin has or the
+register's, and a site campus row. The register's address goes to
+`geocode_meta.evidence.previous_address_i18n` (where site-address keeps it, read by every
+re-import path), the pin it moved to `manual_fix.previous`, and its coords/address source tags go.
 
 `cli move-to-site-campus --location-id N --campus-id M --note "..." [--apply]` moves a shown
 register location to the address and point of the school's own site campus location (M,
