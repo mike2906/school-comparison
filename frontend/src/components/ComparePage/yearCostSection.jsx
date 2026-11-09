@@ -149,8 +149,8 @@ export function buildYearCostSection({ t, language, schools, costById, stage, ne
   const firstYearCell = (school) => {
     const cost = costById.get(school.id)
     if (state(school) !== 'cost') return fallback(school)
-    const { options, deposits, uniforms } = cost.firstYear
-    if (options.length + deposits.length + uniforms.length === 0) return muted(t('yearCost.notStated'))
+    const { options, deposits, uniforms, inTotal } = cost.firstYear
+    if (options.length + deposits.length + uniforms.length === 0) return muted(t(inTotal ? 'yearCost.firstYearInTotal' : 'yearCost.notStated'))
     const uniformRange = uniforms.length > 0 && {
       min: Math.min(...uniforms.map(item => item.value.min)),
       max: Math.max(...uniforms.map(item => item.value.max)),
@@ -158,6 +158,7 @@ export function buildYearCostSection({ t, language, schools, costById, stage, ne
     return (
       <div className="space-y-1.5">
         {/* Listed, not summed: two admission fees may be one or the other (round I or II). */}
+        {inTotal && <p className="text-xs text-neutral-600">{t('yearCost.firstYearInTotal')}</p>}
         {options.length > 0 && optionList(options, { named: true })}
         {deposits.map(item => (
           <p key={item.row.id} className="text-xs text-neutral-600">
