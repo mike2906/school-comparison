@@ -4,7 +4,8 @@ name: Live flows
 # cut-offs and catchment check, school facts and open days, social links, fees with
 # payment plans, compare, and schools without a verified pin. Each flow picks its school
 # from the live API. Runs after every deploy and daily, so data changes are caught too.
-# Read-only. GitHub emails the repository owner when a run fails; screenshots of failed
+# Read-only. GitHub emails the repository owner when a run fails (after a deploy, only for
+# a flow that passed in the previous run: e2e/live/still-failing.js); screenshots of failed
 # flows are attached to the run. Flows: frontend/e2e/live/ (one file per feature area).
 on:
   workflow_run:
@@ -31,6 +32,9 @@ concurrency:
 
 permissions:
   contents: read
+  # still-failing.js reads the previous run's failed flows.
+  actions: read
+  checks: read
 
 jobs:
   flows:
@@ -79,15 +83,27 @@ jobs:
           npx playwright install --with-deps chromium
 
       - name: Flows
+        id: flows
+        # The next step decides whether a failure turns the run red.
+        continue-on-error: true
         env:
           LIVE_SITE_URL: ${{ inputs.site_url || 'https://schooldecider.com' }}
           LIVE_API_URL: ${{ inputs.api_url || 'https://api.schooldecider.com' }}
+          LIVE_FAILED_LIST: ${{ runner.temp }}/failed-flows.txt
         # One retry, so a single slow answer does not page anyone. Each flow that fails the
         # retry too is an annotation on the run's page.
         run: npm run test:live:ci || { echo "Retrying once in 60 seconds."; sleep 60; LIVE_LAST_TRY=1 npm run test:live:ci; }
 
+      # A deploy's run goes red only for a flow that passed in the previous run; flows
+      # already failing become a warning. The daily and manual runs go red on any failure.
+      - name: New failures
+        if: steps.flows.outcome == 'failure'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node e2e/live/still-failing.js "$RUNNER_TEMP/failed-flows.txt"
+
       - name: Upload screenshots
-        if: failure()
+        if: always() && steps.flows.outcome == 'failure'
         uses: actions/upload-artifact@v4
         with:
           name: live-flows-report

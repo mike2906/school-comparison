@@ -19,7 +19,14 @@ you picked, and go to Mike only for the short list in "Still goes to Mike".
    `frontend/e2e/live/` in the same PR: one file per feature area, the school picked from
    the live API, texts from the i18n files. The flows run after every deploy and daily
    (`.github/workflows/live-flows.yml`), so after merging, check that the run following
-   your deploy is green. A change to a result a parent gets (a calculator answer, a fee
+   your deploy is green. After a deploy, a flow that was already failing in the previous
+   run only warns; the daily run goes red on every failure, so read the run's warnings too.
+   **A check that only passes once data is re-read or published lands after that data
+   step**, not with the code fix: merge the fix, run the data step, then merge the check in
+   a follow-up PR. Before the publish, run the new check against the live site to show it
+   fails (`LIVE_SITE_URL=https://schooldecider.com node --test --test-name-pattern=...`),
+   and after it, that it passes. Otherwise the flows stay red, after every deploy, for a
+   problem everyone already knows about (16-19 Oct and 6-9 Nov 2026). A change to a result a parent gets (a calculator answer, a fee
    or cut-off for an age, a filter) also adds its parent to
    `frontend/e2e/live/coverage.test.js`, which CI runs on every PR against live data.
    **Before calling such a feature done, use it as a parent would** (Mike, 2026-10-23):
@@ -138,6 +145,11 @@ needs one message from him, and that message should cover the whole job:
   ask Mike to repeat his go between steps. Stop for a result you can't explain, an item
   from "Still goes to Mike", spend heading past what he saw, or a stop the job's plan
   names (e.g. "stop for Mike with measurements").
+- **Small re-reads need no go phrase** (Mike, 2026-11-09): re-reading and publishing one
+  school after a merged fix, expected under about $0.10, needs no "go" in his words. The
+  platform still needs a message of his in the thread to start the PC session, so ask in
+  one line (or a one-tap card) and treat any yes as the go for that job. Bigger runs still
+  need his go naming the steps.
 - **Steering a running session.** To change the plan mid-job, send the new instructions
   with the same tool that started the session; it delivers them to the running session.
   The general cross-session message tool is refused for Remote Control sessions. That
