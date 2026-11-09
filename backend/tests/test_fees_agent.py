@@ -881,7 +881,21 @@ async def test_a_gone_page_keeps_its_rows_when_the_read_finds_nothing_publishabl
     assert published == [580.0]
 
 
+@pytest.mark.postgres  # a rollback, then a write
 async def test_a_gone_page_is_valid_again_when_the_read_fails(db_session, pages, frozen_today):
+    from app.models.country import Country
+
+    db_session.add(  # PostgreSQL holds the school's country key
+        Country(
+            code="bg",
+            name_i18n={"bg": "България", "en": "Bulgaria"},
+            education_config={},
+            map_config={},
+            supported_languages=["bg", "en"],
+            default_language="bg",
+            default_currency="EUR",
+        )
+    )
     school = await _school(db_session)
     await _old_rows(db_session, school, None, [580], page_url=OLD_URL)
     await db_session.commit()
