@@ -1380,7 +1380,7 @@ function SearchPage() {
                   </div>
                 )}
 
-                <SavedAdmissionBanner schools={matchingSchools} filters={filters} onFilterChange={handleFilterChange} hiddenCount={matchingSchools.length - filteredSchools.length} />
+                <SavedAdmissionBanner schools={schools} filters={filters} onFilterChange={handleFilterChange} hiddenCount={matchingSchools.length - filteredSchools.length} />
 
                 {isFirstLoad && (
                   <div className="p-4 space-y-4">

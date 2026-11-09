@@ -189,7 +189,7 @@ test('the list banner names only the saved tabs a listed school shows a result f
   const saved = { kindergarten: { startYear: 2026, answers: kgAnswers } }
   const privateSchool = { id: 6, school_type: 'private', education_level: 'primary', admission_info: {} }
   // 300 (ESPA) alone under "Preschool · schools": a private school's own admission shows no points.
-  assert.deepEqual([...stagesShown([privateSchool], saved, null, data)], [])
+  assert.equal(stagesShown([privateSchool], saved, null, data).size, 0)
   const withKindergarten = [privateSchool, { ...kindergarten(home, [kgRow(10)]), id: 1 }]
-  assert.deepEqual([...stagesShown(withKindergarten, saved, null, data)], ['kindergarten'])
+  assert.deepEqual([...stagesShown(withKindergarten, saved, null, data).get('kindergarten')], ['kindergarten'])
 })

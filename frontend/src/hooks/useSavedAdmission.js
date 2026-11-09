@@ -112,7 +112,7 @@ export function useStagesShown(schools, ageGroup = null) {
   const hasSaved = Boolean(saved.kindergarten || saved.grade_1)
   const data = useVerdictData(Boolean(saved.kindergarten), Boolean(saved.grade_1))
   return useMemo(() => {
-    if (!hasSaved) return new Set()
+    if (!hasSaved) return new Map()
     if (!data) return null
     return stagesShown(schools, saved, ageGroup, { ...data, today: sofiaToday() })
   }, [hasSaved, data, saved, schools, ageGroup])

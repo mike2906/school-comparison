@@ -4,7 +4,6 @@ import { formatRange, rankingWhen, rowLabel } from '../../admission/calculator'
 import { forgetSaved, SAVED_STAGES } from '../../admission/saved'
 import { savedListFilters, savedStageApplies } from '../../admission/schoolVerdict'
 import { setHideBelow, useHideBelow, useSavedAdmission, useStagesShown } from '../../hooks/useSavedAdmission'
-import { preschoolWhere } from '../../utils/ageSelection'
 import { CutoffValue } from './CutoffTable'
 
 const TONE = {
@@ -152,9 +151,13 @@ export function SavedAdmissionBanner({ schools = [], filters = {}, onFilterChang
   const shown = useStagesShown(schools, ageGroup)
   const stages = SAVED_STAGES.filter(stage => savedStageApplies(stage, saved[stage], ageGroup) && shown?.has(stage))
   if (stages.length === 0) return null
-  // Preschool happens at kindergartens and at schools; the note names the places listed.
-  const where = ageGroup === 'preschool' ? preschoolWhere(filters) : 'kindergarten'
-  const variant = stage => (stage === 'kindergarten' && where !== 'kindergarten' ? `kindergarten_${where}` : stage)
+  // The preschool year is ranked at kindergartens and at schools' preparatory groups: the
+  // note names the kinds of place whose cards show the points.
+  const variant = stage => {
+    const kinds = shown.get(stage)
+    if (stage !== 'kindergarten' || !kinds.has('school')) return stage
+    return kinds.has('kindergarten') ? 'kindergarten_both' : 'kindergarten_school'
+  }
   return (
     <div className="mx-3 mt-3 rounded-xl border border-primary-200 bg-primary-50 p-3 text-sm text-primary-900" data-testid="saved-admission-banner">
       {stages.map(stage => {

@@ -51,10 +51,11 @@ describe('the saved points note on the school list', () => {
       await open('en', `/search?age_group=preschool&education_level=primary&school_type=state&target_year=${startYear}`)
       await banner.getByText(t('en', 'savedAdmission.banner.kindergarten_school', { year: answers.birthYear })).waitFor()
 
-      await open('en', `/search?age_group=preschool&education_level=primary&school_type=private&target_year=${startYear}`)
-      await page.locator('a[href^="/en/schools/"]').first().waitFor()
-      await page.waitForTimeout(2_000) // the rule files load after the list
-      assert.equal(await banner.count(), 0, 'no note about the city\'s points over private schools')
+      // The type chip filters in the page: the rule files are loaded, so the note is gone
+      // because no private school shows points, not because it has not loaded yet.
+      await page.getByRole('button', { name: t('en', 'schoolTypes.private'), exact: true }).filter({ visible: true }).first().click()
+      await page.waitForURL(url => url.searchParams.get('school_type') === 'private')
+      await banner.waitFor({ state: 'detached' })
     } finally {
       await page.evaluate(() => localStorage.removeItem('admissionAnswers'))
     }

@@ -1,7 +1,7 @@
 import { languageLabel } from '../../utils/languages.js'
 import { getNvoDetail as getSharedNvoDetail } from '../../utils/nvo.js'
 import { getCanonicalAmenityFlags, getOptionLabel, normalizeLanguageFocus } from '../../utils/schoolAttributes.js'
-import { formatPriceLabel, PRICE_CATEGORY_ORDER, priceAgeGroupLabel, selectPricingCohort, tuitionRows } from '../../utils/pricing.js'
+import { formatPriceLabel, priceAgeGroupLabel, selectPricingCohort, sortByCategory, tuitionRows } from '../../utils/pricing.js'
 import { planNameLabel } from '../../utils/priceLabels.js'
 import { priceCategory, pricePeriod } from '../../utils/priceRows.js'
 import { parsePhones } from '../../utils/phone.js'
@@ -205,11 +205,6 @@ export function getLocationAgeGroups(location) {
   return []
 }
 
-const categoryRank = category => {
-  const rank = PRICE_CATEGORY_ORDER.indexOf(category)
-  return rank < 0 ? PRICE_CATEGORY_ORDER.length : rank
-}
-
 export function buildExpandedSections({
   school,
   attributes,
@@ -318,18 +313,21 @@ export function buildExpandedSections({
     // The main price of each group, then the other kinds of fee by name: the school page
     // lists every fee. Listing them all here buried the price (300 had 62 lines, among them
     // fifteen bare "Extracurricular" ones and every instalment).
-    const rows = selectPricingCohort(pricing, { ageGroup })?.rows || []
-    const pricingLines = tuitionRows(rows, ageGroup).map(item => {
+    const cohort = selectPricingCohort(pricing, { ageGroup })
+    const rows = cohort?.rows || pricing
+    const tuition = tuitionRows(rows, ageGroup)
+    const pricingLines = tuition.map(item => {
       const group = priceAgeGroupLabel(item, t, language)
       const plan = planNameLabel(item, t, language)
       const name = [group, plan].filter(Boolean).join(' · ') || t('pricing.tuition')
       const period = pricePeriod(item)
       const periodLabel = period ? t(`pricing.${period}`) : t('pricing.periodNotStated')
-      return `${name}: ${formatPriceLabel(item, locale, t)} (${periodLabel})`
+      const source = item.source ? ` · ${t(`priceSource.${item.source}`)}` : ''
+      return `${name}: ${formatPriceLabel(item, locale, t)} (${periodLabel})${cohort?.academicYear ? ` · ${cohort.academicYear}` : ''}${source}`
     })
-    const others = [...new Set(rows.map(priceCategory))]
-      .filter(category => category !== 'tuition')
-      .sort((a, b) => categoryRank(a) - categoryRank(b))
+    // With no main price shown, tuition is one of the other fees.
+    const others = [...new Set(sortByCategory(rows).map(priceCategory))]
+      .filter(category => category !== 'tuition' || tuition.length === 0)
     if (others.length > 0) {
       pricingLines.push(t('schoolCard.otherFees', { fees: others.map(category => t(`pricing.${category}`)).join(', ') }))
     }
