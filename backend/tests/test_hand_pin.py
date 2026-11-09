@@ -134,5 +134,12 @@ async def test_a_shown_pin_moves_only_when_asked_and_to_the_sites_address(db_ses
     row = await db_session.get(SchoolLocation, location_id)
     await db_session.refresh(row)
     assert (row.lat, row.lng) == point and row.address_i18n == {"bg": 'ул. „Проф. Кирил Попов“ № 13'}
-    # The register's address stays the one kept, so a re-import still finds the row.
-    assert row.geocode_meta["manual_fix"]["previous"]["address_i18n"] == {"bg": 'ул. "Майор Коста Паница"'}
+    assert row.geocode_meta["manual_fix"]["previous"]["address_i18n"] == {"bg": "ул. Тенев баир 2"}
+    # The chain keeps the register's address, so a re-import still finds the row.
+    from app.scrapers.sources.base_adapter import _is_pinned_location
+
+    assert _is_pinned_location(row, {"bg": 'ул. "Майор Коста Паница"'})
+    same = await set_hand_pin(
+        db_session, location_id, point, note="x", address="ул. Проф. Кирил Попов 13", move_shown=True
+    )
+    assert same["outcome"] == "move_needs_address"  # the address it already has

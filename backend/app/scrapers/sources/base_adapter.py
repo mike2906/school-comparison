@@ -58,6 +58,26 @@ def _match_source_rows(existing_locations, incoming_locations) -> tuple[list, li
     return matched, new
 
 
+def _replaced_addresses(meta, depth: int = 0) -> list[dict]:
+    """Every address a correction replaced, down a chain of them: a hand pin moved again keeps
+    the pin it moved in ``manual_fix.previous.geocode_meta``, with the register's address
+    one level further down."""
+    if not isinstance(meta, dict) or depth > 5:
+        return []
+    found = []
+    evidence = meta.get("evidence")
+    replaced = evidence.get("previous_address_i18n") if isinstance(evidence, dict) else None
+    if isinstance(replaced, dict):
+        found.append(replaced)
+    manual_fix = meta.get("manual_fix")
+    previous = manual_fix.get("previous") if isinstance(manual_fix, dict) else None
+    if isinstance(previous, dict):
+        if isinstance(previous.get("address_i18n"), dict):
+            found.append(previous["address_i18n"])
+        found.extend(_replaced_addresses(previous.get("geocode_meta"), depth + 1))
+    return found
+
+
 def _is_pinned_location(location, address_i18n: Optional[dict]) -> bool:
     """Whether a source address is this pinned location.
 
@@ -66,11 +86,7 @@ def _is_pinned_location(location, address_i18n: Optional[dict]) -> bool:
     keeps it in ``geocode_meta.evidence.previous_address_i18n``).
     """
     known = set(_address_keys(location))
-    meta = location.geocode_meta if isinstance(location.geocode_meta, dict) else {}
-    manual_fix = meta.get("manual_fix")
-    previous = manual_fix.get("previous") if isinstance(manual_fix, dict) else None
-    if isinstance(previous, dict):
-        known.add(_address_key(previous.get("address_i18n")))
+    known.update(_address_key(address) for address in _replaced_addresses(location.geocode_meta))
     if _address_key(address_i18n) in known:
         return True
     return same_building(
