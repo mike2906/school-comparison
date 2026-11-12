@@ -8,6 +8,7 @@ import {
   buildRobots,
   buildSitemap,
   createTranslator,
+  districtPages,
   fixedPages,
   indexReasons,
   isThinSchool,
@@ -237,7 +238,7 @@ test('/schools lists schools then kindergartens by name, linked in the page lang
   const page = (language) => fixedPages(translator(language), language, listed).find((p) => p.routePath === '/schools')
   const { body, sitemap, canonicalPath } = page('en')
   assert.deepEqual([sitemap, canonicalPath], [true, '/schools'])
-  assert.deepEqual([...body.matchAll(/href="([^"]+)"/g)].map((m) => m[1]), ['/en/schools/4', '/en/schools/3', '/en/schools/5'])
+  assert.deepEqual([...body.matchAll(/href="([^"]+)"/g)].map((m) => m[1]), ['/en/districts', '/en/schools/4', '/en/schools/3', '/en/schools/5'])
   assert.ok(body.indexOf('Schools (2)') < body.indexOf('Kindergartens (1)'))
   assert.match(body, /Bee &lt;Garden&gt;/)
   assert.match(page('bg').body, /href="\/schools\/5"/)
@@ -287,4 +288,22 @@ test('a school page carries schema.org data that cannot break out of its script'
   const script = html.match(/<script type="application\/ld\+json">(.*?)<\/script>/)[1]
   assert.doesNotMatch(script, /</)
   assert.equal(JSON.parse(script).address.streetAddress, '1 Main St</script>')
+})
+
+test('district pages list each district with its schools, kindergartens and headline results', () => {
+  const listed = [
+    pinned,
+    { ...kindergarten, id: 13, resolved_name_i18n: { en: 'Bee Garden' }, school_type: 'state', locations: pinned.locations },
+    school({ id: 14, locations: [{ is_primary: true, lat: 10, lng: 10 }] }),
+  ]
+  const pages = districtPages(t, 'en', listed, districts)
+  assert.deepEqual(pages.map((page) => page.routePath), ['/districts', '/districts/mladost'])
+  assert.match(pages[0].body, /<a href="\/en\/districts\/mladost">Mladost district<\/a> · 2 kindergartens and schools/)
+  const page = pages[1]
+  assert.equal(page.title, 'Kindergartens and schools in Mladost district · Sofia Schools')
+  assert.ok(page.sitemap && page.canonicalPath === '/districts/mladost')
+  assert.match(page.body, /Schools \(1\).*School &lt;One&gt;.*Kindergartens \(1\).*same district \(Mladost district\) get 3 extra points.*Bee Garden.*<br \/>1 Main St&lt;\/script&gt;/)
+  assert.doesNotMatch(page.body, /schools\/14/)
+  const [empty] = districtPages(t, 'en', [], districts)
+  assert.deepEqual([empty.routePath, empty.sitemap, empty.noindex], ['/districts', false, true])
 })

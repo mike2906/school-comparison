@@ -3,33 +3,17 @@
  * block inside `#root` that React replaces on mount (hidden until then, see index.html).
  * Pure builders; the file and network work lives in `scripts/prerender.js`.
  */
-import {
-  LAST_ADMITTED_KINDS,
-  comparableRound,
-  cutoffText,
-  cutoffValue,
-  rankingLabel,
-  roundCounts,
-  rowLabel,
-  shortCampaign,
-} from '../admission/calculator.js'
 import { districtLabel } from '../admission/catchments.js'
 import { kindergartenDistrictFeature } from '../admission/schoolVerdict.js'
 import { getAddress, getSchoolName } from '../utils/i18n.js'
-import { formatPercent } from '../utils/nvoDisplay.js'
 import { parseCoordinate } from '../utils/coordinates.js'
 import { parsePhones } from '../utils/phone.js'
 import { URL_LANGUAGES, alternateLinks, canonicalUrl, languagePath } from '../utils/languageUrl.js'
 import { schoolLevelLabel, schoolTypeLabel } from '../utils/levelLabel.js'
-import {
-  getAvailableExamTypes,
-  getExamTypeForEducationLevel,
-  getExamTypeLabel,
-  getNvoSubjectKey,
-  isAverageMetric,
-} from '../utils/nvo.js'
-import { statedTuition } from '../utils/pricing.js'
+import { getExamTypeForEducationLevel } from '../utils/nvo.js'
 import { getSchoolFacts } from '../utils/schoolFacts.js'
+import { districtGroups, districtListLine } from '../utils/districtPages.js'
+import { cutoffLines, hasAdmissionResult, latestNvoResults, nvoLine, tuitionLine } from '../utils/schoolHighlights.js'
 import { directorySections } from '../utils/schoolDirectory.js'
 
 // Our own thin-content heuristic, not an SEO rule: a published Bulgarian summary shorter
@@ -79,76 +63,6 @@ function truncate(text, max = DESCRIPTION_MAX_CHARS) {
   const cut = text.slice(0, max - 1)
   const lastSpace = cut.lastIndexOf(' ')
   return `${(lastSpace > max / 2 ? cut.slice(0, lastSpace) : cut).replace(/[\s.,;:–-]+$/, '')}…`
-}
-
-/** Latest-year average scores per exam type, lowest grade first. */
-function latestNvoResults(school) {
-  const results = Array.isArray(school?.exam_results) ? school.exam_results : []
-  return getAvailableExamTypes(results).flatMap((examType) => {
-    const rows = results.filter((row) => row.exam_type === examType && isAverageMetric(row.metric))
-    const year = Math.max(...rows.map((row) => row.year))
-    const scores = {}
-    rows
-      .filter((row) => row.year === year)
-      .forEach((row) => {
-        const subject = getNvoSubjectKey(row.subject)
-        const value = Number(row.value)
-        if (subject && Number.isFinite(value)) scores[subject] = value
-      })
-    return Object.keys(scores).length > 0 ? [{ examType, year, scores }] : []
-  })
-}
-
-function nvoLine(result, t, language) {
-  const scores = [
-    result.scores.bulgarian != null && t('seo.nvoBulgarian', { value: formatPercent(result.scores.bulgarian, 1, language) }),
-    result.scores.math != null && t('seo.nvoMath', { value: formatPercent(result.scores.math, 1, language) }),
-  ].filter(Boolean)
-  return t('seo.nvoLine', {
-    exam: getExamTypeLabel(result.examType, t),
-    year: result.year,
-    scores: scores.join(', '),
-  })
-}
-
-function tuitionLine(school, t) {
-  // This year's fee, not next year's: the description has no room to label the year.
-  const tuition = statedTuition(school?.pricing, { intake: false })
-  // Euro only, in the period the school states (never annualised), and never an older
-  // year's fee, which the description has no room to label as such.
-  if (!tuition || tuition.currency !== 'EUR' || !tuition.period || tuition.yearStatus === 'dated_other') return ''
-  const [min, max] = [tuition.min, tuition.max].map((value) => Math.round(value))
-  const period = t(`pricing.per.${tuition.period}`)
-  const [one, range] = tuition.total ? ['seo.totalOne', 'seo.totalRange'] : ['seo.tuitionOne', 'seo.tuitionRange']
-  return min === max ? t(one, { min, period }) : t(range, { min, max, period })
-}
-
-/**
- * The admission rankings in words, one line per group or class, read on the same ranking
- * as the school page's "Who got in before" (`comparableRound`).
- */
-function cutoffLines(school, t, language) {
-  const rows = school?.admission_info?.cutoff_summary
-  if (!Array.isArray(rows)) return []
-  return rows.flatMap((row) => {
-    const round = comparableRound(row)
-    if (!round) return []
-    const value = cutoffText(round, t, language)
-    const ranking = rankingLabel(row, round, t, language)
-    const result = value
-      ? `${ranking}${LAST_ADMITTED_KINDS.has(cutoffValue(round)?.kind) ? `, ${t('cutoffs.lastAdmitted')} ` : ': '}${value}`
-      : ranking
-    const tie = round.tie_at_cutoff ? ` ${t('cutoffs.tie')}` : ''
-    const counts = roundCounts(round, t)
-    const label = [shortCampaign(row.campaign), row.quota && t('cutoffs.quota')].filter(Boolean).join(', ')
-    return [`${rowLabel(row, t, language)} (${label}): ${result}${tie}${counts ? ` (${counts})` : ''}`]
-  })
-}
-
-/** A row whose ranking says who got in: a cut-off, or that everyone did. */
-function hasAdmissionResult(row) {
-  const kind = cutoffValue(comparableRound(row))?.kind
-  return Boolean(kind) && kind !== 'noPlaces'
 }
 
 /**
@@ -214,7 +128,61 @@ function directoryBody(listedSchools, t, language) {
       .join('')
     return `<section><h2 class="font-semibold">${escapeHtml(`${t(`directory.${key}`)} (${entries.length})`)}</h2><ul>${items}</ul></section>`
   })
-  return mainBlock([heading(t('directory.title')), paragraph(t('directory.intro')), ...sections])
+  const byDistrict = `<p><a href="${escapeHtml(languagePath('/districts', language))}">${escapeHtml(t('districtPages.title'))}</a></p>`
+  return mainBlock([heading(t('directory.title')), paragraph(t('directory.intro')), byDistrict, ...sections])
+}
+
+/** One school in a district list: link, type and level, and its headline result. */
+function districtEntry({ school, name }, t, language, where) {
+  const href = languagePath(`/schools/${school.id}`, language)
+  const facts = t('seo.schoolFacts', { type: schoolTypeLabel(school, t), level: schoolLevelLabel(school, t) })
+  const highlight = districtListLine(school, t, language, where)
+  return `<li><a href="${escapeHtml(href)}">${escapeHtml(name)}</a> · ${escapeHtml(facts)}${highlight ? `<br />${escapeHtml(highlight)}` : ''}</li>`
+}
+
+/** `/districts` and one page per district (src/components/DistrictPage), as the app renders them. */
+export function districtPages(t, language, listedSchools, districts) {
+  const siteName = t('nav.title')
+  // The index is always written (a route without a file is a 404 in production), but
+  // offered to search engines only with districts to list.
+  const groups = districts?.features ? districtGroups(listedSchools, districts, language) : []
+  const index = groups
+    .map((group) => {
+      const href = languagePath(`/districts/${group.slug}`, language)
+      const label = t('seo.district', { district: group.label })
+      return `<li><a href="${escapeHtml(href)}">${escapeHtml(label)}</a> · ${escapeHtml(t('districtPages.count', { count: group.count }))}</li>`
+    })
+    .join('')
+  return [
+    {
+      routePath: '/districts',
+      title: `${t('districtPages.title')} · ${siteName}`,
+      description: truncate(t('districtPages.intro')),
+      canonicalPath: '/districts',
+      sitemap: groups.length > 0,
+      noindex: groups.length === 0,
+      body: mainBlock([heading(t('districtPages.title')), paragraph(t('districtPages.intro')), `<ul>${index}</ul>`]),
+    },
+    ...groups.map((group) => {
+      const title = t('districtPages.pageTitle', { district: group.label })
+      const intro = t('districtPages.pageIntro', { district: group.label })
+      const sections = group.sections.map(({ key, entries }) => {
+        const items = entries.map((entry) => districtEntry(entry, t, language, { districts, district: group.name })).join('')
+        const note = key === 'kindergartens' && entries.some(({ school }) => school.school_type === 'state')
+          ? paragraph(t('admissionArea.districtIntro', { district: t('seo.district', { district: group.label }) }))
+          : ''
+        return `<section><h2 class="font-semibold">${escapeHtml(`${t(`directory.${key}`)} (${entries.length})`)}</h2>${note}<ul>${items}</ul></section>`
+      })
+      return {
+        routePath: `/districts/${group.slug}`,
+        title: `${title} · ${siteName}`,
+        description: truncate(intro),
+        canonicalPath: `/districts/${group.slug}`,
+        sitemap: true,
+        body: mainBlock([heading(title), paragraph(intro), ...sections]),
+      }
+    }),
+  ]
 }
 
 /**

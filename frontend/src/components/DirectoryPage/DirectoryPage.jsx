@@ -43,6 +43,9 @@ function DirectoryPage() {
       <div className="mx-auto max-w-3xl px-4 py-8 md:px-6 md:py-12">
         <h1 className="text-3xl font-bold text-neutral-900">{t('directory.title')}</h1>
         <p className="mt-3 text-neutral-700">{t('directory.intro')}</p>
+        <p className="mt-3">
+          <Link to="/districts" className="text-sm font-medium text-primary-700 hover:underline">{t('districtPages.title')}</Link>
+        </p>
         {failed && <p className="mt-6 text-neutral-700">{t('common.error')}</p>}
         {!schools && !failed && <p className="mt-6 text-neutral-500">{t('common.loading')}</p>}
         {sections.map((section) => (
