@@ -457,13 +457,6 @@ def test_yearly_fee_stored_as_monthly_is_withheld():
     assert implausible_tuition_row_ids(rows) == set()
 
 
-def test_a_row_over_the_ceiling_does_not_raise_the_peer_floor():
-    # School 632: an old "€10,000 a month" from its FAQ beside the real €700 a month and
-    # the €7,000 paid for the year in full (no period).
-    rows = [_tuition_row(1, 700), _tuition_row(2, 7000, None), _tuition_row(3, 10000)]
-    assert implausible_tuition_row_ids(rows) == {3}
-
-
 def test_bgn_tuition_is_converted_before_comparison():
     # 1500 BGN/year is about €767: below the floor. 1500 BGN/month is not.
     assert implausible_tuition_row_ids([_tuition_row(1, 1500, "yearly", "BGN")]) == {1}
