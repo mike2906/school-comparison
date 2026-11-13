@@ -65,7 +65,7 @@ from app.scrapers.extraction.agent_fees import (
 )
 from app.scrapers.fee_pages import fee_http_client, page_key, pdf_text
 from app.scrapers.price_evidence import _PRICE_RE, PriceRow, _amount_key
-from app.scrapers.shared_site_check import registrable_domain
+from app.scrapers.shared_site_check import level_family, registrable_domain
 from app.scrapers.stages import common as stage_common
 from app.scrapers.stages import fee_check, school_pool
 from app.scrapers.stages import fee_images as fee_images_module
@@ -471,8 +471,17 @@ def reader_message(school: School, pages: list[PageRead], missed: Sequence[Decim
             "in full and list every fee, including every row of each fee table. Some of these "
             "amounts may be from an older year or not be fees: the rules above still decide."
         )
-    name = (school.name_i18n or {}).get("bg") or (school.name_i18n or {}).get("en")
-    return f"Institution: {name} ({school.school_type} {school.education_level})\n\n{text}"
+    return f"Institution: {institution(school)}\n\n{text}"
+
+
+def institution(school: School) -> str:
+    """The school's name, type and family for the reader and the fee check.
+
+    The family (school or kindergarten) only: the stored level is the highest stage, and
+    "upper_secondary" made the reader skip Victor Hugo's (505) maternelle, élémentaire and
+    collège tables as a sibling's, three reads out of three; without it all five were read."""
+    name = (school.name_i18n or {}).get("bg") or (school.name_i18n or {}).get("en") or ""
+    return f"{name} ({school.school_type} {level_family(school.education_level)})"
 
 
 def reader_agent():
@@ -535,9 +544,7 @@ async def _mark_reported(db: AsyncSession, school_ids: list[int]) -> None:
 
 async def check_read(school: School, pages: list[PageRead], fees: list[AgentFee], spend: Spend) -> fee_check.FeeCheck:
     """The fee check (stages/fee_check.py) over the pages the reader saw and the fees it gave."""
-    name = (school.name_i18n or {}).get("bg") or (school.name_i18n or {}).get("en") or ""
-    kind = f"{name} ({school.school_type} {school.education_level})"
-    return await fee_check.check_fees(school.id, kind, reader_text(pages), fees, spend, stage=STAGE)
+    return await fee_check.check_fees(school.id, institution(school), reader_text(pages), fees, spend, stage=STAGE)
 
 
 async def read_fees(school: School, pages: list[PageRead], spend: Spend, missed: Sequence[Decimal]) -> FeeRead:
