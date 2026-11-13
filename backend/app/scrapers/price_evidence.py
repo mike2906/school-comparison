@@ -532,6 +532,10 @@ def heading_period(text: str, span: tuple[int, int], skip: frozenset[str] = froz
         markdown_heading = line.lstrip().startswith("#")
         if _is_price_line(line) and not markdown_heading and shape(line) != shape(amount_line):
             return None
+        if markdown_heading and _is_price_line(line) and period_families(line):
+            # A heading with a price is that fee's own line: 632's "## Месечна такса за обучение:
+            # 7 00 евро" says nothing of the pay-in-full €7 000 under it.
+            return None
         if not line.strip() or _TABLE_RULE_RE.match(line) or (_is_price_line(line) and not markdown_heading):
             continue
         if index and _is_price_line(lines[index - 1]) and re.match(r"\s*[-–—/]", line):

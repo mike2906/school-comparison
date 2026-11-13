@@ -907,3 +907,16 @@ def test_214_a_footnote_speaks_only_for_what_carries_its_asterisk():
     assert rules(row(Decimal("8800"), period="YEARLY"), SVETLINA, "school") == set()
     marked = "Месечна такса: 933€*\n*при плащане на равни месечни вноски се дължи депозит"
     assert "4_deposit_not_tuition" in rules(row(Decimal("933"), period="MONTHLY"), marked, "school")
+
+
+ACATAMUS = """## ТАКСИ ЗА ОБУЧЕНИЕ
+######  ТАКСИ ЗА УЧЕБНАТА 2026 / 2027
+##  Месечна такса за обучение: 7 00 евро
+  * Получавате 10% отстъпка при плащане на пълната сума ( €7 000) наведнъж.
+  * Допълнително всеки ученик заплаща 150 евро на месец за уъркшопи.
+"""
+
+
+def test_632_a_heading_with_its_own_price_heads_nothing_under_it():
+    # The pay-in-full €7,000 is the year's; "Месечна такса" is the €700 heading's own word.
+    assert rules(row(Decimal("7000"), plan_name="Плащане на пълната сума наведнъж"), ACATAMUS, "school") == set()
