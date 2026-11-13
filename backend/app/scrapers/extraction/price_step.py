@@ -7,7 +7,9 @@ Each function is one phase of that orchestrator. This module must not import
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+import dataclasses
+import re
+from collections.abc import Iterable, Mapping
 from typing import Any
 
 from sqlalchemy import delete, select
@@ -23,13 +25,16 @@ from app.schemas.extraction import ExtractedPrice, PageFees, PriceExtractionOutp
 from app.scrapers.extraction import fee_lines, llm_results, price_lines, price_rows, text_values
 from app.scrapers.page_content import is_template_filler
 from app.scrapers.price_evidence import (
+    RULE_PERIOD_MISSING,
     PriceRow,
+    check_price_row,
     label_is_another_institutions,
     page_is_another_institutions,
     replacement_regressions,
 )
 from app.scrapers.shared_site_check import level_family
 from app.utils.display_gating import blocked_pricing_row_ids, pricing_row_is_publishable
+from app.utils.website_data import VALIDATION_HISTORY_KEY
 
 
 def _supported_price_rows(
@@ -116,12 +121,58 @@ def _pricing_replacement_regressions(
     if not published:
         return []
     texts = {page.id: page.raw_markdown for page in pages}
+    family = level_family(school.education_level)
+    filled = auto_filled_period_row_ids(school.attributes)
     return replacement_regressions(
-        [(PriceRow.from_pricing(row), texts.get(row.source_page_id)) for row in published],
+        [
+            (_as_evidence(row, texts.get(row.source_page_id), family, row.id in filled), texts.get(row.source_page_id))
+            for row in published
+        ],
         [(PriceRow.from_pricing(row), texts.get(row.source_page_id)) for row in proposed],
-        level_family(school.education_level),
+        family,
         listed_under_a_fee,
     )
+
+
+_PERIOD_FIX_PATH_RE = re.compile(r"^pricing\[(\d+)\]\.period$")
+
+
+def auto_filled_period_row_ids(attributes: Any) -> set[int]:
+    """Pricing rows whose period Stage 6 filled in from the page, by its current and old reports."""
+    attrs = attributes if isinstance(attributes, Mapping) else {}
+    reports = [attrs.get("data_validation"), *(attrs.get(VALIDATION_HISTORY_KEY) or [])]
+    ids: set[int] = set()
+    for report in reports:
+        if not isinstance(report, Mapping):
+            continue
+        for fix in report.get("auto_fixes") or []:
+            if isinstance(fix, Mapping) and fix.get("code") == "pricing_period_from_text":
+                match = _PERIOD_FIX_PATH_RE.match(str(fix.get("field_path") or ""))
+                if match:
+                    ids.add(int(match.group(1)))
+    return ids
+
+
+def _as_evidence(row: Pricing, page_text: str | None, family: str, auto_filled: bool) -> PriceRow:
+    """The published row as rule 6 weighs it.
+
+    A period Stage 6 filled in is the checks' reading of the page, not the reader's or a
+    person's. When today's checks no longer give it (632's €7,000 took "monthly" from the
+    priced heading above it before #555), it is no evidence to keep, so the row is weighed
+    without it.
+    """
+    price_row = PriceRow.from_pricing(row)
+    if not auto_filled or not price_row.period or not page_text:
+        return price_row  # no page text shows the checks no longer give it
+    # Checked at the stored amount Stage 6 filled it at: an old lev row compared in euro
+    # (fees_agent's _InEuro) would not find its own amount on its page.
+    stored = dataclasses.replace(PriceRow.from_pricing(getattr(row, "_row", row)), period=None)
+    still_given = any(
+        finding.rule == RULE_PERIOD_MISSING and (finding.period or "").lower() == price_row.period.lower()
+        for finding in check_price_row(stored, page_text, family)
+    )
+    unfilled = dataclasses.replace(price_row, period=None)
+    return price_row if still_given else unfilled
 
 
 # What the model is asked to do with a school's fee pages. The model copies the priced
