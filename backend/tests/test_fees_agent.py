@@ -2513,3 +2513,14 @@ def test_unnamed_activity_fees_with_the_same_label_stay_unnamed():
     ]
     fees_agent._name_unnamed_alike(rows)
     assert [row.plan_name for row in rows] == [None, None]
+
+
+def test_the_reader_is_told_the_family_not_the_highest_stage():
+    # 505's "upper_secondary" made the reader skip its maternelle, élémentaire and collège.
+    lycee = School(name_i18n={"bg": "Виктор Юго"}, school_type="international", education_level="upper_secondary")
+    assert fees_agent.institution(lycee) == "Виктор Юго (international school)"
+    garden = School(name_i18n={"bg": "Дружба"}, school_type="private", education_level="kindergarten")
+    assert fees_agent.institution(garden) == "Дружба (private kindergarten)"
+    assert fees_agent.reader_message(lycee, [PageRead(URL, PAGE_STAGE, True)], ()).startswith(
+        "Institution: Виктор Юго (international school)\n"
+    )
