@@ -162,6 +162,10 @@ page still shows them) are not counted, nor are new fees that give way to a kept
 read was held against all 62 rows, its instalments included, and with it its new €8,800
 (2026-11-09). A school where the agent reads nothing also
 keeps its rows. A failed or partial crawl must not wipe good prices or make them flicker.
+An undated lev row the old pipeline wrote gives way, rule 6 or not, once the read gives the
+same kind of fee in euro for this school year or later: Bulgaria has priced in euro since
+1 January 2026, so the lev fee is from before then even when its page still shows it (632's
+old FAQ, "Таксата за година е 10000 лв.", 2026-11-13).
 A published row's period counts for the old-row rule only when the reader or a person gave
 it, or today's checks still read it from the page: a period an older validation auto-fix
 (`pricing_period_from_text`) filled in by a rule fixed since is no evidence (632's

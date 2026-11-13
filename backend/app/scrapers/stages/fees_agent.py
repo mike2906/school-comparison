@@ -922,6 +922,13 @@ async def _superseded_rows(db: AsyncSession, school: School, rows: list[Pricing]
     of their own, and the re-read gives them as payment options of undated fees, so the
     dated rows stayed and led the headline."""
     replaced = await price_step._find_superseded_rows(db, school, rows)
+    euro = _euro_categories(rows)
+    if euro:
+        ids = {row.id for row in replaced}
+        stored = await db.execute(
+            select(Pricing).where(Pricing.school_id == school.id, Pricing.source == PriceSource.SCRAPED_WEBSITE)
+        )
+        replaced.extend(row for row in stored.scalars().all() if row.id not in ids and _pre_euro_leftover(row, euro))
     undated = [row for row in rows if not str(row.academic_year or "").strip()]
     undated_fees = {
         (row.category, float(row.amount), (row.currency or "").upper()) for row in undated if row.amount is not None
@@ -953,6 +960,36 @@ async def _superseded_rows(db: AsyncSession, school: School, rows: list[Pricing]
         )
     )
     return replaced
+
+
+def _euro_categories(rows: list[Pricing]) -> set[PriceCategory]:
+    """Kinds of fee the read gives in euro for this school year or later."""
+    current = current_academic_year()
+    return {
+        row.category
+        for row in rows
+        if (row.currency or "").upper() == "EUR"
+        and (year := normalize_academic_year(row.academic_year)) is not None
+        and year >= current
+        and pricing_row_is_publishable(row)
+    }
+
+
+def _pre_euro_leftover(row: Pricing, euro: set[PriceCategory]) -> bool:
+    """An undated lev row the old pipeline wrote, of a kind of fee the read now gives in euro.
+
+    Bulgaria has priced in euro since 1 January 2026, so a lev-only fee with no year is from
+    before then. The read does not replace it by year, and rule 6 would keep it while its page
+    still shows it: 632's old FAQ ("Таксата за година е 10000 лв.", stored as monthly) stayed
+    beside the €700 a month its fee page gives now and hid it as implausible.
+    """
+    context = row.pricing_context if isinstance(row.pricing_context, dict) else {}
+    return (
+        row.category in euro
+        and (row.currency or "").upper() == "BGN"
+        and not str(row.academic_year or "").strip()
+        and "extractor" not in context
+    )
 
 
 def _refiled(olds: list[Any], proposed: list[Pricing]) -> bool:
@@ -1489,10 +1526,11 @@ async def _run_school(
 
     # Old rows the read would lose (a fee it missed, a period it dropped) stay, instead of
     # holding the whole school; new rows at those amounts give way to them.
+    euro = _euro_categories(publishable)
     kept, kept_amounts, regressions = _rows_to_keep(
         school,
         [*stored_pages, *source_pages.values()],
-        [row for row in superseded if row not in planned],
+        [row for row in superseded if row not in planned and not _pre_euro_leftover(row, euro)],
         publishable,
         [(category, amount) for category, _, amount in listed],
     )

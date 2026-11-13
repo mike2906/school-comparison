@@ -548,6 +548,57 @@ async def test_apply_replaces_only_the_years_it_read(db_session, pages, frozen_t
     assert rows[0].pricing_context == {"confidence": 0.9} and rows[2].pricing_context["extractor"] == "agent"
 
 
+FAQ = "https://school.example/faqs"
+
+
+async def test_undated_lev_rows_the_old_pipeline_wrote_give_way_to_a_euro_read(db_session, pages, frozen_today):
+    # 632: the old FAQ's "Таксата за година е 10000 лв." stayed as monthly tuition beside the
+    # €700 a month the fee page gives now, and hid it as implausible.
+    school = await _school(db_session)
+    faq = SourcePage(
+        school_id=school.id,
+        scrape_type=ScrapeType.WEBSITE,
+        source_url=FAQ,
+        content_hash="faq",
+        is_valid=True,
+        raw_markdown="Таксата за година е 10000 лв., като може да бъде платена на месечни вноски по 1000 лв.\nТранспорт: 300 лв.",
+    )
+    db_session.add(faq)
+    await db_session.flush()
+
+    def old(category, amount, currency="BGN", **context):
+        return Pricing(
+            school_id=school.id,
+            category=category,
+            amount=amount,
+            currency=currency,
+            period=PricePeriod.MONTHLY,
+            source=PriceSource.SCRAPED_WEBSITE,
+            source_url=FAQ,
+            source_page_id=faq.id,
+            plan_name="Таксата за година",
+            pricing_context={"confidence": 0.9, **context},
+        )
+
+    db_session.add_all(
+        [
+            old(PriceCategory.TUITION, 10000),  # goes
+            old(PriceCategory.TRANSPORT, 300),  # a kind of fee the read does not give: stays
+            old(PriceCategory.TUITION, 1000, extractor="agent"),  # the fees agent's own: rule 6 decides
+        ]
+    )
+    await db_session.commit()
+    report = await fees_agent.run_school(db_session, school, find=_find(pages), read=_read(FEES_STAGE), apply=True)
+    assert report["outcome"] == "written", report
+    rows = await _rows(db_session, school)
+    assert sorted((r.category.value, float(r.amount), r.currency) for r in rows) == [
+        ("registration", 200.0, "EUR"),
+        ("transport", 300.0, "BGN"),
+        ("tuition", 700.0, "EUR"),
+        ("tuition", 1000.0, "BGN"),
+    ]
+
+
 async def test_page_another_stage_ruled_invalid_keeps_the_old_rows(db_session, pages, frozen_today):
     school = await _school(db_session)
     await _old_rows(db_session, school, "2025/2026", [650])
