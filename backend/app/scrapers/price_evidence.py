@@ -286,6 +286,9 @@ def _price_currency(price: str) -> Optional[str]:
     return _CURRENCY_CODES.get(found.group(1).casefold()) if found else None
 
 
+_FOOTNOTE_RE = re.compile(r"^\s*\\?\*(?![*\s])")  # "*при ...", not "* item" or "**bold**"
+
+
 def amount_context(text: str, span: tuple[int, int]) -> str:
     """The words that belong to one amount occurrence.
 
@@ -309,6 +312,7 @@ def amount_context(text: str, span: tuple[int, int]) -> str:
             break
         parts.insert(0, previous)
     after_lines = text[end + 1:].split("\n") if end < len(text) else []
+    marked = "*" in parts[-1]
     for index, following in enumerate(after_lines[:ATTACHED_LINES]):
         # The next fee's label: "label:", or "label" with its colon starting the next
         # line ("Депозит\n: 450 EUR", school 183).
@@ -317,6 +321,9 @@ def amount_context(text: str, span: tuple[int, int]) -> str:
             _is_price_line(following)
             or following.rstrip(" *_").endswith(":")  # "**Дневна такса:**" heads the next list (535)
             or next_line.lstrip().startswith(":")
+            # A footnote speaks for what carries its asterisk: under Svetlina's table, "*при
+            # плащане на равни месечни вноски се дължи депозит" is the monthly column's (214).
+            or (_FOOTNOTE_RE.match(following) and not marked)
         ):
             break
         parts.append(following)
@@ -524,6 +531,10 @@ def heading_period(text: str, span: tuple[int, int], skip: frozenset[str] = froz
         line = lines[index]
         markdown_heading = line.lstrip().startswith("#")
         if _is_price_line(line) and not markdown_heading and shape(line) != shape(amount_line):
+            return None
+        if markdown_heading and _is_price_line(line) and period_families(line):
+            # A heading with a price is that fee's own line: 632's "## Месечна такса за обучение:
+            # 7 00 евро" says nothing of the pay-in-full €7 000 under it.
             return None
         if not line.strip() or _TABLE_RULE_RE.match(line) or (_is_price_line(line) and not markdown_heading):
             continue
