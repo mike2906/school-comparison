@@ -162,6 +162,10 @@ page still shows them) are not counted, nor are new fees that give way to a kept
 read was held against all 62 rows, its instalments included, and with it its new €8,800
 (2026-11-09). A school where the agent reads nothing also
 keeps its rows. A failed or partial crawl must not wipe good prices or make them flicker.
+A published row's period counts for the old-row rule only when the reader or a person gave
+it, or today's checks still read it from the page: a period an older validation auto-fix
+(`pricing_period_from_text`) filled in by a rule fixed since is no evidence (632's
+€7,000 kept "monthly" from the priced heading above it, 2026-11-13).
 
 **Freshness.** Fees change about once a year, for the new school year. Run monthly, and
 weekly from June to September. One run over Sofia's 175 private and international schools
