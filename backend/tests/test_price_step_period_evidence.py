@@ -68,3 +68,19 @@ def test_632_rereading_the_7000_without_a_period_is_no_regression_once_dropped()
     assert replacement_regressions(kept, [(new, ACATAMUS)], "school")  # the old guard holds it
     weighed = [(_as_evidence(old, ACATAMUS, "school", auto_filled=True), ACATAMUS)]
     assert replacement_regressions(weighed, [(new, ACATAMUS)], "school") == []
+
+
+def test_a_filled_period_stays_when_the_page_text_is_missing():
+    row = stored(6657, "7000", "monthly")
+    assert _as_evidence(row, None, "school", auto_filled=True).period == "MONTHLY"
+
+
+def test_an_old_lev_row_weighed_in_euro_is_checked_at_its_lev_amount():
+    from app.scrapers.stages.fees_agent import _InEuro
+
+    row = stored(1, "899.68", "yearly")
+    row.currency = "BGN"
+    page = "Годишна такса за обучение: 899.68 лв.\n"
+    weighed = _as_evidence(_InEuro(row, (Decimal("460"), None, None)), page, "school", auto_filled=True)
+    assert weighed.period == "YEARLY"
+    assert weighed.amount == Decimal("460")

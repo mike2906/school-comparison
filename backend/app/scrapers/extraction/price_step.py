@@ -162,13 +162,16 @@ def _as_evidence(row: Pricing, page_text: str | None, family: str, auto_filled: 
     without it.
     """
     price_row = PriceRow.from_pricing(row)
-    if not auto_filled or not price_row.period:
-        return price_row
-    unfilled = dataclasses.replace(price_row, period=None)
+    if not auto_filled or not price_row.period or not page_text:
+        return price_row  # no page text shows the checks no longer give it
+    # Checked at the stored amount Stage 6 filled it at: an old lev row compared in euro
+    # (fees_agent's _InEuro) would not find its own amount on its page.
+    stored = dataclasses.replace(PriceRow.from_pricing(getattr(row, "_row", row)), period=None)
     still_given = any(
         finding.rule == RULE_PERIOD_MISSING and (finding.period or "").lower() == price_row.period.lower()
-        for finding in check_price_row(unfilled, page_text, family)
+        for finding in check_price_row(stored, page_text, family)
     )
+    unfilled = dataclasses.replace(price_row, period=None)
     return price_row if still_given else unfilled
 
 
