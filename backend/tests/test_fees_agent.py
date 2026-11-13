@@ -561,12 +561,12 @@ async def test_undated_lev_rows_the_old_pipeline_wrote_give_way_to_a_euro_read(d
         source_url=FAQ,
         content_hash="faq",
         is_valid=True,
-        raw_markdown="Таксата за година е 10000 лв., като може да бъде платена на месечни вноски по 1000 лв.\nТранспорт: 300 лв.",
+        raw_markdown="Таксата за година е 10000 лв., като може да бъде платена на месечни вноски по 1000 лв.\nДетска градина: 900 лв. месечно\nТранспорт: 300 лв.",
     )
     db_session.add(faq)
     await db_session.flush()
 
-    def old(category, amount, currency="BGN", **context):
+    def old(category, amount, currency="BGN", plan_name="Таксата за година", **context):
         return Pricing(
             school_id=school.id,
             category=category,
@@ -576,7 +576,7 @@ async def test_undated_lev_rows_the_old_pipeline_wrote_give_way_to_a_euro_read(d
             source=PriceSource.SCRAPED_WEBSITE,
             source_url=FAQ,
             source_page_id=faq.id,
-            plan_name="Таксата за година",
+            plan_name=plan_name,
             pricing_context={"confidence": 0.9, **context},
         )
 
@@ -585,6 +585,8 @@ async def test_undated_lev_rows_the_old_pipeline_wrote_give_way_to_a_euro_read(d
             old(PriceCategory.TUITION, 10000),  # goes
             old(PriceCategory.TRANSPORT, 300),  # a kind of fee the read does not give: stays
             old(PriceCategory.TUITION, 1000, extractor="agent"),  # the fees agent's own: rule 6 decides
+            # Another group's lev fee that sits beside the read's €700 without hiding it: stays.
+            old(PriceCategory.TUITION, 900, plan_name="Детска градина"),
         ]
     )
     await db_session.commit()
@@ -595,6 +597,7 @@ async def test_undated_lev_rows_the_old_pipeline_wrote_give_way_to_a_euro_read(d
         ("registration", 200.0, "EUR"),
         ("transport", 300.0, "BGN"),
         ("tuition", 700.0, "EUR"),
+        ("tuition", 900.0, "BGN"),
         ("tuition", 1000.0, "BGN"),
     ]
 
