@@ -498,7 +498,8 @@ def implausible_tuition_row_ids(rows: Iterable[Any]) -> set[int]:
     ``rows`` are the school's rows that already pass :func:`pricing_row_is_publishable`.
     A row is withheld when its yearly equivalent is below
     :data:`TUITION_YEARLY_FLOOR_EUR`, or below :data:`TUITION_PEER_RATIO_FLOOR` times the
-    median yearly tuition across those rows; likewise above
+    median yearly tuition across those rows (leaving out rows over the yearly ceiling);
+    likewise above
     :data:`TUITION_YEARLY_CEILING_EUR`, or :data:`TUITION_PEER_RATIO_CEILING` times the
     median of the rows inside those two yearly bounds. A row with no period is held to
     the floors as a yearly fee, but neither sets the median nor meets the peer ceiling:
@@ -513,7 +514,11 @@ def implausible_tuition_row_ids(rows: Iterable[Any]) -> set[int]:
             value, stated = found
             (yearly if stated else unstated)[row_id] = value
     ordered = sorted(yearly.values())
-    peer_floor = _median(ordered) * TUITION_PEER_RATIO_FLOOR if ordered else None
+    # A row over the yearly ceiling is withheld on its own and sets no floor: 632's old
+    # "€10,000 a month" (€120,000 a year) put the median of its rows at €64,200 and hid
+    # its real €700 a month and €7,000 a year.
+    affordable = [value for value in ordered if value <= TUITION_YEARLY_CEILING_EUR]
+    peer_floor = _median(affordable) * TUITION_PEER_RATIO_FLOOR if affordable else None
     # The ceiling compares against the rows inside the yearly bounds only: three misfiled
     # add-ons below the floor must not make the school's one real fee look too dear.
     bounded = [
