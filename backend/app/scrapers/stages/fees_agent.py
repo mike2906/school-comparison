@@ -81,7 +81,12 @@ from app.services.provider_costs import (
     provider_cost_scope,
 )
 from app.utils.academic_year import current_academic_year, normalize_academic_year
-from app.utils.display_gating import _BGN_PER_EUR, blocked_pricing_row_ids, pricing_row_is_publishable
+from app.utils.display_gating import (
+    _BGN_PER_EUR,
+    blocked_pricing_row_ids,
+    implausible_tuition_row_ids,
+    pricing_row_is_publishable,
+)
 from app.utils.website_data import prepare_validation_rollover
 
 logger = logging.getLogger(__name__)
@@ -922,6 +927,15 @@ async def _superseded_rows(db: AsyncSession, school: School, rows: list[Pricing]
     of their own, and the re-read gives them as payment options of undated fees, so the
     dated rows stayed and led the headline."""
     replaced = await price_step._find_superseded_rows(db, school, rows)
+    if _euro_categories(rows):
+        ids = {row.id for row in replaced}
+        stored = await db.execute(
+            select(Pricing)
+            .where(Pricing.school_id == school.id, Pricing.source == PriceSource.SCRAPED_WEBSITE)
+            .options(selectinload(Pricing.source_page).load_only(SourcePage.id, SourcePage.is_valid))
+        )
+        olds = [row for row in stored.scalars().all() if row.id not in ids]
+        replaced.extend(_pre_euro_leftovers(olds, rows))
     undated = [row for row in rows if not str(row.academic_year or "").strip()]
     undated_fees = {
         (row.category, float(row.amount), (row.currency or "").upper()) for row in undated if row.amount is not None
@@ -953,6 +967,59 @@ async def _superseded_rows(db: AsyncSession, school: School, rows: list[Pricing]
         )
     )
     return replaced
+
+
+def _euro_categories(rows: list[Pricing]) -> set[PriceCategory]:
+    """Kinds of fee the read gives in euro for this school year or later."""
+    current = current_academic_year()
+    return {
+        row.category
+        for row in rows
+        if (row.currency or "").upper() == "EUR"
+        and (year := normalize_academic_year(row.academic_year)) is not None
+        and year >= current
+    }
+
+
+class _Numbered:
+    """A new row with a stand-in id, so the tuition gate can name it before it is written."""
+
+    def __init__(self, row: Pricing, number: int):
+        self._row = row
+        self.id = number
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._row, name)
+
+
+def _pre_euro_leftovers(stored: Iterable[Pricing], rows: list[Pricing]) -> list[Pricing]:
+    """Undated lev rows the old pipeline wrote that would hide the read's euro fees.
+
+    Bulgaria has priced in euro since 1 January 2026, so a lev-only fee with no year is from
+    before then. The read does not replace it by year, and rule 6 keeps it while its page
+    still shows it. Such a row goes only when it is of a kind of fee the read gives in euro
+    for this school year or later, and the tuition gate would withhold one of the read's fees
+    beside it but not without it: 632's old FAQ ("Таксата за година е 10000 лв.", stored as
+    monthly) hid the €700 a month its fee page gives now. A lev fee that sits beside the read
+    without conflict (another group's fee on another page) stays.
+    """
+    new = [row for row in rows if pricing_row_is_publishable(row)]
+    euro = _euro_categories(new)
+    olds = [
+        row
+        for row in stored
+        if row.category in euro
+        and (row.currency or "").upper() == "BGN"
+        and not str(row.academic_year or "").strip()
+        and "extractor" not in (row.pricing_context if isinstance(row.pricing_context, dict) else {})
+        and pricing_row_is_publishable(row)
+    ]
+    if not olds:
+        return []
+    numbered = [_Numbered(row, -number) for number, row in enumerate(new, start=1)]
+    ids = {row.id for row in numbered}
+    alone = implausible_tuition_row_ids(numbered) & ids
+    return [old for old in olds if (implausible_tuition_row_ids([*numbered, old]) & ids) - alone]
 
 
 def _refiled(olds: list[Any], proposed: list[Pricing]) -> bool:
@@ -1489,10 +1556,11 @@ async def _run_school(
 
     # Old rows the read would lose (a fee it missed, a period it dropped) stay, instead of
     # holding the whole school; new rows at those amounts give way to them.
+    leftovers = _pre_euro_leftovers(superseded, rows)
     kept, kept_amounts, regressions = _rows_to_keep(
         school,
         [*stored_pages, *source_pages.values()],
-        [row for row in superseded if row not in planned],
+        [row for row in superseded if row not in planned and row not in leftovers],
         publishable,
         [(category, amount) for category, _, amount in listed],
     )
