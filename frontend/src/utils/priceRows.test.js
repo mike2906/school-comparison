@@ -243,3 +243,20 @@ test('rowAgeGroupKeys: English kindergarten, Pre-K and upper-school names (506, 
 test('rowAgeGroupKeys: an English "preparatory group" is the preschool year (555)', () => {
   assert.ok(rowAgeGroupKeys({ age_group: 'PREPARATORY GROUP | YEAR 2' }).has('preschool'))
 })
+
+test('rowAgeGroupKeys: French school stages (505)', () => {
+  const keys = age_group => [...rowAgeGroupKeys({ age_group })].sort()
+  assert.deepEqual(keys('Très petite section — 1er enfant'), ['nursery'])
+  assert.deepEqual(keys('Petite, moyenne, grande section — 2ème enfant'), ['first', 'second', 'third'])
+  assert.deepEqual(keys('Élémentaire — 1er enfant'), ['grade_1_4', 'preschool'])
+  assert.deepEqual(keys('Collège — 1er enfant'), ['grade_5_7', 'grade_8_12'])
+  assert.deepEqual(keys('Lycée — 1er enfant'), ['grade_8_12'])
+})
+
+test('sibling and employer rates are not the regular price (505)', () => {
+  assert.equal(priceTerms({ age_group: 'Élémentaire — 4ème enfant', plan_name: 'Total droits scolaires' }), 'discount')
+  assert.equal(priceTerms({ age_group: 'Élémentaire — 1er enfant', plan_name: 'Total droits scolaires' }), null)
+  assert.equal(isClosedGroupFee({ plan_name: 'Entreprise ≥ 50', pricing_context: { plan_name_en: 'Company ≥ 50' } }), true)
+  assert.equal(isClosedGroupFee({ plan_name: 'Entreprise < 50' }), true)
+  assert.equal(isClosedGroupFee({ plan_name: 'Total droits scolaires (l\'année)' }), false)
+})
