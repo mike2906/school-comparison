@@ -291,6 +291,8 @@ export function isStatedTotal(row) {
   return [row?.plan_name, row?.pricing_context?.plan_name_en].some(text => text && STATED_TOTAL_RE.test(text))
 }
 
+const CHILD_NUMBER_RE = /\s*[—–-]\s*(?:\d+\s*(?:er|re|ère|e|è|ème|eme|st|nd|rd|th)|first|second|third|fourth)\s+(?:enfant|child)\s*$/iu
+
 // The headline's tuition rows: whole fees (not one instalment) that any new pupil pays, for the
 // chosen age group when there is one. A special-needs or returning-pupil rate stays listed.
 // Where the school prints a total of its fees for an age group, the total is what that group
@@ -314,15 +316,11 @@ export function tuitionRows(rows, ageGroup = null) {
   // paying in parts its "to". It counts only for a group with no regular price.
   // A regular price naming no group covers every group; a price on other terms naming none
   // gives way to any regular price.
-  const group = row => row.age_group?.trim() || ''
-  const regularRows = shown.filter(row => !priceTerms(row))
-  const regular = new Set(regularRows.map(group))
-  // A regular price for the same age group counts too when the names differ: 505's
-  // "Élémentaire — 1er enfant" is the regular price beside "Élémentaire — 4ème enfant".
-  const regularKeys = new Set(regularRows.flatMap(row => [...rowAgeGroupKeys(row)]))
-  const sharesKey = row => [...rowAgeGroupKeys(row)].some(key => regularKeys.has(key))
-  const hasRegular = row =>
-    regular.has('') || regular.has(group(row)) || (group(row) === '' && regular.size > 0) || sharesKey(row)
+  // The child a sibling rate is for is not part of the group: 505's "Élémentaire — 1er
+  // enfant" is the regular price beside "Élémentaire — 4ème enfant".
+  const group = row => (row.age_group || '').replace(CHILD_NUMBER_RE, '').trim()
+  const regular = new Set(shown.filter(row => !priceTerms(row)).map(group))
+  const hasRegular = row => regular.has('') || regular.has(group(row)) || (group(row) === '' && regular.size > 0)
   return shown.filter(row => !priceTerms(row) || !hasRegular(row))
 }
 
