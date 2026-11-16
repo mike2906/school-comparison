@@ -51,7 +51,7 @@ export function pricePeriod(row) {
 
 // A fee for pupils a new family's child is not: special educational needs (171's "Ученици със
 // СОП"), pupils already at the school (555's returning-children rate), staff's children.
-const CLOSED_GROUP_RE = /(?<![\p{L}])соп(?![\p{L}])|специални образователни потребности|special (?:educational )?needs|(?:returning|existing|current) (?:students|pupils|children)|настоящи ученици|деца на (?:служители|учители|персонала)|(?:staff|employees?)['’]?s? children|children of (?:staff|employees)/iu
+const CLOSED_GROUP_RE = /(?<![\p{L}])соп(?![\p{L}])|специални образователни потребности|special (?:educational )?needs|(?:returning|existing|current) (?:students|pupils|children)|настоящи ученици|деца на (?:служители|учители|персонала)|(?:staff|employees?)['’]?s? children|children of (?:staff|employees)|(?<![\p{L}])(?:entreprise|company)\s*[<>≤≥]/iu
 // The English abbreviation only in capitals: "Sen. school" is not one.
 const SEN_RE = /(?<![\p{L}])SEN(?![\p{L}])/u
 // Free-text notes count only when they open by naming the group: 594's "For returning students
@@ -76,7 +76,7 @@ export function isClosedGroupFee(row) {
 // its regular contract next to a dearer flexible one.
 const PRICE_TERMS = [
   ['promotion', /промоци|(?<![\p{L}])промо(?![\p{L}])|promo(?:tion|tional)?(?![\p{L}])|special offer|специална (?:оферта|цена)|коледн|christmas|early[- ]bird|ранно записване/iu],
-  ['discount', /отстъпк|discount|намаление|(?:втор|трет|четвърт)(?:о|ото) дете|(?:second|third|fourth|2nd|3rd|4th) child|sibling|[(\s][-−–+]\s?\d+(?:[.,]\d+)?\s?%/iu],
+  ['discount', /отстъпк|discount|намаление|(?:втор|трет|четвърт)(?:о|ото) дете|(?:second|third|fourth|2nd|3rd|4th) child|(?<![\p{L}\p{N}])[2-9](?:e|è|ème|eme) enfant|sibling|[(\s][-−–+]\s?\d+(?:[.,]\d+)?\s?%/iu],
   // Paid ahead for a stated stretch: "за 6 месеца", "за цяла година", "for 6 months". A
   // monthly fee "платима авансово" (paid at the start of the month) is the regular price.
   ['prepaid', /(?:предплащ|авансов|еднократно|наведнъж|prepa(?:id|y)|in advance|at once)[^/]*?(?:за|for) (?:\d+|цял|целия|една|един|a whole|the whole|a full|the full|one) ?(?:\p{L}+ )?(?:месец|месеца|година|срок|семест|months?|year|term|semester)|(?:за|for) (?:\d+|цял\p{L}*|a whole|the whole) (?:учебна )?(?:месеца|година|months|year)[^/]*?(?:at once|наведнъж|предварително|in advance)/iu],
@@ -85,12 +85,16 @@ const PRICE_TERMS = [
   ['one_payment', /еднократно плащане|one-time payment|paid in full|(?<![\p{L}])годишно плащане|annual payment/iu],
 ]
 
+const SIBLING_GROUP_RE = /(?<![\p{L}\p{N}])[2-9](?:e|è|ème|eme) enfant|(?:second|third|fourth|2nd|3rd|4th) child|(?:втор|трет|четвърт)(?:о|ото) дете/iu
+
 /**
  * The terms a fee's own name puts it on (`promotion`, `discount`, `prepaid`, `instalments`,
  * `one_payment`), or null for the school's regular price.
  */
 export function priceTerms(row) {
   const words = [row?.plan_name, row?.pricing_context?.plan_name_en].filter(Boolean).join(' / ')
+  // A sibling rate may sit in the group's name: 505's "Élémentaire — 4ème enfant".
+  if (SIBLING_GROUP_RE.test(`${row?.age_group || ''} / ${row?.pricing_context?.age_group_en || ''}`)) return 'discount'
   if (!words) return null
   const found = PRICE_TERMS.find(([, re]) => re.test(words))
   if (found) return found[0]
@@ -156,6 +160,20 @@ const UPPER_SCHOOL_RE = /(?<![\p{L}])(?:igcse|a-levels?|a levels|(?:first|second
 // 555's English "PREPARATORY GROUP | YEAR 2" too.
 const PRESCHOOL_NAME_RE = /подготвителн[аи] груп|предучилищн[аи] груп|предучилищен клас|подготвителен клас|(?<![\p{L}])п[гк]у?(?![\p{L}])|pre-?school|preparatory (?:group|class|year)/u
 
+// French school stages (505, the Lycée français): très petite section takes two year olds,
+// petite, moyenne and grande section the first to third groups, élémentaire (CP to CM2) the
+// preschool year and grades 1-4, collège (6e to 3e) grades 5-8 and lycée grades 9-12.
+const FRENCH_STAGES = [
+  [/très petite section|(?<![\p{L}])tps(?![\p{L}])/u, ['nursery']],
+  [/(?<!très )petite(?:,| et| section)/u, ['first']],
+  [/moyenne(?:,| et| section)/u, ['second']],
+  [/grande section/u, ['third']],
+  [/(?<![\p{L}])maternelle(?![\p{L}])/u, ['first', 'second', 'third']],
+  [/(?<![\p{L}])élémentaire(?![\p{L}])/u, ['preschool', 'grade_1_4']],
+  [/(?<![\p{L}])collège(?![\p{L}])/u, ['grade_5_7', 'grade_8_12']],
+  [/(?<![\p{L}])lycée(?![\p{L}])/u, ['grade_8_12']],
+]
+
 const AGE_GROUP_KEYS = new Set([
   'nursery', 'first', 'second', 'third', 'preschool', 'grade_1_4', 'grade_5_7', 'grade_8_12',
 ])
@@ -180,6 +198,7 @@ function groupKeys(text) {
   if (PRE_K_RE.test(english)) ['first', 'second'].forEach(key => keys.add(key))
   if (KINDERGARTEN_TO_GRADE_RE.test(english)) ['third', 'preschool'].forEach(key => keys.add(key))
   if (UPPER_SCHOOL_RE.test(english)) keys.add('grade_8_12')
+  for (const [re, stageKeys] of FRENCH_STAGES) if (re.test(normalized)) stageKeys.forEach(key => keys.add(key))
   for (const match of normalized.matchAll(GROUP_LIST_RE)) {
     // "2 групи" counts groups; only a worded ordinal names them in the plural.
     const plural = match[2] !== 'група' && match[2] !== 'group'

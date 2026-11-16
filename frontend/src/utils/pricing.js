@@ -315,8 +315,14 @@ export function tuitionRows(rows, ageGroup = null) {
   // A regular price naming no group covers every group; a price on other terms naming none
   // gives way to any regular price.
   const group = row => row.age_group?.trim() || ''
-  const regular = new Set(shown.filter(row => !priceTerms(row)).map(group))
-  const hasRegular = row => regular.has('') || regular.has(group(row)) || (group(row) === '' && regular.size > 0)
+  const regularRows = shown.filter(row => !priceTerms(row))
+  const regular = new Set(regularRows.map(group))
+  // A regular price for the same age group counts too when the names differ: 505's
+  // "Élémentaire — 1er enfant" is the regular price beside "Élémentaire — 4ème enfant".
+  const regularKeys = new Set(regularRows.flatMap(row => [...rowAgeGroupKeys(row)]))
+  const sharesKey = row => [...rowAgeGroupKeys(row)].some(key => regularKeys.has(key))
+  const hasRegular = row =>
+    regular.has('') || regular.has(group(row)) || (group(row) === '' && regular.size > 0) || sharesKey(row)
   return shown.filter(row => !priceTerms(row) || !hasRegular(row))
 }
 

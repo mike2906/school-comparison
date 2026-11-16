@@ -868,3 +868,37 @@ test('requiredExtras: a payment deadline is no requirement, a printed total hold
   const total = [...rows, current({ id: 4, amount: 6200, plan_name: 'Общо' })]
   assert.deepEqual(statedTuition(total).required, [])
 })
+
+test('statedTuition reads French stages and leaves sibling and employer rates out (505)', () => {
+  // Victor Hugo: one price per stage, child number and payer; grade 1 headlined 4,898–8,836.
+  const fees = [
+    ['Très petite section', 7965.52],
+    ['Petite, moyenne, grande section', 6822.12],
+    ['Élémentaire', 6530.67],
+    ['Collège', 7351.15],
+    ['Lycée', 8032.81],
+  ]
+  let id = 0
+  const rows = fees.flatMap(([stage, first]) =>
+    [['1er', 1], ['2ème', 0.91], ['4ème', 0.75]].flatMap(([child, share]) =>
+      [['Total droits scolaires (l\'année)', 1], ['Entreprise < 50', 1.05], ['Entreprise ≥ 50', 1.1]].map(([plan, rate]) =>
+        current({
+          id: ++id,
+          amount: Math.round(first * share * rate * 100) / 100,
+          age_group: `${stage} — ${child} enfant`,
+          plan_name: plan,
+          pricing_context: { plan_name_en: plan.replace('Entreprise', 'Company') },
+        }),
+      ),
+    ),
+  )
+  const headline = ageGroup => {
+    const tuition = statedTuition(rows, { ageGroup, today: new Date('2026-11-16') })
+    return [tuition.min, tuition.max]
+  }
+  assert.deepEqual(headline('grade_1_4'), [6530.67, 6530.67])
+  assert.deepEqual(headline('grade_5_7'), [7351.15, 7351.15])
+  assert.deepEqual(headline('grade_8_12'), [7351.15, 8032.81])
+  assert.deepEqual(headline('second'), [6822.12, 6822.12])
+  assert.deepEqual(headline('nursery'), [7965.52, 7965.52])
+})
