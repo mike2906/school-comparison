@@ -2,7 +2,7 @@
  "meta": {
   "source": "kg.sofia.bg",
   "source_url": "https://kg.sofia.bg/spots",
-  "retrieved_at": "2026-11-18T13:18:54+00:00",
+  "retrieved_at": "2026-11-18T21:36:07+00:00",
   "as_of": "2026-11-18",
   "school_years": [
    "2026/2027",
@@ -5877,8 +5877,8 @@
      "queues": {
       "general": {
        "capacity": 52,
-       "enrolled": 49,
-       "free": 3,
+       "enrolled": 48,
+       "free": 4,
        "ranked_not_enrolled": 0
       },
       "chronic": {
@@ -7665,8 +7665,8 @@
      "queues": {
       "general": {
        "capacity": 27,
-       "enrolled": 24,
-       "free": 3,
+       "enrolled": 23,
+       "free": 4,
        "ranked_not_enrolled": 0
       },
       "sop": {
@@ -14370,9 +14370,9 @@
      "queues": {
       "general": {
        "capacity": 57,
-       "enrolled": 55,
+       "enrolled": 56,
        "free": 1,
-       "ranked_not_enrolled": 1
+       "ranked_not_enrolled": 0
       }
      }
     },
@@ -17134,8 +17134,8 @@
      "queues": {
       "general": {
        "capacity": 25,
-       "enrolled": 25,
-       "free": 0,
+       "enrolled": 24,
+       "free": 1,
        "ranked_not_enrolled": 0
       },
       "chronic": {
