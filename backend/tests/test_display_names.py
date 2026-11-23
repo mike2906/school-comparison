@@ -291,3 +291,20 @@ def test_nursery_abbreviation_is_spelled_out_in_bulgarian():
 )
 def test_foreign_patrons_keep_their_own_spelling(stored_bg, expected_en):
     assert resolve_name_i18n({"bg": stored_bg})["en"] == expected_en
+
+
+def test_a_display_name_that_is_a_contact_field_falls_back_to_the_register_name():
+    # 551: the page's address line, "Address: Частна детска градина Меридиан 22 … София",
+    # was taken for the school's name, and called the grades 1-7 school a kindergarten.
+    attributes = {
+        "display_name_i18n": {
+            "bg": "Address: Частна детска градина Меридиан 22 с изучаване на английски език София",
+            "en": "Address: Private Kindergarten Meridian 22 with English Sofia",
+        },
+        "display_name_evidence": {"signals": ["repeated_on_page_identity", "exact_official_page_identity"]},
+    }
+    resolved = resolve_name_i18n(
+        {"bg": '"ЧАСТНО ОСНОВНО УЧИЛИЩЕ С ИЗУЧАВАНЕ НА АНГЛИЙСКИ ЕЗИК МЕРИДИАН 22" ЕООД'}, attributes
+    )
+    assert resolved["bg"] == "Частно основно училище с изучаване на английски език Меридиан 22"
+    assert not resolved["en"].startswith("Address")

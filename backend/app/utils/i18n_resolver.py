@@ -310,6 +310,14 @@ def _filter_display_name_i18n(display_name: Mapping[str, Any] | None) -> dict[st
     }
 
 
+# A contact block's field label scraped in with the value: 551's "Address: Частна детска
+# градина Меридиан 22 … София" is the address line of a page, not the school's name.
+_FIELD_LABEL_RE = re.compile(
+    r"^(?:address|адрес|phone|tel|телефон|e-?mail|имейл|location|локация|contacts?|контакти?)\s*:",
+    re.IGNORECASE,
+)
+
+
 def _is_identity_display_name(value: str | None) -> bool:
     """Reject corroborated page labels that are still prose rather than identities."""
     normalized = re.sub(r"\s+", " ", value or "").strip()
@@ -324,6 +332,8 @@ def _is_identity_display_name(value: str | None) -> bool:
         marker in lowered
         for marker in ("©", "all rights reserved", "всички права запазени")
     ):
+        return False
+    if _FIELD_LABEL_RE.match(normalized):
         return False
     return not lowered.startswith(
         (
