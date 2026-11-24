@@ -18,9 +18,10 @@ you picked, and go to Mike only for the short list in "Still goes to Mike".
    calculator or filter, or a changed one) adds or updates its live flow in
    `frontend/e2e/live/` in the same PR: one file per feature area, the school picked from
    the live API, texts from the i18n files. The flows run after every deploy and daily
-   (`.github/workflows/live-flows.yml`), so after merging, check that the run following
-   your deploy is green. After a deploy, a flow that was already failing in the previous
-   run only warns; the daily run goes red on every failure, so read the run's warnings too.
+   (`.github/workflows/live-flows.yml`). Runs stay green and email nobody, so after
+   merging, read the run following your deploy for a "Live flows failed" warning and fix
+   what your change broke. A flow failing two daily runs in a row opens a `live-check`
+   issue, which the daily live-check session fixes.
    **A check that only passes once data is re-read or published lands after that data
    step**, not with the code fix: merge the fix, run the data step, then merge the check in
    a follow-up PR. Before the publish, run the new check against the live site to show it

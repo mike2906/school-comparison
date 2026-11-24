@@ -5,7 +5,7 @@
  * Failures are annotated only on the last try (LIVE_LAST_TRY=1), so one a retry fixes
  * does not mark a green run.
  * On the last try it also lists each failed flow's name in LIVE_FAILED_LIST, if set, for
- * still-failing.js, and ends the list with END_OF_RUN once the run finishes, so a list cut
+ * issues.js, and ends the list with END_OF_RUN once the run finishes, so a list cut
  * short by a crash is not mistaken for the whole story. A suite that fails for its own
  * reason (a hook), not because a flow in it failed, is listed and annotated too.
  * Used beside the usual reporter: `--test-reporter=spec --test-reporter=./e2e/live/annotate.js`.
