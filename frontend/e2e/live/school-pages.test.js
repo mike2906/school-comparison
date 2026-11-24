@@ -25,7 +25,7 @@ import { rowAgeGroupKeys, splitRowsForAgeGroup } from '../../src/utils/priceRows
 import { getAvailableExamTypes, prepareNvoTimelineData } from '../../src/utils/nvo.js'
 import { feeRangeNotes, formatCurrency, groupPricingByAcademicYear, intakeYearStart, rangeEndLabels, statedTuition, tuitionSortValue } from '../../src/utils/pricing.js'
 import { upcomingOpenDays } from '../../src/utils/schoolFacts.js'
-import { API, NoSchoolError, PHONE, address, allSchools, findSchool, open, page, schoolName, t, liveBrowser } from './live.js'
+import { API, appT, NoSchoolError, PHONE, address, allSchools, findSchool, open, page, schoolName, t, liveBrowser } from './live.js'
 
 liveBrowser(PHONE)
 
@@ -371,7 +371,7 @@ describe('a school page', () => {
       return
     }
     await open('bg', `/schools/${listed.id}`)
-    const line = feeRangeNotes(statedTuition(listed.pricing), (key, vars) => t('bg', key, vars), 'bg', () => 'PRICE')
+    const line = feeRangeNotes(statedTuition(listed.pricing), appT('bg'), 'bg', () => 'PRICE')
       .find(text => text.startsWith(t('bg', 'pricing.alsoRequired', { fees: '' })))
     assert.ok(line, 'the required extras line')
     await page.getByText(t('bg', 'pricing.alsoRequired', { fees: '' }), { exact: false }).first().waitFor()

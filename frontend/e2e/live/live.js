@@ -32,6 +32,19 @@ export function t(lang, key, vars = {}) {
   return value.replace(/\{\{\s*(\w+)\s*\}\}/g, (_, name) => String(vars[name] ?? ''))
 }
 
+/**
+ * A translator for the app's own helpers, which ask for keys that may not exist (a row's
+ * age group as the website wrote it, "1. - 4. клас") and fall back when i18next hands the
+ * key back. `t` throws on such a key, which failed the required-extras flow from 14 Nov 2026.
+ */
+export const appT = lang => (key, vars) => {
+  try {
+    return t(lang, key, vars)
+  } catch {
+    return key
+  }
+}
+
 /** `/en` for English, nothing for Bulgarian (the URL decides the language). */
 export const prefix = lang => (lang === 'en' ? '/en' : '')
 
