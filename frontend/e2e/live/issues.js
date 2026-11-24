@@ -22,12 +22,15 @@
  * Env: GITHUB_TOKEN, GITHUB_REPOSITORY, GITHUB_RUN_ID, GITHUB_EVENT_NAME, LIVE_FLOWS_OUTCOME.
  */
 import fs from 'node:fs'
+import { pathToFileURL } from 'node:url'
 import { END_OF_RUN, flowName } from './annotate.js'
 
 const LIST_TITLE = 'Failed flows'
 export const LABEL = 'live-check'
 export const CRASHED = 'the live flows did not finish (a crash or a hook failed)'
 const TITLE_PREFIX = 'Live check failing: '
+// GitHub refuses titles over 256 characters; a flow name can be longer (a hook's message).
+const titleKey = name => flowName(name.slice(0, 200))
 
 const repo = process.env.GITHUB_REPOSITORY
 const runUrl = `https://github.com/${repo}/actions/runs/${process.env.GITHUB_RUN_ID}`
@@ -54,15 +57,16 @@ export function failedFlows(text, outcome) {
 
 /** The flows a finished run failed, from its "Failed flows" notice or its error titles. */
 async function failedIn(run) {
-  const names = new Set()
-  if (run.conclusion === 'success' || run.conclusion === 'failure') {
-    for (const job of (await api(`actions/runs/${run.id}/jobs`)).jobs) {
-      for (const note of await api(`check-runs/${job.id}/annotations?per_page=100`)) {
-        if (note.title === LIST_TITLE) JSON.parse(note.message).forEach(name => names.add(flowName(name)))
-        else if (note.annotation_level === 'failure' && note.title) names.add(flowName(note.title))
-      }
+  const listed = new Set()
+  const errors = new Set()
+  for (const job of (await api(`actions/runs/${run.id}/jobs`)).jobs) {
+    for (const note of await api(`check-runs/${job.id}/annotations?per_page=100`)) {
+      if (note.title === LIST_TITLE) JSON.parse(note.message).forEach(name => listed.add(flowName(name)))
+      else if (note.annotation_level === 'failure' && note.title) errors.add(flowName(note.title))
     }
   }
+  // The list is the whole story; error titles only for a run from before it existed.
+  const names = listed.size > 0 || errors.size === 0 ? listed : errors
   // A red run naming no flow (an install step, a crash before the list) was a crash.
   if (run.conclusion === 'failure' && names.size === 0) names.add(CRASHED)
   return names
@@ -71,7 +75,7 @@ async function failedIn(run) {
 /** The daily run before this one, or null. Manual runs (a branch, a preview) never count. */
 async function previousDaily() {
   const { workflow_runs: runs } = await api('actions/workflows/live-flows.yml/runs?status=completed&branch=main&event=schedule&per_page=10')
-  return runs.find(run => String(run.id) !== process.env.GITHUB_RUN_ID) || null
+  return runs.find(run => String(run.id) !== process.env.GITHUB_RUN_ID && ['success', 'failure'].includes(run.conclusion)) || null
 }
 
 const openIssues = async () => (await api(`issues?state=open&labels=${LABEL}&per_page=100`)).filter(issue => !issue.pull_request)
@@ -79,10 +83,12 @@ export const flowOf = issue => (issue.title.startsWith(TITLE_PREFIX) ? flowName(
 
 /** What to open and close, from this run's failures, the last daily run's and the open issues. */
 export function plan(failed, failedBefore, issues) {
-  const open = new Map(issues.map(issue => [flowOf(issue), issue]))
+  const open = new Set(issues.map(flowOf))
+  const failing = new Set(failed.map(titleKey))
   return {
-    toOpen: failed.filter(name => failedBefore.has(name) && !open.has(name)),
-    toClose: issues.filter(issue => flowOf(issue) && !failed.includes(flowOf(issue))),
+    toOpen: failed.filter(name => failedBefore.has(name) && !open.has(titleKey(name))),
+    // A crash ran only some flows (or none), so it proves no flow passed.
+    toClose: failed.includes(CRASHED) ? [] : issues.filter(issue => flowOf(issue) && !failing.has(flowOf(issue))),
   }
 }
 
@@ -106,7 +112,7 @@ async function main() {
   const failedBefore = previous ? await failedIn(previous) : new Set()
   const { toOpen, toClose } = plan(failed, failedBefore, await openIssues())
   for (const name of toOpen) {
-    const issue = await api('issues', { method: 'POST', body: { title: `${TITLE_PREFIX}${name}`, body: issueBody(name, previous), labels: [LABEL] } })
+    const issue = await api('issues', { method: 'POST', body: { title: `${TITLE_PREFIX}${titleKey(name)}`, body: issueBody(name, previous), labels: [LABEL] } })
     console.log(`Opened ${issue.html_url}`)
   }
   for (const issue of toClose) {
@@ -117,7 +123,7 @@ async function main() {
   return 0
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && import.meta.url === pathToFileURL(fs.realpathSync(process.argv[1])).href) {
   main().then(code => process.exit(code), error => {
     console.log(`::error title=Live flow issues::Could not read or write issues (${error.message}).`)
     process.exit(1)

@@ -107,10 +107,12 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
           LIVE_FLOWS_OUTCOME: ${{ steps.flows.outcome }}
-        # A live commit from before this script existed has none: any failure is red.
+        # No script: the checkout failed, or the live commit predates it. Then any failure is red.
         run: |
           if [ -f e2e/live/issues.js ]; then node e2e/live/issues.js "$LIVE_FAILED_LIST"
-          else [ "$LIVE_FLOWS_OUTCOME" = success ]; fi
+          elif [ "$LIVE_FLOWS_OUTCOME" != success ]; then
+            echo "::error title=Live flows::The flows did not pass ($LIVE_FLOWS_OUTCOME) and there is no e2e/live/issues.js to report them."; exit 1
+          fi
 
       - name: Upload screenshots
         if: always() && steps.flows.outcome != 'success'

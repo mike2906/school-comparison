@@ -35,3 +35,16 @@ test('a flow with an open issue opens no second one, and a passing flow closes i
   assert.deepEqual(toClose, [passed])
   assert.equal(flowOf(other), null)
 })
+
+test('a crash closes nothing: the flows it did not run proved nothing', () => {
+  const { toClose } = plan([CRASHED], new Set(), [issue(1, 'some flow')])
+  assert.deepEqual(toClose, [])
+})
+
+test('a long flow name gets a title GitHub accepts and still matches its issue', () => {
+  const long = 'x'.repeat(400)
+  const { toOpen } = plan([long], new Set([long]), [])
+  assert.deepEqual(toOpen, [long])
+  const open = issue(1, long.slice(0, 200))
+  assert.deepEqual(plan([long], new Set([long]), [open]), { toOpen: [], toClose: [] })
+})
