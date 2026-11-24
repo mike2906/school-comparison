@@ -136,6 +136,12 @@ export function liveBrowser(viewport = PHONE) {
     })
   })
   afterEach(async testContext => {
+    // A phone page wider than the screen scrolls sideways under a parent's thumb (the
+    // compare page did, from screen-reader text escaping its scroller, Nov 2026).
+    if (viewport.width <= PHONE.width && page.url().startsWith(SITE)) {
+      const width = await page.evaluate(() => document.documentElement.scrollWidth).catch(() => null)
+      if (width > viewport.width + 1) requestErrors.push(`page scrolls sideways: ${width}px wide on a ${viewport.width}px screen (${page.url()})`)
+    }
     const failed = testContext.passed === false || requestErrors.length > 0
     if (failed) {
       const file = `${testContext.name.replace(/[^\w]+/g, '_').slice(0, 80)}.png`

@@ -404,13 +404,14 @@ describe('a school page', () => {
     assert.ok(!(await page.locator('body').innerText()).includes(shown(picked.all)), `${picked.s.id} shows its all-ages range`)
   })
 
-  test('two private schools with fees compare side by side', async () => {
+  test('three private schools with fees compare side by side', async () => {
+    // Three, the most a parent can compare: with three the phone page scrolled sideways (Nov 2026).
     const withFees = (await allSchools()).filter(s => isPrivate(s) && (s.pricing || []).some(row => row.amount != null || row.amount_min != null))
-    assert.ok(withFees.length >= 2, 'two private schools with fees')
-    const pair = withFees.slice(0, 2)
-    await open('bg', `/compare?ids=${pair.map(s => s.id).join(',')}`)
+    assert.ok(withFees.length >= 3, 'three private schools with fees')
+    const schools = withFees.slice(0, 3)
+    await open('bg', `/compare?ids=${schools.map(s => s.id).join(',')}`)
     await page.getByRole('heading', { level: 1, name: t('bg', 'compare.title') }).waitFor()
-    for (const school of pair) await page.getByText(schoolName(school, 'bg'), { exact: true }).first().waitFor()
+    for (const school of schools) await page.getByText(schoolName(school, 'bg'), { exact: true }).first().waitFor()
     assert.match(await page.locator('body').innerText(), /EUR|€/)
   })
 

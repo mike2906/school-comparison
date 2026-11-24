@@ -609,7 +609,7 @@ function ComparePage() {
           <div
             ref={mobileBodyRef}
             onScroll={handleMobileScroll}
-            className="overflow-x-auto overscroll-x-contain snap-x snap-mandatory bg-white"
+            className="relative overflow-x-auto overscroll-x-contain snap-x snap-mandatory bg-white"
           >
             <div style={mobileInnerStyle}>
               {visibleSections.map(section => (
