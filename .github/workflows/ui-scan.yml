@@ -3,8 +3,10 @@ name: UI scan
 # Opens every school page (plus search, about and compare) in Bulgarian and English at
 # phone width and reports raw translation keys, leaked NaN/undefined, overflowing text,
 # lev or implausible prices, wrong-language labels, console errors and failed requests.
-# Read-only. GitHub emails the repository owner when a scheduled run finds something;
-# the report and screenshots are attached to the run. Script: frontend/scripts/ui-scan.js
+# Read-only on the site. Findings do not turn the run red (that emailed every week): they
+# go into one open `ui-scan` issue, updated each run and closed when a scan is clean, which
+# the daily live-check session picks up. The report and screenshots are attached to the run.
+# Red only when the scan itself crashes. Script: frontend/scripts/ui-scan.js
 on:
   schedule:
     - cron: "17 5 * * 1"
@@ -25,6 +27,7 @@ concurrency:
 
 permissions:
   contents: read
+  issues: write
 
 jobs:
   scan:
@@ -54,7 +57,32 @@ jobs:
         env:
           SCAN_SITE_URL: ${{ inputs.site_url || 'https://schooldecider.com' }}
           SCAN_API_URL: ${{ inputs.api_url || 'https://api.schooldecider.com' }}
-        run: npm run scan:ui
+        id: scan
+        # Exit 1 means findings (reported in the issue below); anything else is a crash.
+        run: |
+          set +e
+          npm run scan:ui
+          code=$?
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          [ "$code" -le 1 ]
+
+      - name: Issue
+        # The live site only: a scan of a branch's preview reports in its own run.
+        if: always() && steps.scan.outputs.code != '' && (inputs.site_url == '' || inputs.site_url == 'https://schooldecider.com')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CODE: ${{ steps.scan.outputs.code }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          number="$(gh issue list --repo "$GITHUB_REPOSITORY" --label ui-scan --state open --json number --jq '.[0].number // empty')"
+          if [ "$CODE" = 1 ]; then
+            { echo "The weekly phone-width scan ($RUN_URL) found the problems below. Fix each at its root (a site bug, a data error, or a check reading the page too narrowly); screenshots are attached to the run. This issue is updated by every scan and closes when one is clean."; echo; head -c 60000 ui-scan-report/report.md; } > body.md
+            if [ -n "$number" ]; then gh issue edit "$number" --repo "$GITHUB_REPOSITORY" --body-file body.md
+            else gh label create ui-scan --repo "$GITHUB_REPOSITORY" --color FBCA04 2>/dev/null || true
+              gh issue create --repo "$GITHUB_REPOSITORY" --label ui-scan --title "UI scan findings" --body-file body.md; fi
+          elif [ "$CODE" = 0 ] && [ -n "$number" ]; then
+            gh issue close "$number" --repo "$GITHUB_REPOSITORY" --comment "The scan $RUN_URL found nothing. Closing."
+          fi
 
       - name: Upload report
         if: always()

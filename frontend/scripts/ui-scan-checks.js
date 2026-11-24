@@ -123,13 +123,29 @@ export function findWrongLanguage(texts, lang, foreignStrings, otherLanguageText
     .map(text => ({ check: 'wrong-language', text }))
 }
 
+/**
+ * Every string the school's own data gives for `lang` (`attributes_i18n[lang]`): a
+ * programme the school calls "Cambridge" on its Bulgarian page is its name, not our label
+ * in the wrong language.
+ */
+export function schoolTexts(schoolPayload, lang) {
+  const out = new Set()
+  const walk = node => {
+    if (typeof node === 'string') out.add(node.trim())
+    else if (node && typeof node === 'object') Object.values(node).forEach(walk)
+  }
+  walk(schoolPayload?.attributes_i18n?.[lang])
+  return out
+}
+
 export function textFindings(texts, { lang, index, schoolPayload, otherLanguageTexts }) {
+  const ownTexts = schoolTexts(schoolPayload, lang)
   return [
     ...findRawKeys(texts, index.namespaces),
     ...findJunk(texts),
     ...findLev(texts),
     ...findImplausiblePrices(texts),
-    ...findWrongLanguage(texts, lang, index.foreignStrings, otherLanguageTexts),
+    ...findWrongLanguage(texts.filter(text => !ownTexts.has(text.trim())), lang, index.foreignStrings, otherLanguageTexts),
     ...(schoolPayload ? findMissingPrice(texts, schoolPayload) : []),
   ]
 }

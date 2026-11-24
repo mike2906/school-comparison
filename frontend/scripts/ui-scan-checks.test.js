@@ -10,6 +10,8 @@ import {
   findMissingPrice,
   findRawKeys,
   findWrongLanguage,
+  schoolTexts,
+  textFindings,
 } from './ui-scan-checks.js'
 
 const index = buildDictionaryIndex({
@@ -73,4 +75,13 @@ test('euroAmounts reads the non-breaking spaces Intl uses in bg-BG', () => {
 
 test('findWrongLanguage skips text the page marks as the other language', () => {
   assert.deepEqual(findWrongLanguage(['Такси'], 'en', index.foreignStrings, new Set(['Такси'])), [])
+})
+
+test('a school\'s own data in the page language is never the wrong language', () => {
+  const index = buildDictionaryIndex({ bg: { names: { cambridge: 'Кеймбридж' } }, en: { names: { cambridge: 'Cambridge' } } })
+  assert.equal(textFindings(['Cambridge'], { lang: 'bg', index, otherLanguageTexts: new Set() }).length, 1)
+  const payload = { attributes_i18n: { bg: { special_programs: ['Cambridge'] }, en: { special_programs: ['Cambridge'] } } }
+  const found = textFindings(['Cambridge'], { lang: 'bg', index, schoolPayload: payload, otherLanguageTexts: new Set() })
+  assert.deepEqual(found.filter(f => f.check === 'wrong-language'), [])
+  assert.deepEqual([...schoolTexts(payload, 'bg')], ['Cambridge'])
 })
