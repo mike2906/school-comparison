@@ -124,22 +124,26 @@ export function findWrongLanguage(texts, lang, foreignStrings, otherLanguageText
 }
 
 /**
- * Every string the school's own data gives for `lang` (`attributes_i18n[lang]`): a
- * programme the school calls "Cambridge" on its Bulgarian page is its name, not our label
- * in the wrong language.
+ * Names in the school's own data: strings its `attributes_i18n` gives the same in both
+ * languages. A programme called "Cambridge" on the Bulgarian page too is its name, not our
+ * label in the wrong language; English left untranslated in `bg` alone is still flagged.
  */
-export function schoolTexts(schoolPayload, lang) {
-  const out = new Set()
-  const walk = node => {
-    if (typeof node === 'string') out.add(node.trim())
-    else if (node && typeof node === 'object') Object.values(node).forEach(walk)
+export function schoolTexts(schoolPayload) {
+  const strings = node => {
+    const out = new Set()
+    const walk = value => {
+      if (typeof value === 'string') out.add(value.trim())
+      else if (value && typeof value === 'object') Object.values(value).forEach(walk)
+    }
+    walk(node)
+    return out
   }
-  walk(schoolPayload?.attributes_i18n?.[lang])
-  return out
+  const en = strings(schoolPayload?.attributes_i18n?.en)
+  return new Set([...strings(schoolPayload?.attributes_i18n?.bg)].filter(text => en.has(text)))
 }
 
 export function textFindings(texts, { lang, index, schoolPayload, otherLanguageTexts }) {
-  const ownTexts = schoolTexts(schoolPayload, lang)
+  const ownTexts = schoolTexts(schoolPayload)
   return [
     ...findRawKeys(texts, index.namespaces),
     ...findJunk(texts),

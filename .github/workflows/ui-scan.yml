@@ -67,16 +67,23 @@ jobs:
           [ "$code" -le 1 ]
 
       - name: Issue
-        # The live site only: a scan of a branch's preview reports in its own run.
-        if: always() && steps.scan.outputs.code != '' && (inputs.site_url == '' || inputs.site_url == 'https://schooldecider.com')
+        # The live site and API from main only: any other scan reports in its own run.
+        if: >-
+          always() && steps.scan.outputs.code != '' && github.ref == 'refs/heads/main' &&
+          (inputs.site_url == '' || inputs.site_url == 'https://schooldecider.com') &&
+          (inputs.api_url == '' || inputs.api_url == 'https://api.schooldecider.com')
         env:
           GH_TOKEN: ${{ github.token }}
           CODE: ${{ steps.scan.outputs.code }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           number="$(gh issue list --repo "$GITHUB_REPOSITORY" --label ui-scan --state open --json number --jq '.[0].number // empty')"
+          if [ "$CODE" = 1 ] && [ ! -f ui-scan-report/report.md ]; then
+            echo "::error title=UI scan::Exit 1 with no report: the scan crashed."; exit 1
+          fi
           if [ "$CODE" = 1 ]; then
-            { echo "The weekly phone-width scan ($RUN_URL) found the problems below. Fix each at its root (a site bug, a data error, or a check reading the page too narrowly); screenshots are attached to the run. This issue is updated by every scan and closes when one is clean."; echo; head -c 60000 ui-scan-report/report.md; } > body.md
+            { echo "The weekly phone-width scan ($RUN_URL) found the problems below. Fix each at its root (a site bug, a data error, or a check reading the page too narrowly); screenshots are attached to the run. This issue is updated by every scan and closes when one is clean."; echo; head -c 60000 ui-scan-report/report.md | iconv -f utf-8 -t utf-8 -c
+              [ "$(wc -c < ui-scan-report/report.md)" -le 60000 ] || printf '\n\n_Cut short: the full report is attached to the run._\n'; } > body.md
             if [ -n "$number" ]; then gh issue edit "$number" --repo "$GITHUB_REPOSITORY" --body-file body.md
             else gh label create ui-scan --repo "$GITHUB_REPOSITORY" --color FBCA04 2>/dev/null || true
               gh issue create --repo "$GITHUB_REPOSITORY" --label ui-scan --title "UI scan findings" --body-file body.md; fi

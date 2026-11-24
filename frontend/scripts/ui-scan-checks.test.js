@@ -83,5 +83,8 @@ test('a school\'s own data in the page language is never the wrong language', ()
   const payload = { attributes_i18n: { bg: { special_programs: ['Cambridge'] }, en: { special_programs: ['Cambridge'] } } }
   const found = textFindings(['Cambridge'], { lang: 'bg', index, schoolPayload: payload, otherLanguageTexts: new Set() })
   assert.deepEqual(found.filter(f => f.check === 'wrong-language'), [])
-  assert.deepEqual([...schoolTexts(payload, 'bg')], ['Cambridge'])
+  assert.deepEqual([...schoolTexts(payload)], ['Cambridge'])
+  // English left in the Bulgarian data only is still the wrong language.
+  const untranslated = { attributes_i18n: { bg: { special_programs: ['Cambridge'] }, en: { special_programs: ['Cambridge classes'] } } }
+  assert.equal(textFindings(['Cambridge'], { lang: 'bg', index, schoolPayload: untranslated, otherLanguageTexts: new Set() }).length, 1)
 })
