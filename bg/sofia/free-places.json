@@ -2,8 +2,8 @@
  "meta": {
   "source": "kg.sofia.bg",
   "source_url": "https://kg.sofia.bg/spots",
-  "retrieved_at": "2026-11-23T15:01:28+00:00",
-  "as_of": "2026-11-23",
+  "retrieved_at": "2026-11-24T15:05:43+00:00",
+  "as_of": "2026-11-24",
   "school_years": [
    "2026/2027",
    "2027/2028"
@@ -4069,8 +4069,8 @@
      "queues": {
       "general": {
        "capacity": 24,
-       "enrolled": 20,
-       "free": 4,
+       "enrolled": 19,
+       "free": 5,
        "ranked_not_enrolled": 0
       },
       "sop": {
@@ -4100,8 +4100,8 @@
      "queues": {
       "general": {
        "capacity": 20,
-       "enrolled": 20,
-       "free": 0,
+       "enrolled": 19,
+       "free": 1,
        "ranked_not_enrolled": 0
       },
       "chronic": {
@@ -5395,8 +5395,8 @@
      "groups": 1.0,
      "queues": {
       "general": {
-       "capacity": 25,
-       "enrolled": 24,
+       "capacity": 24,
+       "enrolled": 23,
        "free": 1,
        "ranked_not_enrolled": 0
       },
@@ -8447,12 +8447,18 @@
      "campaign": "2026/2027",
      "stage": "nursery",
      "age_group": "nursery",
-     "groups": 0.0,
+     "groups": 1.0,
      "queues": {
       "general": {
-       "capacity": 2,
+       "capacity": 22,
        "enrolled": 2,
-       "free": 0,
+       "free": 20,
+       "ranked_not_enrolled": 0
+      },
+      "chronic": {
+       "capacity": 2,
+       "enrolled": 0,
+       "free": 2,
        "ranked_not_enrolled": 0
       }
      }
@@ -8464,13 +8470,13 @@
      "campaign": "2026/2027",
      "stage": "nursery",
      "age_group": "nursery",
-     "groups": 1.0,
+     "groups": 2.0,
      "queues": {
       "general": {
        "capacity": 40,
        "enrolled": 28,
-       "free": 1,
-       "ranked_not_enrolled": 11
+       "free": 2,
+       "ranked_not_enrolled": 10
       }
      }
     },
@@ -8481,25 +8487,13 @@
      "campaign": "2026/2027",
      "stage": "kindergarten",
      "age_group": "first",
-     "groups": 2.0,
+     "groups": 1.0,
      "queues": {
       "general": {
-       "capacity": 50,
+       "capacity": 26,
        "enrolled": 26,
-       "free": 18,
+       "free": 0,
        "ranked_not_enrolled": 6
-      },
-      "chronic": {
-       "capacity": 2,
-       "enrolled": 0,
-       "free": 2,
-       "ranked_not_enrolled": 0
-      },
-      "sop": {
-       "capacity": 2,
-       "enrolled": 0,
-       "free": 2,
-       "ranked_not_enrolled": 0
       }
      }
     },
@@ -8889,8 +8883,8 @@
      "queues": {
       "general": {
        "capacity": 52,
-       "enrolled": 52,
-       "free": 0,
+       "enrolled": 51,
+       "free": 1,
        "ranked_not_enrolled": 0
       },
       "sop": {
@@ -14951,9 +14945,9 @@
       },
       "sop": {
        "capacity": 1,
-       "enrolled": 1,
+       "enrolled": 2,
        "free": 0,
-       "ranked_not_enrolled": 1
+       "ranked_not_enrolled": 0
       }
      }
     },
@@ -15865,8 +15859,8 @@
      "queues": {
       "general": {
        "capacity": 51,
-       "enrolled": 50,
-       "free": 1,
+       "enrolled": 49,
+       "free": 2,
        "ranked_not_enrolled": 0
       },
       "chronic": {
@@ -18300,8 +18294,8 @@
       "general": {
        "capacity": 80,
        "enrolled": 77,
-       "free": 1,
-       "ranked_not_enrolled": 2
+       "free": 3,
+       "ranked_not_enrolled": 0
       },
       "sop": {
        "capacity": 1,
@@ -18551,8 +18545,8 @@
      "queues": {
       "general": {
        "capacity": 34,
-       "enrolled": 31,
-       "free": 2,
+       "enrolled": 30,
+       "free": 3,
        "ranked_not_enrolled": 1
       }
      }
@@ -21761,8 +21755,8 @@
       "general": {
        "capacity": 14,
        "enrolled": 13,
-       "free": 0,
-       "ranked_not_enrolled": 1
+       "free": 1,
+       "ranked_not_enrolled": 0
       },
       "chronic": {
        "capacity": 2,
@@ -21783,9 +21777,9 @@
      "queues": {
       "general": {
        "capacity": 54,
-       "enrolled": 42,
+       "enrolled": 43,
        "free": 10,
-       "ranked_not_enrolled": 2
+       "ranked_not_enrolled": 1
       },
       "chronic": {
        "capacity": 2,
@@ -22328,8 +22322,8 @@
       "general": {
        "capacity": 50,
        "enrolled": 49,
-       "free": 0,
-       "ranked_not_enrolled": 1
+       "free": 1,
+       "ranked_not_enrolled": 0
       },
       "chronic": {
        "capacity": 2,
@@ -27948,8 +27942,8 @@
      "queues": {
       "general": {
        "capacity": 7,
-       "enrolled": 4,
-       "free": 3,
+       "enrolled": 3,
+       "free": 4,
        "ranked_not_enrolled": 0
       },
       "sop": {
@@ -28875,9 +28869,9 @@
      "queues": {
       "general": {
        "capacity": 13,
-       "enrolled": 3,
+       "enrolled": 4,
        "free": 8,
-       "ranked_not_enrolled": 2
+       "ranked_not_enrolled": 1
       }
      }
     },
@@ -29218,7 +29212,7 @@
      "queues": {
       "general": {
        "capacity": 25,
-       "enrolled": 25,
+       "enrolled": 26,
        "free": 0,
        "ranked_not_enrolled": 0
       },
@@ -29653,8 +29647,8 @@
       "general": {
        "capacity": 15,
        "enrolled": 14,
-       "free": 0,
-       "ranked_not_enrolled": 1
+       "free": 1,
+       "ranked_not_enrolled": 0
       }
      }
     },
@@ -29943,8 +29937,8 @@
      "queues": {
       "general": {
        "capacity": 23,
-       "enrolled": 22,
-       "free": 1,
+       "enrolled": 21,
+       "free": 2,
        "ranked_not_enrolled": 0
       },
       "sop": {
@@ -29997,8 +29991,8 @@
      "queues": {
       "general": {
        "capacity": 22,
-       "enrolled": 22,
-       "free": 0,
+       "enrolled": 21,
+       "free": 1,
        "ranked_not_enrolled": 0
       }
      }
@@ -30014,9 +30008,9 @@
      "queues": {
       "general": {
        "capacity": 25,
-       "enrolled": 20,
+       "enrolled": 21,
        "free": 4,
-       "ranked_not_enrolled": 1
+       "ranked_not_enrolled": 0
       },
       "chronic": {
        "capacity": 1,
@@ -31107,8 +31101,8 @@
       "general": {
        "capacity": 66,
        "enrolled": 63,
-       "free": 1,
-       "ranked_not_enrolled": 2
+       "free": 2,
+       "ranked_not_enrolled": 1
       }
      }
     },
@@ -32924,9 +32918,9 @@
      "queues": {
       "general": {
        "capacity": 44,
-       "enrolled": 43,
+       "enrolled": 44,
        "free": 0,
-       "ranked_not_enrolled": 1
+       "ranked_not_enrolled": 0
       }
      }
     },
@@ -34966,8 +34960,8 @@
      "queues": {
       "general": {
        "capacity": 24,
-       "enrolled": 24,
-       "free": 0,
+       "enrolled": 23,
+       "free": 1,
        "ranked_not_enrolled": 0
       },
       "chronic": {
@@ -37314,6 +37308,140 @@
    ]
   },
   {
+   "source_id": "736",
+   "family": "kindergarten",
+   "name": "ДГ №5 Надежда (с яслени групи)",
+   "district": "Връбница",
+   "groups": [
+    {
+     "group_id": 9645,
+     "label": "1-ва ясла, родени 2025 г.",
+     "birth_year": 2025,
+     "campaign": "2026/2027",
+     "stage": "nursery",
+     "age_group": "nursery",
+     "groups": 0.0,
+     "queues": {
+      "general": {
+       "capacity": 40,
+       "enrolled": 0,
+       "free": 40,
+       "ranked_not_enrolled": 0
+      },
+      "chronic": {
+       "capacity": 4,
+       "enrolled": 0,
+       "free": 4,
+       "ranked_not_enrolled": 0
+      }
+     }
+    },
+    {
+     "group_id": 9646,
+     "label": "2-ра ясла, родени 2024 г.",
+     "birth_year": 2024,
+     "campaign": "2026/2027",
+     "stage": "nursery",
+     "age_group": "nursery",
+     "groups": 0.0,
+     "queues": {
+      "general": {
+       "capacity": 40,
+       "enrolled": 0,
+       "free": 40,
+       "ranked_not_enrolled": 0
+      },
+      "chronic": {
+       "capacity": 4,
+       "enrolled": 0,
+       "free": 4,
+       "ranked_not_enrolled": 0
+      }
+     }
+    },
+    {
+     "group_id": 9644,
+     "label": "1-ва група, родени 2023 г.",
+     "birth_year": 2023,
+     "campaign": "2026/2027",
+     "stage": "kindergarten",
+     "age_group": "first",
+     "groups": 0.0,
+     "queues": {
+      "general": {
+       "capacity": 40,
+       "enrolled": 39,
+       "free": 1,
+       "ranked_not_enrolled": 0
+      },
+      "chronic": {
+       "capacity": 2,
+       "enrolled": 0,
+       "free": 2,
+       "ranked_not_enrolled": 0
+      },
+      "sop": {
+       "capacity": 1,
+       "enrolled": 0,
+       "free": 1,
+       "ranked_not_enrolled": 0
+      }
+     }
+    },
+    {
+     "group_id": 9647,
+     "label": "2-ра група, родени 2022 г.",
+     "birth_year": 2022,
+     "campaign": "2026/2027",
+     "stage": "kindergarten",
+     "age_group": "second",
+     "groups": 0.0,
+     "queues": {
+      "general": {
+       "capacity": 20,
+       "enrolled": 34,
+       "free": 0,
+       "ranked_not_enrolled": 0
+      }
+     }
+    },
+    {
+     "group_id": 9648,
+     "label": "3-та група, родени 2021 г.",
+     "birth_year": 2021,
+     "campaign": "2026/2027",
+     "stage": "kindergarten",
+     "age_group": "third",
+     "groups": 0.0,
+     "queues": {
+      "general": {
+       "capacity": 21,
+       "enrolled": 33,
+       "free": 0,
+       "ranked_not_enrolled": 0
+      }
+     }
+    },
+    {
+     "group_id": 9649,
+     "label": "Подготвителна група, родени 2020 г.",
+     "birth_year": 2020,
+     "campaign": "2026/2027",
+     "stage": "kindergarten",
+     "age_group": "preschool",
+     "groups": 0.0,
+     "queues": {
+      "general": {
+       "capacity": 3,
+       "enrolled": 21,
+       "free": 0,
+       "ranked_not_enrolled": 0
+      }
+     }
+    }
+   ]
+  },
+  {
    "source_id": "366",
    "family": "preparatory",
    "name": "5. ОУ \"Иван Вазов\" (целодневна организация)",
@@ -38100,8 +38228,8 @@
      "queues": {
       "general": {
        "capacity": 71,
-       "enrolled": 68,
-       "free": 3,
+       "enrolled": 64,
+       "free": 7,
        "ranked_not_enrolled": 0
       },
       "sop": {
@@ -39149,9 +39277,9 @@
      "groups": 0.5,
      "queues": {
       "general": {
-       "capacity": 13,
+       "capacity": 14,
        "enrolled": 13,
-       "free": 0,
+       "free": 1,
        "ranked_not_enrolled": 0
       }
      }
